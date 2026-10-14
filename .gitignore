@@ -34,3 +34,6 @@
 **/build-*/
 **/.venv/
 /experiments/qwen-image21-sage/baselines/*/sd-server
+# Rust service and local credentials, SQLite journals and generated media.
+/target/
+/.imagine/

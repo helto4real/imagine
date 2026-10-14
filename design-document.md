@@ -1,6 +1,6 @@
 # Image and Video Generation Backend
 
-Status: Qwen Image 2.1 1600×896 baseline frozen; Rust API and H3 execution pending
+Status: native baseline and Rust API v1 frozen; Qwen API implemented; H3 execution pending
 Updated: 2026-10-14
 
 Publication note: see [README.md](README.md) for restoration/build instructions.
@@ -18,9 +18,27 @@ Build a standalone image and video generation backend without a ComfyUI dependen
 
 The backend and public API will be written in Rust. The first inference engine will be **stable-diffusion.cpp**, running as a separate C/C++ process. The initial model targets are **Qwen Image 2.1** and **MiniMax H3**.
 
-Python remains acceptable for a future inference implementation if measurements or missing capabilities justify it. It is not a dependency of the proposed first inference path.
+Python remains acceptable for a future inference implementation if measurements or missing capabilities justify it. It is not a dependency of the first inference path.
 
-The inference source checkout and local build setup are described below. Qwen Image 2.1 text-to-image now has a frozen native server baseline, measured headless ComfyUI/Kitchen comparisons and validated memory optimizations. The Rust backend, H3 execution and editing validation remain pending.
+The inference source checkout and local build setup are described below. Qwen Image 2.1 text-to-image now has a frozen native server baseline, measured headless ComfyUI/Kitchen comparisons and validated memory optimizations. The Rust API now implements Qwen generation/editing and worker lifecycle. H3 execution remains pending.
+
+## Accepted API baseline — 2026-10-14
+
+**`imagine-api-v1` is accepted and implemented.** The authoritative contract is
+[API-BASELINE.md](docs/API-BASELINE.md), with startup instructions, endpoints,
+request/default schemas, access control, queue/restart semantics and unload.
+Start the service with `./start-server.sh`. See [local validation](docs/API-VALIDATION.md).
+
+The first implementation uses Axum/Tokio, SQLite, owned media assets and one
+persistent native server. It supports Qwen text-to-image and image editing at
+1600×896, ordered lists of up to ten reference images, per-image reference resize
+metadata (default 1 MP), job polling/SSE, cancellation, and administrative full
+unload/resume. Only one reference has local image-quality evidence. H3 appears
+as unavailable metadata, with video contracts reserved for later validation.
+
+The native frozen settings are unchanged. Native defaults, the measured
+resolution-specific profile, and the stable public API remain separate. The
+API does not expose unvalidated native flags or accept arbitrary filesystem paths.
 
 ## Current accepted baseline — 2026-10-14
 
@@ -69,8 +87,8 @@ The launcher defaults to dry-run. `--serve` runs on loopback port 1234
 repeats in its own server, verifies the native reference and saves timings and
 images under a fresh `runs/*-resident-*` directory, then stops the server.
 `QWEN_MODEL_ROOT` relocates the same model files; seed overrides are rejected for
-this fixed reference. API clients may supply prompts to the resident server,
-but request validation for the profile is still the future Rust adapter's job.
+this fixed reference. The Rust API applies profile validation; clients should use it rather than
+bypass validation through the native server.
 
 The frozen executable is copied under
 `experiments/qwen-image21-sage/baselines/1600x896-v1/`, separate from the build
@@ -101,7 +119,7 @@ not an instruction to continue optimizing after this freeze.
 
 ## Initial scope boundaries
 
-The first version focuses on Qwen Image 2.1 image generation/editing and MiniMax H3 video/audio generation. Exact checkpoints, LoRAs, and supported operating limits will be selected through experiments. It will not attempt to reproduce ComfyUI's graph editor, execute arbitrary ComfyUI workflows, or provide compatibility with arbitrary custom nodes.
+The implemented first slice covers Qwen Image 2.1 image generation/editing with the frozen checkpoint and 1600×896 profile. MiniMax H3 video/audio remains a planned target, advertised as unavailable until separately validated. LoRAs and wider operating limits require further acceptance. It will not attempt to reproduce ComfyUI's graph editor, execute arbitrary ComfyUI workflows, or provide compatibility with arbitrary custom nodes.
 
 A pure Rust inference engine is not required. Multi-GPU scheduling, distributed workers, and a general-purpose plugin platform are outside the initial scope.
 
@@ -132,7 +150,7 @@ The Rust service owns the public API and job lifecycle:
 - Worker startup, supervision, and recovery.
 - Scheduling GPU use and managing model residency through worker lifecycle operations.
 
-SQLite is the proposed initial store for jobs and metadata. Images and videos are stored as files referenced by asset identifiers.
+SQLite stores jobs and metadata. Images are stored as files referenced by owned asset identifiers; the same boundary is planned for video.
 
 The service runs independently of the UI. Closing the dedicated application does not stop the service or interrupt jobs submitted by other clients.
 
@@ -140,7 +158,7 @@ The service runs independently of the UI. Closing the dedicated application does
 
 Start with one long-lived worker for one GPU and one active generation job at a time. Keeping the worker alive allows model components to remain loaded between jobs.
 
-Use `sd-cli` for the initial reproducible model experiments. Once the model paths are validated, use a supervised `sd-server` process for warm execution behind Rust.
+The historical experiments used `sd-cli` and `sd-server`. The implemented Rust service supervises the frozen `sd-server` for warm execution.
 
 The engine owns model execution:
 
@@ -248,34 +266,22 @@ The API exposes generation jobs rather than inference-engine internals.
 | `POST /v1/jobs/{id}/cancel` | Request cancellation. |
 | `GET /v1/assets/{id}` | Retrieve an input or generated asset. |
 
-Example request:
+The accepted request contract is in [API-BASELINE.md](docs/API-BASELINE.md).
+It uses typed common fields (`sampling`, `inputs`, `output`) and a validated
+`model_options.qwen_image_2_1` namespace, including
+`reference_max_pixels_per_image`. `client_metadata` is passive client data.
+Unknown and unsupported fields are rejected. Inputs reference owned asset IDs.
+Resolved seeds, defaults, preprocessing dimensions and profile revision are
+persisted with each job. GET model metadata does not load weights.
 
-```json
-{
-  "operation": "text_to_image",
-  "model": "my-image-model",
-  "prompt": "A lighthouse in a winter storm",
-  "width": 1024,
-  "height": 1024,
-  "seed": 12345,
-  "parameters": {
-    "steps": 28,
-    "guidance": 4.0
-  }
-}
-```
-
-This request is illustrative. Parameter names and operation-specific fields need to be finalized against the first supported model.
-
-Common fields remain stable across implementations. Model-specific parameters are validated against the selected model's declared schema. Unsupported options must produce actionable errors rather than being silently ignored.
-
-Reference inputs use asset identifiers. Clients cannot supply arbitrary worker filesystem paths.
-
-The backend records the effective generation settings, including a resolved seed when one was omitted and the selected model configuration. Matching settings do not guarantee identical output across different inference engines or versions.
+The implementation additionally provides `GET /v1/models/{id}`,
+`GET /v1/runtime`, `POST /v1/runtime/unload`, `POST /v1/runtime/resume`, and
+`GET /v1/operations/{id}`. Unload/resume are admin operations with persisted
+scheduler pause and confirmed native process exit.
 
 ## Job lifecycle
 
-Proposed states are `queued`, `running`, `cancelling`, `succeeded`, `failed`, and `cancelled`. Use `interrupted` when a crash prevents completion and normal cancellation cannot be confirmed.
+Implemented states are `queued`, `running`, `cancelling`, `succeeded`, `failed`, and `cancelled`. Use `interrupted` when a crash prevents completion and normal cancellation cannot be confirmed.
 
 Persist accepted jobs before acknowledging them. Dispatch one job at a time to the worker. Execution phases such as model loading, prompt encoding, sampling, and decoding are progress details within a running job.
 
@@ -283,9 +289,9 @@ Progress events may include a phase and step counts where meaningful. Do not fab
 
 The inspected sd-server supports cancellation of queued jobs but returns HTTP 409 for a job that is already generating. Do not advertise cooperative in-flight cancellation for this engine revision.
 
-Rust can remove a job from its own queue immediately. For an active job, the proposed first implementation terminates the dedicated inference process, confirms exit, discards partial results, and recreates the process when needed. Keep the job in `cancelling` until termination is confirmed; only then mark it `cancelled`. A spontaneous process failure produces `failed` or `interrupted`, not a successful cancellation. Process termination discards loaded models and its recovery cost must be measured.
+Rust can remove a job from its own queue immediately. For an active job, the first implementation terminates the dedicated inference process, confirms exit, discards partial results, and recreates the process when needed. Keep the job in `cancelling` until termination is confirmed; only then mark it `cancelled`. A spontaneous process failure produces `failed` or `interrupted`, not a successful cancellation. Process termination discards loaded models and its recovery cost must be measured.
 
-After a server restart, previously active jobs are marked interrupted rather than silently regenerated. Queued jobs remain persisted. The exact queue-resume policy remains an open decision.
+After a server restart, previously active jobs are marked interrupted rather than silently regenerated. Queued jobs remain persisted. The persisted pause state governs restart: unpaused queued work continues, while paused work requires an explicit resume. Active work is never automatically replayed.
 
 ## Internal engine integration
 
@@ -339,7 +345,7 @@ Sources: [engine controls](https://github.com/leejet/stable-diffusion.cpp/blob/d
 
 Keep models warm when useful. When switching profiles or yielding the GPU to another service, stop the engine and confirm exit before proceeding. The integration with any existing external GPU coordinator must be decided separately; the server cannot assume that unrelated applications respect its internal queue.
 
-Job-specific LoRAs and settings must not leak into subsequent requests. Qwen's within-generation prefix cache is an experiment candidate; it is distinct from caching user inputs across jobs. Initially, avoid cross-job caches of prompt embeddings or other input-derived tensors; add them only when their ownership and invalidation rules are defined.
+Job-specific settings must not leak into subsequent requests; LoRAs are unavailable in API v1. The accepted profile includes Qwen within-generation prefix caching and the native conditioning cache (capacity four), keyed by conditioning inputs and retained only in process-local CPU RAM. Unload destroys the cache. The Rust service does not persist prompt tensors.
 
 Memory or worker failures must leave the next job with a known usable state. Restarting the worker is the recovery fallback when cleanup cannot be confirmed.
 
@@ -351,9 +357,21 @@ SQLite stores references and metadata rather than image or video blobs. Complete
 
 Package a reproducible stable-diffusion.cpp binary alongside the Rust service. Record the upstream revision, build flags, ggml revision, GPU backend/toolchain, driver, and optional media support. No Python environment is required for this initial runtime. A future Python adapter would need its own pinned environment.
 
-Propose local-only binding initially. Authentication, network exposure, storage retention, and cleanup policy need explicit decisions before broader use. Prompts and media should not be included in routine diagnostic logs.
+API v1 binds to loopback, requires client/admin bearer tokens and stores local data under an ignored private directory. Automatic retention/cleanup and remote deployment remain outside this slice. Prompts and media are excluded from routine diagnostic logs. See the accepted API contract for exact storage and access behavior.
 
 ## Application and Dreamchat integration
+
+The first native Rust client is implemented under `ui/`, launched with
+`./start-ui.sh`. It follows Helto, uses the public API and its defaults, supports
+ordered reference uploads, and automatically saves completed images to a
+user-selected folder persisted in local preferences. Its English UI now exposes
+steps, CFG, random-per-job or fixed seed, AIO preset ratios and max side (pixels).
+These settings, negative prompt and the hover-reveal privacy toggle persist
+between restarts. The API accepts aligned dimensions beyond the default
+1600×896; only that default has the frozen native validation evidence. See
+[UI.md](docs/UI.md) for rounding, limits and validation scope.
+Dreamchat integration remains a separate step.
+
 
 Both clients use the same API and discover capabilities from the backend. The dedicated application can expose more controls, while Dreamchat can submit a smaller set of supported requests.
 
@@ -361,16 +379,16 @@ Clients own their presentation and product workflows. The backend owns generatio
 
 ## Delivery sequence
 
-1. **Qwen Image 2.1 CLI experiments:** establish image generation/editing quality and memory baselines, then evaluate individual optimizations.
-2. **MiniMax H3 CLI experiments:** establish joint video/audio and conditioning baselines, then measure scaling and memory profiles.
-3. **Thin Rust integration:** supervise sd-server, translate native requests, and implement the public job/asset lifecycle, progress, cancellation fallback, model switching, and recovery.
-4. **Client integration:** connect the dedicated application and Dreamchat through the stable API using only validated model capabilities.
+1. **Qwen native baseline and editing:** completed; preserve the frozen control and experiment decisions.
+2. **Thin Rust integration:** implemented and validated for Qwen, with persistent jobs/assets, model metadata, progress, cancellation, full unload/resume and recovery.
+3. **Client integration:** connect the dedicated application and Dreamchat through API v1.
+4. **MiniMax H3:** separately validate native video/audio, conditioning, memory and its API adapter before enabling execution. Model switching is deferred until a second profile is validated.
 
-Only expand model support after the initial adapters and lifecycle have been validated.
+Only expand model support after the corresponding adapter and lifecycle have been validated.
 
 ## Experiment plan
 
-The first Qwen text-to-image smoke test has been executed and is recorded below. The broader comparison, editing, H3, and Rust integration experiments remain planned. Source/build preparation is separate from model execution.
+The historical Qwen experiments are recorded below. The accepted native/API baselines above supersede their old proposed next steps. Qwen comparison, editing and Rust integration have now been exercised; H3 remains planned. Source/build preparation is separate from model execution.
 
 ### Local source and build setup
 

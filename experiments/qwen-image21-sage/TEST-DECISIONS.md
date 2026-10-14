@@ -49,6 +49,8 @@ baseline launcher/checker no longer depends on those removed artifacts.
 | Source-matched attention chain | Compared projections, Q/K norm/RoPE, prefix concatenation, attention and output. Native Sage and Kitchen use different precision/quantization; Kitchen also performs output-layout work. Motivated reduced traffic and BF16 investigation, not an unsupported claim of identical kernels. | [ATTENTION-CHAIN](profiling/ATTENTION-CHAIN.md) |
 | Refreshed Comfy comparison after fusions | Native/Comfy had different remaining memory/precision/fusion paths; fresh-process and cached timings must not be mixed. Later resident comparison supersedes these as the main end-to-end reference. | [COMFY-CURRENT](profiling/COMFY-CURRENT.md) |
 | Persistent runtime plus conditioning cache | Accepted. Last matched warm comparison: native 40.216 s mean / 39.384 median versus Comfy 38.814 / 38.708 s. Both skip warm text encoding. Native includes HTTP/polling/PNG transport; Comfy headless does not. References differ across engines. | [RESIDENT-COMPARISON](profiling/RESIDENT-COMPARISON.md) |
+| Portrait followed by a single-reference environment edit | Completed with the unchanged frozen executable/flags. Very strong visual likeness in this one pair; 40.569 s portrait and 138.934 s edit to saved PNG. Actual VAE/vision reference encoding verified. Edit used 34 diffusion segments and larger BF16 prefix caches. This is a smoke test, not a new frozen editing baseline or universal quality guarantee. | [REFERENCE-EDIT](profiling/REFERENCE-EDIT.md) |
+| Same edit with a 1 MP reference budget | Native `vae_input_max_pixels=1000000` produced 1344×736 reference encoding. Portrait/reference input hashes and all other settings matched. Edit fell from 138.934 to 47.401 s; 79/80 forwards used one segment, with smaller BF16 prefix caches. Very strong visual likeness remained in this pair; different output pixels. Single-run follow-up, not a universal quality or timing guarantee; frozen baseline unchanged. | [REFERENCE-EDIT follow-up](profiling/REFERENCE-EDIT.md#follow-up-1-megapixel-reference-budget) |
 
 ## Accepted diffusion and memory-planning choices
 
@@ -126,8 +128,10 @@ these failures or extrapolate saved reference-pixel identity to all shapes.
 - **Next VAE bottleneck:** `decoder.upsamples.2.upsamples.3.resample.1`, 800×448,
   576→576, now creates the arena-ending im2col. Stripping it was proposed but
   has not been implemented/tested. Freezing v1 supersedes that automatic next step.
-- **MiniMax H3, alternative quantizations, LoRAs/editing, other resolutions and
-  GPUs:** research or future compatibility work, not measured by this baseline.
+- **MiniMax H3, alternative quantizations, LoRAs, broader editing scenarios,
+  other resolutions and GPUs:** research or future compatibility work. The
+  single-reference portrait-to-environment smoke test above is the only editing
+  case measured so far; it does not validate these other workloads.
 - Public RTX 4070 and AMD reports used different weights/backends/conditions.
   They motivated local profiling; they are not proof of our precise bottleneck.
 

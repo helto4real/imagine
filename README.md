@@ -1,13 +1,79 @@
 # Imagine
 
-Experiments toward a local image/video generation backend with a Rust API and
-no ComfyUI runtime dependency. The current implementation is a patched native
-**stable-diffusion.cpp** engine, build tooling and Qwen Image 2.1 benchmarks.
-The Rust service and MiniMax H3 support are design work, not implemented features.
+A local image/video generation backend with a Rust API and no ComfyUI runtime
+dependency. The Rust service runs Qwen Image 2.1 through our frozen, optimized
+**stable-diffusion.cpp** engine. MiniMax H3 is declared but not enabled yet.
 
 Start with [the design](design-document.md), the
 [frozen 1600×896 profile](experiments/qwen-image21-sage/BASELINE.md) and the
 [experiment decision register](experiments/qwen-image21-sage/TEST-DECISIONS.md).
+
+## Start the API
+
+On this configured machine:
+
+```sh
+./start-server.sh
+```
+
+This incrementally builds the Rust release server and starts it at
+`http://127.0.0.1:8080`. It loads the native engine only when a job runs.
+Ctrl-C stops the server and its worker. Optional arguments:
+`--bind 127.0.0.1:8081 --data /private/path/imagine-data`.
+
+First start creates `.imagine/access.json` with a client token and a separate
+admin token. Local credentials, jobs and media are ignored by Git. Use Rust/Cargo
+and the frozen native executable/model files described below. A fresh clone must
+restore the frozen binary; the API does not substitute a different build.
+
+With `curl` and `jq`, from the project root:
+
+```sh
+TOKEN=$(jq -r '.clients.local' .imagine/access.json)
+curl -sS -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8080/v1/models
+curl -sS -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -H 'Idempotency-Key: first-lighthouse' \
+  -d '{"model":"qwen-image-2.1-int8","operation":"text_to_image","prompt":"A lighthouse on a rocky coast at sunrise, realistic photography","seed":42}' \
+  http://127.0.0.1:8080/v1/jobs
+```
+
+Follow the returned `status_url` or `events_url` with the same bearer token.
+When `status` is `succeeded`, download `/v1/assets/{id}` using the ID in
+`output.assets[0].id`. Defaults are 1600×896, 40 ER-SDE/beta steps, CFG 2.5 and PNG.
+Editing accepts ordered reference asset IDs, with a default 1 MP resize target
+per image. Other resolutions and H3 execution are deliberately unavailable in v1.
+
+To release all model VRAM owned by this service and pause the queue:
+
+```sh
+ADMIN=$(jq -r '.admin_token' .imagine/access.json)
+curl -sS -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
+  -d '{"active_job":"wait"}' http://127.0.0.1:8080/v1/runtime/unload
+# Follow the returned operation status URL; then resume when wanted:
+curl -sS -X POST -H "Authorization: Bearer $ADMIN" http://127.0.0.1:8080/v1/runtime/resume
+```
+
+Use `active_job:"cancel"` to stop an active generation immediately. Read the
+[frozen API contract](docs/API-BASELINE.md) for ownership, reference limits,
+restart behavior, schema and examples. [Validation](docs/API-VALIDATION.md)
+separates simulated lifecycle tests from real native/GPU checks.
+
+## Desktop UI
+
+With the API running in another terminal:
+
+```sh
+./start-ui.sh
+```
+
+The native Rust app uses the Helto design system. Enter a prompt, optionally
+upload and reorder reference images, choose **Spara i → Välj mapp**, then
+**Generera**. It uses the API's standard settings and saves each PNG under a
+unique filename in your chosen folder. The folder choice persists across starts.
+
+Default output: `.imagine/images`; preferences: `.imagine/ui-settings.json`.
+The app reads the local client token from `.imagine/access.json`.
+See [UI setup and behavior](docs/UI.md) for custom API paths and recovery.
 
 ## Build the native engine
 
