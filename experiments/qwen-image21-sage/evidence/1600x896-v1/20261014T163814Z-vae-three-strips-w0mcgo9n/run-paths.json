@@ -1,0 +1,6 @@
+{
+  "control_A": "experiments/qwen-image21-sage/runs/20261014T163814Z-resident-ag81fgw5",
+  "combined_A": "experiments/qwen-image21-sage/runs/20261014T164016Z-resident-o941bspn",
+  "combined_B": "experiments/qwen-image21-sage/runs/20261014T164218Z-resident-klvpm_vd",
+  "control_B": "experiments/qwen-image21-sage/runs/20261014T164423Z-resident-m8vi3_gu"
+}

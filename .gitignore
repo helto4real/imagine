@@ -1,0 +1,36 @@
+# Local engine checkout; its pinned base and complete changes live in native/.
+/stable-diffusion.cpp/
+# Personal tool settings and external/local data.
+/.agents/
+/.codex/
+/.aws/
+/comfyui/
+/models/
+.env
+.env.*
+!.env.example
+**/local-settings.json
+# Generated inference, profiling and build artifacts.
+**/runs/
+**/__pycache__/
+*.py[cod]
+*.log
+*.nsys-rep
+*.sqlite
+*.safetensors
+*.gguf
+*.pt
+*.pth
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.mp4
+*.webm
+*.so
+*.o
+*.a
+**/build/
+**/build-*/
+**/.venv/
+/experiments/qwen-image21-sage/baselines/*/sd-server

@@ -1,0 +1,185 @@
+{
+  "all_12_images_bitidentical": true,
+  "decoded_pixel_reference": [
+    "RGBA",
+    [
+      1600,
+      896
+    ],
+    "473bfa4ab0c2230258a168afbe07523bd6bc7d81a4a2daf458500b6df036132d"
+  ],
+  "rgb_sha256": "c672ca9049d2826d3c713c3ead1f41edaca4498e201b0249663341f6cbd7db1c",
+  "all_images_untiled": true,
+  "accepted_flags_unchanged": true,
+  "vae_graph_mib": {
+    "control": 8663.87,
+    "combined": 8073.24
+  },
+  "retention": "off",
+  "series": {
+    "control_A": {
+      "images": 3,
+      "whole_gpu_sampled_peak_mib": 15289.0,
+      "sources_unchanged": true,
+      "binary_hash_verified": true,
+      "request_memory_evidence": [
+        {
+          "index": 0,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 6920.55,
+              "tensors": 457,
+              "blocks": 7
+            }
+          ],
+          "retained_workspace_events_mib": []
+        },
+        {
+          "index": 1,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 2946.44,
+              "tensors": 199,
+              "blocks": 3
+            }
+          ],
+          "retained_workspace_events_mib": []
+        },
+        {
+          "index": 2,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 2946.44,
+              "tensors": 199,
+              "blocks": 3
+            }
+          ],
+          "retained_workspace_events_mib": []
+        }
+      ]
+    },
+    "combined_A": {
+      "images": 3,
+      "whole_gpu_sampled_peak_mib": 14744.0,
+      "sources_unchanged": true,
+      "binary_hash_verified": true,
+      "request_memory_evidence": [
+        {
+          "index": 0,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 6920.55,
+              "tensors": 457,
+              "blocks": 7
+            }
+          ],
+          "retained_workspace_events_mib": []
+        },
+        {
+          "index": 1,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 2946.44,
+              "tensors": 199,
+              "blocks": 3
+            }
+          ],
+          "retained_workspace_events_mib": []
+        },
+        {
+          "index": 2,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 2946.44,
+              "tensors": 199,
+              "blocks": 3
+            }
+          ],
+          "retained_workspace_events_mib": []
+        }
+      ]
+    },
+    "combined_B": {
+      "images": 3,
+      "whole_gpu_sampled_peak_mib": 14761.0,
+      "sources_unchanged": true,
+      "binary_hash_verified": true,
+      "request_memory_evidence": [
+        {
+          "index": 0,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 6920.55,
+              "tensors": 457,
+              "blocks": 7
+            }
+          ],
+          "retained_workspace_events_mib": []
+        },
+        {
+          "index": 1,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 2946.44,
+              "tensors": 199,
+              "blocks": 3
+            }
+          ],
+          "retained_workspace_events_mib": []
+        },
+        {
+          "index": 2,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 2946.44,
+              "tensors": 199,
+              "blocks": 3
+            }
+          ],
+          "retained_workspace_events_mib": []
+        }
+      ]
+    },
+    "control_B": {
+      "images": 3,
+      "whole_gpu_sampled_peak_mib": 15334.0,
+      "sources_unchanged": true,
+      "binary_hash_verified": true,
+      "request_memory_evidence": [
+        {
+          "index": 0,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 6920.55,
+              "tensors": 457,
+              "blocks": 7
+            }
+          ],
+          "retained_workspace_events_mib": []
+        },
+        {
+          "index": 1,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 2946.44,
+              "tensors": 199,
+              "blocks": 3
+            }
+          ],
+          "retained_workspace_events_mib": []
+        },
+        {
+          "index": 2,
+          "prepared_gpu_parameter_groups": [
+            {
+              "mib": 2946.44,
+              "tensors": 199,
+              "blocks": 3
+            }
+          ],
+          "retained_workspace_events_mib": []
+        }
+      ]
+    }
+  }
+}

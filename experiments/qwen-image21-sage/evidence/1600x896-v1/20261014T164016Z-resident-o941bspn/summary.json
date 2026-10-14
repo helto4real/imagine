@@ -1,0 +1,28 @@
+{
+  "native": {
+    "sampling_seconds": {
+      "mean": 37.095,
+      "median": 37.095,
+      "min": 37.07,
+      "max": 37.12
+    },
+    "conditioning_seconds": {
+      "mean": 0.0,
+      "median": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "vae_seconds": {
+      "mean": 1.725,
+      "median": 1.725,
+      "min": 1.66,
+      "max": 1.79
+    },
+    "saved_seconds": {
+      "mean": 39.07465421705274,
+      "median": 39.07465421705274,
+      "min": 38.98582488007378,
+      "max": 39.1634835540317
+    }
+  }
+}

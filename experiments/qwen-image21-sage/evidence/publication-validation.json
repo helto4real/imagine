@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-14",
+  "scope": "Public repository packaging and cleanup; no native inference changes",
+  "cleanup": {
+    "removed_files": 9472,
+    "removed_bytes": 19513033675,
+    "retained": "Independent frozen executable, current native checkout/build, reports, accepted compact evidence and exact CUTLASS header snapshot"
+  },
+  "checks": {
+    "fresh_native_restore": "Passed using local upstream Git objects and the actual setup script; exact revisions and all 29 recorded source hashes matched",
+    "cutlass_headers": "822 of 822 archived header checksums matched",
+    "frozen_launcher": "Passed offline: binary/config hashes, accepted command/flags/prompts/request, override isolation, serve/replay dispatch and replay preparation",
+    "syntax": "70 Python files parsed, preserved JSON parsed, build and run shell syntax passed",
+    "publication_inventory": "Staged files inspected for binary/model/log artifacts, Git links, personal filesystem roots and common credential patterns; none found",
+    "whitespace": "Project files checked; immutable third-party headers and patch payloads retain original whitespace"
+  },
+  "not_run": [
+    "CUDA rebuild",
+    "GPU inference",
+    "ComfyUI execution"
+  ],
+  "baseline_binary_sha256": "4e33830f7eba36573cba9785249641ae8c727be5e6a506e9c7ef0ee74beea2e3"
+}

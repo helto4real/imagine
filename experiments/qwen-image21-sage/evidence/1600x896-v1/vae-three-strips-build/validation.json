@@ -1,0 +1,19 @@
+{
+  "arena_mib": {
+    "control": 8663.867432,
+    "combined": 8073.242432
+  },
+  "arena_saving_mib": 590.625,
+  "separate_pool_growth_mib": 394,
+  "current_block_production_bytes_identical": 825753600,
+  "retained_input_unchanged": true,
+  "normal_and_instrumented_graphs_match": true,
+  "only_instrumented_archive_member": [
+    "ggml-alloc.c.o"
+  ],
+  "native_sources_unchanged": true,
+  "reused_artifact_hashes_verified": true,
+  "small_shape_identity_not_general": true,
+  "full_graph_numerical_identity_not_established_by_metadata": true,
+  "image_memory_gate_passed": true
+}

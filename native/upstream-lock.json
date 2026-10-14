@@ -1,0 +1,14 @@
+{
+  "stable-diffusion.cpp": {
+    "url": "https://github.com/leejet/stable-diffusion.cpp.git",
+    "commit": "d637cfb935feb2254898a8f1524046c958f3df80",
+    "patch": "native/patches/stable-diffusion.cpp.patch",
+    "patch_sha256": "1cb4fe3b1e2b6441ef649e3423cd3a9007a81383c7ec4bf4efe034b235ffebbe"
+  },
+  "ggml": {
+    "url": "https://github.com/leejet/ggml.git",
+    "commit": "d25b121ce1d6ae0c7e62ad080460d9fc1e46dd93",
+    "patch": "native/patches/ggml.patch",
+    "patch_sha256": "7bd707041561719db13aeccbb0d6a5eeef2514472fb17e497c68989ee37b2ffc"
+  }
+}

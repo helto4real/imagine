@@ -1,0 +1,14 @@
+{
+  "profile": "qwen-image21-1600x896-v1",
+  "date": "2026-10-14",
+  "shell_syntax_passed": true,
+  "offline_launcher_checks_passed": true,
+  "generated_command_and_environment_match_accepted_run": true,
+  "frozen_binary_is_independent_copy": true,
+  "selected_native_source_hashes_unchanged": true,
+  "decision_register_covers_all_profiling_reports": true,
+  "new_doc_relative_links_resolve": true,
+  "new_gpu_runs": 0,
+  "live_evidence_reused": "runs/20261014T163814Z-vae-three-strips-w0mcgo9n/validation.json",
+  "escalation_this_freeze": false
+}

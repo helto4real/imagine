@@ -1,0 +1,995 @@
+diff --git a/src/core/ggml_extend.cpp b/src/core/ggml_extend.cpp
+index d16b92a..b17a40d 100644
+--- a/src/core/ggml_extend.cpp
++++ b/src/core/ggml_extend.cpp
+@@ -1,10 +1,13 @@
+ #include "core/ggml_extend.h"
+ 
+ #include <cmath>
++#include <cstdlib>
++#include <cstring>
+ #include <stdexcept>
+ #include <utility>
+ 
+ #include "core/ggml_extend_backend.h"
++#include "core/util.h"
+ 
+ ggml_tensor* ggml_ext_mul_n_mode(ggml_context* ctx, ggml_tensor* a, ggml_tensor* b, int mode) {
+     // reshape A
+@@ -257,7 +260,14 @@ ggml_tensor* ggml_ext_linear_i8_tensorwise(ggml_context* ctx,
+     ggml_tensor* fused_bias = scale == 1.f ? b : nullptr;
+     auto mul_mat            = [&](ggml_tensor* input) {
+         if (input->type == GGML_TYPE_F32 && convrot_group_size > 0) {
++            auto source = input;
+             input = ggml_quantize_i8_convrot(ctx, input, convrot_group_size);
++            const char* bf16_flag = std::getenv("SD_QWEN21_BF16_ATTENTION");
++            if (bf16_flag && std::strcmp(bf16_flag, "1") == 0 && source->op == GGML_OP_SCALE &&
++                source->src[0]->op == GGML_OP_CPY && source->src[0]->src[0]->type == GGML_TYPE_BF16) {
++                // The CUDA cast/scale/ConvRot fusion reads this source directly.
++                input->src[1] = source->src[0]->src[0];
++            }
+         }
+         return ggml_mul_mat_i8_tensorwise(ctx, w, input, weight_scale, fused_bias, convrot_group_size);
+     };
+@@ -413,6 +423,32 @@ ggml_tensor* ggml_ext_conv_1d(ggml_context* ctx,
+     return result;
+ }
+ 
++static ggml_tensor* conv_2d_strips(ggml_context* ctx, ggml_tensor* x, ggml_tensor* w, int p0, int p1) {
++    const int64_t width = x->ne[0] + 2 * p0 - 2;
++    const int64_t height = x->ne[1] + 2 * p1 - 2;
++    auto result = ggml_new_tensor_4d(ctx, GGML_TYPE_F32, width, height, w->ne[3], 1);
++    // Chain writes to one output so each strip's im2col/GEMM storage can be reused.
++    for (int64_t row = 0; row < height; row += 64) {
++        const int64_t rows = std::min<int64_t>(64, height - row);
++        const int64_t lo = std::max<int64_t>(0, row - p1);
++        const int64_t hi = std::min<int64_t>(x->ne[1], row + rows + 2 - p1);
++        const int pad = lo > row - p1 || hi < row + rows + 2 - p1 ? 1 : 0;
++        auto input = ggml_view_4d(ctx, x, x->ne[0], hi - lo, x->ne[2], 1,
++                                  x->nb[1], x->nb[2], x->nb[3], lo * x->nb[1]);
++        input = ggml_cont(ctx, input);
++        auto output = ggml_conv_2d(ctx, w, input, 1, 1, p0, pad, 1, 1);
++        const int64_t crop = row - (lo - pad + p1);
++        if (crop != 0 || output->ne[1] != rows) {
++            output = ggml_cont(ctx, ggml_view_4d(ctx, output, width, rows, w->ne[3], 1,
++                                                output->nb[1], output->nb[2], output->nb[3], crop * output->nb[1]));
++        }
++        result = ggml_set_inplace(ctx, result, output, result->nb[1], result->nb[2], result->nb[3], row * result->nb[1]);
++    }
++    LOG_DEBUG("VAE strip convolution: %lldx%lld channels=%lld->%lld rows=64",
++              (long long)width, (long long)height, (long long)x->ne[2], (long long)w->ne[3]);
++    return result;
++}
++
+ ggml_tensor* ggml_ext_conv_2d(ggml_context* ctx,
+                               ggml_tensor* x,
+                               ggml_tensor* w,
+@@ -426,9 +462,22 @@ ggml_tensor* ggml_ext_conv_2d(ggml_context* ctx,
+                               bool direct,
+                               bool circular_x,
+                               bool circular_y,
+-                              float scale) {
++                              float scale,
++                              ggml_backend_t fusion_backend,
++                              bool inplace_input_scale) {
++    const char* fusion_flag = std::getenv("SD_VAE_FUSED_UPSCALE_IM2COL");
++    ggml_tensor* small_input = x->op == GGML_OP_UPSCALE ? x->src[0] : nullptr;
++    const bool fuse_upscale = fusion_flag != nullptr && std::strcmp(fusion_flag, "1") == 0 &&
++                              fusion_backend != nullptr && sd_backend_is(fusion_backend, "CUDA") &&
++                              !direct && !circular_x && !circular_y && scale == 1.f / 128.f &&
++                              s0 == 1 && s1 == 1 && p0 == 1 && p1 == 1 && d0 == 1 && d1 == 1 &&
++                              w->type == GGML_TYPE_F16 && w->ne[0] == 3 && w->ne[1] == 3 &&
++                              small_input != nullptr && small_input->type == GGML_TYPE_F32 &&
++                              ggml_is_contiguous(small_input) && x->op_params[0] == GGML_SCALE_MODE_NEAREST &&
++                              x->ne[0] == 2 * small_input->ne[0] && x->ne[1] == 2 * small_input->ne[1] &&
++                              x->ne[2] == small_input->ne[2] && x->ne[3] == small_input->ne[3];
+     if (scale != 1.f) {
+-        x = ggml_ext_scale(ctx, x, scale);
++        x = ggml_ext_scale(ctx, x, scale, inplace_input_scale);
+     }
+     if (w->ne[2] != x->ne[2] && ggml_n_dims(w) == 2) {
+         w = ggml_reshape_4d(ctx, w, 1, 1, w->ne[0], w->ne[1]);
+@@ -440,8 +489,34 @@ ggml_tensor* ggml_ext_conv_2d(ggml_context* ctx,
+         p1 = 0;
+     }
+ 
+-    if (direct) {
++    const char* strip_flag = std::getenv("SD_VAE_STRIP_CONV");
++    const bool strips = strip_flag != nullptr && std::strcmp(strip_flag, "1") == 0 &&
++                        fusion_backend != nullptr && sd_backend_is(fusion_backend, "CUDA") &&
++                        !direct && !circular_x && !circular_y && !fuse_upscale &&
++                        scale == 1.f / 128.f && s0 == 1 && s1 == 1 && d0 == 1 && d1 == 1 &&
++                        p0 >= 0 && p0 <= 1 && p1 >= 0 && p1 <= 1 &&
++                        w->type == GGML_TYPE_F16 && w->ne[0] == 3 && w->ne[1] == 3 &&
++                        x->type == GGML_TYPE_F32 && x->ne[3] == 1 && ggml_is_contiguous(x);
++    if (strips) {
++        x = conv_2d_strips(ctx, x, w, p0, p1);
++    } else if (direct) {
+         x = ggml_conv_2d_direct(ctx, w, x, s0, s1, p0, p1, d0, d1);
++    } else if (fuse_upscale) {
++        auto patches = ggml_im2col(ctx, w, x, s0, s1, p0, p1, d0, d1, true, GGML_TYPE_F16);
++        // CUDA extension: slots 7/8 encode nearest x2 and the original F32 scale.
++        patches->src[1] = small_input;
++        patches->op_params[7] = 2;
++        std::memcpy(&patches->op_params[8], &scale, sizeof(scale));
++        GGML_ASSERT(ggml_backend_supports_op(fusion_backend, patches));
++        ggml_set_name(patches, "vae_fused_upscale_scale_im2col");
++        LOG_DEBUG("VAE fused upscale/scale/im2col: %lldx%lldx%lld -> %lldx%lldx%lld",
++                  (long long)small_input->ne[0], (long long)small_input->ne[1], (long long)small_input->ne[2],
++                  (long long)patches->ne[0], (long long)patches->ne[1], (long long)patches->ne[2]);
++        x = ggml_mul_mat(ctx,
++                         ggml_reshape_2d(ctx, patches, patches->ne[0], patches->ne[3] * patches->ne[2] * patches->ne[1]),
++                         ggml_reshape_2d(ctx, w, w->ne[0] * w->ne[1] * w->ne[2], w->ne[3]));
++        x = ggml_reshape_4d(ctx, x, patches->ne[1], patches->ne[2], patches->ne[3], w->ne[3]);
++        x = ggml_cont(ctx, ggml_permute(ctx, x, 0, 1, 3, 2));
+     } else {
+         x = ggml_conv_2d(ctx, w, x, s0, s1, p0, p1, d0, d1);
+     }
+@@ -732,10 +807,55 @@ ggml_tensor* ggml_ext_attention_ext(ggml_context* ctx,
+     };
+ 
+ #ifndef SD_USE_UPSTREAM_GGML
+-    if (sage_attn && mask == nullptr && d_head > 0 && d_head <= 128) {
++    const char* bf16_attention_flag = std::getenv("SD_QWEN21_BF16_ATTENTION");
++    const bool bf16_attention = bf16_attention_flag && std::strcmp(bf16_attention_flag, "1") == 0;
++    if (bf16_attention && sage_attn && mask == nullptr && d_head == 128 && N == 1 && kv_scale == 1.f &&
++        q->type == GGML_TYPE_BF16 && k->type == GGML_TYPE_BF16 && v->type == GGML_TYPE_BF16 &&
++        sd_backend_is(backend, "CUDA")) {
++        auto q_in = ggml_reshape_4d(ctx, ggml_ext_cont(ctx, q), d_head, L_q, n_head, N);
++        auto k_in = ggml_reshape_4d(ctx, ggml_ext_cont(ctx, k), d_head, L_k, n_kv_head, N);
++        auto v_in = ggml_permute(ctx, v, 0, 2, 1, 3);
++        auto out = ggml_sage_attn(ctx, q_in, k_in, v_in, scale, GGML_SAGE_ATTN_2_PLUS_PLUS);
++        const char* split_v = std::getenv("SD_SAGE_SPLIT_V");
++        if (split_v && std::strcmp(split_v, "1") == 0 && v->op == GGML_OP_CONCAT &&
++            v->op_params[0] == 2 && v->src[0]->ne[2] > 0) {
++            out->src[2] = ggml_permute(ctx, v->src[1], 0, 2, 1, 3);
++            out->src[4] = ggml_permute(ctx, v->src[0], 0, 2, 1, 3);
++            if (!ggml_backend_supports_op(backend, out)) {
++                out->src[2] = v_in;
++                out->src[4] = nullptr;
++            }
++        }
++        const char* split_k = std::getenv("SD_SAGE_SPLIT_K");
++        if (split_k && std::strcmp(split_k, "1") == 0 && out->src[4] && k->op == GGML_OP_CONCAT &&
++            k->op_params[0] == 1 && k->src[0]->ne[1] > 0 &&
++            ggml_is_contiguous(k->src[0]) && ggml_is_contiguous(k->src[1])) {
++            out->src[1] = k->src[1];
++            out->src[5] = k->src[0];
++            if (!ggml_backend_supports_op(backend, out)) {
++                out->src[1] = k_in;
++                out->src[5] = nullptr;
++            }
++        }
++        if (ggml_backend_supports_op(backend, out)) kqv = out;
++    }
++    if (bf16_attention && kqv == nullptr && q->type == GGML_TYPE_BF16) {
++        q = ggml_cast(ctx, q, GGML_TYPE_F32);
++        k = ggml_cast(ctx, k, GGML_TYPE_F32);
++        v = ggml_cast(ctx, v, GGML_TYPE_F32);
++    }
++    if (kqv == nullptr && sage_attn && mask == nullptr && d_head > 0 && d_head <= 128) {
++        static const bool direct_v_cast = []() {
++            const char* value = std::getenv("SD_SAGE_DIRECT_V_CAST");
++            return value != nullptr && std::strcmp(value, "1") == 0;
++        }();
+         auto q_in                 = ggml_reshape_4d(ctx, ggml_ext_cont(ctx, q->type == GGML_TYPE_F32 ? q : ggml_cast(ctx, q, GGML_TYPE_F32)), d_head, L_q, n_head, N);
+         auto k_in                 = ggml_reshape_4d(ctx, ggml_ext_cont(ctx, k->type == GGML_TYPE_F32 ? k : ggml_cast(ctx, k, GGML_TYPE_F32)), d_head, L_k, n_kv_head, N);
+-        auto v_in                 = ggml_ext_cont(ctx, ggml_permute(ctx, v, 0, 2, 1, 3));
++        auto v_in                 = ggml_permute(ctx, v, 0, 2, 1, 3);
++        if (!(direct_v_cast && d_head == 128 && N == 1 && kv_scale == 1.0f &&
++              v->type == GGML_TYPE_F32 && sd_backend_is(backend, "CUDA"))) {
++            v_in = ggml_ext_cont(ctx, v_in);
++        }
+         const int64_t padded_head = d_head <= 64 ? 64 : 128;
+         if ((padded_head != d_head || kv_scale != 1.0f) && v_in->type != GGML_TYPE_F32) {
+             v_in = ggml_cast(ctx, v_in, GGML_TYPE_F32);
+diff --git a/src/core/ggml_extend.h b/src/core/ggml_extend.h
+index 5747d62..088beee 100644
+--- a/src/core/ggml_extend.h
++++ b/src/core/ggml_extend.h
+@@ -132,7 +132,9 @@ ggml_tensor* ggml_ext_conv_2d(ggml_context* ctx,
+                               bool direct     = false,
+                               bool circular_x = false,
+                               bool circular_y = false,
+-                              float scale     = 1.f);
++                              float scale     = 1.f,
++                              ggml_backend_t fusion_backend = nullptr,
++                              bool inplace_input_scale = false);
+ 
+ // w: [OC，IC, KD, 1 * 1]
+ // x: [N, IC, IH, IW]
+diff --git a/src/core/ggml_extend_backend.cpp b/src/core/ggml_extend_backend.cpp
+index b1bce98..f0396b9 100644
+--- a/src/core/ggml_extend_backend.cpp
++++ b/src/core/ggml_extend_backend.cpp
+@@ -1096,3 +1096,19 @@ float ggml_ext_backend_tensor_get_f32(ggml_tensor* tensor) {
+     }
+     return value;
+ }
++
++bool sd_backend_graph_pool_memory(ggml_backend_t backend, ggml_cgraph* graph,
++                                  size_t* resident, size_t* growth) {
++    *resident = *growth = 0;
++    if (backend == nullptr || graph == nullptr) {
++        return false;
++    }
++    auto device = ggml_backend_get_device(backend);
++    if (device == nullptr) {
++        return false;
++    }
++    auto reg = ggml_backend_dev_backend_reg(device);
++    using Query = bool (*)(ggml_backend_t, ggml_cgraph*, size_t*, size_t*);
++    auto query = reinterpret_cast<Query>(ggml_backend_reg_get_proc_address(reg, "ggml_backend_cuda_graph_pool_memory"));
++    return query != nullptr && query(backend, graph, resident, growth);
++}
+diff --git a/src/core/ggml_extend_backend.h b/src/core/ggml_extend_backend.h
+index df1d692..7c530ae 100644
+--- a/src/core/ggml_extend_backend.h
++++ b/src/core/ggml_extend_backend.h
+@@ -87,6 +87,8 @@ private:
+ 
+ bool sd_backend_is(ggml_backend_t backend, const std::string& name);
+ bool sd_backend_is_cpu(ggml_backend_t backend);
++bool sd_backend_graph_pool_memory(ggml_backend_t backend, ggml_cgraph* graph,
++                                  size_t* resident, size_t* growth);
+ bool sd_backend_supports_cuda_mma(ggml_backend_t backend);
+ ggml_backend_buffer_t sd_backend_dev_buffer_from_host_ptr(ggml_backend_dev_t device,
+                                                           void* ptr,
+diff --git a/src/core/ggml_runner.cpp b/src/core/ggml_runner.cpp
+index 4c156ed..0b13844 100644
+--- a/src/core/ggml_runner.cpp
++++ b/src/core/ggml_runner.cpp
+@@ -1,4 +1,5 @@
+ #include <algorithm>
++#include <cstdlib>
+ #include <exception>
+ #include <map>
+ #include <utility>
+@@ -473,14 +474,45 @@ bool GGMLRunner::runner_start() {
+         });
+     }
+     runner_started_ = true;
++    idle_weights_retained_ = false;
+     return true;
+ }
+ 
+-void GGMLRunner::runner_end() {
++void GGMLRunner::runner_idle(bool keep_workspace) {
++    const char* retain = std::getenv("SD_QWEN21_RETAIN_IDLE");
++    if (retain == nullptr || std::string(retain) != "1" ||
++        get_desc() != "qwen_image_2_1" || last_compute_status_ != GGML_STATUS_SUCCESS) {
++        runner_end();
++        return;
++    }
+     GGML_ASSERT(!graph_active_);
+     if (!runner_started_) {
+         return;
+     }
++    // Prefix tensors depend on this request's conditioning; only allocations and weights survive.
++    cache_.clear();
++    if (auto manager = residency_manager.lock()) {
++        manager->clear_prefetched_params(reinterpret_cast<uintptr_t>(this));
++    }
++    if (!keep_workspace) {
++        workspace_.release();
++        if (auto manager = residency_manager.lock()) {
++            manager->remove_runtime_owner(reinterpret_cast<uintptr_t>(this));
++        }
++        runner_started_ = false;
++        idle_weights_retained_ = true;
++    } else {
++        sync_runtime_residency();
++    }
++    LOG_VERBOSE("%s idle: retaining reclaimable weights and %.2f MiB workspace",
++                get_desc().c_str(), workspace_.bytes(runtime_backend) / (1024.0 * 1024.0));
++}
++
++void GGMLRunner::runner_end() {
++    GGML_ASSERT(!graph_active_);
++    if (!runner_started_ && !idle_weights_retained_) {
++        return;
++    }
+     workspace_.release();
+     cache_.clear();
+     logged_compute_bytes_.clear();
+@@ -497,6 +529,7 @@ void GGMLRunner::runner_end() {
+         manager->remove_runtime_owner(reinterpret_cast<uintptr_t>(this));
+     }
+     runner_started_ = false;
++    idle_weights_retained_ = false;
+ }
+ 
+ GGMLRunner::GGMLRunner(ggml_backend_t backend,
+@@ -721,7 +754,7 @@ ComputeWorkspace::Measurement GGMLRunner::measure(ggml_cgraph* graph, size_t dir
+ 
+ std::vector<DeviceMemoryRequest> GGMLRunner::memory_requests(
+     const std::vector<BackendBufferSize>& sizes,
+-    size_t pending_cache_bytes) const {
++    size_t pending_cache_bytes, ggml_cgraph* graph) const {
+     std::vector<DeviceMemoryRequest> requests;
+     for (const auto& size : sizes) {
+         const size_t retained    = retained_runtime_buffer_bytes(size.backend);
+@@ -739,8 +772,10 @@ std::vector<DeviceMemoryRequest> GGMLRunner::memory_requests(
+                 limit = graph_cut_layer_split_backend_vram_limits_[index];
+             }
+         }
++        size_t pool_resident = 0, pool_growth = 0;
++        sd_backend_graph_pool_memory(size.backend, graph, &pool_resident, &pool_growth);
+         requests.push_back({size.backend, reinterpret_cast<uintptr_t>(this), pending,
+-                            retained, limit});
++                            retained, limit, pool_resident, pool_growth});
+     }
+     return requests;
+ }
+@@ -840,7 +875,7 @@ std::optional<Tensor<float>> GGMLRunner::execute_graph(ggml_cgraph* graph, int n
+     auto fits_monolithic = [&]() {
+         // Planning headroom absorbs allocation estimate drift; execution keeps the normal limits.
+         constexpr size_t planning_headroom = 128ULL * 1024ULL * 1024ULL;
+-        auto requests                      = memory_requests(full_measurement.buffers, cache_.pending_bytes(graph));
++        auto requests                      = memory_requests(full_measurement.buffers, cache_.pending_bytes(graph), graph);
+         for (auto& request : requests) {
+             request.pending_allocation_bytes = add_bytes(request.pending_allocation_bytes, planning_headroom);
+         }
+@@ -933,13 +968,13 @@ std::optional<Tensor<float>> GGMLRunner::execute_graph(ggml_cgraph* graph, int n
+         const size_t new_cache_bytes = add_bytes(cut_bytes, cache_.pending_bytes(segment_graph));
+         auto ensure_capacity         = [&]() {
+             sync_runtime_residency();
+-            auto requests = memory_requests(measurement.buffers, new_cache_bytes);
++            auto requests = memory_requests(measurement.buffers, new_cache_bytes, segment_graph);
+             if (fits(requests, weights.params(index))) {
+                 return true;
+             }
+             if (workspace_.release_excess(measurement)) {
+                 sync_runtime_residency();
+-                requests = memory_requests(measurement.buffers, new_cache_bytes);
++                requests = memory_requests(measurement.buffers, new_cache_bytes, segment_graph);
+             }
+             const bool ready = weights.ensure_segment_capacity(index, requests);
+             if (!ready && manager != nullptr) {
+@@ -977,10 +1012,18 @@ std::optional<Tensor<float>> GGMLRunner::execute_graph(ggml_cgraph* graph, int n
+             return fail_segment("allocated capacity check");
+         }
+         copy_data_to_backend_tensor(segment_graph, false);
+-        auto prefetch_requests = memory_requests(measurement.buffers, new_cache_bytes);
++        auto prefetch_requests = memory_requests(measurement.buffers, new_cache_bytes, segment_graph);
+         if (!prefetch_requests.empty()) {
+             weights.enqueue_next(index, prefetch_requests.front());
+         }
++        for (const auto& request : prefetch_requests) {
++            if (request.backend_pool_growth_bytes > 0) {
++                LOG_DEBUG("%s %s backend pool: resident %.2f MiB, additional %.2f MiB",
++                          get_desc().c_str(), ggml_backend_name(request.compute_backend),
++                          request.backend_pool_resident_bytes / (1024.0 * 1024.0),
++                          request.backend_pool_growth_bytes / (1024.0 * 1024.0));
++            }
++        }
+         LOG_DEBUG("%s executing segment %zu/%zu: %s", get_desc().c_str(),
+                   index + 1, plan.segments.size(), segment.group_name.c_str());
+         if (!execute_segment(segment_graph, n_threads)) {
+diff --git a/src/core/ggml_runner.h b/src/core/ggml_runner.h
+index 02630c0..b379991 100644
+--- a/src/core/ggml_runner.h
++++ b/src/core/ggml_runner.h
+@@ -140,10 +140,11 @@ private:
+     std::map<ggml_backend_t, size_t> logged_compute_bytes_;
+     size_t logged_segment_count_     = 0;
+     ggml_status last_compute_status_ = GGML_STATUS_SUCCESS;
++    bool idle_weights_retained_     = false;
+ 
+     sd::ComputeWorkspace::Measurement measure(ggml_cgraph* graph, size_t direct_bytes);
+     std::vector<DeviceMemoryRequest> memory_requests(const std::vector<sd::BackendBufferSize>& sizes,
+-                                                     size_t pending_cache_bytes) const;
++                                                     size_t pending_cache_bytes, ggml_cgraph* graph) const;
+     bool fits(const std::vector<DeviceMemoryRequest>& requests,
+               const std::vector<ggml_tensor*>& params) const;
+     bool execute_segment(ggml_cgraph* graph, int n_threads);
+@@ -289,6 +290,8 @@ public:
+ 
+     void runner_end();
+ 
++    void runner_idle(bool keep_workspace = true);
++
+ public:
+     virtual std::string get_desc() = 0;
+ 
+diff --git a/src/device_residency_manager.h b/src/device_residency_manager.h
+index 0a2a889..fca9290 100644
+--- a/src/device_residency_manager.h
++++ b/src/device_residency_manager.h
+@@ -27,6 +27,8 @@ struct DeviceMemoryRequest {
+     size_t pending_allocation_bytes = 0;
+     size_t runtime_resident_bytes   = 0;
+     size_t max_backend_bytes        = 0;
++    size_t backend_pool_resident_bytes = 0;
++    size_t backend_pool_growth_bytes   = 0;
+ 
+     // Runtime buffers only; the manager accounts for weights separately.
+     size_t runtime_peak_bytes() const {
+diff --git a/src/model/common/ggml_block.hpp b/src/model/common/ggml_block.hpp
+index 1d35b41..ea953a2 100644
+--- a/src/model/common/ggml_block.hpp
++++ b/src/model/common/ggml_block.hpp
+@@ -3,6 +3,8 @@
+ 
+ #include <cmath>
+ #include <cstdint>
++#include <cstdlib>
++#include <cstring>
+ #include <map>
+ #include <memory>
+ #include <set>
+@@ -236,8 +238,11 @@ public:
+         ggml_tensor* linear_bias = has_weight_scale ? nullptr : b;
+         ggml_tensor* out         = nullptr;
+         if (w->type == GGML_TYPE_I8) {
++            const char* bf16_flag = std::getenv("SD_QWEN21_BF16_ATTENTION");
++            auto bf16_input = x->type == GGML_TYPE_BF16 && bf16_flag && std::strcmp(bf16_flag, "1") == 0 &&
++                sd_backend_is(ctx->backend, "CUDA") ? x : nullptr;
+             if (x->type != GGML_TYPE_F32) {
+-                x = ggml_ext_cast_f32(ctx->ggml_ctx, ctx->backend, x);
++                x = bf16_input ? ggml_cast(ctx->ggml_ctx, x, GGML_TYPE_F32) : ggml_ext_cast_f32(ctx->ggml_ctx, ctx->backend, x);
+             }
+             if (!ggml_is_contiguous(x)) {
+                 x = ggml_cont(ctx->ggml_ctx, x);
+@@ -251,7 +256,17 @@ public:
+                 const auto cache_key = std::make_pair(x, int8_convrot_group_size);
+                 auto cached          = ctx->int8_convrot_cache.find(cache_key);
+                 if (cached == ctx->int8_convrot_cache.end()) {
++                    auto source = x;
+                     x = ggml_quantize_i8_convrot(ctx->ggml_ctx, x, int8_convrot_group_size);
++                    if (bf16_input) {
++                        x->src[1] = bf16_input;
++                    }
++                    const char* gate_up_flag = std::getenv("SD_QWEN21_BF16_GATE_UP");
++                    if (gate_up_flag && std::strcmp(gate_up_flag, "1") == 0 && source->op == GGML_OP_GLU &&
++                        source->src[0]->op == GGML_OP_CPY && source->src[0]->src[0]->type == GGML_TYPE_BF16) {
++                        // The fused SwiGLU/ConvRot kernel reads this buffer after the cast's lifetime.
++                        x->src[1] = source->src[0]->src[0];
++                    }
+                     ctx->int8_convrot_cache.emplace(cache_key, x);
+                 } else {
+                     x = cached->second;
+@@ -581,7 +596,8 @@ public:
+                                 ctx->conv2d_direct_enabled,
+                                 ctx->circular_x_enabled,
+                                 ctx->circular_y_enabled,
+-                                scale);
++                                scale,
++                                prefix == "first_stage_model.decoder.upsamples.3.upsamples.3.resample.1." ? ctx->backend : nullptr);
+     }
+ };
+ 
+diff --git a/src/model/diffusion/qwen_image_2_1.hpp b/src/model/diffusion/qwen_image_2_1.hpp
+index 1d37d6a..fa5c4a5 100644
+--- a/src/model/diffusion/qwen_image_2_1.hpp
++++ b/src/model/diffusion/qwen_image_2_1.hpp
+@@ -179,17 +179,68 @@ namespace Qwen {
+ 
+         ggml_tensor* forward(GGMLRunnerContext* ctx, ggml_tensor* x, ggml_tensor* pe, const std::vector<QwenImage21Segment>& segments, const std::vector<ggml_tensor*>& masks, const QwenImage21PrefixCache& cache) {
+             int64_t heads = x->ne[0] / dim_head;
++            const char* bf16_flag = std::getenv("SD_QWEN21_BF16_ATTENTION");
++            const bool bf16_attention = bf16_flag && std::strcmp(bf16_flag, "1") == 0 &&
++                dim_head == 128 && x->ne[0] == 4096 && x->ne[2] == 1 &&
++                ctx->sage_attn_enabled && sd_backend_is(ctx->backend, "CUDA");
+             auto project  = [&](const char* name) {
+                 auto h = std::dynamic_pointer_cast<Linear>(blocks[name])->forward(ctx, x);
++                if (bf16_attention) {
++                    auto cast = ggml_cast(ctx->ggml_ctx, h, GGML_TYPE_BF16);
++                    auto live = ggml_view_4d(ctx->ggml_ctx, cast, cast->ne[0], cast->ne[1], cast->ne[2], cast->ne[3], cast->nb[1], cast->nb[2], cast->nb[3], 0);
++                    if (h->op == GGML_OP_MUL_MAT) {
++                        live->src[1] = h->src[0];
++                        live->src[2] = h->src[1];
++                        live->src[3] = h->src[2];
++                    }
++                    h = live;
++                }
+                 return ggml_reshape_4d(ctx->ggml_ctx, h, dim_head, heads, x->ne[1], x->ne[2]);
+             };
+             auto q = project("to_q");
+             auto k = project("to_k");
+             auto v = project("to_v");
+-            q      = std::dynamic_pointer_cast<RMSNorm>(blocks["norm_q"])->forward(ctx, q);
+-            k      = std::dynamic_pointer_cast<RMSNorm>(blocks["norm_k"])->forward(ctx, k);
+-            q      = Rope::apply_rope(ctx, q, pe);
+-            k      = Rope::apply_rope(ctx, k, pe);
++            auto norm_rope = [&](const char* name, ggml_tensor* input) {
++                auto norm_input = bf16_attention ? ggml_cast(ctx->ggml_ctx, input, GGML_TYPE_F32) : input;
++                auto norm = std::dynamic_pointer_cast<RMSNorm>(blocks[name])->forward(ctx, norm_input);
++                auto out  = Rope::apply_rope(ctx, norm, pe);
++                if (bf16_attention) {
++                    out = ggml_cast(ctx->ggml_ctx, out, GGML_TYPE_BF16);
++                    auto live = ggml_view_4d(ctx->ggml_ctx, out, out->ne[0], out->ne[1], out->ne[2], out->ne[3], out->nb[1], out->nb[2], out->nb[3], 0);
++                    live->src[1] = input;
++                    live->src[2] = norm->src[1];
++                    return live;
++                }
++#ifndef SD_USE_UPSTREAM_GGML
++                static const bool fused_rms_rope = []() {
++                    const char* value = std::getenv("GGML_CUDA_FUSED_RMS_ROPE");
++                    return value != nullptr && std::strcmp(value, "1") == 0;
++                }();
++                if (fused_rms_rope && sd_backend_is(ctx->backend, "CUDA") && out->op == GGML_OP_ROPE_APPLY) {
++                    // The direct allocator does not consume CUDA scheduler allocation dependencies.
++                    // Keep the fused inputs alive through the layout-changing output operation.
++                    auto dependency    = ggml_view_4d(ctx->ggml_ctx, out, out->ne[0], out->ne[1], out->ne[2], out->ne[3], out->nb[1], out->nb[2], out->nb[3], 0);
++                    dependency->src[1] = input;
++                    dependency->src[2] = norm->src[1];
++                    return dependency;
++                }
++#endif
++                return out;
++            };
++            const char* paired_flag = std::getenv("GGML_CUDA_FUSED_QK_RMS_ROPE");
++            const bool paired_rms_rope = bf16_attention && paired_flag && std::strcmp(paired_flag, "1") == 0;
++            if (paired_rms_rope) {
++                ctx->expand_graph(q);
++                ctx->expand_graph(k);
++            }
++            q = norm_rope("norm_q", q);
++            k = norm_rope("norm_k", k);
++            if (paired_rms_rope) {
++                // Keep both norm/RoPE chains adjacent, with both projections ready.
++                // The dependency views retain their inputs through both outputs.
++                ctx->expand_graph(q->src[0]);
++                ctx->expand_graph(k->src[0]);
++            }
+             if (cache.mode == QwenImage21PrefixCache::Mode::STORE) {
+                 // Preserve query-first attention evaluation while writing each layer's
+                 // prefix before its full-sequence K/V can accumulate across layers.
+@@ -214,6 +265,9 @@ namespace Qwen {
+                 if (cache.flash_attn_used != nullptr) {
+                     *cache.flash_attn_used &= used_flash_attn;
+                 }
++                if (bf16_attention && out->type != GGML_TYPE_BF16) {
++                    out = ggml_cast(ctx->ggml_ctx, out, GGML_TYPE_BF16);
++                }
+                 return out;
+             };
+             ggml_tensor* result = nullptr;
+@@ -279,28 +333,117 @@ namespace Qwen {
+             return ggml_concat(ctx, prefix, target, 1);
+         }
+ 
++        static ggml_tensor* with_dependency(ggml_context* ctx, ggml_tensor* x, ggml_tensor* dependency) {
++            auto view    = ggml_view_4d(ctx, x, x->ne[0], x->ne[1], x->ne[2], x->ne[3], x->nb[1], x->nb[2], x->nb[3], 0);
++            view->src[1] = dependency;
++            return view;
++        }
++
++        ggml_tensor* modulated_norm(GGMLRunnerContext* ctx, const char* name, ggml_tensor* x, ggml_tensor* params, int64_t prefix_length) {
++#ifndef SD_USE_UPSTREAM_GGML
++            static const bool enabled = []() {
++                const char* value = std::getenv("GGML_CUDA_FUSED_NORM_MODULATION");
++                return value != nullptr && std::strcmp(value, "1") == 0;
++            }();
++            if (enabled && prefix_length == 0 && x->ne[0] == 4096 && x->ne[2] == 1 && x->ne[3] == 1 && sd_backend_is(ctx->backend, "CUDA")) {
++                auto row = ggml_scale_bias(ctx->ggml_ctx, ggml_ext_chunk(ctx->ggml_ctx, params, 2, 1)[0], 1.f, 1.f);
++                // Order the small scale computation before the norm and preserve fused-input lifetimes.
++                auto input = with_dependency(ctx->ggml_ctx, x, row);
++                auto norm_input = input->type == GGML_TYPE_BF16 ? ggml_cast(ctx->ggml_ctx, input, GGML_TYPE_F32) : input;
++                auto norm  = std::dynamic_pointer_cast<LayerNorm>(blocks[name])->forward(ctx, norm_input);
++                auto out   = ggml_mul(ctx->ggml_ctx, norm, row);
++                auto live    = with_dependency(ctx->ggml_ctx, out, input);
++                live->src[2] = row;
++                return live;
++            }
++#endif
++            auto input = x->type == GGML_TYPE_BF16 ? ggml_cast(ctx->ggml_ctx, x, GGML_TYPE_F32) : x;
++            return modulate(ctx->ggml_ctx, std::dynamic_pointer_cast<LayerNorm>(blocks[name])->forward(ctx, input), params, prefix_length);
++        }
++
++        static ggml_tensor* gated_residual(GGMLRunnerContext* ctx, ggml_tensor* x, ggml_tensor* h, ggml_tensor* params, int64_t prefix_length) {
++#ifndef SD_USE_UPSTREAM_GGML
++            static const bool enabled = []() {
++                const char* value = std::getenv("GGML_CUDA_FUSED_GATED_RESIDUAL");
++                return value != nullptr && std::strcmp(value, "1") == 0;
++            }();
++            if (enabled && prefix_length == 0 && h->ne[0] == 4096 && h->ne[2] == 1 && h->ne[3] == 1 && sd_backend_is(ctx->backend, "CUDA")) {
++                auto row   = ggml_tanh(ctx->ggml_ctx, ggml_ext_chunk(ctx->ggml_ctx, params, 2, 1)[0]);
++                const char* down_flag = std::getenv("GGML_CUDA_FUSED_DOWN_RESIDUAL");
++                const bool down_residual = down_flag && std::strcmp(down_flag, "1") == 0 &&
++                    x->type == GGML_TYPE_BF16 && h->op == GGML_OP_MUL_MAT &&
++                    h->src[0]->type == GGML_TYPE_I8 && h->src[0]->ne[0] == 12288 &&
++                    h->src[1]->type == GGML_TYPE_I8 && h->src[3] == nullptr;
++                const char* attention_flag = std::getenv("GGML_CUDA_FUSED_ATTENTION_RESIDUAL");
++                const bool attention_residual = attention_flag && std::strcmp(attention_flag, "1") == 0 &&
++                    x->type == GGML_TYPE_BF16 && h->op == GGML_OP_SCALE &&
++                    h->src[0]->op == GGML_OP_MUL_MAT && h->src[0]->src[0]->type == GGML_TYPE_I8 &&
++                    h->src[0]->src[0]->ne[0] == 4096 && h->src[0]->src[1]->type == GGML_TYPE_I8 &&
++                    h->src[0]->src[3] == nullptr;
++                auto projection = attention_residual ? h->src[0] : h;
++                if (down_residual || attention_residual) {
++                    // Schedule the gate before GEMM; retain its real inputs through the fused store.
++                    projection->src[4] = row;
++                }
++                auto input = with_dependency(ctx->ggml_ctx, h, row);
++                auto out   = ggml_add(ctx->ggml_ctx, x, ggml_mul(ctx->ggml_ctx, input, row));
++                if (down_residual || attention_residual) {
++                    out->src[2] = projection->src[0];
++                    out->src[3] = projection->src[1];
++                    out->src[4] = projection->src[2];
++                    auto live = with_dependency(ctx->ggml_ctx, out, x);
++                    live->src[2] = row;
++                    return live;
++                }
++                auto live  = with_dependency(ctx->ggml_ctx, out, input);
++                live->src[2] = x;
++                live->src[3] = row;
++                return live;
++            }
++#endif
++            return ggml_add(ctx->ggml_ctx, x, modulate(ctx->ggml_ctx, h, params, prefix_length, true));
++        }
++
+         ggml_tensor* forward(GGMLRunnerContext* ctx, ggml_tensor* x, const std::vector<ggml_tensor*>& modulation, ggml_tensor* pe, const QwenImage21Layout& layout, const std::vector<ggml_tensor*>& masks, const QwenImage21PrefixCache& cache) {
+             const int64_t prefix_length = cache.mode == QwenImage21PrefixCache::Mode::REUSE ? 0 : layout.prefix_length;
+-            auto h                      = std::dynamic_pointer_cast<LayerNorm>(blocks["img_norm1"])->forward(ctx, x);
+-            h                           = modulate(ctx->ggml_ctx, h, modulation[0], prefix_length);
++            auto h                      = modulated_norm(ctx, "img_norm1", x, modulation[0], prefix_length);
+             h                           = std::dynamic_pointer_cast<QwenImage21Attention>(blocks["attn"])->forward(ctx, h, pe, layout.segments, masks, cache);
+-            x                           = ggml_add(ctx->ggml_ctx, x, modulate(ctx->ggml_ctx, h, modulation[1], prefix_length, true));
+-            h                           = std::dynamic_pointer_cast<LayerNorm>(blocks["img_norm2"])->forward(ctx, x);
+-            h                           = modulate(ctx->ggml_ctx, h, modulation[2], prefix_length);
+-            ggml_tensor* gate;
++            x                           = gated_residual(ctx, x, h, modulation[1], prefix_length);
++            h                           = modulated_norm(ctx, "img_norm2", x, modulation[2], prefix_length);
+             auto fused = blocks.find("img_mlp.gate_up");
+             if (fused != blocks.end()) {
+                 auto gate_up = std::dynamic_pointer_cast<Linear>(fused->second)->forward(ctx, h);
+-                auto parts   = ggml_ext_chunk(ctx->ggml_ctx, gate_up, 2, 0);
+-                gate         = parts[0];
+-                h            = parts[1];
++                const char* bf16_gate_up = std::getenv("SD_QWEN21_BF16_GATE_UP");
++                if (bf16_gate_up && std::strcmp(bf16_gate_up, "1") == 0 && sd_backend_is(ctx->backend, "CUDA") &&
++                    gate_up->op == GGML_OP_MUL_MAT && gate_up->src[0]->type == GGML_TYPE_I8 &&
++                    gate_up->ne[0] == 24576 && gate_up->ne[2] == 1 && gate_up->ne[3] == 1) {
++                    auto cast = ggml_cast(ctx->ggml_ctx, gate_up, GGML_TYPE_BF16);
++                    auto live = ggml_view_4d(ctx->ggml_ctx, cast, cast->ne[0], cast->ne[1], cast->ne[2], cast->ne[3], cast->nb[1], cast->nb[2], cast->nb[3], 0);
++                    live->src[1] = gate_up->src[0];
++                    live->src[2] = gate_up->src[1];
++                    live->src[3] = gate_up->src[2];
++                    // Make BF16 rounding explicit even when CUDA fusion falls back.
++                    gate_up = ggml_cast(ctx->ggml_ctx, live, GGML_TYPE_F32);
++                }
++                h            = ggml_swiglu(ctx->ggml_ctx, gate_up);
++                const char* fused_swiglu = std::getenv("GGML_CUDA_FUSED_INT8_GATE_UP_SWIGLU");
++                if (fused_swiglu && std::strcmp(fused_swiglu, "1") == 0 && sd_backend_is(ctx->backend, "CUDA") &&
++                    gate_up->op == GGML_OP_MUL_MAT && gate_up->type == GGML_TYPE_F32 && gate_up->src[0]->type == GGML_TYPE_I8 &&
++                    gate_up->ne[0] == 24576 && gate_up->ne[1] >= 1025 && gate_up->ne[2] == 1 && gate_up->ne[3] == 1) {
++                    auto live = ggml_view_4d(ctx->ggml_ctx, h, h->ne[0], h->ne[1], h->ne[2], h->ne[3], h->nb[1], h->nb[2], h->nb[3], 0);
++                    // Retain GEMM inputs until the fused SwiGLU output has been written.
++                    live->src[1] = gate_up->src[0];
++                    live->src[2] = gate_up->src[1];
++                    live->src[3] = gate_up->src[2];
++                    h = live;
++                }
+             } else {
+-                gate = std::dynamic_pointer_cast<Linear>(blocks["img_mlp.gate_layer"])->forward(ctx, h);
+-                h    = std::dynamic_pointer_cast<Linear>(blocks["img_mlp.proj"])->forward(ctx, h);
++                auto gate = std::dynamic_pointer_cast<Linear>(blocks["img_mlp.gate_layer"])->forward(ctx, h);
++                h         = std::dynamic_pointer_cast<Linear>(blocks["img_mlp.proj"])->forward(ctx, h);
++                h         = ggml_mul(ctx->ggml_ctx, h, ggml_silu(ctx->ggml_ctx, gate));
+             }
+-            h = ggml_mul(ctx->ggml_ctx, h, ggml_silu(ctx->ggml_ctx, gate));
+             h = std::dynamic_pointer_cast<Linear>(blocks["img_mlp.out"])->forward(ctx, h);
+-            return ggml_add(ctx->ggml_ctx, x, modulate(ctx->ggml_ctx, h, modulation[3], prefix_length, true));
++            return gated_residual(ctx, x, h, modulation[3], prefix_length);
+         }
+     };
+ 
+@@ -348,6 +491,16 @@ namespace Qwen {
+                     joint = joint == nullptr ? h : ggml_concat(ctx->ggml_ctx, joint, h, 1);
+                 }
+             }
++#ifndef SD_USE_UPSTREAM_GGML
++            static const bool bf16_residual = []() {
++                const char* value = std::getenv("SD_QWEN21_BF16_RESIDUAL");
++                return value != nullptr && std::strcmp(value, "1") == 0;
++            }();
++            if (bf16_residual && cache.mode == QwenImage21PrefixCache::Mode::REUSE &&
++                config.hidden_size == 4096 && joint->ne[2] == 1 && joint->ne[3] == 1 && sd_backend_is(ctx->backend, "CUDA")) {
++                joint = ggml_cast(ctx->ggml_ctx, joint, GGML_TYPE_BF16);
++            }
++#endif
+             sd::ggml_graph_cut::mark_graph_cut(joint, "qwen_image_2_1.prelude", "joint");
+             for (int i = 0; i < config.num_layers; ++i) {
+                 const std::string layer = "transformer_blocks." + std::to_string(i);
+@@ -361,6 +514,9 @@ namespace Qwen {
+             if (cache.mode != QwenImage21PrefixCache::Mode::REUSE) {
+                 joint = ggml_ext_slice(ctx->ggml_ctx, joint, 1, layout.prefix_length, joint->ne[1]);
+             }
++            if (joint->type == GGML_TYPE_BF16) {
++                joint = ggml_cast(ctx->ggml_ctx, joint, GGML_TYPE_F32);
++            }
+             auto scale = std::dynamic_pointer_cast<Linear>(blocks["norm_out.linear"])->forward(ctx, ggml_ext_chunk(ctx->ggml_ctx, time, 2, 1)[0]);
+             joint      = std::dynamic_pointer_cast<LayerNorm>(blocks["norm_out.norm"])->forward(ctx, joint);
+             joint      = ggml_mul(ctx->ggml_ctx, joint, ggml_scale_bias(ctx->ggml_ctx, scale, 1.f, 1.f));
+@@ -489,8 +645,12 @@ namespace Qwen {
+                 cache.name = "qwen_image_2_1.prefix." + std::to_string(extra->prefix_id) +
+                              ".circular." + std::to_string(circular_x_enabled) + std::to_string(circular_y_enabled);
+                 cache.prefix_length = layout.prefix_length;
++                const char* bf16_flag = std::getenv("SD_QWEN21_BF16_ATTENTION");
+                 if (prefix_cache_type != GGML_TYPE_COUNT) {
+                     cache.type = prefix_cache_type;
++                } else if (bf16_flag && std::strcmp(bf16_flag, "1") == 0 && sage_attn_enabled &&
++                           config.head_dim == 128 && config.hidden_size == 4096 && sd_backend_is(runtime_backend, "CUDA")) {
++                    cache.type = GGML_TYPE_BF16;
+                 } else if (!prefix_cache_auto_f32 && flash_attn_enabled && !sage_attn_enabled &&
+                            (attn_scale <= 0.f || attn_scale == 1.f)) {
+                     cache.type = GGML_TYPE_F16;
+diff --git a/src/model/vae/wan_vae.hpp b/src/model/vae/wan_vae.hpp
+index 9dd30fd..652fa43 100644
+--- a/src/model/vae/wan_vae.hpp
++++ b/src/model/vae/wan_vae.hpp
+@@ -65,7 +65,7 @@ namespace WAN {
+             scale = scale_value;
+         }
+ 
+-        ggml_tensor* forward(GGMLRunnerContext* ctx, ggml_tensor* x, ggml_tensor* cache_x = nullptr) {
++        ggml_tensor* forward(GGMLRunnerContext* ctx, ggml_tensor* x, ggml_tensor* cache_x = nullptr, bool strip_conv = true) {
+             // x: [N*IC, ID, IH, IW]
+             // result: x: [N*OC, ID, IH, IW]
+             ggml_tensor* w = params["weight"];
+@@ -86,6 +86,7 @@ namespace WAN {
+                 lp2 -= (int)cache_x->ne[2];
+             }
+ 
++            auto unpadded = x;
+             x = ggml_ext_pad_ext(ctx->ggml_ctx, ctx->backend, x, lp0, rp0, lp1, rp1, lp2, rp2, 0, 0, ctx->circular_x_enabled, ctx->circular_y_enabled);
+             if (w->ne[2] == 1 && x->ne[2] == 1 && x->ne[3] == in_channels) {
+                 // One frame through a one-frame-deep kernel is a 2D conv; backends without
+@@ -93,12 +94,31 @@ namespace WAN {
+                 if (!ggml_is_contiguous(x)) {
+                     x = ggml_cont(ctx->ggml_ctx, x);
+                 }
++                const char* reuse_flag = std::getenv("SD_VAE_REUSE_PAD_SCALE");
++                // This freshly created PAD tensor is private to this convolution.
++                const bool reuse_pad = reuse_flag != nullptr && std::strcmp(reuse_flag, "1") == 0 &&
++                                       sd_backend_is(ctx->backend, "CUDA") && !ctx->conv2d_direct_enabled &&
++                                       !ctx->circular_x_enabled && !ctx->circular_y_enabled &&
++                                       scale == 1.f / 128.f && x != unpadded &&
++                                       x->op == GGML_OP_PAD && x->view_src == nullptr &&
++                                       std::strcmp(w->name, "first_stage_model.decoder.upsamples.4.upsamples.0.residual.2.weight") == 0;
++                if (reuse_pad) {
++                    LOG_DEBUG("VAE reuse padded scale: %lldx%lldx%lldx%lld",
++                              (long long)x->ne[0], (long long)x->ne[1], (long long)x->ne[2], (long long)x->ne[3]);
++                }
+                 ggml_tensor* x2 = ggml_reshape_4d(ctx->ggml_ctx, x, x->ne[0], x->ne[1], in_channels, 1);
+                 ggml_tensor* w2 = ggml_reshape_4d(ctx->ggml_ctx, w, w->ne[0], w->ne[1], in_channels, out_channels);
++                const char* stage3_flag = std::getenv("SD_VAE_STRIP_STAGE3");
++                const bool stage3_strips = stage3_flag != nullptr && std::strcmp(stage3_flag, "1") == 0 &&
++                                           std::strcmp(w->name, "first_stage_model.decoder.upsamples.3.upsamples.0.residual.2.weight") == 0;
++                const bool strip_target = stage3_strips ||
++                                          std::strcmp(w->name, "first_stage_model.decoder.upsamples.4.upsamples.0.residual.2.weight") == 0;
+                 x2              = ggml_ext_conv_2d(ctx->ggml_ctx, x2, w2, b,
+                                                    std::get<2>(stride), std::get<1>(stride), 0, 0,
+                                                    std::get<2>(dilation), std::get<1>(dilation),
+-                                                   ctx->conv2d_direct_enabled, false, false, scale);
++                                                   ctx->conv2d_direct_enabled, false, false, scale,
++                                                   strip_conv && strip_target ? ctx->backend : nullptr,
++                                                   reuse_pad);
+                 return ggml_reshape_4d(ctx->ggml_ctx, x2, x2->ne[0], x2->ne[1], 1, out_channels);
+             }
+             return ggml_ext_conv_3d(ctx->ggml_ctx, ctx->backend, x, w, b, in_channels,
+@@ -346,6 +366,12 @@ namespace WAN {
+         int64_t factor_s;
+         int64_t factor;
+         int64_t repeats;
++        bool strip_add_eligible_ = false;
++
++        void init_params(ggml_context*, const String2TensorStorage& = {}, const std::string prefix = "") override {
++            strip_add_eligible_ = prefix == "first_stage_model.decoder.upsamples.2.avg_shortcut." &&
++                                  in_channels == 1152 && out_channels == 576 && factor_t == 2 && factor_s == 2;
++        }
+ 
+     public:
+         DupUp3D(int64_t in_channels, int64_t out_channels, int64_t factor_t, int64_t factor_s = 1)
+@@ -387,6 +413,35 @@ namespace WAN {
+ 
+             return x;
+         }
++
++        ggml_tensor* forward_add(GGMLRunnerContext* ctx,
++                                 ggml_tensor* x,
++                                 ggml_tensor* main,
++                                 bool first_chunk,
++                                 int64_t b = 1) {
++            const char* flag = std::getenv("SD_VAE_STRIP_SHORTCUT");
++            if (!strip_add_eligible_ || flag == nullptr || std::strcmp(flag, "1") != 0 ||
++                !sd_backend_is(ctx->backend, "CUDA") || ctx->graph != nullptr || b != 1 || !first_chunk ||
++                x->type != GGML_TYPE_F32 || main->type != GGML_TYPE_F32 ||
++                x->ne[2] != 1 || x->ne[3] != in_channels ||
++                main->ne[0] != x->ne[0] * factor_s || main->ne[1] != x->ne[1] * factor_s ||
++                main->ne[2] != 1 || main->ne[3] != out_channels || !ggml_is_contiguous(main)) {
++                return ggml_add(ctx->ggml_ctx, main, forward(ctx, x, first_chunk, b));
++            }
++            auto result = main;
++            for (int64_t row = 0; row < x->ne[1]; row += 32) {
++                const int64_t rows = std::min<int64_t>(32, x->ne[1] - row);
++                auto input = ggml_cont(ctx->ggml_ctx, ggml_view_4d(ctx->ggml_ctx, x, x->ne[0], rows, 1, in_channels,
++                                                                 x->nb[1], x->nb[2], x->nb[3], row * x->nb[1]));
++                auto shortcut = ggml_cont(ctx->ggml_ctx, forward(ctx, input, true, b));
++                // ACC chains disjoint row updates while retaining the original main-then-shortcut addition order.
++                result = ggml_acc_inplace(ctx->ggml_ctx, result, shortcut, result->nb[1], result->nb[2], result->nb[3],
++                                           row * factor_s * result->nb[1]);
++            }
++            LOG_DEBUG("VAE strip shortcut add: %lldx%lld channels=1152->576 input_rows=32",
++                      (long long)x->ne[0], (long long)x->ne[1]);
++            return result;
++        }
+     };
+ 
+     class ResidualBlock : public GGMLBlock {
+@@ -394,6 +449,16 @@ namespace WAN {
+         int64_t in_dim;
+         int64_t out_dim;
+         bool is_2D;
++        bool strip_block_eligible_ = false;
++
++        void init_params(ggml_context*, const String2TensorStorage& shapes = {}, const std::string prefix = "") override {
++            strip_block_eligible_ = !is_2D && in_dim == 288 && out_dim == 144 &&
++                                    prefix == "first_stage_model.decoder.upsamples.4.upsamples.0.";
++            for (const char* name : {"residual.2.weight", "residual.6.weight", "shortcut.weight"}) {
++                const auto it = shapes.find(prefix + name);
++                strip_block_eligible_ = strip_block_eligible_ && it != shapes.end() && it->second.ne[2] == 1;
++            }
++        }
+ 
+     public:
+         ResidualBlock(int64_t in_dim, int64_t out_dim, bool is_2D = false)
+@@ -426,9 +491,41 @@ namespace WAN {
+                              ggml_tensor* x,
+                              int64_t b,
+                              std::vector<ggml_tensor*>& feat_cache,
+-                             int& feat_idx) {
++                             int& feat_idx,
++                             bool within_strip = false) {
+             // x: [b*c, t, h, w]
+             GGML_ASSERT(b == 1);
++            const char* strip_flag = std::getenv("SD_VAE_STRIP_RESIDUAL");
++            if (!within_strip && strip_block_eligible_ && strip_flag != nullptr && std::strcmp(strip_flag, "1") == 0 &&
++                sd_backend_is(ctx->backend, "CUDA") && ctx->graph == nullptr &&
++                !ctx->conv2d_direct_enabled && !ctx->conv3d_direct_enabled &&
++                !ctx->circular_x_enabled && !ctx->circular_y_enabled &&
++                x->type == GGML_TYPE_F32 && x->ne[2] == 1 && x->ne[3] == in_dim &&
++                feat_idx >= 0 && static_cast<size_t>(feat_idx + 1) < feat_cache.size() &&
++                feat_cache[feat_idx] == nullptr && feat_cache[feat_idx + 1] == nullptr) {
++                const int64_t width = x->ne[0];
++                const int64_t height = x->ne[1];
++                auto result = ggml_new_tensor_4d(ctx->ggml_ctx, GGML_TYPE_F32, width, height, 1, out_dim);
++                for (int64_t row = 0; row < height; row += 64) {
++                    const int64_t rows = std::min<int64_t>(64, height - row);
++                    const int64_t lo = std::max<int64_t>(0, row - 2);
++                    const int64_t hi = std::min<int64_t>(height, row + rows + 2);
++                    auto input = ggml_cont(ctx->ggml_ctx, ggml_view_4d(ctx->ggml_ctx, x, width, hi - lo, 1, in_dim,
++                                                                 x->nb[1], x->nb[2], x->nb[3], lo * x->nb[1]));
++                    std::vector<ggml_tensor*> strip_cache(2, nullptr);
++                    int strip_idx = 0;
++                    auto output = forward(ctx, input, b, strip_cache, strip_idx, true);
++                    GGML_ASSERT(strip_idx == 2);
++                    output = ggml_cont(ctx->ggml_ctx, ggml_view_4d(ctx->ggml_ctx, output, width, rows, 1, out_dim,
++                                                                  output->nb[1], output->nb[2], output->nb[3], (row - lo) * output->nb[1]));
++                    result = ggml_set_inplace(ctx->ggml_ctx, result, output, result->nb[1], result->nb[2], result->nb[3], row * result->nb[1]);
++                }
++                // These singleton-temporal kernels do not consume frame caches; keep their slots aligned.
++                feat_idx += 2;
++                LOG_DEBUG("VAE strip residual block: %lldx%lld channels=288->144 rows=64 halo=2",
++                          (long long)width, (long long)height);
++                return result;
++            }
+             ggml_tensor* h = x;
+             if (in_dim != out_dim) {
+                 if (is_2D) {
+@@ -464,7 +561,7 @@ namespace WAN {
+ 
+                             x = layer->forward(ctx, x);
+                         } else {
+-                            x = layer->forward(ctx, x, feat_cache[idx]);
++                            x = layer->forward(ctx, x, feat_cache[idx], !within_strip);
+                         }
+                         feat_cache[idx] = cache_x;
+                         feat_idx += 1;
+@@ -595,9 +692,7 @@ namespace WAN {
+                 x                      = block->forward(ctx, x, b, feat_cache, feat_idx, chunk_idx);
+ 
+                 auto avg_shortcut = std::dynamic_pointer_cast<DupUp3D>(blocks["avg_shortcut"]);
+-                auto shortcut     = avg_shortcut->forward(ctx, x_copy, chunk_idx == 0, b);
+-
+-                x = ggml_add(ctx->ggml_ctx, x, shortcut);
++                x = avg_shortcut->forward_add(ctx, x_copy, x, chunk_idx == 0, b);
+             }
+ 
+             return x;
+diff --git a/src/model_manager.cpp b/src/model_manager.cpp
+index 2815e16..c49990c 100644
+--- a/src/model_manager.cpp
++++ b/src/model_manager.cpp
+@@ -1731,10 +1731,11 @@ ModelManager::CapacityCheck ModelManager::check_capacity(
+     }
+     auto add             = [](size_t a, size_t b) { return b > SIZE_MAX - a ? SIZE_MAX : a + b; };
+     const size_t missing = compute_backend_alloc_size(states, true);
+-    // Backend scratch buffers and pipelines are not included in graph measurements.
++    // Keep headroom for unmeasured kernels, library internals, and external allocations.
+     constexpr size_t safety_margin = 512ULL * 1024ULL * 1024ULL;
+-    result.required_device_bytes   = add(add(request.pending_allocation_bytes, missing), safety_margin);
+-    result.required_budget_bytes   = add(request.runtime_peak_bytes(), missing);
++    result.required_device_bytes   = add(add(add(request.pending_allocation_bytes, missing), request.backend_pool_growth_bytes), safety_margin);
++    result.required_budget_bytes   = add(add(request.runtime_peak_bytes(), missing),
++                                         add(request.backend_pool_resident_bytes, request.backend_pool_growth_bytes));
+     auto available_device_bytes    = [&](ggml_backend_t backend) {
+         auto device = ggml_backend_get_device(backend);
+         if (device == nullptr) {
+@@ -1744,7 +1745,8 @@ ModelManager::CapacityCheck ModelManager::check_capacity(
+         ggml_backend_dev_memory(device, &free_bytes, &total_bytes);
+         const size_t weights_resident = compute_backend_resident_bytes(backend);
+         const size_t other_runtime    = other_runtime_resident_bytes(request.owner_id, backend);
+-        const size_t resident         = add(weights_resident, add(other_runtime, request.runtime_resident_bytes));
++        const size_t resident         = add(add(weights_resident, add(other_runtime, request.runtime_resident_bytes)),
++                                             request.backend_pool_resident_bytes);
+         if (log_details) {
+             LOG_WARN("model manager memory on %s: reported free %.2f MB / total %.2f MB, tracked weights %.2f MB / other runtime %.2f MB / current runtime %.2f MB",
+                         ggml_backend_name(backend),
+diff --git a/src/pipeline/diffusion_engine.cpp b/src/pipeline/diffusion_engine.cpp
+index ddc4eb1..7fbe1a5 100644
+--- a/src/pipeline/diffusion_engine.cpp
++++ b/src/pipeline/diffusion_engine.cpp
+@@ -196,11 +196,15 @@ void StableDiffusionGGML::capture_runner_sources() {
+     runner_state_ = std::move(state);
+ }
+ 
+-void StableDiffusionGGML::end_runners() {
++void StableDiffusionGGML::end_runners(bool keep_diffusion_idle) {
+     if (cond_stage_model)
+         cond_stage_model->runner_end();
+-    if (diffusion_model)
+-        diffusion_model->runner_end();
++    if (diffusion_model) {
++        if (keep_diffusion_idle)
++            diffusion_model->runner_idle(false);
++        else
++            diffusion_model->runner_end();
++    }
+     if (high_noise_diffusion_model)
+         high_noise_diffusion_model->runner_end();
+     if (clip_vision)
+@@ -1805,7 +1809,8 @@ bool StableDiffusionGGML::apply_loras(const sd_lora_t* loras, uint32_t lora_coun
+     }
+ 
+     int64_t t0 = ggml_time_ms();
+-    end_runners();
++    // An unchanged empty LoRA configuration needs no weight invalidation.
++    end_runners(all_loras.empty() && conditioning_loras_.empty() && runtime_lora_models.empty());
+     clear_lora_adapters();
+     if (!model_manager->prepare_lora_sources(all_loras)) {
+         conditioning_cache_->clear();
+@@ -2303,7 +2308,7 @@ sd::Tensor<float> StableDiffusionGGML::sample(const std::shared_ptr<DiffusionMod
+         GGMLRunner* runner = nullptr;
+         ~RunnerEndOnExit() {
+             if (runner != nullptr) {
+-                runner->runner_end();
++                runner->runner_idle();
+             }
+         }
+     };
+diff --git a/src/pipeline/diffusion_engine.h b/src/pipeline/diffusion_engine.h
+index d1a8866..d8f70f4 100644
+--- a/src/pipeline/diffusion_engine.h
++++ b/src/pipeline/diffusion_engine.h
+@@ -197,7 +197,7 @@ public:
+ 
+     void capture_runner_sources();
+ 
+-    void end_runners();
++    void end_runners(bool keep_diffusion_idle = false);
+ 
+     bool reset_runners(const RunnerGroups& groups);
+ 
+@@ -242,7 +242,7 @@ public:
+ 
+         ~ExecutionScope() {
+             if (ready) {
+-                operation.sd.end_runners();
++                operation.sd.end_runners(true);
+             }
+         }
+     };
