@@ -1,0 +1,22 @@
+{
+  "1600-control": [
+    "STAGE2 strips=0",
+    "GRAPH fused=0 nodes=2265 direct=8073.242432 MiB scheduler=0",
+    "POOL resident=0.000000 MiB growth=394.000000 MiB"
+  ],
+  "1600-candidate": [
+    "STAGE2 strips=7",
+    "GRAPH fused=1 nodes=2332 direct=7879.111816 MiB scheduler=0",
+    "POOL resident=0.000000 MiB growth=394.000000 MiB"
+  ],
+  "4096-control": [
+    "STAGE2 strips=0",
+    "GRAPH fused=0 nodes=4256 direct=53145.000244 MiB scheduler=0",
+    "POOL resident=0.000000 MiB growth=2592.000000 MiB"
+  ],
+  "4096-candidate": [
+    "STAGE2 strips=18",
+    "GRAPH fused=1 nodes=4433 direct=51856.033691 MiB scheduler=0",
+    "POOL resident=0.000000 MiB growth=2592.000000 MiB"
+  ]
+}

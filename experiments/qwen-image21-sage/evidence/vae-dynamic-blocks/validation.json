@@ -1,0 +1,15 @@
+{
+  "native_restored": true,
+  "native_prepare_check": "passed",
+  "frozen_offline_check": "passed",
+  "python_syntax": "passed",
+  "diff_check": "passed",
+  "candidate_binary_hash_matches": true,
+  "components_passed": 13,
+  "images_completed": 8,
+  "within_mode_repeat_identity": true,
+  "cross_mode_1600_identity": true,
+  "cross_mode_4096_identity": false,
+  "gpu_access_escalated": true,
+  "commit_or_push": false
+}

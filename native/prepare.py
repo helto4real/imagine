@@ -12,7 +12,7 @@ import subprocess
 
 PROJECT = Path(__file__).resolve().parents[1]
 SOURCE = PROJECT / 'stable-diffusion.cpp'
-BASELINE = PROJECT / 'experiments/qwen-image21-sage/baselines/1600x896-v1'
+BASELINE = PROJECT / 'experiments/qwen-image21-sage/baselines/1600x896-v2'
 
 
 def git(directory, *args):

@@ -1,0 +1,10 @@
+{
+  "two_images_pass": true,
+  "repeat_rgba_identical": true,
+  "frozen_prompt_hashes_match": true,
+  "kitchen_dispatch_verified": true,
+  "selected_comfy_aio_sources_unchanged": true,
+  "no_comfy_spatial_tiling_retry_logged": true,
+  "allocator_warning_count": 2,
+  "harness_sha256": "c8304e5d8fac740aec8b0356f1a805666e39d83c889b5b45fe3410b13e58ee71"
+}

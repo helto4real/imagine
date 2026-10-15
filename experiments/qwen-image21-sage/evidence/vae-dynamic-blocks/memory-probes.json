@@ -1,0 +1,22 @@
+{
+  "probe-1600-0": {
+    "nodes": 2265,
+    "arena_mib": 8073.242432,
+    "scratch_growth_mib": 394.0
+  },
+  "probe-1600-1": {
+    "nodes": 7200,
+    "arena_mib": 6373.437744,
+    "scratch_growth_mib": 38.0
+  },
+  "probe-4096-0": {
+    "nodes": 4256,
+    "arena_mib": 53145.000244,
+    "scratch_growth_mib": 2592.0
+  },
+  "probe-4096-1": {
+    "nodes": 40405,
+    "arena_mib": 36279.000244,
+    "scratch_growth_mib": 244.0
+  }
+}

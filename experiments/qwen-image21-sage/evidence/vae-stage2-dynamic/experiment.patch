@@ -1,0 +1,22 @@
+--- a/src/model/common/ggml_block.hpp
++++ b/src/model/common/ggml_block.hpp
+@@ -583,6 +583,10 @@
+             forward_params.conv2d.scale      = scale;
+             return ctx->weight_adapter->forward_with_lora(ctx->ggml_ctx, ctx->backend, x, w, b, prefix, forward_params);
+         }
++        const char* stage2_flag = std::getenv("SD_VAE_STRIP_STAGE2");
++        const bool stage2_strips = stage2_flag != nullptr && std::strcmp(stage2_flag, "1") == 0 &&
++                                   prefix == "first_stage_model.decoder.upsamples.2.upsamples.3.resample.1." &&
++                                   in_channels == 576 && out_channels == 576;
+         return ggml_ext_conv_2d(ctx->ggml_ctx,
+                                 x,
+                                 w,
+@@ -597,7 +601,7 @@
+                                 ctx->circular_x_enabled,
+                                 ctx->circular_y_enabled,
+                                 scale,
+-                                prefix == "first_stage_model.decoder.upsamples.3.upsamples.3.resample.1." ? ctx->backend : nullptr);
++                                (stage2_strips || prefix == "first_stage_model.decoder.upsamples.3.upsamples.3.resample.1.") ? ctx->backend : nullptr);
+     }
+ };
+ 

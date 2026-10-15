@@ -111,6 +111,7 @@ contradict the final accepted combination.
 | DupUp3D shortcut with direct addition alone | Isolated workspace 5512.50→2531.25 MiB, synthetic cases exact. Complete arena instead grew to 8669.36 MiB. Metadata-only strip sizes 16/32/64 rows produced the same arena; only implemented 32-row path got numerical validation. No image run. | [VAE-SHORTCUT-STRIPS](profiling/VAE-SHORTCUT-STRIPS.md) |
 | Stage-3 convolution alone / with shortcut | Alone 9057.62 MiB; shortcut+stage-3 8669.36 MiB, still worse than control. Production convolution exact and locally 3150 MiB smaller, but no image test because complete-memory gate failed. | [VAE-SHORTCUT-STAGE3](profiling/VAE-SHORTCUT-STAGE3.md) |
 | All three plus original convolution strips | **Accepted for 1600×896.** Arena 8663.87→8073.24 MiB (590.625 MiB saved); 12/12 RGBA images exact. Warm PNG 39.074→39.219 s, VAE 1.700→1.720 s, same three-block reload. Chosen for memory headroom, not speed. | [VAE-THREE-STRIPS](profiling/VAE-THREE-STRIPS.md) |
+| Additional stage-2 800×448, 576→576 convolution strips | **Tested candidate; not promoted into v1.** With all frozen flags, arena 8073.24→7879.11 MiB (194.13 MiB saved); production component and 12/12 RGBA images exact. Warm PNG mean 38.627→38.756 s, median 38.689→38.522 s; VAE 1.6725→1.6825 s. Same 2946.44 MiB / three-block reload. Useful memory headroom, no demonstrated speed or residency gain. Candidate patch/binary preserved separately, native source restored. | [VAE-STAGE2-STRIPS](profiling/VAE-STAGE2-STRIPS.md); repeat only for changed workload, implementation or residency evidence |
 
 Numerical boundary: production component shapes pass, but small synthetic VAE
 shapes do not all match. Original strip convolution failures were localized to
@@ -119,15 +120,34 @@ GEMM after im2col matched, not halo/SET assembly. The stage-3 65×129 test had
 0.0234375). Their exact internal causes were not newly isolated. Do not suppress
 these failures or extrapolate saved reference-pixel identity to all shapes.
 
+## Dynamic stage-2 follow-up (completed)
+
+The fixed-size guard was removed in a separate candidate. Production component
+and all eight images at 1600×896 and 4096×2304 are bitidentical per resolution.
+At 4096 the full-graph prediction drops 53145.00→51856.03 MiB, but both use 49
+VAE tiles in practice: actual arena 3321.56→3242.32 MiB, warm VAE
+32.19→32.28 s. Total warm time worsens 508.18→671.94 s with much more segmented
+diffusion/weight streaming; the cause of different admission is not isolated.
+Not promoted. Do not propose this as an untested idea or claim it accelerates
+4096 generation. See [VAE-STAGE2-DYNAMIC](profiling/VAE-STAGE2-DYNAMIC.md).
+
+## ComfyUI 4096 reference (completed)
+
+Headless AIO/Kitchen, same synthetic prompts/models/seed and 4096×2304,
+40 ER-SDE/beta steps, CFG 2.5: first/repeat 473.87/465.64 s, repeat sampling
+450.97 s and VAE 7.47 s. Two images are bitidentical within ComfyUI, not to
+native. The repeat prompt cache expired (AIO TTL 300 s). No Comfy spatial VAE
+fallback was logged; internal allocation warnings recovered. Native frozen
+repeat was 508.18 s with 32.19 s VAE. One repeat each is not a controlled speed
+sweep. See [reference report](comfy-headless/REFERENCE-4096.md) before proposing
+another 4096 comparison or attributing the gap to a particular implementation.
+
 ## Discussed or researched, not completed optimization tests
 
 - **FlashAttention replacement:** user explicitly deferred it. The observed
   masked-prefix Flash fallback is not a whole-model Flash-versus-Sage benchmark.
 - **Kitchen in the text encoder:** source path discussed; it was not selected
   for implementation. Warm cached comparisons execute no text encoder anyway.
-- **Next VAE bottleneck:** `decoder.upsamples.2.upsamples.3.resample.1`, 800×448,
-  576→576, now creates the arena-ending im2col. Stripping it was proposed but
-  has not been implemented/tested. Freezing v1 supersedes that automatic next step.
 - **MiniMax H3, alternative quantizations, LoRAs, broader editing scenarios,
   other resolutions and GPUs:** research or future compatibility work. The
   single-reference portrait-to-environment smoke test above is the only editing
@@ -142,3 +162,48 @@ Reuse the completed 12-image comparison; do not rerun GPU benchmarks solely to
 re-establish the same binary/flags. Verify profile hashes, generated commands,
 flag selection and launcher behavior locally. A change to native computation,
 model assets or workload warrants separately scoped runtime validation.
+
+## Dynamic whole-block/upscale strips (completed 2026-10-15)
+
+A separate `SD_VAE_DYNAMIC_BLOCK_STRIPS=1` candidate extends tensor-budget-based
+strips to more whole residual blocks and complete upscale/convolution sequences,
+preserving precision and all frozen switches. Leaf destinations initially grew
+the arena; allocating destinations after the first computed strip fixed that.
+Thirteen synthetic comparisons pass byte identity and retained-input checks.
+
+Full non-tiled graph arena: 1600, 8073.24→6373.44 MiB; 4096,
+53145.00→36279.00 MiB. At 1600 all four images match v1, warm PNG
+39.210→39.007 s, VAE 1.73→1.72 s, reload 2946.44→1008.83 MiB.
+At 4096 the candidate fits 9 larger tiles instead of 49; warm VAE
+32.69→23.39 s and PNG 499.518→480.405 s, with sampling also 9.82 s faster.
+Actual tiled arena increases 3321.56→10498.50 MiB because tile size increases.
+One warm sample per mode is not a statistically established total speed gain.
+
+**4096 cross-variant pixels are not bitidentical**: 44.2843% of RGBA pixels
+change, RGB mean absolute error 0.196635/255, max channel error 15. Repeats
+within each mode are exact. Different outer tiling is a confounder; no
+same-outer-tile comparison isolates its share. Not promoted; active native
+source restored, candidate patch/binary preserved separately. Read
+[VAE-DYNAMIC-BLOCKS](profiling/VAE-DYNAMIC-BLOCKS.md) before proposing it again.
+
+## v2 acceptance — 2026-10-15
+
+Tomas accepted the dynamic-block candidate as `qwen-image21-1600x896-v2` for
+1600×896. The verified binary/flags are copied and pinned independently; v1 is
+preserved. This supersedes the prior "not promoted" decision for the 1600 scope
+only. The algorithm remains dynamic. Same-grid 4096 investigation is separate
+from the default profile and does not set a fixed outer tile size in launchers.
+
+## 4096 identical-outer-grid control — completed 2026-10-15
+
+Frozen v1 versus v2, initial plus warm image each, explicitly 49 tiles of
+1024×576 at overlap 0.5. Actual geometry and absence of fallback are asserted.
+All four RGBA images are bitidentical and match the v1 reference. Internal
+v2 strips remain dynamic. Actual VAE arena 3321.56→2476.69 MiB (844.87 MiB /
+25.4% saved); warm VAE 33.05→32.00 s, initial 33.52→32.95 s. One warm sample
+per mode does not establish a speed gain. Warm full image 498.072→507.611 s
+because sampling/staging also differ; do not attribute that to VAE or claim
+improved 4096 residency. Same-grid exactness supports outer tiling as the cause
+of the earlier auto-grid pixel difference for this workload. Do not repeat
+this as an untested hypothesis. No fixed outer tile setting is adopted into
+v2 defaults. See [VAE-FIXED-TILES-4096](profiling/VAE-FIXED-TILES-4096.md).

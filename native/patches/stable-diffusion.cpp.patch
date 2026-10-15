@@ -4,16 +4,16 @@ index d16b92a..b17a40d 100644
 +++ b/src/core/ggml_extend.cpp
 @@ -1,10 +1,13 @@
  #include "core/ggml_extend.h"
- 
+
  #include <cmath>
 +#include <cstdlib>
 +#include <cstring>
  #include <stdexcept>
  #include <utility>
- 
+
  #include "core/ggml_extend_backend.h"
 +#include "core/util.h"
- 
+
  ggml_tensor* ggml_ext_mul_n_mode(ggml_context* ctx, ggml_tensor* a, ggml_tensor* b, int mode) {
      // reshape A
 @@ -257,7 +260,14 @@ ggml_tensor* ggml_ext_linear_i8_tensorwise(ggml_context* ctx,
@@ -34,7 +34,7 @@ index d16b92a..b17a40d 100644
 @@ -413,6 +423,32 @@ ggml_tensor* ggml_ext_conv_1d(ggml_context* ctx,
      return result;
  }
- 
+
 +static ggml_tensor* conv_2d_strips(ggml_context* ctx, ggml_tensor* x, ggml_tensor* w, int p0, int p1) {
 +    const int64_t width = x->ne[0] + 2 * p0 - 2;
 +    const int64_t height = x->ne[1] + 2 * p1 - 2;
@@ -92,7 +92,7 @@ index d16b92a..b17a40d 100644
 @@ -440,8 +489,34 @@ ggml_tensor* ggml_ext_conv_2d(ggml_context* ctx,
          p1 = 0;
      }
- 
+
 -    if (direct) {
 +    const char* strip_flag = std::getenv("SD_VAE_STRIP_CONV");
 +    const bool strips = strip_flag != nullptr && std::strcmp(strip_flag, "1") == 0 &&
@@ -127,7 +127,7 @@ index d16b92a..b17a40d 100644
      }
 @@ -732,10 +807,55 @@ ggml_tensor* ggml_ext_attention_ext(ggml_context* ctx,
      };
- 
+
  #ifndef SD_USE_UPSTREAM_GGML
 -    if (sage_attn && mask == nullptr && d_head > 0 && d_head <= 128) {
 +    const char* bf16_attention_flag = std::getenv("SD_QWEN21_BF16_ATTENTION");
@@ -195,7 +195,7 @@ index 5747d62..088beee 100644
 +                              float scale     = 1.f,
 +                              ggml_backend_t fusion_backend = nullptr,
 +                              bool inplace_input_scale = false);
- 
+
  // w: [OC，IC, KD, 1 * 1]
  // x: [N, IC, IH, IW]
 diff --git a/src/core/ggml_extend_backend.cpp b/src/core/ggml_extend_backend.cpp
@@ -227,7 +227,7 @@ index df1d692..7c530ae 100644
 --- a/src/core/ggml_extend_backend.h
 +++ b/src/core/ggml_extend_backend.h
 @@ -87,6 +87,8 @@ private:
- 
+
  bool sd_backend_is(ggml_backend_t backend, const std::string& name);
  bool sd_backend_is_cpu(ggml_backend_t backend);
 +bool sd_backend_graph_pool_memory(ggml_backend_t backend, ggml_cgraph* graph,
@@ -252,7 +252,7 @@ index 4c156ed..0b13844 100644
 +    idle_weights_retained_ = false;
      return true;
  }
- 
+
 -void GGMLRunner::runner_end() {
 +void GGMLRunner::runner_idle(bool keep_workspace) {
 +    const char* retain = std::getenv("SD_QWEN21_RETAIN_IDLE");
@@ -298,10 +298,10 @@ index 4c156ed..0b13844 100644
      runner_started_ = false;
 +    idle_weights_retained_ = false;
  }
- 
+
  GGMLRunner::GGMLRunner(ggml_backend_t backend,
 @@ -721,7 +754,7 @@ ComputeWorkspace::Measurement GGMLRunner::measure(ggml_cgraph* graph, size_t dir
- 
+
  std::vector<DeviceMemoryRequest> GGMLRunner::memory_requests(
      const std::vector<BackendBufferSize>& sizes,
 -    size_t pending_cache_bytes) const {
@@ -375,7 +375,7 @@ index 02630c0..b379991 100644
      size_t logged_segment_count_     = 0;
      ggml_status last_compute_status_ = GGML_STATUS_SUCCESS;
 +    bool idle_weights_retained_     = false;
- 
+
      sd::ComputeWorkspace::Measurement measure(ggml_cgraph* graph, size_t direct_bytes);
      std::vector<DeviceMemoryRequest> memory_requests(const std::vector<sd::BackendBufferSize>& sizes,
 -                                                     size_t pending_cache_bytes) const;
@@ -384,14 +384,14 @@ index 02630c0..b379991 100644
                const std::vector<ggml_tensor*>& params) const;
      bool execute_segment(ggml_cgraph* graph, int n_threads);
 @@ -289,6 +290,8 @@ public:
- 
+
      void runner_end();
- 
+
 +    void runner_idle(bool keep_workspace = true);
 +
  public:
      virtual std::string get_desc() = 0;
- 
+
 diff --git a/src/device_residency_manager.h b/src/device_residency_manager.h
 index 0a2a889..fca9290 100644
 --- a/src/device_residency_manager.h
@@ -402,7 +402,7 @@ index 0a2a889..fca9290 100644
      size_t max_backend_bytes        = 0;
 +    size_t backend_pool_resident_bytes = 0;
 +    size_t backend_pool_growth_bytes   = 0;
- 
+
      // Runtime buffers only; the manager accounts for weights separately.
      size_t runtime_peak_bytes() const {
 diff --git a/src/model/common/ggml_block.hpp b/src/model/common/ggml_block.hpp
@@ -410,7 +410,7 @@ index 1d35b41..ea953a2 100644
 --- a/src/model/common/ggml_block.hpp
 +++ b/src/model/common/ggml_block.hpp
 @@ -3,6 +3,8 @@
- 
+
  #include <cmath>
  #include <cstdint>
 +#include <cstdlib>
@@ -458,13 +458,13 @@ index 1d35b41..ea953a2 100644
 +                                prefix == "first_stage_model.decoder.upsamples.3.upsamples.3.resample.1." ? ctx->backend : nullptr);
      }
  };
- 
+
 diff --git a/src/model/diffusion/qwen_image_2_1.hpp b/src/model/diffusion/qwen_image_2_1.hpp
 index 1d37d6a..fa5c4a5 100644
 --- a/src/model/diffusion/qwen_image_2_1.hpp
 +++ b/src/model/diffusion/qwen_image_2_1.hpp
 @@ -179,17 +179,68 @@ namespace Qwen {
- 
+
          ggml_tensor* forward(GGMLRunnerContext* ctx, ggml_tensor* x, ggml_tensor* pe, const std::vector<QwenImage21Segment>& segments, const std::vector<ggml_tensor*>& masks, const QwenImage21PrefixCache& cache) {
              int64_t heads = x->ne[0] / dim_head;
 +            const char* bf16_flag = std::getenv("SD_QWEN21_BF16_ATTENTION");
@@ -549,7 +549,7 @@ index 1d37d6a..fa5c4a5 100644
 @@ -279,28 +333,117 @@ namespace Qwen {
              return ggml_concat(ctx, prefix, target, 1);
          }
- 
+
 +        static ggml_tensor* with_dependency(ggml_context* ctx, ggml_tensor* x, ggml_tensor* dependency) {
 +            auto view    = ggml_view_4d(ctx, x, x->ne[0], x->ne[1], x->ne[2], x->ne[3], x->nb[1], x->nb[2], x->nb[3], 0);
 +            view->src[1] = dependency;
@@ -676,7 +676,7 @@ index 1d37d6a..fa5c4a5 100644
 +            return gated_residual(ctx, x, h, modulation[3], prefix_length);
          }
      };
- 
+
 @@ -348,6 +491,16 @@ namespace Qwen {
                      joint = joint == nullptr ? h : ggml_concat(ctx->ggml_ctx, joint, h, 1);
                  }
@@ -718,27 +718,46 @@ index 1d37d6a..fa5c4a5 100644
                             (attn_scale <= 0.f || attn_scale == 1.f)) {
                      cache.type = GGML_TYPE_F16;
 diff --git a/src/model/vae/wan_vae.hpp b/src/model/vae/wan_vae.hpp
-index 9dd30fd..652fa43 100644
+index 9dd30fd..09c7be3 100644
 --- a/src/model/vae/wan_vae.hpp
 +++ b/src/model/vae/wan_vae.hpp
-@@ -65,7 +65,7 @@ namespace WAN {
+@@ -15,6 +15,18 @@ namespace WAN {
+
+     constexpr int CACHE_T = 2;
+
++    static bool dynamic_strips_enabled() {
++        const char* flag = std::getenv("SD_VAE_DYNAMIC_BLOCK_STRIPS");
++        return flag != nullptr && std::strcmp(flag, "1") == 0;
++    }
++
++    static int64_t dynamic_strip_rows(int64_t width, int64_t height, int64_t channels, int scale = 1) {
++        constexpr int64_t element_budget = 1 << 24;
++        const int64_t elements = width * height * channels * scale * scale;
++        const int64_t count = std::max<int64_t>(1, (elements + element_budget - 1) / element_budget);
++        return std::max<int64_t>(1, (height + count - 1) / count);
++    }
++
+     class CausalConv3d : public GGMLBlock {
+     protected:
+         int64_t in_channels;
+@@ -65,7 +77,7 @@ namespace WAN {
              scale = scale_value;
          }
- 
+
 -        ggml_tensor* forward(GGMLRunnerContext* ctx, ggml_tensor* x, ggml_tensor* cache_x = nullptr) {
 +        ggml_tensor* forward(GGMLRunnerContext* ctx, ggml_tensor* x, ggml_tensor* cache_x = nullptr, bool strip_conv = true) {
              // x: [N*IC, ID, IH, IW]
              // result: x: [N*OC, ID, IH, IW]
              ggml_tensor* w = params["weight"];
-@@ -86,6 +86,7 @@ namespace WAN {
+@@ -86,6 +98,7 @@ namespace WAN {
                  lp2 -= (int)cache_x->ne[2];
              }
- 
+
 +            auto unpadded = x;
              x = ggml_ext_pad_ext(ctx->ggml_ctx, ctx->backend, x, lp0, rp0, lp1, rp1, lp2, rp2, 0, 0, ctx->circular_x_enabled, ctx->circular_y_enabled);
              if (w->ne[2] == 1 && x->ne[2] == 1 && x->ne[3] == in_channels) {
                  // One frame through a one-frame-deep kernel is a 2D conv; backends without
-@@ -93,12 +94,31 @@ namespace WAN {
+@@ -93,12 +106,31 @@ namespace WAN {
                  if (!ggml_is_contiguous(x)) {
                      x = ggml_cont(ctx->ggml_ctx, x);
                  }
@@ -771,7 +790,52 @@ index 9dd30fd..652fa43 100644
                  return ggml_reshape_4d(ctx->ggml_ctx, x2, x2->ne[0], x2->ne[1], 1, out_channels);
              }
              return ggml_ext_conv_3d(ctx->ggml_ctx, ctx->backend, x, w, b, in_channels,
-@@ -346,6 +366,12 @@ namespace WAN {
+@@ -164,8 +196,11 @@ namespace WAN {
+     protected:
+         int64_t dim;
+         std::string mode;
++        bool image_strips_ = false;
+
+     public:
++        void enable_image_strips() { image_strips_ = true; }
++
+         Resample(int64_t dim, const std::string& mode, bool wan2_2 = false, bool is_2D = false)
+             : dim(dim), mode(mode) {
+             if (mode == "upsample2d") {
+@@ -253,6 +288,32 @@ namespace WAN {
+                 auto resample_1 = std::dynamic_pointer_cast<Conv2d>(blocks["resample.1"]);
+
+                 x = ggml_ext_cont(ctx->ggml_ctx, ggml_ext_torch_permute(ctx->ggml_ctx, x, 0, 1, 3, 2));  // (t, c, h, w)
++                const bool strip_upsample = image_strips_ && dynamic_strips_enabled() &&
++                                            (mode == "upsample2d" || mode == "upsample3d") &&
++                                            t == 1 && chunk_idx == 0 && x->type == GGML_TYPE_F32 &&
++                                            sd_backend_is(ctx->backend, "CUDA") && ctx->graph == nullptr &&
++                                            !ctx->weight_adapter && !ctx->conv2d_direct_enabled &&
++                                            !ctx->circular_x_enabled && !ctx->circular_y_enabled;
++                const int64_t step = dynamic_strip_rows(w, h, c, 2);
++                if (strip_upsample && step < h) {
++                    ggml_tensor* result = nullptr;
++                    for (int64_t row = 0; row < h; row += step) {
++                        const int64_t rows = std::min(step, h - row);
++                        const int64_t lo = std::max<int64_t>(0, row - 1);
++                        const int64_t hi = std::min(h, row + rows + 1);
++                        auto input = ggml_cont(ctx->ggml_ctx, ggml_view_4d(ctx->ggml_ctx, x, w, hi - lo, c, 1,
++                                                                       x->nb[1], x->nb[2], x->nb[3], lo * x->nb[1]));
++                        auto output = resample_1->forward(ctx, ggml_upscale(ctx->ggml_ctx, input, 2, GGML_SCALE_MODE_NEAREST));
++                        output = ggml_cont(ctx->ggml_ctx, ggml_view_4d(ctx->ggml_ctx, output, w * 2, rows * 2, c, 1,
++                                                                     output->nb[1], output->nb[2], output->nb[3], (row - lo) * 2 * output->nb[1]));
++                        // A leaf destination is allocated at graph start and would retain every block's output.
++                        result = result == nullptr ? ggml_pad(ctx->ggml_ctx, output, 0, (h - rows) * 2, 0, 0) :
++                                 ggml_set_inplace(ctx->ggml_ctx, result, output, result->nb[1], result->nb[2], result->nb[3], row * 2 * result->nb[1]);
++                    }
++                    LOG_DEBUG("VAE dynamic upscale-conv: %lldx%lld channels=%lld input_rows=%lld",
++                              (long long)w, (long long)h, (long long)c, (long long)step);
++                    return ggml_ext_cont(ctx->ggml_ctx, ggml_ext_torch_permute(ctx->ggml_ctx, result, 0, 1, 3, 2));
++                }
+                 if (mode == "upsample2d") {
+                     x = ggml_upscale(ctx->ggml_ctx, x, 2, GGML_SCALE_MODE_NEAREST);
+                 } else if (mode == "upsample3d") {
+@@ -346,6 +407,12 @@ namespace WAN {
          int64_t factor_s;
          int64_t factor;
          int64_t repeats;
@@ -781,11 +845,11 @@ index 9dd30fd..652fa43 100644
 +            strip_add_eligible_ = prefix == "first_stage_model.decoder.upsamples.2.avg_shortcut." &&
 +                                  in_channels == 1152 && out_channels == 576 && factor_t == 2 && factor_s == 2;
 +        }
- 
+
      public:
          DupUp3D(int64_t in_channels, int64_t out_channels, int64_t factor_t, int64_t factor_s = 1)
-@@ -387,6 +413,35 @@ namespace WAN {
- 
+@@ -387,6 +454,35 @@ namespace WAN {
+
              return x;
          }
 +
@@ -818,26 +882,38 @@ index 9dd30fd..652fa43 100644
 +            return result;
 +        }
      };
- 
+
      class ResidualBlock : public GGMLBlock {
-@@ -394,6 +449,16 @@ namespace WAN {
+@@ -394,8 +490,28 @@ namespace WAN {
          int64_t in_dim;
          int64_t out_dim;
          bool is_2D;
 +        bool strip_block_eligible_ = false;
++        bool image_strips_ = false;
++        bool image_kernels_ = false;
 +
 +        void init_params(ggml_context*, const String2TensorStorage& shapes = {}, const std::string prefix = "") override {
 +            strip_block_eligible_ = !is_2D && in_dim == 288 && out_dim == 144 &&
 +                                    prefix == "first_stage_model.decoder.upsamples.4.upsamples.0.";
++            image_kernels_ = !is_2D && prefix.find("first_stage_model.decoder.") == 0;
++            for (const char* name : {"residual.2.weight", "residual.6.weight", "shortcut.weight"}) {
++                if (std::strcmp(name, "shortcut.weight") == 0 && in_dim == out_dim) continue;
++                const auto it = shapes.find(prefix + name);
++                image_kernels_ = image_kernels_ && it != shapes.end() && it->second.ne[2] == 1;
++            }
 +            for (const char* name : {"residual.2.weight", "residual.6.weight", "shortcut.weight"}) {
 +                const auto it = shapes.find(prefix + name);
 +                strip_block_eligible_ = strip_block_eligible_ && it != shapes.end() && it->second.ne[2] == 1;
 +            }
 +        }
- 
+
      public:
++        void enable_image_strips() { image_strips_ = true; }
++
          ResidualBlock(int64_t in_dim, int64_t out_dim, bool is_2D = false)
-@@ -426,9 +491,41 @@ namespace WAN {
+             : in_dim(in_dim), out_dim(out_dim), is_2D(is_2D) {
+             blocks["residual.0"] = std::shared_ptr<GGMLBlock>(new RMS_norm(in_dim));
+@@ -426,9 +542,47 @@ namespace WAN {
                               ggml_tensor* x,
                               int64_t b,
                               std::vector<ggml_tensor*>& feat_cache,
@@ -847,7 +923,12 @@ index 9dd30fd..652fa43 100644
              // x: [b*c, t, h, w]
              GGML_ASSERT(b == 1);
 +            const char* strip_flag = std::getenv("SD_VAE_STRIP_RESIDUAL");
-+            if (!within_strip && strip_block_eligible_ && strip_flag != nullptr && std::strcmp(strip_flag, "1") == 0 &&
++            const int64_t dynamic_step = dynamic_strip_rows(x->ne[0], x->ne[1], std::max(in_dim, out_dim));
++            const bool dynamic = image_strips_ && image_kernels_ && dynamic_strips_enabled() && dynamic_step < x->ne[1];
++            const int64_t step = dynamic ? dynamic_step : 64;
++            const bool selected = dynamic ? step < x->ne[1] :
++                                  strip_block_eligible_ && strip_flag != nullptr && std::strcmp(strip_flag, "1") == 0;
++            if (!within_strip && selected && !ctx->weight_adapter &&
 +                sd_backend_is(ctx->backend, "CUDA") && ctx->graph == nullptr &&
 +                !ctx->conv2d_direct_enabled && !ctx->conv3d_direct_enabled &&
 +                !ctx->circular_x_enabled && !ctx->circular_y_enabled &&
@@ -856,9 +937,9 @@ index 9dd30fd..652fa43 100644
 +                feat_cache[feat_idx] == nullptr && feat_cache[feat_idx + 1] == nullptr) {
 +                const int64_t width = x->ne[0];
 +                const int64_t height = x->ne[1];
-+                auto result = ggml_new_tensor_4d(ctx->ggml_ctx, GGML_TYPE_F32, width, height, 1, out_dim);
-+                for (int64_t row = 0; row < height; row += 64) {
-+                    const int64_t rows = std::min<int64_t>(64, height - row);
++                auto result = dynamic ? nullptr : ggml_new_tensor_4d(ctx->ggml_ctx, GGML_TYPE_F32, width, height, 1, out_dim);
++                for (int64_t row = 0; row < height; row += step) {
++                    const int64_t rows = std::min<int64_t>(step, height - row);
 +                    const int64_t lo = std::max<int64_t>(0, row - 2);
 +                    const int64_t hi = std::min<int64_t>(height, row + rows + 2);
 +                    auto input = ggml_cont(ctx->ggml_ctx, ggml_view_4d(ctx->ggml_ctx, x, width, hi - lo, 1, in_dim,
@@ -869,19 +950,20 @@ index 9dd30fd..652fa43 100644
 +                    GGML_ASSERT(strip_idx == 2);
 +                    output = ggml_cont(ctx->ggml_ctx, ggml_view_4d(ctx->ggml_ctx, output, width, rows, 1, out_dim,
 +                                                                  output->nb[1], output->nb[2], output->nb[3], (row - lo) * output->nb[1]));
-+                    result = ggml_set_inplace(ctx->ggml_ctx, result, output, result->nb[1], result->nb[2], result->nb[3], row * result->nb[1]);
++                    result = result == nullptr ? ggml_pad(ctx->ggml_ctx, output, 0, height - rows, 0, 0) :
++                             ggml_set_inplace(ctx->ggml_ctx, result, output, result->nb[1], result->nb[2], result->nb[3], row * result->nb[1]);
 +                }
 +                // These singleton-temporal kernels do not consume frame caches; keep their slots aligned.
 +                feat_idx += 2;
-+                LOG_DEBUG("VAE strip residual block: %lldx%lld channels=288->144 rows=64 halo=2",
-+                          (long long)width, (long long)height);
++                LOG_DEBUG("VAE strip residual block: %lldx%lld channels=%lld->%lld rows=%lld halo=2 dynamic=%d",
++                          (long long)width, (long long)height, (long long)in_dim, (long long)out_dim, (long long)step, dynamic);
 +                return result;
 +            }
              ggml_tensor* h = x;
              if (in_dim != out_dim) {
                  if (is_2D) {
-@@ -464,7 +561,7 @@ namespace WAN {
- 
+@@ -464,7 +618,7 @@ namespace WAN {
+
                              x = layer->forward(ctx, x);
                          } else {
 -                            x = layer->forward(ctx, x, feat_cache[idx]);
@@ -889,17 +971,36 @@ index 9dd30fd..652fa43 100644
                          }
                          feat_cache[idx] = cache_x;
                          feat_idx += 1;
-@@ -595,9 +692,7 @@ namespace WAN {
+@@ -595,9 +749,7 @@ namespace WAN {
                  x                      = block->forward(ctx, x, b, feat_cache, feat_idx, chunk_idx);
- 
+
                  auto avg_shortcut = std::dynamic_pointer_cast<DupUp3D>(blocks["avg_shortcut"]);
 -                auto shortcut     = avg_shortcut->forward(ctx, x_copy, chunk_idx == 0, b);
 -
 -                x = ggml_add(ctx->ggml_ctx, x, shortcut);
 +                x = avg_shortcut->forward_add(ctx, x_copy, x, chunk_idx == 0, b);
              }
- 
+
              return x;
+@@ -1128,6 +1280,8 @@ namespace WAN {
+                 std::vector<GGMLBlock*> all_blocks;
+                 get_all_blocks(all_blocks);
+                 for (auto block : all_blocks) {
++                    if (auto residual = dynamic_cast<ResidualBlock*>(block)) residual->enable_image_strips();
++                    if (auto resample = dynamic_cast<Resample*>(block)) resample->enable_image_strips();
+                     if (auto conv = dynamic_cast<Conv2d*>(block)) {
+                         conv->set_scale(conv_scale);
+                     } else if (auto conv = dynamic_cast<CausalConv3d*>(block)) {
+@@ -1443,7 +1597,8 @@ namespace WAN {
+         }
+
+         ggml_cgraph* build_graph(const sd::Tensor<float>& z_tensor, bool decode_graph) {
+-            ggml_cgraph* gf = new_graph_custom(10240 * z_tensor.shape()[2]);
++            const size_t graph_nodes = decode_graph && dynamic_strips_enabled() ? 131072 : 10240;
++            ggml_cgraph* gf = new_graph_custom(graph_nodes * z_tensor.shape()[2]);
+             ggml_tensor* z  = make_input(z_tensor);
+
+             auto runner_ctx = get_context();
 diff --git a/src/model_manager.cpp b/src/model_manager.cpp
 index 2815e16..c49990c 100644
 --- a/src/model_manager.cpp
@@ -936,7 +1037,7 @@ index ddc4eb1..7fbe1a5 100644
 @@ -196,11 +196,15 @@ void StableDiffusionGGML::capture_runner_sources() {
      runner_state_ = std::move(state);
  }
- 
+
 -void StableDiffusionGGML::end_runners() {
 +void StableDiffusionGGML::end_runners(bool keep_diffusion_idle) {
      if (cond_stage_model)
@@ -954,7 +1055,7 @@ index ddc4eb1..7fbe1a5 100644
      if (clip_vision)
 @@ -1805,7 +1809,8 @@ bool StableDiffusionGGML::apply_loras(const sd_lora_t* loras, uint32_t lora_coun
      }
- 
+
      int64_t t0 = ggml_time_ms();
 -    end_runners();
 +    // An unchanged empty LoRA configuration needs no weight invalidation.
@@ -976,16 +1077,16 @@ index d1a8866..d8f70f4 100644
 --- a/src/pipeline/diffusion_engine.h
 +++ b/src/pipeline/diffusion_engine.h
 @@ -197,7 +197,7 @@ public:
- 
+
      void capture_runner_sources();
- 
+
 -    void end_runners();
 +    void end_runners(bool keep_diffusion_idle = false);
- 
+
      bool reset_runners(const RunnerGroups& groups);
- 
+
 @@ -242,7 +242,7 @@ public:
- 
+
          ~ExecutionScope() {
              if (ready) {
 -                operation.sd.end_runners();

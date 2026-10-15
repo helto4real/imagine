@@ -1,0 +1,6 @@
+{
+  "file": "src/model/vae/wan_vae.hpp",
+  "baseline": "5510222321efc6437a5380b60def8c2a4629a2044b742d942113e519c637ba5f",
+  "candidate": "2ff227f3908236303dd7d64183fb00e388dd09b99cda45f86411953c81e925bb",
+  "binary": "9fd49b0e5cb3426043ebd85271ad167555551ac65252590cde5ac25bed44bbb0"
+}

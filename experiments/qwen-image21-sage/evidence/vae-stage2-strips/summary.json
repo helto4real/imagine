@@ -1,0 +1,90 @@
+{
+  "control": {
+    "saved_seconds": {
+      "mean": 38.62678208446596,
+      "median": 38.689323352475185,
+      "min": 38.18813743698411,
+      "max": 38.940344195929356
+    },
+    "sampling_seconds": {
+      "mean": 36.7175,
+      "median": 36.769999999999996,
+      "min": 36.3,
+      "max": 37.03
+    },
+    "vae_seconds": {
+      "mean": 1.6724999999999999,
+      "median": 1.66,
+      "min": 1.66,
+      "max": 1.71
+    },
+    "vae_workspace_mib": {
+      "mean": 8073.24,
+      "median": 8073.24,
+      "min": 8073.24,
+      "max": 8073.24
+    },
+    "prepared_gpu_params_mib": {
+      "mean": 2946.44,
+      "median": 2946.44,
+      "min": 2946.44,
+      "max": 2946.44
+    },
+    "tensor_loading_seconds": {
+      "mean": 0.4,
+      "median": 0.4,
+      "min": 0.4,
+      "max": 0.4
+    },
+    "idle_gpu_MiB": {
+      "mean": 6297.0,
+      "median": 6300.0,
+      "min": 6217.0,
+      "max": 6371.0
+    }
+  },
+  "candidate": {
+    "saved_seconds": {
+      "mean": 38.7559839397436,
+      "median": 38.52187680400675,
+      "min": 38.16461956396233,
+      "max": 39.81556258699857
+    },
+    "sampling_seconds": {
+      "mean": 36.832499999999996,
+      "median": 36.595,
+      "min": 36.28,
+      "max": 37.86
+    },
+    "vae_seconds": {
+      "mean": 1.6824999999999999,
+      "median": 1.67,
+      "min": 1.67,
+      "max": 1.72
+    },
+    "vae_workspace_mib": {
+      "mean": 7879.11,
+      "median": 7879.11,
+      "min": 7879.11,
+      "max": 7879.11
+    },
+    "prepared_gpu_params_mib": {
+      "mean": 2946.44,
+      "median": 2946.44,
+      "min": 2946.44,
+      "max": 2946.44
+    },
+    "tensor_loading_seconds": {
+      "mean": 0.4,
+      "median": 0.4,
+      "min": 0.4,
+      "max": 0.4
+    },
+    "idle_gpu_MiB": {
+      "mean": 6314.75,
+      "median": 6303.0,
+      "min": 6273.0,
+      "max": 6380.0
+    }
+  }
+}

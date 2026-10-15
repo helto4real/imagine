@@ -3,9 +3,9 @@
 Accepted: 2026-10-14. Revision: `imagine-api-v1`.
 
 This is the implementation contract for the first Rust service. It supersedes
-older illustrative API examples in `design-document.md`. The inference control
-remains `qwen-image21-1600x896-v1`; accepting this API does not authorize changing
-its native binary, CUDA flags, memory policy or precision.
+older illustrative API examples in `design-document.md`. The native profile was explicitly advanced to `qwen-image21-1600x896-v2` on
+2026-10-15. API revision and request validation remain unchanged. The new profile
+adds dynamic VAE strips while preserving precision and memory policy.
 
 ## Scope and architecture
 
@@ -35,7 +35,7 @@ Module responsibilities:
 | `config` | Local credentials, single-server lock, project/model paths |
 
 The backend trait is a small testable boundary, not a plugin framework.
-The native C++ code and the frozen executable are unchanged.
+The native binary and environment are pinned by the accepted v2 manifest.
 
 ## Start and credentials
 

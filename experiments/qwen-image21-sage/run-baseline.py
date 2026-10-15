@@ -8,7 +8,7 @@ import shlex
 import sys
 
 ROOT = Path(__file__).resolve().parent
-BASELINE = ROOT / 'baselines/1600x896-v1'
+BASELINE = ROOT / 'baselines/1600x896-v2'
 
 
 def prepare(environ):

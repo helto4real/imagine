@@ -1,0 +1,64 @@
+{
+  "all_eight_images_pass": true,
+  "same_rgba_per_resolution": true,
+  "accepted_flags_verified": true,
+  "source_stable_during_runs": true,
+  "dynamic_dispatch_both_resolutions": true,
+  "warm_metrics": {
+    "1600-control": {
+      "saved_seconds": 40.33598584297579,
+      "sampling_seconds": 38.46,
+      "vae_seconds": 1.66,
+      "vae_workspace_mib": 8073.24,
+      "prepared_gpu_params_mib": 2946.44,
+      "single_segment_forwards": 80
+    },
+    "1600-candidate": {
+      "saved_seconds": 38.89041460095905,
+      "sampling_seconds": 36.94,
+      "vae_seconds": 1.7,
+      "vae_workspace_mib": 7879.11,
+      "prepared_gpu_params_mib": 2946.44,
+      "single_segment_forwards": 80
+    },
+    "4096-control": {
+      "saved_seconds": 508.1765307940077,
+      "sampling_seconds": 474.58,
+      "vae_seconds": 32.19,
+      "vae_workspace_mib": 3321.56,
+      "prepared_gpu_params_mib": 11403.189999999999,
+      "single_segment_forwards": 77
+    },
+    "4096-candidate": {
+      "saved_seconds": 671.9371685760561,
+      "sampling_seconds": 638.29,
+      "vae_seconds": 32.28,
+      "vae_workspace_mib": 3242.32,
+      "prepared_gpu_params_mib": 59698.7,
+      "single_segment_forwards": 22
+    }
+  },
+  "diffusion_forward_counts": {
+    "image-1600-control": [
+      80,
+      80
+    ],
+    "image-1600-candidate": [
+      80,
+      80
+    ],
+    "image-4096-control": [
+      80,
+      80
+    ],
+    "image-4096-candidate": [
+      80,
+      80
+    ]
+  },
+  "patch_roundtrip_verified": true,
+  "native_prepare_check_passed": true,
+  "frozen_offline_check_passed": true,
+  "python_syntax_passed": true,
+  "compute_sanitizer_run": false
+}

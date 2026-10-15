@@ -1,0 +1,12 @@
+{
+  "all_four_rgba_images_identical": true,
+  "matches_v1_reference": true,
+  "fixed_grid_validated_in_request_and_logs": true,
+  "automatic_tile_fallback": false,
+  "frozen_v1_v2_hashes_verified": true,
+  "only_profile_flag_difference": "SD_VAE_DYNAMIC_BLOCK_STRIPS=1",
+  "precision_unchanged": true,
+  "gpu_access_escalated": true,
+  "new_native_build": false,
+  "commit_or_push": false
+}

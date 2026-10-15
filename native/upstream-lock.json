@@ -3,7 +3,7 @@
     "url": "https://github.com/leejet/stable-diffusion.cpp.git",
     "commit": "d637cfb935feb2254898a8f1524046c958f3df80",
     "patch": "native/patches/stable-diffusion.cpp.patch",
-    "patch_sha256": "1cb4fe3b1e2b6441ef649e3423cd3a9007a81383c7ec4bf4efe034b235ffebbe"
+    "patch_sha256": "f6d22135b7fef166c1eea43e28acf50674ac733f428a82ef8c305a8795396fc4"
   },
   "ggml": {
     "url": "https://github.com/leejet/ggml.git",

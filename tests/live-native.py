@@ -24,7 +24,7 @@ args = parser.parse_args()
 if not args.run:
     parser.exit(message='Pass --run to perform three real generations and lifecycle checks.\n')
 root = Path(__file__).resolve().parents[1]
-baseline = root / 'experiments/qwen-image21-sage/baselines/1600x896-v1'
+baseline = root / 'experiments/qwen-image21-sage/baselines/1600x896-v2'
 manifest = json.loads((baseline / 'manifest.json').read_text())
 (root / '.imagine/test-runs').mkdir(parents=True, exist_ok=True)
 out = Path(tempfile.mkdtemp(prefix='native-api-', dir=root / '.imagine/test-runs'))

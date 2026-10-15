@@ -1,0 +1,6 @@
+{
+  "file": "src/model/common/ggml_block.hpp",
+  "before": "36b0d55cdf2042c5fe1ab4f17b9c498168229ed610fe994832fd1a36a3324eef",
+  "candidate": "dd31a37c0e8cea7753df6743f1ae2799d1e8172c843aa135adc51a71367d1cbb",
+  "patch_sha256": "bde464f672f26cddae11b6be045ba0286045ea489672e5452df288157b9b68ee"
+}

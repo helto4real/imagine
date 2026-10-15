@@ -115,7 +115,7 @@ The independently preserved, hash-checked baseline executable is intentionally
 not distributed through Git. The repository contains its identity, settings,
 synthetic prompts and compact measurement evidence. A fresh clone can build the
 engine, but the strict frozen launcher requires the exact archived executable;
-it does not silently accept a rebuilt development binary as baseline v1.
+it does not silently accept a rebuilt development binary as the frozen baseline.
 
 For a machine with that executable and the model files:
 
@@ -136,7 +136,7 @@ but must be validated separately before being called the frozen baseline.
 
 ## Measurements and cleanup
 
-The selected profile saves 590.625 MiB of VAE workspace versus the preceding
+Historical v1 saves 590.625 MiB of VAE workspace versus the preceding
 control, with 12/12 reference images pixel-identical. Its measured warm request
 to PNG mean was 39.219 s. This is not a fresh simultaneous comparison with
 ComfyUI and not a universal bit-identity guarantee.
@@ -160,3 +160,8 @@ The engine and ggml patches are based on the MIT-licensed upstream projects;
 their notices are retained in `native/licenses/`. CUTLASS has its own license
 and per-file notices in `third_party/cutlass/`. Downloaded upstream dependencies
 retain their respective licenses. These notices do not license model weights.
+
+Current native baseline: `qwen-image21-1600x896-v2` (accepted 2026-10-15).
+The Rust service and experiment launcher select v2; v1 is retained as control.
+The strip algorithm is dynamic; 1600×896 identifies the validated profile.
+See [current baseline](experiments/qwen-image21-sage/BASELINE.md).

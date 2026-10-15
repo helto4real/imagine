@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 pub const MODEL: &str = "qwen-image-2.1-int8";
-pub const PROFILE: &str = "qwen-image21-1600x896-v1";
+pub const PROFILE: &str = "qwen-image21-1600x896-v2";
 pub const API_REVISION: &str = "imagine-api-v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

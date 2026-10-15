@@ -1,0 +1,46 @@
+{
+  "order": [
+    "control_A",
+    "candidate_A",
+    "candidate_B",
+    "control_B"
+  ],
+  "images_per_series": 3,
+  "warm_per_mode": 4,
+  "control_sha256": "4e33830f7eba36573cba9785249641ae8c727be5e6a506e9c7ef0ee74beea2e3",
+  "candidate_sha256": "80227a5a72b8972e773d0b2ce7179aa092463e6a741553ab0f963673a219d155",
+  "accepted_flags": {
+    "GGML_CUDA_FUSED_INT8_GATE_UP": "1",
+    "GGML_CUDA_FUSED_INT8_PROJECTION": "1",
+    "GGML_CUDA_CONVROT_THREADS": "512",
+    "GGML_CUDA_FUSED_SWIGLU_CONVROT": "1",
+    "GGML_CUDA_SWIGLU_CONVROT_VEC": "0",
+    "GGML_CUDA_FUSED_INT8_DOWN": "1",
+    "GGML_CUDA_FUSED_RMS_ROPE": "1",
+    "GGML_CUDA_FUSED_NORM_MODULATION": "1",
+    "GGML_CUDA_FUSED_NORM_CONVROT": "1",
+    "GGML_CUDA_FUSED_DOWN_RESIDUAL": "1",
+    "GGML_CUDA_FUSED_ATTENTION_RESIDUAL": "1",
+    "GGML_CUDA_FUSED_QK_RMS_ROPE": "1",
+    "GGML_CUDA_FUSED_GATED_RESIDUAL": "1",
+    "SD_QWEN21_BF16_RESIDUAL": "1",
+    "SD_QWEN21_BF16_GATE_UP": "0",
+    "SD_QWEN21_BF16_ATTENTION": "1",
+    "SD_SAGE_DIRECT_V_CAST": "0",
+    "SD_SAGE_SPLIT_V": "1",
+    "SD_SAGE_SPLIT_K": "0",
+    "GGML_CUDA_FUSED_INT8_GATE_UP_SWIGLU": "1",
+    "GGML_CUDA_GATE_UP_DIRECT": "0",
+    "SD_QWEN21_RETAIN_IDLE": "0",
+    "SD_VAE_FUSED_UPSCALE_IM2COL": "0",
+    "SD_VAE_REUSE_PAD_SCALE": "0",
+    "SD_VAE_STRIP_CONV": "1",
+    "SD_VAE_STRIP_SHORTCUT": "1",
+    "SD_VAE_STRIP_STAGE3": "1",
+    "SD_VAE_STRIP_RESIDUAL": "1"
+  },
+  "candidate_flag": {
+    "SD_VAE_STRIP_STAGE2": "1"
+  },
+  "reference_rgba_sha256": "473bfa4ab0c2230258a168afbe07523bd6bc7d81a4a2daf458500b6df036132d"
+}

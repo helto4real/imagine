@@ -115,7 +115,7 @@ impl Config {
     }
 }
 pub fn baseline_dir(project: &Path) -> PathBuf {
-    project.join("experiments/qwen-image21-sage/baselines/1600x896-v1")
+    project.join("experiments/qwen-image21-sage/baselines/1600x896-v2")
 }
 
 #[cfg(test)]

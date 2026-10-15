@@ -78,3 +78,7 @@ injection was performed; database crash recovery was tested synthetically.
 No native source, CUDA settings or frozen executable was changed. Network access
 was elevated to fetch Cargo dependencies, and GPU access was elevated for the
 live test. No commit or push was performed for this implementation.
+
+Native profile update (2026-10-15): the service now selects v2. The live API/edit
+results above were measured with v1; they have not been rerun for this freeze.
+Native v2 text-to-image acceptance and scope are recorded in the baseline report.

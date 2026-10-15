@@ -1,0 +1,158 @@
+[
+  {
+    "index": 0,
+    "saved_seconds": 473.8730338390451,
+    "process_start_to_save_seconds": 476.17551397904754,
+    "rgb_sha256": "ded824ed6082bd4b41ef9785178a1fb876cdd0b80199edc582dcb2ab60bf0fd0",
+    "size": [
+      4096,
+      2304
+    ],
+    "encoding_cache": {
+      "reference_hits": 0,
+      "reference_encodes": 0,
+      "conditioning_hits": 0,
+      "conditioning_encodes": 2,
+      "negative_skipped": 0
+    },
+    "peak_allocated_mib": 10617.7998046875,
+    "peak_reserved_mib": 13744.0,
+    "dispatch": {
+      "quantize_int8_rowwise_convrot64": 15744,
+      "cutlass_int8_dequant:True": 15744,
+      "sage_sdpa_prequantized": 2624
+    },
+    "resolved_settings": {
+      "family": "qwen_image_2_1",
+      "reference_megapixels": 1.6,
+      "edit_canvas": "main controls",
+      "memory_policy": "auto",
+      "cache_device": "auto",
+      "cache_dtype": "default",
+      "attention_mode": "comfy_kitchen_int8",
+      "reference_upscale_method": "lanczos",
+      "sampling_schedule": "comfy",
+      "color_match_strength": 0.8,
+      "color_match": false,
+      "brightness_strength": 0.0,
+      "contrast_strength": 0.0,
+      "microcontrast_strength": 0.0,
+      "privacy_mode": true,
+      "use_zero_negative_conditioning": false,
+      "width": 4096,
+      "height": 2304,
+      "steps": 40,
+      "cfg": 2.5,
+      "sampler": "er_sde",
+      "scheduler": "beta",
+      "max_side": 4096,
+      "aspect_ratio": "16:9",
+      "size_mode": "use aspect ratio",
+      "multiple_value": 32,
+      "edit_mode": "text_to_image",
+      "resolved_memory_policy": "auto",
+      "memory_cleanup_applied": false,
+      "memory_reserved_vram_gb": 0.0,
+      "performance_apply_timing": "after_loras",
+      "resolved_attention_mode": "comfy_kitchen_int8",
+      "torch_compile_mode": "off",
+      "torch_compile_backend": "inductor",
+      "resolved_torch_compile_mode": "off",
+      "resolved_torch_compile_backend": "off",
+      "encoding_cache": {
+        "reference_hits": 0,
+        "reference_encodes": 0,
+        "conditioning_hits": 0,
+        "conditioning_encodes": 2,
+        "negative_skipped": 0
+      }
+    },
+    "forward_count": 80,
+    "steps_executed": 40,
+    "phases_seconds": {
+      "prepare_models": 0.38641314301639795,
+      "conditioning": 3.0081553980708122,
+      "sample_with_comfy_ksampler": 458.9174196589738,
+      "decode_latent": 7.976044101989828
+    },
+    "rgba_sha256": "aaf0d9f38c7a322c1f5567b3bc81d6067088d6ff1a83783a1d92b3d8b811f00b"
+  },
+  {
+    "index": 1,
+    "saved_seconds": 465.642256608,
+    "process_start_to_save_seconds": 942.1598752900027,
+    "rgb_sha256": "ded824ed6082bd4b41ef9785178a1fb876cdd0b80199edc582dcb2ab60bf0fd0",
+    "size": [
+      4096,
+      2304
+    ],
+    "encoding_cache": {
+      "reference_hits": 0,
+      "reference_encodes": 0,
+      "conditioning_hits": 0,
+      "conditioning_encodes": 2,
+      "negative_skipped": 0
+    },
+    "peak_allocated_mib": 10616.9248046875,
+    "peak_reserved_mib": 12188.0,
+    "dispatch": {
+      "quantize_int8_rowwise_convrot64": 15744,
+      "cutlass_int8_dequant:True": 15744,
+      "sage_sdpa_prequantized": 2624
+    },
+    "resolved_settings": {
+      "family": "qwen_image_2_1",
+      "reference_megapixels": 1.6,
+      "edit_canvas": "main controls",
+      "memory_policy": "auto",
+      "cache_device": "auto",
+      "cache_dtype": "default",
+      "attention_mode": "comfy_kitchen_int8",
+      "reference_upscale_method": "lanczos",
+      "sampling_schedule": "comfy",
+      "color_match_strength": 0.8,
+      "color_match": false,
+      "brightness_strength": 0.0,
+      "contrast_strength": 0.0,
+      "microcontrast_strength": 0.0,
+      "privacy_mode": true,
+      "use_zero_negative_conditioning": false,
+      "width": 4096,
+      "height": 2304,
+      "steps": 40,
+      "cfg": 2.5,
+      "sampler": "er_sde",
+      "scheduler": "beta",
+      "max_side": 4096,
+      "aspect_ratio": "16:9",
+      "size_mode": "use aspect ratio",
+      "multiple_value": 32,
+      "edit_mode": "text_to_image",
+      "resolved_memory_policy": "auto",
+      "memory_cleanup_applied": false,
+      "memory_reserved_vram_gb": 0.0,
+      "performance_apply_timing": "after_loras",
+      "resolved_attention_mode": "comfy_kitchen_int8",
+      "torch_compile_mode": "off",
+      "torch_compile_backend": "inductor",
+      "resolved_torch_compile_mode": "off",
+      "resolved_torch_compile_backend": "off",
+      "encoding_cache": {
+        "reference_hits": 0,
+        "reference_encodes": 0,
+        "conditioning_hits": 0,
+        "conditioning_encodes": 2,
+        "negative_skipped": 0
+      }
+    },
+    "forward_count": 80,
+    "steps_executed": 40,
+    "phases_seconds": {
+      "prepare_models": 0.3157983151031658,
+      "conditioning": 3.139737223042175,
+      "sample_with_comfy_ksampler": 450.97353826696053,
+      "decode_latent": 7.470459448988549
+    },
+    "rgba_sha256": "aaf0d9f38c7a322c1f5567b3bc81d6067088d6ff1a83783a1d92b3d8b811f00b"
+  }
+]

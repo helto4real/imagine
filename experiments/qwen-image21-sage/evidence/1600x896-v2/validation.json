@@ -1,0 +1,16 @@
+{
+  "independent_binary_copy": true,
+  "exact_candidate_hash": true,
+  "v1_frozen_files_and_binary_unchanged": true,
+  "native_complete_patch_restoration": true,
+  "native_prepare_check": true,
+  "launcher_offline_checks": true,
+  "rust_tests_passed": 11,
+  "python_syntax": true,
+  "shell_syntax": true,
+  "gpu_runs_reused_from_accepted_candidate": true,
+  "live_api_or_editing_retested": false,
+  "commit_or_push": false,
+  "rust_formatting": true,
+  "same_grid_4096_control": "../vae-fixed-tiles/"
+}

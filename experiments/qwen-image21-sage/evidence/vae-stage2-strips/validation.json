@@ -1,0 +1,40 @@
+{
+  "images": 12,
+  "all_rgba_match_reference": true,
+  "warm_images_per_mode": 4,
+  "all_accepted_flags_verified": true,
+  "stage2_dispatch_verified_in_loaded_graph": true,
+  "source_stable_during_series": true,
+  "warm_reload_mib": 2946.44,
+  "warm_reload_blocks": 3,
+  "all_warm_conditioning_cache_hits": 2,
+  "all_warm_text_encoder_calls": 0,
+  "vae_spatial_tiling_retries": 0,
+  "series": {
+    "control_A": {
+      "whole_gpu_sampled_peak_mib": 14966.0,
+      "run": "20261014T202635Z-resident-pg85jt34"
+    },
+    "candidate_A": {
+      "whole_gpu_sampled_peak_mib": 14762.0,
+      "run": "20261014T202836Z-resident-njbyjsme"
+    },
+    "candidate_B": {
+      "whole_gpu_sampled_peak_mib": 14673.0,
+      "run": "20261014T203037Z-resident-t25yd5yu"
+    },
+    "control_B": {
+      "whole_gpu_sampled_peak_mib": 14877.0,
+      "run": "20261014T203237Z-resident-hwj4x9hm"
+    }
+  },
+  "reference_rgba_sha256": "473bfa4ab0c2230258a168afbe07523bd6bc7d81a4a2daf458500b6df036132d",
+  "candidate_rebuild_matches_measured_binary": true,
+  "experiment_patch_roundtrip_hashes_verified": true,
+  "active_source_restored_native_prepare_check_passed": true,
+  "frozen_baseline_offline_check_passed": true,
+  "python_syntax_passed": true,
+  "new_cuda_kernel": false,
+  "compute_sanitizer_run": false,
+  "restored_development_server_build_passed": true
+}

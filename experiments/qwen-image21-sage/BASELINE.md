@@ -1,7 +1,50 @@
+# Current frozen Qwen Image 2.1 baseline: v2
+
+Accepted by Tomas on 2026-10-15: **qwen-image21-1600x896-v2**.
+The internal strip algorithm is dynamic and has no resolution whitelist.
+1600×896 describes the accepted validation scope, not a restriction in the
+native algorithm. v1 remains an immutable comparison control below.
+
+Use `./experiments/qwen-image21-sage/run.sh --dry-run`, `--serve` or `--run`.
+The Rust API also selects v2; its API revision and request validation are unchanged.
+All original flags, prompts, precision, auto memory policy and idle-retention
+choice remain; the only added switch is `SD_VAE_DYNAMIC_BLOCK_STRIPS=1`.
+Native engine defaults remain separate from the frozen profile.
+
+The independently copied executable is
+`baselines/1600x896-v2/sd-server`, SHA-256:
+`9fd49b0e5cb3426043ebd85271ad167555551ac65252590cde5ac25bed44bbb0`.
+The manifest pins command, 29 switches, prompt copies and source hashes.
+Preserve both v1 and v2 executables during cleanup; neither binary ships in Git.
+The complete native patches/lock now restore the v2 source, with the new flag
+still off in engine defaults. Full patch restoration and hashes are verified.
+
+| Matched 1600 warm metric (one sample per mode) | v1 | v2 |
+| --- | ---: | ---: |
+| VAE arena, MiB | 8073.24 | 6373.44 |
+| Prepared GPU weights, MiB | 2946.44 | 1008.83 |
+| Start to saved PNG, s | 39.210 | 39.007 |
+| VAE, s | 1.73 | 1.72 |
+
+v2 is selected for memory savings, not an established speed gain. Four images
+(two per mode) match the v1 RGBA reference exactly. Thirteen synthetic checks
+pass. This does not prove all prompts, editing paths, shapes or GPUs are exact.
+The wider-scope historical v1 evidence remains valid for its original binary.
+
+At 4096 auto tiling changes from 49 to 9 tiles; the candidate is faster but its
+pixels differ from v1. A completed same-outer-grid diagnostic gives four bitidentical 4096 images,
+844.87 MiB less VAE workspace and warm VAE 33.05→32.00 s. This does not
+introduce a fixed tile size into v2. See [4096 control](profiling/VAE-FIXED-TILES-4096.md). See
+[dynamic-block report](profiling/VAE-DYNAMIC-BLOCKS.md),
+[v2 evidence](evidence/1600x896-v2/) and [test decisions](TEST-DECISIONS.md).
+No new model run is needed solely to freeze this already tested executable.
+
+## Preserved v1 history
+
 # Frozen Qwen Image 2.1 baseline
 
 Accepted by Tomas on 2026-10-14: **qwen-image21-1600x896-v1**.
-This is the current project baseline. Historical reports and their default-off
+This is the preserved historical v1 baseline; v2 above is current. Historical reports and their default-off
 statements describe earlier decisions; this profile now explicitly enables the
 accepted combination. Engine-wide defaults remain unchanged.
 

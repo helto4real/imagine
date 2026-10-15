@@ -1,0 +1,67 @@
+{
+  "component-400-224-576-576-0": [
+    "EXEC block_strip=0 target=1 shape=400x224 nodes=47 matmuls=2 workspace=1293.837891 MiB compute=83.110 ms bytes=206438400 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=400x224 nodes=208 matmuls=8 workspace=797.414062 MiB compute=41.060 ms bytes=206438400 input_unchanged=1",
+    "COMPARE 400x224 channels=576->576 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=206438400"
+  ],
+  "component-800-448-576-288-0": [
+    "EXEC block_strip=0 target=1 shape=800x448 nodes=124 matmuls=9 workspace=3553.837646 MiB compute=222.611 ms bytes=412876800 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=800x448 nodes=858 matmuls=39 workspace=1698.427002 MiB compute=124.571 ms bytes=412876800 input_unchanged=1",
+    "COMPARE 800x448 channels=576->288 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=412876800"
+  ],
+  "component-1600-896-288-144-0": [
+    "EXEC block_strip=0 target=1 shape=1600x896 nodes=924 matmuls=42 workspace=3144.273071 MiB compute=273.408 ms bytes=825753600 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=1600x896 nodes=1650 matmuls=75 workspace=2889.328735 MiB compute=217.349 ms bytes=825753600 input_unchanged=1",
+    "COMPARE 1600x896 channels=288->144 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=825753600"
+  ],
+  "component-1600-896-144-144-0": [
+    "EXEC block_strip=0 target=1 shape=1600x896 nodes=47 matmuls=2 workspace=5122.208740 MiB compute=215.781 ms bytes=825753600 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=1600x896 nodes=676 matmuls=26 workspace=2163.860840 MiB compute=146.158 ms bytes=825753600 input_unchanged=1",
+    "COMPARE 1600x896 channels=144->144 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=825753600"
+  ],
+  "component-400-224-576-576-1": [
+    "EXEC block_strip=0 target=1 shape=400x224 nodes=14 matmuls=1 workspace=4533.822510 MiB compute=82.752 ms bytes=825753600 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=400x224 nodes=223 matmuls=13 workspace=1440.072510 MiB compute=62.717 ms bytes=825753600 input_unchanged=1",
+    "COMPARE 400x224 channels=576->576 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=825753600"
+  ],
+  "component-800-448-288-288-1": [
+    "EXEC block_strip=0 target=1 shape=800x448 nodes=151 matmuls=14 workspace=4173.592896 MiB compute=152.953 ms bytes=1651507200 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=800x448 nodes=502 matmuls=25 workspace=4170.956177 MiB compute=129.210 ms bytes=1651507200 input_unchanged=1",
+    "COMPARE 800x448 channels=288->288 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=1651507200"
+  ],
+  "component-256-144-576-576-1": [
+    "EXEC block_strip=0 target=1 shape=256x144 nodes=14 matmuls=1 workspace=1868.697510 MiB compute=47.985 ms bytes=339738624 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=256x144 nodes=104 matmuls=6 workspace=786.447510 MiB compute=24.925 ms bytes=339738624 input_unchanged=1",
+    "COMPARE 256x144 channels=576->576 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=339738624"
+  ],
+  "component-512-288-288-288-1": [
+    "EXEC block_strip=0 target=1 shape=512x288 nodes=101 matmuls=9 workspace=1861.612427 MiB compute=69.860 ms bytes=679477248 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=512x288 nodes=222 matmuls=11 workspace=1928.549927 MiB compute=60.030 ms bytes=679477248 input_unchanged=1",
+    "COMPARE 512x288 channels=288->288 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=679477248"
+  ],
+  "component-1024-576-288-144-0": [
+    "EXEC block_strip=0 target=1 shape=1024x576 nodes=594 matmuls=27 workspace=1472.804321 MiB compute=144.433 ms bytes=339738624 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=1024x576 nodes=726 matmuls=33 workspace=1453.092651 MiB compute=83.422 ms bytes=339738624 input_unchanged=1",
+    "COMPARE 1024x576 channels=288->144 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=339738624"
+  ],
+  "component-65-129-288-144-0": [
+    "EXEC block_strip=0 target=1 shape=65x129 nodes=198 matmuls=9 workspace=46.362671 MiB compute=41.182 ms bytes=4829760 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=65x129 nodes=198 matmuls=9 workspace=46.362671 MiB compute=1.224 ms bytes=4829760 input_unchanged=1",
+    "COMPARE 65x129 channels=288->144 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=4829760"
+  ],
+  "component-100-56-1152-1152-1": [
+    "EXEC block_strip=0 target=1 shape=100x56 nodes=14 matmuls=1 workspace=588.801270 MiB compute=39.547 ms bytes=103219200 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=100x56 nodes=36 matmuls=2 workspace=475.422363 MiB compute=11.242 ms bytes=103219200 input_unchanged=1",
+    "COMPARE 100x56 channels=1152->1152 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=103219200"
+  ],
+  "component-200-112-1152-1152-0": [
+    "EXEC block_strip=0 target=1 shape=200x112 nodes=47 matmuls=2 workspace=688.183594 MiB compute=55.789 ms bytes=103219200 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=200x112 nodes=104 matmuls=4 workspace=625.306641 MiB compute=23.658 ms bytes=103219200 input_unchanged=1",
+    "COMPARE 200x112 channels=1152->1152 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=103219200"
+  ],
+  "component-200-112-1152-1152-1": [
+    "EXEC block_strip=0 target=1 shape=200x112 nodes=14 matmuls=1 workspace=2286.848145 MiB compute=60.376 ms bytes=412876800 input_unchanged=1",
+    "EXEC block_strip=1 target=1 shape=200x112 nodes=121 matmuls=7 workspace=919.270020 MiB compute=39.011 ms bytes=412876800 input_unchanged=1",
+    "COMPARE 200x112 channels=1152->1152 differing_floats=0 max_abs_error=0 nonfinite=0 bytes=412876800"
+  ]
+}

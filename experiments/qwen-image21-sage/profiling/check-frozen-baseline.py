@@ -18,8 +18,7 @@ spec = importlib.util.spec_from_file_location('baseline_launcher', ROOT / 'run-b
 launcher = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(launcher)
 manifest, flags, env, server, replay = launcher.prepare({})
-accepted_dir = ROOT / 'evidence/1600x896-v1/20261014T164016Z-resident-o941bspn'
-accepted = json.loads((accepted_dir / 'plan.json').read_text())
+accepted = json.loads((ROOT / 'evidence/1600x896-v2/accepted-plan.json').read_text())
 assert flags == accepted['native_environment']
 assert hashlib.sha256(Path(server[0]).read_bytes()).hexdigest() == accepted['native_sha256']
 
@@ -45,6 +44,7 @@ _, _, contaminated, _, _ = launcher.prepare({'SD_VAE_STRIP_RESIDUAL': '0', 'GGML
 assert contaminated['SD_VAE_STRIP_RESIDUAL'] == '1'
 assert 'GGML_CUDA_DISABLE_FUSION' not in contaminated
 assert 'SD_VAE_REUSE_UPSAMPLE_OUTPUT' not in contaminated
+assert contaminated['SD_VAE_DYNAMIC_BLOCK_STRIPS'] == '1'
 for bad in [{'QWEN_SEED': '7'}, {'QWEN_PORT': '65536'}, {'LD_PRELOAD': '/tmp/profiler.so'}]:
     try:
         launcher.prepare(bad)
@@ -89,4 +89,9 @@ with tempfile.TemporaryDirectory(prefix='qwen-baseline-check-') as scratch:
     assert prepared['request_without_prompts'] == accepted['request_without_prompts']
     assert prepared['prompt_hashes'] == accepted['prompt_hashes']
     assert prepared['images_per_engine'] == 3
+old = ROOT / 'baselines/1600x896-v1'
+old_manifest = json.loads((old / 'manifest.json').read_text())
+for name, digest in old_manifest['files_sha256'].items():
+    assert hashlib.sha256((old / name).read_bytes()).hexdigest() == digest
+assert hashlib.sha256((old / 'sd-server').read_bytes()).hexdigest() == old_manifest['binary_sha256']
 print('PASS: frozen hashes, accepted command/flags/prompts/request, override isolation, serve/run dispatch and replay preparation. No GPU or network execution.')

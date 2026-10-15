@@ -1,7 +1,7 @@
 # Image and Video Generation Backend
 
 Status: native baseline and Rust API v1 frozen; Qwen API implemented; H3 execution pending
-Updated: 2026-10-14
+Updated: 2026-10-15
 
 Publication note: see [README.md](README.md) for restoration/build instructions.
 The modified native checkout is represented by pinned upstream revisions and
@@ -36,77 +36,45 @@ metadata (default 1 MP), job polling/SSE, cancellation, and administrative full
 unload/resume. Only one reference has local image-quality evidence. H3 appears
 as unavailable metadata, with video contracts reserved for later validation.
 
-The native frozen settings are unchanged. Native defaults, the measured
+The API contract remains stable; the native profile was explicitly advanced to v2 on 2026-10-15. Native defaults, the measured
 resolution-specific profile, and the stable public API remain separate. The
 API does not expose unvalidated native flags or accept arbitrary filesystem paths.
 
-## Current accepted baseline — 2026-10-14
+## Current accepted native baseline — 2026-10-15
 
-**`qwen-image21-1600x896-v1` is frozen.** Use this profile for future Qwen
-comparisons and backend integration; do not silently adopt a newer build or
-restart completed optimization experiments. Historical sections below retain
-their original settings, failures and decisions; this section supersedes their
-launcher defaults and proposed immediate next steps.
+**`qwen-image21-1600x896-v2` is frozen.** The Rust API and native launcher select
+this independent executable; v1 remains the preserved comparison control.
+The API revision remains `imagine-api-v1`.
 
-| Configuration | Accepted choice |
-| --- | --- |
-| Model / hardware scope | Selected Qwen Image 2.1 INT8 ConvRot diffusion and encoder, Qwen VAE; RTX 4070 Ti SUPER / SM89, CUDA 13.4 |
-| Reference request | 1600×896, 40 ER-SDE/beta steps, CFG 2.5, seed 42, CPU RNG, batch 1; frozen positive/negative prompts, no LoRA/reference/second pass |
-| Attention and precision | Sage2++; BF16 attention/cache and residual, F32 gate/up with packing; split V on, split K off |
-| Fusion flags | All previously accepted INT8, norm/RoPE, modulation, residual and gate/up-SwiGLU fusions |
-| CPU / CUDA threads | 11 CPU threads; accepted 512-thread K=4096 ConvRot configuration |
-| Placement | Auto-fit with real CUDA scratch accounting; no manual `--max-vram` margin |
-| Lifetime | Long-lived native server; conditioning cache capacity 4 in CPU RAM; extra idle-retention flag off |
-| VAE | Existing convolution strips plus shortcut, stage-3 and residual-block strips on; old upscale/im2col fusion and PAD reuse off |
+v2 adds dynamic whole-residual-block and upscale/convolution strips to all v1
+accepted switches. Precision stays F32 activations/F16 VAE convolutions; diffusion
+BF16 settings, F32 gate/up, Sage2++, 11 CPU threads, automatic memory fitting,
+conditioning cache and idle retention off are unchanged. There is no resolution
+whitelist in the new algorithm: strip rows depend on tensor size. The profile
+name records the validated 1600×896 canvas, not an algorithmic size restriction.
 
-Latest live comparison: **8073.24 MiB VAE workspace**, saving **590.625 MiB**
-against the preceding strip-convolution baseline. Four warm images average
-**39.219 s to saved PNG** and **1.720 s VAE decode**. All 12 reference images
-match native RGBA pixels exactly. The control averaged 39.074 / 1.700 s, so the
-combination is selected for memory, not a measured latency improvement.
-Reload remains 2946.44 MiB / three diffusion blocks per warm image.
+Matched warm evidence: VAE arena 8073.24→6373.44 MiB; prepared GPU weights
+2946.44→1008.83 MiB; start-to-PNG 39.210→39.007 s and VAE 1.73→1.72 s.
+Four reference images match v1 exactly. One warm sample per mode does not
+establish a speed gain; acceptance is for memory headroom. Previous native versus
+ComfyUI comparisons are historical and must not be combined into a new gap claim.
 
-The last matched resident ComfyUI comparison was 40.216 s native versus
-38.814 s headless AIO/Kitchen. The latest 39.219 s native result was measured
-later; do not claim a newly controlled 0.405-second gap. The native and Comfy
-reference images differ. Small/odd VAE component test shapes also have known
-numerical differences; this acceptance does not extend to every prompt,
-resolution, LoRA/editing path or intermediate tensor.
+The binary SHA-256 is
+`9fd49b0e5cb3426043ebd85271ad167555551ac65252590cde5ac25bed44bbb0`, at
+`experiments/qwen-image21-sage/baselines/1600x896-v2/sd-server`.
+The published native patches and lock reproduce the source; engine defaults stay
+separate from the profile. Frozen binaries are preserved locally and ignored by
+Git. Use `./experiments/qwen-image21-sage/run.sh --dry-run`, `--serve` or `--run`;
+`--run` replays one initial and two warm images with the frozen prompts/seed.
 
-From the project root:
-
-```sh
-./experiments/qwen-image21-sage/run.sh --dry-run
-./experiments/qwen-image21-sage/run.sh --serve
-# Stop the separate server before running the reference replay:
-./experiments/qwen-image21-sage/run.sh --run
-```
-
-The launcher defaults to dry-run. `--serve` runs on loopback port 1234
-(`QWEN_PORT` may override it). `--run` generates one initial image plus two warm
-repeats in its own server, verifies the native reference and saves timings and
-images under a fresh `runs/*-resident-*` directory, then stops the server.
-`QWEN_MODEL_ROOT` relocates the same model files; seed overrides are rejected for
-this fixed reference. The Rust API applies profile validation; clients should use it rather than
-bypass validation through the native server.
-
-The frozen executable is copied under
-`experiments/qwen-image21-sage/baselines/1600x896-v1/`, separate from the build
-tree, with SHA-256
-`4e33830f7eba36573cba9785249641ae8c727be5e6a506e9c7ef0ee74beea2e3`.
-The manifest pins command/environment/prompt evidence. Inherited experimental
-`SD_*`/`GGML_*` variables are cleared before applying the profile. Native defaults
-and development builds remain separate. Model file contents are not newly
-hashed; filename equality alone does not validate a replacement checkpoint.
-
-Read [baseline usage and limits](experiments/qwen-image21-sage/BASELINE.md) and
-[the complete test decision register](experiments/qwen-image21-sage/TEST-DECISIONS.md)
-before proposing further optimization. The register covers accepted fusions,
-CPU/CUDA thread sweeps, rejected precision/layout/kernel variants, both retention
-tests, the corrected VAE probes and every strip combination. Do not repeat those
-experiments without concrete changed evidence, a relevant regression or a new
-requested workload. The proposed next VAE convolution remains untested and is
-not an instruction to continue optimizing after this freeze.
+4096 auto tiling changes 49→9 tiles and does not preserve v1 pixels. A completed diagnostic with identical outer tiling gives four bitidentical
+4096 images, VAE workspace 3321.56→2476.69 MiB and warm VAE 33.05→32.00 s.
+This control is separate from default auto tiling; it does not fix tile sizes
+in the algorithm. See [same-grid report](experiments/qwen-image21-sage/profiling/VAE-FIXED-TILES-4096.md).
+See [baseline details](experiments/qwen-image21-sage/BASELINE.md),
+[experiment](experiments/qwen-image21-sage/profiling/VAE-DYNAMIC-BLOCKS.md),
+[test decisions](experiments/qwen-image21-sage/TEST-DECISIONS.md) and
+[v2 evidence](experiments/qwen-image21-sage/evidence/1600x896-v2/).
 
 ## Goals
 

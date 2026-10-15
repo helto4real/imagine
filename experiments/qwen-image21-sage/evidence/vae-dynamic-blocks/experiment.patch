@@ -1,0 +1,157 @@
+--- a/src/model/vae/wan_vae.hpp
++++ b/src/model/vae/wan_vae.hpp
+@@ -14,6 +14,18 @@
+ namespace WAN {
+ 
+     constexpr int CACHE_T = 2;
++
++    static bool dynamic_strips_enabled() {
++        const char* flag = std::getenv("SD_VAE_DYNAMIC_BLOCK_STRIPS");
++        return flag != nullptr && std::strcmp(flag, "1") == 0;
++    }
++
++    static int64_t dynamic_strip_rows(int64_t width, int64_t height, int64_t channels, int scale = 1) {
++        constexpr int64_t element_budget = 1 << 24;
++        const int64_t elements = width * height * channels * scale * scale;
++        const int64_t count = std::max<int64_t>(1, (elements + element_budget - 1) / element_budget);
++        return std::max<int64_t>(1, (height + count - 1) / count);
++    }
+ 
+     class CausalConv3d : public GGMLBlock {
+     protected:
+@@ -184,8 +196,11 @@
+     protected:
+         int64_t dim;
+         std::string mode;
++        bool image_strips_ = false;
+ 
+     public:
++        void enable_image_strips() { image_strips_ = true; }
++
+         Resample(int64_t dim, const std::string& mode, bool wan2_2 = false, bool is_2D = false)
+             : dim(dim), mode(mode) {
+             if (mode == "upsample2d") {
+@@ -273,6 +288,32 @@
+                 auto resample_1 = std::dynamic_pointer_cast<Conv2d>(blocks["resample.1"]);
+ 
+                 x = ggml_ext_cont(ctx->ggml_ctx, ggml_ext_torch_permute(ctx->ggml_ctx, x, 0, 1, 3, 2));  // (t, c, h, w)
++                const bool strip_upsample = image_strips_ && dynamic_strips_enabled() &&
++                                            (mode == "upsample2d" || mode == "upsample3d") &&
++                                            t == 1 && chunk_idx == 0 && x->type == GGML_TYPE_F32 &&
++                                            sd_backend_is(ctx->backend, "CUDA") && ctx->graph == nullptr &&
++                                            !ctx->weight_adapter && !ctx->conv2d_direct_enabled &&
++                                            !ctx->circular_x_enabled && !ctx->circular_y_enabled;
++                const int64_t step = dynamic_strip_rows(w, h, c, 2);
++                if (strip_upsample && step < h) {
++                    ggml_tensor* result = nullptr;
++                    for (int64_t row = 0; row < h; row += step) {
++                        const int64_t rows = std::min(step, h - row);
++                        const int64_t lo = std::max<int64_t>(0, row - 1);
++                        const int64_t hi = std::min(h, row + rows + 1);
++                        auto input = ggml_cont(ctx->ggml_ctx, ggml_view_4d(ctx->ggml_ctx, x, w, hi - lo, c, 1,
++                                                                       x->nb[1], x->nb[2], x->nb[3], lo * x->nb[1]));
++                        auto output = resample_1->forward(ctx, ggml_upscale(ctx->ggml_ctx, input, 2, GGML_SCALE_MODE_NEAREST));
++                        output = ggml_cont(ctx->ggml_ctx, ggml_view_4d(ctx->ggml_ctx, output, w * 2, rows * 2, c, 1,
++                                                                     output->nb[1], output->nb[2], output->nb[3], (row - lo) * 2 * output->nb[1]));
++                        // A leaf destination is allocated at graph start and would retain every block's output.
++                        result = result == nullptr ? ggml_pad(ctx->ggml_ctx, output, 0, (h - rows) * 2, 0, 0) :
++                                 ggml_set_inplace(ctx->ggml_ctx, result, output, result->nb[1], result->nb[2], result->nb[3], row * 2 * result->nb[1]);
++                    }
++                    LOG_DEBUG("VAE dynamic upscale-conv: %lldx%lld channels=%lld input_rows=%lld",
++                              (long long)w, (long long)h, (long long)c, (long long)step);
++                    return ggml_ext_cont(ctx->ggml_ctx, ggml_ext_torch_permute(ctx->ggml_ctx, result, 0, 1, 3, 2));
++                }
+                 if (mode == "upsample2d") {
+                     x = ggml_upscale(ctx->ggml_ctx, x, 2, GGML_SCALE_MODE_NEAREST);
+                 } else if (mode == "upsample3d") {
+@@ -450,10 +491,18 @@
+         int64_t out_dim;
+         bool is_2D;
+         bool strip_block_eligible_ = false;
++        bool image_strips_ = false;
++        bool image_kernels_ = false;
+ 
+         void init_params(ggml_context*, const String2TensorStorage& shapes = {}, const std::string prefix = "") override {
+             strip_block_eligible_ = !is_2D && in_dim == 288 && out_dim == 144 &&
+                                     prefix == "first_stage_model.decoder.upsamples.4.upsamples.0.";
++            image_kernels_ = !is_2D && prefix.find("first_stage_model.decoder.") == 0;
++            for (const char* name : {"residual.2.weight", "residual.6.weight", "shortcut.weight"}) {
++                if (std::strcmp(name, "shortcut.weight") == 0 && in_dim == out_dim) continue;
++                const auto it = shapes.find(prefix + name);
++                image_kernels_ = image_kernels_ && it != shapes.end() && it->second.ne[2] == 1;
++            }
+             for (const char* name : {"residual.2.weight", "residual.6.weight", "shortcut.weight"}) {
+                 const auto it = shapes.find(prefix + name);
+                 strip_block_eligible_ = strip_block_eligible_ && it != shapes.end() && it->second.ne[2] == 1;
+@@ -461,6 +510,8 @@
+         }
+ 
+     public:
++        void enable_image_strips() { image_strips_ = true; }
++
+         ResidualBlock(int64_t in_dim, int64_t out_dim, bool is_2D = false)
+             : in_dim(in_dim), out_dim(out_dim), is_2D(is_2D) {
+             blocks["residual.0"] = std::shared_ptr<GGMLBlock>(new RMS_norm(in_dim));
+@@ -496,7 +547,12 @@
+             // x: [b*c, t, h, w]
+             GGML_ASSERT(b == 1);
+             const char* strip_flag = std::getenv("SD_VAE_STRIP_RESIDUAL");
+-            if (!within_strip && strip_block_eligible_ && strip_flag != nullptr && std::strcmp(strip_flag, "1") == 0 &&
++            const int64_t dynamic_step = dynamic_strip_rows(x->ne[0], x->ne[1], std::max(in_dim, out_dim));
++            const bool dynamic = image_strips_ && image_kernels_ && dynamic_strips_enabled() && dynamic_step < x->ne[1];
++            const int64_t step = dynamic ? dynamic_step : 64;
++            const bool selected = dynamic ? step < x->ne[1] :
++                                  strip_block_eligible_ && strip_flag != nullptr && std::strcmp(strip_flag, "1") == 0;
++            if (!within_strip && selected && !ctx->weight_adapter &&
+                 sd_backend_is(ctx->backend, "CUDA") && ctx->graph == nullptr &&
+                 !ctx->conv2d_direct_enabled && !ctx->conv3d_direct_enabled &&
+                 !ctx->circular_x_enabled && !ctx->circular_y_enabled &&
+@@ -505,9 +561,9 @@
+                 feat_cache[feat_idx] == nullptr && feat_cache[feat_idx + 1] == nullptr) {
+                 const int64_t width = x->ne[0];
+                 const int64_t height = x->ne[1];
+-                auto result = ggml_new_tensor_4d(ctx->ggml_ctx, GGML_TYPE_F32, width, height, 1, out_dim);
+-                for (int64_t row = 0; row < height; row += 64) {
+-                    const int64_t rows = std::min<int64_t>(64, height - row);
++                auto result = dynamic ? nullptr : ggml_new_tensor_4d(ctx->ggml_ctx, GGML_TYPE_F32, width, height, 1, out_dim);
++                for (int64_t row = 0; row < height; row += step) {
++                    const int64_t rows = std::min<int64_t>(step, height - row);
+                     const int64_t lo = std::max<int64_t>(0, row - 2);
+                     const int64_t hi = std::min<int64_t>(height, row + rows + 2);
+                     auto input = ggml_cont(ctx->ggml_ctx, ggml_view_4d(ctx->ggml_ctx, x, width, hi - lo, 1, in_dim,
+@@ -518,12 +574,13 @@
+                     GGML_ASSERT(strip_idx == 2);
+                     output = ggml_cont(ctx->ggml_ctx, ggml_view_4d(ctx->ggml_ctx, output, width, rows, 1, out_dim,
+                                                                   output->nb[1], output->nb[2], output->nb[3], (row - lo) * output->nb[1]));
+-                    result = ggml_set_inplace(ctx->ggml_ctx, result, output, result->nb[1], result->nb[2], result->nb[3], row * result->nb[1]);
++                    result = result == nullptr ? ggml_pad(ctx->ggml_ctx, output, 0, height - rows, 0, 0) :
++                             ggml_set_inplace(ctx->ggml_ctx, result, output, result->nb[1], result->nb[2], result->nb[3], row * result->nb[1]);
+                 }
+                 // These singleton-temporal kernels do not consume frame caches; keep their slots aligned.
+                 feat_idx += 2;
+-                LOG_DEBUG("VAE strip residual block: %lldx%lld channels=288->144 rows=64 halo=2",
+-                          (long long)width, (long long)height);
++                LOG_DEBUG("VAE strip residual block: %lldx%lld channels=%lld->%lld rows=%lld halo=2 dynamic=%d",
++                          (long long)width, (long long)height, (long long)in_dim, (long long)out_dim, (long long)step, dynamic);
+                 return result;
+             }
+             ggml_tensor* h = x;
+@@ -1223,6 +1280,8 @@
+                 std::vector<GGMLBlock*> all_blocks;
+                 get_all_blocks(all_blocks);
+                 for (auto block : all_blocks) {
++                    if (auto residual = dynamic_cast<ResidualBlock*>(block)) residual->enable_image_strips();
++                    if (auto resample = dynamic_cast<Resample*>(block)) resample->enable_image_strips();
+                     if (auto conv = dynamic_cast<Conv2d*>(block)) {
+                         conv->set_scale(conv_scale);
+                     } else if (auto conv = dynamic_cast<CausalConv3d*>(block)) {
+@@ -1538,7 +1597,8 @@
+         }
+ 
+         ggml_cgraph* build_graph(const sd::Tensor<float>& z_tensor, bool decode_graph) {
+-            ggml_cgraph* gf = new_graph_custom(10240 * z_tensor.shape()[2]);
++            const size_t graph_nodes = decode_graph && dynamic_strips_enabled() ? 131072 : 10240;
++            ggml_cgraph* gf = new_graph_custom(graph_nodes * z_tensor.shape()[2]);
+             ggml_tensor* z  = make_input(z_tensor);
+ 
+             auto runner_ctx = get_context();

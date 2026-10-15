@@ -1,0 +1,24 @@
+{
+  "id": "qwen-image21-1600x896-v2",
+  "accepted": "2026-10-15",
+  "scope": "Qwen Image 2.1 text-to-image, 1600x896, RTX 4070 Ti SUPER / SM89, CUDA 13.4; reference prompt/seed verified, not universal bit identity",
+  "binary_path": "experiments/qwen-image21-sage/baselines/1600x896-v2/sd-server",
+  "binary_sha256": "9fd49b0e5cb3426043ebd85271ad167555551ac65252590cde5ac25bed44bbb0",
+  "default_model_root": "models",
+  "models": {
+    "--diffusion-model": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+    "--llm": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+    "--vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+  },
+  "reference_rgba_sha256": "473bfa4ab0c2230258a168afbe07523bd6bc7d81a4a2daf458500b6df036132d",
+  "evidence": "experiments/qwen-image21-sage/evidence/1600x896-v2",
+  "files_sha256": {
+    "baseline-environment.json": "fafa32730bb57b542f44c06c37c60fca14e38afce6f0127f7aea61cec09dfc8d",
+    "binary-hashes.json": "117a53ff71256f4438c147a5457b3def03f7b9a64dbf64befea3422d45c3ea79",
+    "after-hashes.json": "9e8ff6e528b597298d940dfcc70d17c55cabc699d0debad8b372af91b80aba26",
+    "prompt.txt": "c88344742eaecf4f9d6aced5c0fe3a57ca37e6eceef4ac16f7d26b17e6ca30b4",
+    "negative-prompt.txt": "8c79e7530015790b980b8828dd9bc90fe784cdb88863fea159bd0064c922c485",
+    "command.sh": "1cae1f725ae1bf5f0f6a122fadfb2f2b9b7de994f8b49b78acfc35b0ded897f1"
+  },
+  "source_binary": "Verified dynamic-blocks candidate; independent frozen copy; v1 retained as control."
+}

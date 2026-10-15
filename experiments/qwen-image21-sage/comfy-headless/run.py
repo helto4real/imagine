@@ -24,13 +24,19 @@ p.add_argument('--runs', type=int, default=3)
 p.add_argument('--profile-index', type=int, default=-1)
 p.add_argument('--probe', action='store_true')
 p.add_argument('--chain-scopes', action='store_true', help='Add profile-only operation-chain scopes and tensor metadata')
+p.add_argument('--comfy-root', type=Path, required=True)
+p.add_argument('--aio-root', type=Path, required=True)
+p.add_argument('--model-root', type=Path, required=True)
+p.add_argument('--width', type=int, default=1600)
+p.add_argument('--height', type=int, default=896)
 a = p.parse_args()
+assert a.width > 0 and a.height > 0 and a.width % 32 == 0 and a.height % 32 == 0
 assert a.runs > 0 and -1 <= a.profile_index < a.runs
 ROOT = Path(__file__).resolve().parents[1]
-COMFY = Path('/path/to/ComfyUI')
-AIO = Path('/path/to/comfyui-all-on-one-image-generation-node')
-MODELS = Path('/path/to/models')
-REF = ROOT/'runs/20261013T074331Z-debug-7nor7cre'
+COMFY = a.comfy_root.resolve()
+AIO = a.aio_root.resolve()
+MODELS = a.model_root.resolve()
+REF = ROOT/'baselines/1600x896-v1'
 OUT = Path(tempfile.mkdtemp(prefix=datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ-comfy-'), dir=ROOT/'runs'))
 print(OUT, flush=True)
 for key, subdir in [('TORCHINDUCTOR_CACHE_DIR','inductor'),('TRITON_CACHE_DIR','triton'),('CUDA_CACHE_PATH','cuda-cache')]:
@@ -70,8 +76,8 @@ from aio_bench.services import profiles
 from comfy_extras.nodes_qwen import TextEncodeQwenImage21
 
 adapter=QwenImage21Adapter()
-settings=adapter.resolve_settings(model_settings=dict(family='qwen_image_2_1',reference_megapixels=1.6,edit_canvas='main controls',memory_policy='auto',cache_device='auto',cache_dtype='default',attention_mode='comfy_kitchen_int8',reference_upscale_method='lanczos',sampling_schedule='comfy',color_match_strength=.8,color_match=False,brightness_strength=0.,contrast_strength=0.,microcontrast_strength=0.,privacy_mode=True,use_zero_negative_conditioning=False),width=1600,height=896,steps=40,cfg=2.5,sampler='er_sde',scheduler='beta')
-settings.update(max_side=1600,aspect_ratio='16:9',size_mode='use aspect ratio',multiple_value=32)
+settings=adapter.resolve_settings(model_settings=dict(family='qwen_image_2_1',reference_megapixels=1.6,edit_canvas='main controls',memory_policy='auto',cache_device='auto',cache_dtype='default',attention_mode='comfy_kitchen_int8',reference_upscale_method='lanczos',sampling_schedule='comfy',color_match_strength=.8,color_match=False,brightness_strength=0.,contrast_strength=0.,microcontrast_strength=0.,privacy_mode=True,use_zero_negative_conditioning=False),width=a.width,height=a.height,steps=40,cfg=2.5,sampler='er_sde',scheduler='beta')
+settings.update(max_side=max(a.width,a.height),aspect_ratio='16:9',size_mode='use aspect ratio',multiple_value=32)
 settings=adapter.resolve_reference_settings(settings,None)
 models=dict(diffusion_model='diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors',text_encoder='clip/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors',vae='vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors')
 paths=pipeline.safetensors_backend.resolve_paths(**models)
@@ -238,7 +244,9 @@ class Progress:
     def __call__(self,*args,**kwargs):pass
     def prepare_sampling_callback(self,model,steps,x0_output_dict=None):
         def callback(step,x0,x,total_steps):
-            if active is not None:active['steps_executed']+=1
+            if active is not None:
+                active['steps_executed']+=1
+                print(f'STEP {step+1}/{total_steps}',flush=True)
         return callback
 progress=Progress()
 monitor_log=(OUT/'gpu.csv').open('w')
@@ -256,7 +264,7 @@ try:
             print(f'BEGIN image {index} profiled={profiling}',flush=True)
             profiler=torch.profiler.profile(activities=[torch.profiler.ProfilerActivity.CPU,torch.profiler.ProfilerActivity.CUDA],record_shapes=False,profile_memory=False,with_stack=False) if profiling else contextlib.nullcontext()
             with profiler:
-                result=adapter.generate(**models,positive_prompt=(REF/'prompt.txt').read_text(),negative_prompt=(REF/'negative-prompt.txt').read_text(),width=1600,height=896,seed=42,sampler='er_sde',scheduler='beta',settings=settings,batch_count=1,lora_config=None,loaded_model=None,loaded_clip=None,reference_inputs=None,decode_image=True,return_vae=False,pid_capture_step=None,progress=progress)
+                result=adapter.generate(**models,positive_prompt=(REF/'prompt.txt').read_text(),negative_prompt=(REF/'negative-prompt.txt').read_text(),width=a.width,height=a.height,seed=42,sampler='er_sde',scheduler='beta',settings=settings,batch_count=1,lora_config=None,loaded_model=None,loaded_clip=None,reference_inputs=None,decode_image=True,return_vae=False,pid_capture_step=None,progress=progress)
                 torch.cuda.synchronize()
             active['generation_seconds']=time.perf_counter()-begin
             image=Image.fromarray(np.clip(result.image[0].float().cpu().numpy()*255.,0,255).astype(np.uint8))
@@ -277,8 +285,10 @@ try:
             results.append(active)
             (OUT/'results.json').write_text(json.dumps(results,indent=2)+'\n')
             print(json.dumps({k:active[k] for k in ['index','profiled','generation_seconds','saved_seconds','rgb_sha256','forward_count','steps_executed','peak_allocated_mib']}),flush=True)
-            assert image.size==(1600,896) and active['steps_executed']==40
+            assert image.size==(a.width,a.height) and active['steps_executed']==40
             assert settings.get('resolved_attention_mode')=='comfy_kitchen_int8'
+            assert active['forward_count']==80
+            if index:assert active['rgb_sha256']==results[0]['rgb_sha256'], 'repeat pixels changed'
             del result,image
             active=None
 finally:

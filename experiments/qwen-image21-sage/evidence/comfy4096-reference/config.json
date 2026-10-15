@@ -1,0 +1,62 @@
+{
+  "comfy_revision": "08ff3c11b3a85eb07c2c06f21cb378ac2e086840",
+  "aio_revision": "52ecbf87dda674f51e1e0a798f8f56d0d37d303d",
+  "torch": "2.13.0+cu130",
+  "torch_cuda": "13.0",
+  "kitchen": "0.2.37",
+  "gpu": "NVIDIA GeForce RTX 4070 Ti SUPER",
+  "cpu_threads": 23,
+  "settings": {
+    "family": "qwen_image_2_1",
+    "reference_megapixels": 1.6,
+    "edit_canvas": "main controls",
+    "memory_policy": "auto",
+    "cache_device": "auto",
+    "cache_dtype": "default",
+    "attention_mode": "comfy_kitchen_int8",
+    "reference_upscale_method": "lanczos",
+    "sampling_schedule": "comfy",
+    "color_match_strength": 0.8,
+    "color_match": false,
+    "brightness_strength": 0.0,
+    "contrast_strength": 0.0,
+    "microcontrast_strength": 0.0,
+    "privacy_mode": true,
+    "use_zero_negative_conditioning": false,
+    "width": 4096,
+    "height": 2304,
+    "steps": 40,
+    "cfg": 2.5,
+    "sampler": "er_sde",
+    "scheduler": "beta",
+    "max_side": 4096,
+    "aspect_ratio": "16:9",
+    "size_mode": "use aspect ratio",
+    "multiple_value": 32,
+    "edit_mode": "text_to_image"
+  },
+  "models": {
+    "diffusion_model": {
+      "path": "<MODEL_ROOT>/diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+      "size": 7256783064,
+      "inode": 68303
+    },
+    "text_encoder": {
+      "path": "<MODEL_ROOT>/text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "size": 9350798360,
+      "inode": 68297
+    },
+    "vae": {
+      "path": "<MODEL_ROOT>/vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors",
+      "size": 675509688,
+      "inode": 68300
+    }
+  },
+  "prompt_hashes": {
+    "prompt.txt": "c88344742eaecf4f9d6aced5c0fe3a57ca37e6eceef4ac16f7d26b17e6ca30b4",
+    "negative-prompt.txt": "8c79e7530015790b980b8828dd9bc90fe784cdb88863fea159bd0064c922c485"
+  },
+  "preview": "headless callback; no live preview image",
+  "execution": "AIO adapter.generate per image; models loaded by AIO each call; process and encoding cache retained",
+  "privacy": "no prompt text, model activations, conditioning tensors or workflow in traces/output PNG metadata"
+}
