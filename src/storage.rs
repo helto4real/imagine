@@ -32,10 +32,7 @@ pub fn hash(data: &[u8]) -> String {
 }
 impl Store {
     pub async fn open(data: &Path) -> Result<Self> {
-        Self::open_session(data, true).await
-    }
-    pub async fn open_session(data: &Path, encrypted: bool) -> Result<Self> {
-        let session = crate::session::Session::new(data, encrypted)?;
+        let session = crate::session::Session::new(data)?;
         let db = SqlitePoolOptions::new()
             // Retiring the sole SQLite connection would silently destroy the RAM database.
             .min_connections(1)
@@ -122,14 +119,12 @@ impl Store {
             bail!("asset_not_found");
         }
         // Only IDs obtained from our database reach the path, never user paths.
-        self.session
-            .decode(id, &tokio::fs::read(self.media.join(id)).await?)
+        Ok(tokio::fs::read(self.media.join(id)).await?)
     }
     pub async fn save_asset(&self, owner: &str, bytes: Vec<u8>) -> Result<Value> {
         let info = tokio::task::spawn_blocking(move || inspect_image(bytes)).await??;
         let asset_id = id("asset");
         let tmp = self.media.join(format!("{asset_id}.partial"));
-        let encoded = self.session.encode(&asset_id, &info.bytes)?;
         let mut f = tokio::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -137,7 +132,7 @@ impl Store {
             .open(&tmp)
             .await?;
         use tokio::io::AsyncWriteExt;
-        f.write_all(&encoded).await?;
+        f.write_all(&info.bytes).await?;
         f.sync_all().await?;
         drop(f);
         tokio::fs::rename(&tmp, self.media.join(&asset_id)).await?;

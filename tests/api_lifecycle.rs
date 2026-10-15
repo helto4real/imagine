@@ -991,7 +991,7 @@ async fn profile_reference_sizing_and_asset_ownership() {
 }
 
 #[tokio::test]
-async fn session_assets_encrypt_at_rest_and_plain_mode_is_explicit() {
+async fn session_assets_are_plain_owned_and_removed_on_close() {
     let dir = tempfile::tempdir().unwrap();
     let bytes = png();
     let store = Store::open(dir.path()).await.unwrap();
@@ -999,17 +999,15 @@ async fn session_assets_encrypt_at_rest_and_plain_mode_is_explicit() {
     let id = asset["id"].as_str().unwrap();
     let path = store.media.join(id);
     let disk = std::fs::read(&path).unwrap();
-    assert!(disk.starts_with(b"IMAGINE1"));
-    assert_ne!(disk, bytes);
+    assert_eq!(disk, bytes);
+    use std::os::unix::fs::PermissionsExt;
+    assert_eq!(
+        std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
     assert_eq!(store.read_asset(id, "a").await.unwrap(), bytes);
     assert!(store.read_asset(id, "other").await.is_err());
     store.close().await.unwrap();
-    assert!(!path.exists());
-    let plain = Store::open_session(dir.path(), false).await.unwrap();
-    let asset = plain.save_asset("a", bytes.clone()).await.unwrap();
-    let path = plain.media.join(asset["id"].as_str().unwrap());
-    assert_eq!(std::fs::read(&path).unwrap(), bytes);
-    plain.close().await.unwrap();
     assert!(!path.exists());
 }
 
@@ -1019,7 +1017,7 @@ async fn old_session_requests_are_rejected_before_mutation() {
     let (status, session) = req(&h.router, "GET", "/v1/session", "alice", None, None).await;
     assert_eq!(status, 200);
     assert_eq!(session["id"], h.store.session.id);
-    assert_eq!(session["encrypted"], true);
+    assert_eq!(session["encrypted"], false);
     let response = h
         .router
         .clone()

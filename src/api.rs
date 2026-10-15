@@ -121,7 +121,8 @@ async fn authenticate(State(app): State<App>, mut request: Request, next: Next) 
     response
 }
 async fn session(State(app): State<App>) -> Json<Value> {
-    Json(json!({"id": app.store.session.id, "encrypted": app.store.session.encrypted()}))
+    // Preserve the response shape for clients that inspect the storage mode.
+    Json(json!({"id": app.store.session.id, "encrypted": false}))
 }
 async fn models() -> Json<Value> {
     Json(contract::models())

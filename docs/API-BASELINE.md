@@ -10,10 +10,9 @@ adds dynamic VAE strips while preserving precision and memory policy.
 ## Scope and architecture
 
 One Rust executable, Axum HTTP, Tokio task/process management, SQLx/SQLite in memory for
-jobs and metadata, encrypted local files for media. There is no ComfyUI dependency.
-Terminal unlock uses a dedicated Python helper with Helto's FIDO2 provider;
-request handling and generation orchestration remain in Rust. Python/Pillow are
-also used by the optional live acceptance test.
+jobs and metadata, disposable local files for media. There is no ComfyUI dependency.
+Request handling and generation orchestration remain in Rust. Python/Pillow are
+used by the optional live acceptance test.
 
 Rust owns validation, authentication, asset ownership, a session-local FIFO queue,
 idempotency, worker lifecycle and output publication. One job runs at a time.
@@ -31,7 +30,7 @@ Module responsibilities:
 | --- | --- |
 | `contract` | Typed requests, semantic validation, model metadata/schema |
 | `api` | HTTP, bearer authentication, ownership, SSE |
-| `storage` | Session-local SQLite and encrypted atomic media files |
+| `storage` | Session-local SQLite and atomic media files |
 | `scheduler` | Sole owner of dispatch, cancellation and unload ordering |
 | `engine` | Native process and `/sdcpp/v1` adapter |
 | `config` | Local credentials, single-server lock, project/model paths |
@@ -74,10 +73,9 @@ the admin token. An admin token owns its own jobs/assets and does not bypass
 client ownership for media/job reads.
 
 SQLite holds prompts, settings and metadata only in process memory. Internal
-media is encrypted with a fresh process-only key. Startup and shutdown clear
-history and temporary media. Password or YubiKey unlock happens in the terminal
-before binding HTTP. `--no-encryption` wipes old data before starting without
-unlock or media encryption. See [session privacy](PRIVACY.md) for MCP exports,
+media is stored as ordinary files. Startup and shutdown clear history and
+temporary media. The server starts without terminal login; API bearer tokens
+remain required. See [session privacy](PRIVACY.md) for MCP exports,
 crash behavior, credentials and saved-file exclusions. A file lock prevents two
 servers from sharing a data directory.
 
@@ -233,7 +231,7 @@ States: `queued`, `running`, `cancelling`, `succeeded`, `failed`, `cancelled`,
 `interrupted`. Upload/output files are written to temporary files, synced and
 atomically renamed; asset metadata is committed before a job can become
 `succeeded`. A crash between file publication and the final job update may leave
-an orphan encrypted file; it cannot publish a false success. Startup removes
+an orphan media file; it cannot publish a false success. Startup removes
 old media without opening it. Accepted entries and parameters live in memory.
 
 Restart creates an empty, unpaused queue and new session ID. Jobs, operations,

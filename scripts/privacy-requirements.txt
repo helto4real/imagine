@@ -1,2 +1,0 @@
-# Pinned Helto FIDO2 provider, with signature/UV/credProtect checks.
-helto-privacy[yubikey] @ git+https://github.com/helto4real/helto-privacy.git@5d4bad3b388dac25c564e8d84c08992e3993cd21

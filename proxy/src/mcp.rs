@@ -228,7 +228,7 @@ impl Mcp {
             *self.inner.session.lock().unwrap() = current.clone();
         }
         if current.is_none() {
-            anyhow::bail!("Imagine is locked or unavailable");
+            anyhow::bail!("Imagine is unavailable");
         }
         Ok(())
     }
@@ -238,7 +238,7 @@ impl Mcp {
             return tool_result(error(
                 Fault::new(
                     "privacy",
-                    "Imagine is locked or unavailable; unlock it in the server terminal",
+                    "Imagine is unavailable; start the Imagine server",
                 ),
                 None,
             ));

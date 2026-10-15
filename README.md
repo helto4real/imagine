@@ -17,7 +17,6 @@ separates synthetic comparisons, real GPU evidence and remaining differences.
 On this configured machine:
 
 ```sh
-./setup-privacy.sh  # first installation only
 ./start-server.sh
 ```
 
@@ -25,12 +24,9 @@ This incrementally builds the Rust release server and starts it at
 `http://127.0.0.1:8080`. It loads the native engine only when a job runs.
 The launcher uses the proxy GPU queue at `.imagine/gpu.sock`; start
 `./start-proxy.sh` with your backend options before submitting jobs.
-The terminal asks for a password before the API opens. First start creates the
-password. Terminal authentication uses a dedicated Python environment with
-Helto's FIDO2 provider; the API and proxy remain Rust services.
-`--enroll-yubikey` registers a second, independent unlock method;
-`--unlock yubikey` uses PIN and touch. `--no-encryption` skips unlock and starts
-with cleared history. See [session privacy](docs/PRIVACY.md) for storage boundaries.
+The server starts without password or YubiKey login. API bearer tokens remain
+required. Prompts and job history stay in memory; temporary images are ordinary
+files removed at session end. See [session privacy](docs/PRIVACY.md).
 Ctrl-C clears history and stops the server and its worker. Optional arguments:
 `--bind 127.0.0.1:8081 --data /private/path/imagine-data`.
 

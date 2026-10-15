@@ -1,16 +1,15 @@
-"""Actual binary/TTY lifecycle tests. Every credential/image/path is synthetic."""
+"""Actual binary lifecycle tests. Every credential/image/path is synthetic."""
 import json
 import os
 from pathlib import Path
-import pty
-import select
-import signal
 import socket
 import struct
+import subprocess
 import tempfile
 import time
 import unittest
 import urllib.request
+import urllib.error
 import zlib
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -26,27 +25,23 @@ class Server:
             s.bind(('127.0.0.1', 0))
             self.port = s.getsockname()[1]
         self.project = project
-        self.output = b''
-        self.pid, self.fd = pty.fork()
-        if self.pid == 0:
-            env = dict(os.environ)
-            env.pop('IMAGINE_COORDINATOR_SOCKET', None)
-            env['IMAGINE_PRIVACY_PYTHON'] = str(ROOT / '.venv-privacy/bin/python')
-            env['HELTO_PRIVACY_SESSION_DIR'] = str(project / 'unused-helto-session')
-            binary = str(ROOT / 'target/debug/imagine-server')
-            os.execve(binary, [binary, '--project', str(project), '--bind', f'127.0.0.1:{self.port}', *args], env)
-    def expect(self, text):
+        env = dict(os.environ)
+        env.pop('IMAGINE_COORDINATOR_SOCKET', None)
+        env['HELTO_PRIVACY_SESSION_DIR'] = str(project / 'unused-helto-session')
+        binary = str(ROOT / 'target/debug/imagine-server')
+        self.process = subprocess.Popen(
+            [binary, '--project', str(project), '--bind', f'127.0.0.1:{self.port}', *args],
+            env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    def ready(self):
         until = time.monotonic() + 15
-        while text.encode() not in self.output:
-            if time.monotonic() > until: raise AssertionError('Expected synthetic server state timed out')
-            if select.select([self.fd], [], [], .1)[0]:
-                try: part = os.read(self.fd, 8192)
-                except OSError: raise AssertionError('Synthetic server exited unexpectedly') from None
-                if not part: raise AssertionError('Synthetic server exited unexpectedly')
-                self.output += part
-    def send(self, value):
-        self.output = b''
-        os.write(self.fd, value.encode() + b'\n')
+        while time.monotonic() < until:
+            if self.process.poll() is not None:
+                raise AssertionError('Synthetic server exited unexpectedly')
+            try:
+                return self.request('/v1/session')
+            except (OSError, urllib.error.URLError):
+                time.sleep(.05)
+        raise AssertionError('Synthetic server did not start without terminal input')
     def request(self, path, body=None):
         access = json.loads((self.project / '.imagine/access.json').read_text())
         r = urllib.request.Request(f'http://127.0.0.1:{self.port}{path}', data=body,
@@ -54,29 +49,20 @@ class Server:
         with urllib.request.urlopen(r, timeout=3) as response:
             return json.load(response)
     def stop(self):
-        if self.pid is None: return
-        try: os.kill(self.pid, signal.SIGTERM)
-        except ProcessLookupError: pass
-        until = time.monotonic() + 10
-        while time.monotonic() < until:
-            pid, status = os.waitpid(self.pid, os.WNOHANG)
-            if pid:
-                self.pid = None
-                os.close(self.fd)
-                return status
-            time.sleep(.05)
-        os.kill(self.pid, signal.SIGKILL)
-        os.waitpid(self.pid, 0)
-        self.pid = None
-        os.close(self.fd)
-        raise AssertionError('Synthetic server did not stop')
+        if self.process.poll() is None:
+            self.process.terminate()
+        try:
+            return self.process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.process.wait()
+            raise AssertionError('Synthetic server did not stop') from None
 
 class Tests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='imagine-privacy-test-')
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
-        (self.root / 'scripts').symlink_to(ROOT / 'scripts', target_is_directory=True)
         (self.root / 'profiles').mkdir()
         (self.root / 'profiles/synthetic.yaml').write_text(json.dumps({
             'schema_version': 1, 'id': 'synthetic', 'version': 1, 'name': 'Synthetic',
@@ -96,43 +82,32 @@ class Tests(unittest.TestCase):
         self.assertFalse((data / 'media/stale').exists())
         for suffix in ('', '-wal', '-shm', '-journal'):
             self.assertFalse((data / ('imagine.sqlite' + suffix)).exists())
-    def test_password_tty_gate_encryption_shutdown_and_wrong_password(self):
+    def check_session_lifecycle(self, *args):
         self.stale()
-        server = self.start()
-        server.expect('New Imagine password:')
+        server = self.start(*args)
+        session = server.ready()
         self.assert_purged()
-        with socket.socket() as s:
-            self.assertNotEqual(s.connect_ex(('127.0.0.1', server.port)), 0)
-        server.send('synthetic-only-password')
-        server.expect('Repeat password:')
-        server.send('synthetic-only-password')
-        server.expect('Imagine listening')
-        self.assertNotIn(b'synthetic-only-password', server.output)
-        session = server.request('/v1/session')
-        self.assertTrue(session['encrypted'])
-        asset = server.request('/v1/assets', png())
-        path = self.root / '.imagine/media' / session['id'] / asset['id']
-        self.assertTrue(path.read_bytes().startswith(b'IMAGINE1'))
-        self.assertEqual(server.stop(), 0)
-        self.assertFalse(path.exists())
-        self.assertTrue((self.root / '.imagine/privacy-keystore.json').exists())
-        wrong = self.start()
-        wrong.expect('Imagine password:')
-        wrong.send('wrong-synthetic-password')
-        wrong.expect('Imagine remains locked')
-        with socket.socket() as s:
-            self.assertNotEqual(s.connect_ex(('127.0.0.1', wrong.port)), 0)
-    def test_plain_start_wipes_before_api_and_cleans_on_stop(self):
-        self.stale()
-        server = self.start('--no-encryption')
-        server.expect('Imagine listening')
-        self.assert_purged()
-        session = server.request('/v1/session')
         self.assertFalse(session['encrypted'])
+        self.assertFalse((self.root / '.imagine/privacy-keystore.json').exists())
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(f'http://127.0.0.1:{server.port}/v1/session', timeout=3)
+        self.assertEqual(error.exception.code, 401)
+        error.exception.close()
         asset = server.request('/v1/assets', png())
         path = self.root / '.imagine/media' / session['id'] / asset['id']
         self.assertEqual(path.read_bytes(), png())
         self.assertEqual(server.stop(), 0)
         self.assertFalse(path.exists())
+        restarted = self.start()
+        self.assertNotEqual(restarted.ready()['id'], session['id'])
+        with self.assertRaises(urllib.error.HTTPError) as error:
+            restarted.request('/v1/assets/' + asset['id'])
+        self.assertEqual(error.exception.code, 404)
+        error.exception.close()
+        self.assertEqual(restarted.stop(), 0)
+    def test_default_start_wipes_before_api_and_cleans_on_stop(self):
+        self.check_session_lifecycle()
+    def test_legacy_no_encryption_flag_remains_compatible(self):
+        self.check_session_lifecycle('--no-encryption')
 
 if __name__ == '__main__': unittest.main()

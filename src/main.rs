@@ -11,7 +11,7 @@ use tokio::sync::{Semaphore, watch};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Session keys and prompts must not be captured by an OS core dump.
+    // Prompts must not be captured by an OS core dump.
     let limit = libc::rlimit {
         rlim_cur: 0,
         rlim_max: 0,
@@ -21,17 +21,13 @@ async fn main() -> Result<()> {
     }
     let mut project = std::env::current_dir()?;
     let mut data = None;
-    let mut encrypted = true;
-    let mut unlock = "password".to_owned();
-    let mut enroll = false;
     let mut profiles = None;
     let mut bind = "127.0.0.1:8080".to_owned();
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
-            "--no-encryption" => encrypted = false,
-            "--unlock" => unlock = args.next().context("--unlock needs password or yubikey")?,
-            "--enroll-yubikey" => enroll = true,
+            // Compatibility with launchers that explicitly selected plain storage.
+            "--no-encryption" => {}
             "--project" => project = PathBuf::from(args.next().context("--project needs a path")?),
             "--profiles" => {
                 profiles = Some(PathBuf::from(
@@ -42,7 +38,7 @@ async fn main() -> Result<()> {
             "--bind" => bind = args.next().context("--bind needs an address")?,
             "--help" => {
                 println!(
-                    "imagine-server [--project PATH] [--data PATH] [--profiles PATH] [--bind 127.0.0.1:8080] [--unlock password|yubikey] [--enroll-yubikey] [--no-encryption]"
+                    "imagine-server [--project PATH] [--data PATH] [--profiles PATH] [--bind 127.0.0.1:8080]"
                 );
                 return Ok(());
             }
@@ -51,43 +47,13 @@ async fn main() -> Result<()> {
     }
     let data = data.unwrap_or_else(|| project.join(".imagine"));
     let (config, _lock) = Config::load(project, data, bind.parse()?)?;
-    if !matches!(unlock.as_str(), "password" | "yubikey") || (!encrypted && enroll) {
-        anyhow::bail!("Invalid privacy options");
-    }
-    // Remove legacy/crash remnants before unlock and before the insecure mode can bind.
+    // Remove legacy/crash remnants before serving requests.
     imagine_server::session::purge(&config.data)?;
-    if encrypted {
-        let python = std::env::var_os("IMAGINE_PRIVACY_PYTHON")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| config.project.join(".venv-privacy/bin/python"));
-        let mut command = std::process::Command::new(python);
-        command
-            .arg(config.project.join("scripts/privacy_unlock.py"))
-            .arg("--store")
-            .arg(config.data.join("privacy-keystore.json"))
-            .arg("--method")
-            .arg(unlock);
-        if enroll {
-            command.arg("--enroll-yubikey");
-        }
-        // Terminal interaction stays in the helper; no secrets cross the process boundary.
-        let status = command
-            .status()
-            .context("Privacy helper unavailable; run ./setup-privacy.sh first")?;
-        if !status.success() {
-            anyhow::bail!("Imagine remains locked");
-        }
-        if enroll {
-            return Ok(());
-        }
-    } else {
-        eprintln!("Imagine: encryption disabled for this empty session");
-    }
     let profiles = Arc::new(imagine_server::profiles::Catalog::load(
         &profiles.unwrap_or_else(|| config.project.join("profiles")),
     )?);
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
-    let store = Store::open_session(&config.data, encrypted).await?;
+    let store = Store::open(&config.data).await?;
     let (engine_tx, engine_rx) = watch::channel(EngineState {
         phase: "unloaded".into(),
         pid: None,
