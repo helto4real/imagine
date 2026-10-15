@@ -140,7 +140,7 @@ impl Client {
         response: Result<reqwest::Response, reqwest::Error>,
     ) -> std::result::Result<Value, Failure> {
         let response = response.map_err(|_| {
-            Failure::retry("Cannot reach the server. Start ./start-server.sh and retry.")
+            Failure::retry("Cannot reach the proxy/API. Start ./start-server.sh and ./start-proxy.sh, then retry.")
         })?;
         let status = response.status();
         let body: Value = response
@@ -352,6 +352,9 @@ fn decode(bytes: &[u8], thumbnail: bool) -> Result<Preview> {
 }
 pub fn error_message(code: &str) -> String {
     match code {
+        "coordinator_unavailable" => "The GPU queue is unavailable. Check that Imagine and the proxy use the same coordinator socket." ,
+        "imagine_proxy_not_configured" => "Restart the proxy with ./start-proxy.sh to enable Imagine coordination.",
+        "imagine_upstream_unavailable" => "The proxy cannot reach Imagine. Start ./start-server.sh and retry.",
         "unsupported_resolution"=>"This server does not accept the selected image size. Restart the updated server or choose a supported size.",
         "unsupported_sampling"=>"Choose steps between 1 and 100 and CFG between 0 and 20.",
         "unauthorized"=>"The API key was rejected. Check access.json and reconnect.",

@@ -8,6 +8,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub const DEFAULT_API_URL: &str = "http://127.0.0.1:8189/imagine";
+
 #[derive(Clone)]
 pub struct Connection {
     pub url: String,

@@ -51,6 +51,7 @@ pub struct Native {
     http: reqwest::Client,
     state: watch::Sender<EngineState>,
     output_reader: Option<tokio::task::JoinHandle<()>>,
+    loaded_weights: Option<String>,
 }
 impl Native {
     pub fn new(config: Config, state: watch::Sender<EngineState>) -> Result<Self> {
@@ -64,6 +65,7 @@ impl Native {
                 .build()?,
             state,
             output_reader: None,
+            loaded_weights: None,
         })
     }
     fn phase(&self, phase: &str) {
@@ -73,7 +75,18 @@ impl Native {
             state.progress = None;
         });
     }
-    async fn ready(&mut self) -> Result<()> {
+    async fn ready(&mut self, request: &JobRequest) -> Result<()> {
+        let workflow = request.model_options.qwen_image_2_1.workflow.as_ref();
+        let weights = workflow
+            .map(|w| serde_json::json!([w.diffusion_model, w.text_encoder, w.vae]).to_string())
+            .unwrap_or_default();
+        if self
+            .loaded_weights
+            .as_ref()
+            .is_some_and(|current| current != &weights)
+        {
+            self.stop().await?;
+        }
         if let Some(child) = &mut self.child {
             if child.try_wait()?.is_none() {
                 return Ok(());
@@ -90,7 +103,7 @@ impl Native {
         let dir = baseline_dir(&self.config.project);
         let manifest: Value =
             serde_json::from_slice(&tokio::fs::read(dir.join("manifest.json")).await?)?;
-        let binary = self
+        let mut binary = self
             .config
             .project
             .join(manifest["binary_path"].as_str().context("binary path")?);
@@ -102,6 +115,39 @@ impl Native {
         ) != expected
         {
             bail!(EngineError("frozen_binary_hash_mismatch"));
+        }
+        if request.model == crate::contract::TURBO {
+            let compatibility: Value = serde_json::from_slice(
+                &tokio::fs::read(
+                    self.config
+                        .project
+                        .join(".imagine/workflow-native/manifest.json"),
+                )
+                .await
+                .context(EngineError("workflow_binary_unavailable"))?,
+            )?;
+            for (path, key) in [
+                ("native/upstream-lock.json", "base_lock_sha256"),
+                ("native/workflow/compat.patch", "compat_patch_sha256"),
+            ] {
+                if hash(&tokio::fs::read(self.config.project.join(path)).await?)
+                    != compatibility[key].as_str().unwrap_or("")
+                {
+                    bail!(EngineError("workflow_profile_hash_mismatch"));
+                }
+            }
+            binary = self
+                .config
+                .project
+                .join(".imagine/workflow-native/build/bin/sd-server");
+            if hash(
+                &tokio::fs::read(&binary)
+                    .await
+                    .context(EngineError("workflow_binary_unavailable"))?,
+            ) != compatibility["binary_sha256"].as_str().unwrap_or("")
+            {
+                bail!(EngineError("workflow_binary_hash_mismatch"));
+            }
         }
         let env_bytes = tokio::fs::read(dir.join("baseline-environment.json")).await?;
         if hash(&env_bytes)
@@ -115,7 +161,12 @@ impl Native {
         let socket = std::net::TcpListener::bind("127.0.0.1:0")?;
         let port = socket.local_addr()?.port();
         let mut command = Command::new(binary);
-        for (key, rel) in manifest["models"].as_object().context("model paths")? {
+        let models = if let Some(w) = workflow {
+            json!({"--diffusion-model":w.diffusion_model,"--llm":w.text_encoder,"--vae":w.vae})
+        } else {
+            manifest["models"].clone()
+        };
+        for (key, rel) in models.as_object().context("model paths")? {
             let path = self
                 .config
                 .model_root
@@ -124,6 +175,11 @@ impl Native {
                 bail!(EngineError("model_weights_missing"));
             }
             command.arg(key).arg(path);
+        }
+        if workflow.is_some() {
+            command
+                .arg("--lora-model-dir")
+                .arg(self.config.model_root.join("loras"));
         }
         command.args([
             "--width",
@@ -207,6 +263,7 @@ impl Native {
             })
             .await;
         }));
+        self.loaded_weights = Some(weights);
         self.base = format!("http://127.0.0.1:{port}");
         self.phase("loading_model");
         let deadline = tokio::time::Instant::now() + Duration::from_secs(300);
@@ -232,24 +289,50 @@ impl Native {
     async fn run(&mut self, req: &JobRequest, owner: &str, store: &Store) -> Result<Vec<u8>> {
         self.state
             .send_modify(|state| state.requested_steps = req.sampling.steps);
-        self.ready().await?;
+        self.ready(req).await?;
         self.phase("preparing_inputs");
         let mut refs = Vec::new();
         for id in &req.inputs.reference_images {
-            refs.push(STANDARD.encode(store.read_asset(id, owner).await?));
+            let bytes = store.read_asset(id, owner).await?;
+            let bytes = if req.model_options.qwen_image_2_1.workflow.is_some() {
+                crate::workflow_image::prepare(
+                    &bytes,
+                    req.model_options
+                        .qwen_image_2_1
+                        .reference_max_pixels_per_image,
+                )?
+            } else {
+                bytes
+            };
+            refs.push(STANDARD.encode(bytes));
         }
         let mut body = json!({"prompt":req.prompt,"negative_prompt":req.negative_prompt,"width":req.width,"height":req.height,
             "seed":req.seed.context("resolved seed")?,"batch_count":1,"sample_params":{"sample_method":req.sampling.sampler,
             "scheduler":req.sampling.scheduler,"sample_steps":req.sampling.steps,"guidance":{"txt_cfg":req.sampling.cfg_scale}},
             "preview":"none","output_format":"png","embed_image_metadata":false});
+        if !req.sampling.custom_sigmas.is_empty() {
+            body["sample_params"]["custom_sigmas"] = json!(req.sampling.custom_sigmas);
+        }
+        if let Some(w) = &req.model_options.qwen_image_2_1.workflow {
+            body["lora"] = json!(
+                w.loras
+                    .iter()
+                    .map(|l| json!({"path":l.path,"multiplier":l.strength}))
+                    .collect::<Vec<_>>()
+            );
+        }
         if !refs.is_empty() {
             body["ref_images"] = json!(refs);
-            body["ref_image_args"] = json!(format!(
-                "vae_input_max_pixels={}",
-                req.model_options
-                    .qwen_image_2_1
-                    .reference_max_pixels_per_image
-            ));
+            body["ref_image_args"] = if req.model_options.qwen_image_2_1.workflow.is_some() {
+                json!("resize_before_vae=false")
+            } else {
+                json!(format!(
+                    "vae_input_max_pixels={}",
+                    req.model_options
+                        .qwen_image_2_1
+                        .reference_max_pixels_per_image
+                ))
+            };
         }
         self.phase("inference");
         let response: Value = self
@@ -283,11 +366,32 @@ impl Native {
             match status["status"].as_str() {
                 Some("completed") => {
                     self.phase("saving_output");
-                    return Ok(STANDARD.decode(
+                    let bytes = STANDARD.decode(
                         status["result"]["images"][0]["b64_json"]
                             .as_str()
                             .context("native output")?,
-                    )?);
+                    )?;
+                    if let Some(w) = &req.model_options.qwen_image_2_1.workflow
+                        && (w.color_match_strength > 0.
+                            || w.brightness_strength > 0.
+                            || w.contrast_strength > 0.)
+                    {
+                        let reference = store
+                            .read_asset(&req.inputs.reference_images[0], owner)
+                            .await?;
+                        let (chroma, brightness, contrast) = (
+                            w.color_match_strength,
+                            w.brightness_strength,
+                            w.contrast_strength,
+                        );
+                        return tokio::task::spawn_blocking(move || {
+                            crate::color_match::apply(
+                                &bytes, &reference, chroma, brightness, contrast,
+                            )
+                        })
+                        .await?;
+                    }
+                    return Ok(bytes);
                 }
                 Some("failed" | "cancelled") => bail!(EngineError("native_generation_failed")),
                 Some("queued" | "generating") => {}

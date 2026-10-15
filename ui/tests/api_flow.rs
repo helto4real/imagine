@@ -78,14 +78,15 @@ impl Backend for Fake {
     }
 }
 #[tokio::test]
-async fn client_uses_real_api_defaults_references_retry_and_output_folder() {
+async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open(dir.path()).await.unwrap();
     let calls = Arc::new(AtomicUsize::new(0));
     let requests = Arc::new(Mutex::new(Vec::new()));
     let blocker = Arc::new(Mutex::new(None));
     let (engine_tx, engine) = watch::channel(EngineState::default());
-    let (control, scheduler) = scheduler::start(
+    let socket = dir.path().join("gpu.sock");
+    let (control, scheduler) = scheduler::start_coordinated(
         store.clone(),
         Box::new(Fake {
             state: engine_tx,
@@ -93,16 +94,27 @@ async fn client_uses_real_api_defaults_references_retry_and_output_folder() {
             requests: requests.clone(),
             block_folder: blocker.clone(),
         }),
+        Some(socket.clone()),
     )
     .await
     .unwrap();
     let access = Access {
         admin_token: "unused-admin-token".into(),
-        clients: BTreeMap::from([("ui-test".into(), "synthetic-test-token".into())]),
+        clients: BTreeMap::from([
+            ("ui-test".into(), "synthetic-test-token".into()),
+            ("other".into(), "other-token".into()),
+        ]),
     };
     let access_path = dir.path().join("access.json");
     std::fs::write(&access_path, serde_json::to_vec(&access).unwrap()).unwrap();
     let app = App {
+        profiles: Arc::new(
+            imagine_server::profiles::Catalog::load(std::path::Path::new(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../profiles"
+            )))
+            .unwrap(),
+        ),
         store,
         control: control.clone(),
         engine,
@@ -113,8 +125,48 @@ async fn client_uses_real_api_defaults_references_retry_and_output_folder() {
     let url = format!("http://{}", listener.local_addr().unwrap());
     let server =
         tokio::spawn(async move { axum::serve(listener, api::router(app)).await.unwrap() });
+    let backend_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let backend_url = format!("http://{}", backend_listener.local_addr().unwrap());
+    let backend_server = tokio::spawn(async move {
+        axum::serve(backend_listener, axum::Router::new()
+            .route("/health", axum::routing::get(|| async { axum::Json(json!({"service":"strata","status":"ok","loaded":false,"model":"synthetic"})) }))
+            .route("/v1/models", axum::routing::get(|| async { axum::Json(json!({"data":[{"id":"synthetic"}]})) }))
+            .route("/free", axum::routing::post(|| async { axum::Json(json!({})) })))
+            .await.unwrap();
+    });
+    let proxy = st_proxy::service::Service::start(st_proxy::config::Config {
+        chat_port: 0,
+        image_port: 0,
+        llm_backend: "sc117".into(),
+        llm_url: backend_url.clone(),
+        comfy_url: backend_url,
+        imagine_url: url,
+        imagine_access_file: Some(access_path.to_string_lossy().into()),
+        coordinator_socket: Some(socket.to_string_lossy().into()),
+        poll_interval: 0.01,
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+    let url = format!("http://127.0.0.1:{}/imagine", proxy.image_port);
+    let http = reqwest::Client::new();
+    let unauthorized = http.get(format!("{url}/v1/models")).send().await.unwrap();
+    assert_eq!(unauthorized.status(), 401);
+    assert_eq!(unauthorized.headers()["cache-control"], "no-store");
+    let denied = http
+        .post(format!("{url}/v1/runtime/unload"))
+        .bearer_auth("synthetic-test-token")
+        .json(&json!({"active_job":"wait"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(
+        denied.status(),
+        403,
+        "proxy must never substitute admin credentials"
+    );
     let client = Client::connect(&Connection {
-        url,
+        url: url.clone(),
         access: access_path,
         client: "ui-test".into(),
     })
@@ -125,6 +177,13 @@ async fn client_uses_real_api_defaults_references_retry_and_output_folder() {
     std::fs::write(&ref_path, png()).unwrap();
     let a = client.upload(&ref_path).await.unwrap();
     let b = client.upload(&ref_path).await.unwrap();
+    let other_asset = http
+        .get(format!("{url}/v1/assets/{}", a.id))
+        .bearer_auth("other-token")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(other_asset.status(), 404);
     let refs = vec![b.id, a.id];
     let settings = GenerationSettings {
         steps: 24,
@@ -180,6 +239,22 @@ async fn client_uses_real_api_defaults_references_retry_and_output_folder() {
         assert_eq!(received.sampling.steps, 24);
         assert_eq!(received.sampling.cfg_scale, 3.25);
     }
+    let hidden = http
+        .get(format!("{url}/v1/jobs/{}", id.as_ref().unwrap()))
+        .bearer_auth("other-token")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(hidden.status(), 404);
+    let events = http
+        .get(format!("{url}/v1/jobs/{}/events", id.as_ref().unwrap()))
+        .bearer_auth("synthetic-test-token")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(events.headers()["content-type"], "text/event-stream");
+    let events = events.text().await.unwrap();
+    assert!(events.contains("succeeded"));
     let duplicate = client.generate(submission, |_| {}).await.unwrap();
     assert_ne!(first.file, duplicate.file);
     assert_eq!(duplicate.seed, first.seed);
@@ -226,5 +301,7 @@ async fn client_uses_real_api_defaults_references_retry_and_output_folder() {
     );
     control.call(Action::Shutdown).await.unwrap();
     scheduler.await.unwrap().unwrap();
+    proxy.close().await;
     server.abort();
+    backend_server.abort();
 }

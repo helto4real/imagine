@@ -87,6 +87,13 @@ async fn setup() -> Harness {
         clients: BTreeMap::from([("a".into(), "alice".into()), ("b".into(), "bob".into())]),
     };
     let router = api::router(App {
+        profiles: Arc::new(
+            imagine_server::profiles::Catalog::load(std::path::Path::new(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/profiles"
+            )))
+            .unwrap(),
+        ),
         store: store.clone(),
         control: control.clone(),
         engine,
@@ -662,4 +669,344 @@ async fn crash_recovery_does_not_replay_active_rows() {
         reopened.job("queued", "a").await.unwrap().unwrap()["status"],
         "queued"
     );
+}
+
+#[tokio::test]
+async fn batch_is_atomic_and_idempotent_for_the_entire_request() {
+    let h = setup().await;
+    let mut invalid = request();
+    invalid["seed"] = json!(9007199254740992u64);
+    let (status, _) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/batch",
+        "alice",
+        Some(json!({"jobs":[request(),invalid]})),
+        Some("batch"),
+    )
+    .await;
+    assert_eq!(status, 422);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM jobs")
+            .fetch_one(&h.store.db)
+            .await
+            .unwrap(),
+        0
+    );
+    let batch = json!({"jobs":[request(),request()]});
+    let (status, first) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/batch",
+        "alice",
+        Some(batch.clone()),
+        Some("batch"),
+    )
+    .await;
+    assert_eq!(status, 202);
+    let (status, retry) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/batch",
+        "alice",
+        Some(batch),
+        Some("batch"),
+    )
+    .await;
+    assert_eq!(status, 202);
+    assert_eq!(first["jobs"][0]["id"], retry["jobs"][0]["id"]);
+    assert_eq!(first["jobs"][1]["id"], retry["jobs"][1]["id"]);
+    assert_eq!(retry["jobs"][0]["reused"], true);
+    let (status, _) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/batch",
+        "alice",
+        Some(json!({"jobs":[request()]})),
+        Some("batch"),
+    )
+    .await;
+    assert_eq!(status, 409);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM jobs")
+            .fetch_one(&h.store.db)
+            .await
+            .unwrap(),
+        2
+    );
+    h.control.call(Action::Shutdown).await.unwrap();
+    h.task.await.unwrap().unwrap();
+}
+
+#[tokio::test]
+async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
+    let h = setup().await;
+    assert_eq!(
+        req(&h.router, "GET", "/v1/profiles", "invalid", None, None)
+            .await
+            .0,
+        401
+    );
+    let (status, catalog) = req(&h.router, "GET", "/v1/profiles", "alice", None, None).await;
+    assert_eq!(status, 200);
+    assert!(
+        catalog["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["id"] == "qwen")
+    );
+    let (_, description) = req(&h.router, "GET", "/v1/profiles/qwen", "alice", None, None).await;
+    for (profile, original_guidance) in [
+        (
+            "qwen",
+            include_str!("../proxy/workflows/prompts/prompt-enhance-scene.md"),
+        ),
+        (
+            "quick-draft",
+            include_str!("../proxy/workflows/prompts/prompt-enhance-scene.md"),
+        ),
+        (
+            "image_generation",
+            include_str!("../proxy/workflows/prompts/prompt-enhance-scene.md"),
+        ),
+        (
+            "qwen_scene",
+            include_str!("../proxy/workflows/prompts/reference-aware-scene.md"),
+        ),
+    ] {
+        let (status, described) = req(
+            &h.router,
+            "GET",
+            &format!("/v1/profiles/{profile}"),
+            "alice",
+            None,
+            None,
+        )
+        .await;
+        assert_eq!(status, 200);
+        assert_eq!(described["prompt_guidance"], original_guidance, "{profile}");
+    }
+    assert_eq!(description["defaults"]["sampling"]["steps"], 40);
+    assert!(description["defaults"].get("negative_prompt").is_none());
+    assert!(
+        description["parameters_schema"]["properties"]
+            .get("resolved_profile")
+            .is_none()
+    );
+    let body = json!({"profile":"qwen","profile_version":2,"prompt":"synthetic profile test", "width":1024,"sampling":{"steps":12},"model_options":{"qwen_image_2_1":{"generation":{"loras":[{"path":"synthetic.safetensors","strength":0.5}]}}}});
+    let (status, validation) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/validate",
+        "alice",
+        Some(body.clone()),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{validation}");
+    assert_eq!(validation["effective"]["width"], 1024);
+    assert_eq!(validation["effective"]["height"], 896);
+    assert_eq!(validation["effective"]["sampling"]["steps"], 12);
+    assert_eq!(validation["effective"]["sampling"]["cfg_scale"], 2.5);
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
+    assert!(validation["effective"].get("prompt").is_none());
+    let (status, submitted) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs",
+        "alice",
+        Some(body.clone()),
+        Some("profile-retry"),
+    )
+    .await;
+    assert_eq!(status, 202, "{submitted}");
+    let id = submitted["id"].as_str().unwrap();
+    wait_calls(&h.probe, 1).await;
+    let effective = h.store.job(id, "a").await.unwrap().unwrap()["effective"].clone();
+    assert_eq!(effective["resolved_profile"]["id"], "qwen");
+    assert_eq!(effective["resolved_profile"]["version"], 2);
+    assert_eq!(
+        effective["resolved_profile"]["sha256"],
+        description["sha256"]
+    );
+    assert!(effective["seed"].is_u64());
+    assert_eq!(
+        effective["model_options"]["qwen_image_2_1"]["generation"]["loras"][0]["path"],
+        "synthetic.safetensors"
+    );
+    let (_, retry) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs",
+        "alice",
+        Some(body),
+        Some("profile-retry"),
+    )
+    .await;
+    assert_eq!(retry["id"], id);
+    assert_eq!(
+        h.store.job(id, "a").await.unwrap().unwrap()["effective"]["seed"],
+        effective["seed"]
+    );
+    let (_, cleared) = req(&h.router, "POST", "/v1/jobs/validate", "alice", Some(json!({"profile":"quick-draft","prompt":"synthetic","sampling":{"custom_sigmas":[]},"model_options":{"qwen_image_2_1":{"generation":{"loras":[]}}}})), None).await;
+    assert!(
+        cleared["effective"]["sampling"]
+            .get("custom_sigmas")
+            .is_none()
+    );
+    assert_eq!(
+        cleared["effective"]["model_options"]["qwen_image_2_1"]["generation"]["loras"],
+        json!([])
+    );
+    h.probe.release.notify_one();
+    wait_status(&h.store, id, "a", "succeeded").await;
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn profiles_reject_invalid_overrides_before_batch_admission() {
+    let h = setup().await;
+    for (patch, code) in [
+        (
+            json!({"profile":"absent","prompt":"test"}),
+            "unknown_profile",
+        ),
+        (
+            json!({"profile":"qwen","profile_version":1,"prompt":"test"}),
+            "profile_version_mismatch",
+        ),
+        (
+            json!({"profile":"qwen","prompt":"test","sampling":{"typo":1}}),
+            "invalid_request",
+        ),
+        (
+            json!({"profile":"qwen","prompt":"test","sampling":null}),
+            "invalid_request",
+        ),
+        (
+            json!({"profile":"qwen","prompt":"test","sampling":{"steps":0}}),
+            "unsupported_sampling",
+        ),
+        (
+            json!({"profile":"qwen","prompt":"test","width":1601}),
+            "unsupported_resolution",
+        ),
+        (
+            json!({"profile":"qwen","prompt":"test","model":"qwen-image-2.1-turbo"}),
+            "model_settings_mismatch",
+        ),
+        (
+            json!({"profile":"qwen","prompt":"test","width":1024,"max_side":1024}),
+            "conflicting_dimensions",
+        ),
+        (
+            json!({"profile":"qwen","prompt":"test","nsfw":"true"}),
+            "invalid_nsfw",
+        ),
+        (
+            json!({"profile":"qwen","prompt":"test","resolved_profile":{}}),
+            "read_only_profile_metadata",
+        ),
+        (
+            json!({"profile":"image_upscale","prompt":"test"}),
+            "invalid_reference_count",
+        ),
+    ] {
+        let (status, result) = req(
+            &h.router,
+            "POST",
+            "/v1/jobs/batch",
+            "alice",
+            Some(json!({"jobs":[{"profile":"qwen","prompt":"valid"},patch]})),
+            None,
+        )
+        .await;
+        assert!(status == 422 || status == 409, "{status}: {result}");
+        assert_eq!(result["error"]["code"], code);
+    }
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
+    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM jobs")
+        .fetch_one(&h.store.db)
+        .await
+        .unwrap();
+    assert_eq!(count, 0);
+    // Frozen v2 still uses the original settings and native reference preprocessing.
+    let (_, frozen) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/validate",
+        "alice",
+        Some(json!({"profile":"qwen-image21-1600x896-v2","prompt":"test"})),
+        None,
+    )
+    .await;
+    assert_eq!(
+        frozen["effective"]["profile_revision"],
+        imagine_server::contract::PROFILE
+    );
+    assert!(
+        frozen["effective"]["model_options"]["qwen_image_2_1"]
+            .get("generation")
+            .is_none()
+    );
+    assert_eq!(frozen["effective"]["width"], 1600);
+    assert_eq!(frozen["effective"]["sampling"]["steps"], 40);
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn profile_reference_sizing_and_asset_ownership() {
+    let h = setup().await;
+    let mut bytes = Cursor::new(Vec::new());
+    image::RgbImage::new(256, 128)
+        .write_to(&mut bytes, image::ImageFormat::Png)
+        .unwrap();
+    let asset = h.store.save_asset("a", bytes.into_inner()).await.unwrap();
+    let body = json!({"profile":"image_upscale","prompt":"synthetic upscale","negative_prompt":"","max_side":512,"inputs":{"reference_images":[asset["id"]]}});
+    let (status, v) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/validate",
+        "alice",
+        Some(body.clone()),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{v}");
+    assert_eq!(v["effective"]["width"], 512);
+    assert_eq!(v["effective"]["height"], 256);
+    assert_eq!(v["effective"]["operation"], "image_edit");
+    assert_eq!(
+        v["effective"]["model_options"]["qwen_image_2_1"]["generation"]["loras"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        req(
+            &h.router,
+            "POST",
+            "/v1/jobs/validate",
+            "bob",
+            Some(body),
+            None
+        )
+        .await
+        .0,
+        404
+    );
+    let (_, v) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/validate",
+        "alice",
+        Some(json!({"profile":"qwen","prompt":"test","max_side":1024,"aspect_ratio":"3:4"})),
+        None,
+    )
+    .await;
+    assert_eq!(v["effective"]["width"], 768);
+    assert_eq!(v["effective"]["height"], 1024);
+    stop(h).await;
 }

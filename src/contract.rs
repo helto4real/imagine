@@ -3,12 +3,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 pub const MODEL: &str = "qwen-image-2.1-int8";
+pub const TURBO: &str = "qwen-image-2.1-turbo";
+pub const MCP_PROFILE: &str = "qwen-image21-workflow-v1";
+pub const MAX_SEED: u64 = 9_007_199_254_740_991;
 pub const PROFILE: &str = "qwen-image21-1600x896-v2";
 pub const API_REVISION: &str = "imagine-api-v1";
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct JobRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_profile: Option<ResolvedProfile>,
     pub model: String,
     pub operation: Operation,
     pub prompt: String,
@@ -18,7 +23,7 @@ pub struct JobRequest {
     pub width: u32,
     #[serde(default = "height")]
     pub height: u32,
-    pub seed: Option<u32>,
+    pub seed: Option<u64>,
     #[serde(default)]
     pub sampling: Sampling,
     #[serde(default)]
@@ -30,6 +35,13 @@ pub struct JobRequest {
     pub video: Option<Video>,
     #[serde(default)]
     pub client_metadata: serde_json::Map<String, Value>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ResolvedProfile {
+    pub id: String,
+    pub version: u32,
+    pub sha256: String,
 }
 fn width() -> u32 {
     1600
@@ -53,6 +65,8 @@ pub struct Sampling {
     pub cfg_scale: f32,
     pub sampler: String,
     pub scheduler: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub custom_sigmas: Vec<f32>,
 }
 impl Default for Sampling {
     fn default() -> Self {
@@ -61,6 +75,7 @@ impl Default for Sampling {
             cfg_scale: 2.5,
             sampler: "er_sde".into(),
             scheduler: "beta".into(),
+            custom_sigmas: Vec::new(),
         }
     }
 }
@@ -81,13 +96,50 @@ pub struct ModelOptions {
 #[serde(default, deny_unknown_fields)]
 pub struct QwenOptions {
     pub reference_max_pixels_per_image: u32,
+    #[serde(
+        rename = "generation",
+        alias = "workflow",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub workflow: Option<WorkflowOptions>,
 }
 impl Default for QwenOptions {
     fn default() -> Self {
         Self {
             reference_max_pixels_per_image: 1_000_000,
+            workflow: None,
         }
     }
+}
+/// Explicit workflow settings are separate from the frozen default profile.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WorkflowOptions {
+    pub diffusion_model: String,
+    pub text_encoder: String,
+    pub vae: String,
+    #[serde(default)]
+    pub loras: Vec<Lora>,
+    #[serde(default)]
+    pub zero_negative_conditioning: bool,
+    #[serde(default)]
+    pub color_match_strength: f32,
+    #[serde(default)]
+    pub brightness_strength: f32,
+    #[serde(default)]
+    pub contrast_strength: f32,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Lora {
+    pub path: String,
+    pub strength: f32,
+}
+fn relative_model_path(path: &str) -> bool {
+    !path.is_empty()
+        && std::path::Path::new(path)
+            .components()
+            .all(|part| matches!(part, std::path::Component::Normal(_)))
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
@@ -116,7 +168,7 @@ impl JobRequest {
         if self.model == "minimax-h3" {
             return Err("model_not_validated");
         }
-        if self.model != MODEL {
+        if self.model != MODEL && self.model != TURBO {
             return Err("unknown_model");
         }
         if !matches!(
@@ -126,8 +178,10 @@ impl JobRequest {
         {
             return Err("unsupported_operation");
         }
-        if !(128..=4096).contains(&self.width)
-            || !(128..=4096).contains(&self.height)
+        let workflow = self.model_options.qwen_image_2_1.workflow.as_ref();
+        let minimum = if workflow.is_some() { 32 } else { 128 };
+        if !(minimum..=4096).contains(&self.width)
+            || !(minimum..=4096).contains(&self.height)
             || self.width.max(self.height) < 256
             || !self.width.is_multiple_of(32)
             || !self.height.is_multiple_of(32)
@@ -143,10 +197,81 @@ impl JobRequest {
         if !(1..=100).contains(&self.sampling.steps)
             || !self.sampling.cfg_scale.is_finite()
             || !(0.0..=20.0).contains(&self.sampling.cfg_scale)
-            || self.sampling.sampler != "er_sde"
-            || self.sampling.scheduler != "beta"
+            || (!matches!(
+                self.sampling.sampler.as_str(),
+                "er_sde" | "euler" | "res_multistep"
+            ))
+            || (!matches!(self.sampling.scheduler.as_str(), "beta" | "simple"))
+            || (workflow.is_none()
+                && (self.sampling.sampler != "er_sde"
+                    || self.sampling.scheduler != "beta"
+                    || !self.sampling.custom_sigmas.is_empty()))
+            || self
+                .sampling
+                .custom_sigmas
+                .iter()
+                .any(|x| !x.is_finite() || *x < 0.)
         {
             return Err("unsupported_sampling");
+        }
+        if !self.sampling.custom_sigmas.is_empty()
+            && (self.sampling.custom_sigmas.len() != self.sampling.steps as usize + 1
+                || self.sampling.custom_sigmas.last() != Some(&0.)
+                || self.sampling.custom_sigmas[0] <= 0.
+                || self.sampling.custom_sigmas.windows(2).any(|s| s[1] > s[0]))
+        {
+            return Err("invalid_sigma_schedule");
+        }
+        if self.seed.is_some_and(|seed| seed > MAX_SEED) {
+            return Err("invalid_seed");
+        }
+        if self.model == TURBO && workflow.is_none() {
+            return Err("workflow_settings_required");
+        }
+        if let Some(w) = workflow {
+            if ![&w.diffusion_model, &w.text_encoder, &w.vae]
+                .iter()
+                .all(|p| relative_model_path(p))
+                || w.loras
+                    .iter()
+                    .any(|l| !relative_model_path(&l.path) || !l.strength.is_finite())
+            {
+                return Err("invalid_model_path");
+            }
+            let expected = if self.model == TURBO {
+                "qwen_image_2.1_turbo_bf16.safetensors"
+            } else {
+                "qwen_image_2.1_int8_convrot.safetensors"
+            };
+            if std::path::Path::new(&w.diffusion_model)
+                .file_name()
+                .and_then(|p| p.to_str())
+                != Some(expected)
+            {
+                return Err("model_settings_mismatch");
+            }
+            if [
+                w.color_match_strength,
+                w.brightness_strength,
+                w.contrast_strength,
+            ]
+            .iter()
+            .any(|v| !v.is_finite() || !(0.0..=1.0).contains(v))
+            {
+                return Err("invalid_color_matching");
+            }
+            if (w.color_match_strength > 0.
+                || w.brightness_strength > 0.
+                || w.contrast_strength > 0.)
+                && self.inputs.reference_images.is_empty()
+            {
+                return Err("invalid_reference_count");
+            }
+            // Zero negative conditioning is immaterial at CFG=1. The pinned native
+            // API does not implement Comfy's zero-tensor conditioning at other CFGs.
+            if w.zero_negative_conditioning && self.sampling.cfg_scale != 1. {
+                return Err("unsupported_zero_negative_conditioning");
+            }
         }
         if self.output.format != "png" || self.output.count != 1 {
             return Err("unsupported_output");
@@ -169,12 +294,14 @@ impl JobRequest {
             }
             _ => {}
         }
-        if !(262_144..=4_000_000).contains(
-            &self
-                .model_options
-                .qwen_image_2_1
-                .reference_max_pixels_per_image,
-        ) {
+        if workflow.is_none()
+            && !(262_144..=4_000_000).contains(
+                &self
+                    .model_options
+                    .qwen_image_2_1
+                    .reference_max_pixels_per_image,
+            )
+        {
             return Err("invalid_reference_pixel_limit");
         }
         if serde_json::to_vec(&self.client_metadata).map_or(true, |v| v.len() > 4096) {
@@ -184,17 +311,24 @@ impl JobRequest {
     }
     pub fn effective(&self) -> Value {
         let mut v = serde_json::to_value(self).expect("serializable request");
-        v["profile_revision"] = json!(PROFILE);
+        v["profile_revision"] = json!(if self.model_options.qwen_image_2_1.workflow.is_some() {
+            MCP_PROFILE
+        } else {
+            PROFILE
+        });
         v["api_revision"] = json!(API_REVISION);
         v
     }
 }
 
 pub fn models() -> Value {
-    json!({"models":[model(MODEL).unwrap(), model("minimax-h3").unwrap()]})
+    json!({"models":[model(MODEL).unwrap(), model(TURBO).unwrap(), model("minimax-h3").unwrap()]})
 }
 pub fn model(id: &str) -> Option<Value> {
     match id {
+        TURBO => Some(
+            json!({"id":TURBO,"available":true,"availability":"requires_local_workflow_binary_and_weights","engine":"stable-diffusion.cpp","profile_revision":MCP_PROFILE,"operations":["text_to_image","image_edit"],"request_schema":schemars::schema_for!(JobRequest)}),
+        ),
         MODEL => Some(json!({
             "id": MODEL, "available": true, "availability": "requires_local_frozen_binary_and_weights",
             "engine":"stable-diffusion.cpp", "profile_revision":PROFILE,

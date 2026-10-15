@@ -1,0 +1,120 @@
+usage: st-proxy [-h] [--listen-host LISTEN_HOST] [--chat-port CHAT_PORT]
+                [--image-port IMAGE_PORT] [--mcp-port MCP_PORT]
+                [--mcp-workflows-dir MCP_WORKFLOWS_DIR]
+                [--mcp-output-dir MCP_OUTPUT_DIR]
+                [--mcp-input-dir MCP_INPUT_DIR]
+                [--model-profiles MODEL_PROFILES]
+                [--llm-backend {koboldcpp,ollama,sc117,orca,sc117_128k,orca_128k,prism,tabbyapi,all}]
+                [--llm-url LLM_URL] [--comfy-url COMFY_URL]
+                [--tabby-url TABBY_URL] [--prism-url PRISM_URL]
+                [--sc117-url SC117_URL] [--orca-url ORCA_URL]
+                [--sc117-128k-url SC117_128K_URL]
+                [--orca-128k-url ORCA_128K_URL]
+                [--kobold-admin-password KOBOLD_ADMIN_PASSWORD]
+                [--connect-timeout CONNECT_TIMEOUT] [--kobold-router-mode]
+                [--kobold-model-cache KOBOLD_MODEL_CACHE]
+                [--kobold-default-model KOBOLD_DEFAULT_MODEL]
+                [--prism-model PRISM_MODEL] [--tabby-model TABBY_MODEL]
+                [--tabby-max-seq-len TABBY_MAX_SEQ_LEN]
+                [--max-chat-body-bytes MAX_CHAT_BODY_BYTES]
+                [--write-kobold-model-cache WRITE_KOBOLD_MODEL_CACHE]
+                [--request-timeout REQUEST_TIMEOUT]
+                [--image-timeout IMAGE_TIMEOUT]
+                [--chat-drain-timeout CHAT_DRAIN_TIMEOUT]
+                [--unload-timeout UNLOAD_TIMEOUT]
+                [--reload-timeout RELOAD_TIMEOUT]
+                [--cleanup-timeout CLEANUP_TIMEOUT]
+                [--idle-timeout IDLE_TIMEOUT] [--restore-llm-on-idle]
+                [--poll-interval POLL_INTERVAL]
+                [--comfy-poll-failure-limit COMFY_POLL_FAILURE_LIMIT]
+                [--max-workflow-body-bytes MAX_WORKFLOW_BODY_BYTES]
+                [--max-queued-images MAX_QUEUED_IMAGES]
+                [--max-queued-workflow-bytes MAX_QUEUED_WORKFLOW_BYTES]
+                [--strict-comfy-routes | --allow-unknown-comfy-routes]
+                [--check-backend]
+                [--backend-check-timeout BACKEND_CHECK_TIMEOUT]
+                [--log-level LOG_LEVEL]
+                [--coordinator-socket COORDINATOR_SOCKET]
+                [--imagine-url IMAGINE_URL]
+                [--imagine-access-file IMAGINE_ACCESS_FILE]
+
+Local SillyTavern VRAM handoff broker
+
+options:
+  -h, --help            show this help message and exit
+  --listen-host LISTEN_HOST
+  --chat-port CHAT_PORT
+  --image-port IMAGE_PORT
+  --mcp-port MCP_PORT   enable local MCP on this port
+  --mcp-workflows-dir MCP_WORKFLOWS_DIR
+  --mcp-output-dir MCP_OUTPUT_DIR
+  --mcp-input-dir MCP_INPUT_DIR
+  --model-profiles MODEL_PROFILES
+                        JSON model defaults; empty string disables profiles
+  --llm-backend {koboldcpp,ollama,sc117,orca,sc117_128k,orca_128k,prism,tabbyapi,all}
+  --llm-url LLM_URL, --kobold-url LLM_URL
+                        LLM origin; --kobold-url is retained as a
+                        compatibility alias
+  --comfy-url COMFY_URL
+  --tabby-url TABBY_URL
+  --prism-url PRISM_URL
+  --sc117-url SC117_URL
+  --orca-url ORCA_URL
+  --sc117-128k-url SC117_128K_URL
+  --orca-128k-url ORCA_128K_URL
+  --kobold-admin-password KOBOLD_ADMIN_PASSWORD
+                        Prefer ST_PROXY_KOBOLD_ADMIN_PASSWORD to avoid shell
+                        history
+  --connect-timeout CONNECT_TIMEOUT
+  --kobold-router-mode
+  --kobold-model-cache KOBOLD_MODEL_CACHE
+  --kobold-default-model KOBOLD_DEFAULT_MODEL
+                        Native router profile used for initial_model and
+                        omitted model
+  --prism-model PRISM_MODEL
+                        Default Prism router preset when the request omits
+                        model
+  --tabby-model TABBY_MODEL
+                        TabbyAPI model name for the first load when no model
+                        is loaded
+  --tabby-max-seq-len TABBY_MAX_SEQ_LEN
+                        Fallback context for first TabbyAPI load; model
+                        profiles override
+  --max-chat-body-bytes MAX_CHAT_BODY_BYTES
+  --write-kobold-model-cache WRITE_KOBOLD_MODEL_CACHE
+                        with --check-backend, export the native router's
+                        passive model list
+  --request-timeout REQUEST_TIMEOUT
+  --image-timeout IMAGE_TIMEOUT
+  --chat-drain-timeout CHAT_DRAIN_TIMEOUT
+  --unload-timeout UNLOAD_TIMEOUT
+  --reload-timeout RELOAD_TIMEOUT
+  --cleanup-timeout CLEANUP_TIMEOUT
+  --idle-timeout IDLE_TIMEOUT
+                        deprecated compatibility setting; no automatic restore
+                        timer is scheduled
+  --restore-llm-on-idle
+                        deprecated compatibility flag; automatic LLM restore
+                        is disabled
+  --poll-interval POLL_INTERVAL
+  --comfy-poll-failure-limit COMFY_POLL_FAILURE_LIMIT
+  --max-workflow-body-bytes MAX_WORKFLOW_BODY_BYTES
+  --max-queued-images MAX_QUEUED_IMAGES
+  --max-queued-workflow-bytes MAX_QUEUED_WORKFLOW_BYTES
+  --strict-comfy-routes
+                        reject unclassified mutating ComfyUI routes; disabled
+                        by default
+  --allow-unknown-comfy-routes
+                        compatibility alias for the default transparent
+                        ComfyUI route policy
+  --check-backend       validate the configured LLM lifecycle API and exit
+  --backend-check-timeout BACKEND_CHECK_TIMEOUT
+  --log-level LOG_LEVEL
+  --coordinator-socket COORDINATOR_SOCKET
+                        private Unix socket for the shared Imagine GPU queue
+  --imagine-url IMAGINE_URL
+                        Imagine public API origin (default
+                        http://127.0.0.1:8080)
+  --imagine-access-file IMAGINE_ACCESS_FILE
+                        operator-owned Imagine access.json for MCP assets and
+                        GPU release

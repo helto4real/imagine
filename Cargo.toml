@@ -5,6 +5,9 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1"
+aes-gcm = "0.10"
+zeroize = "1"
+serde_yaml = "0.9"
 async-stream = "0.3"
 axum = "0.8"
 base64 = "0.22"
@@ -23,10 +26,11 @@ tokio-util = "0.7"
 uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
+st-proxy = { path = "proxy" }
 tempfile = "3"
 tower = { version = "0.5", features = ["util"] }
 
 [workspace]
-members = ["ui"]
+members = ["ui", "proxy"]
 default-members = ["."]
 resolver = "3"

@@ -49,6 +49,9 @@ impl Store {
               request TEXT NOT NULL, request_hash TEXT NOT NULL, idempotency_key TEXT,
               created INTEGER NOT NULL, started INTEGER, finished INTEGER,
               output TEXT, error TEXT, UNIQUE(owner,idempotency_key));
+            CREATE TABLE IF NOT EXISTS job_batches (
+              owner TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL,
+              job_ids TEXT NOT NULL, PRIMARY KEY(owner,idempotency_key));
             CREATE TABLE IF NOT EXISTS assets (
               id TEXT PRIMARY KEY, owner TEXT NOT NULL, mime TEXT NOT NULL,
               width INTEGER NOT NULL, height INTEGER NOT NULL, bytes INTEGER NOT NULL,

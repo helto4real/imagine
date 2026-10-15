@@ -1,0 +1,32 @@
+{
+  "_GRAY": "\u001b[38;2;127;132;156m",
+  "_TEXT": "\u001b[38;2;205;214;244m",
+  "_BLUE": "\u001b[38;2;137;180;250m",
+  "_GREEN": "\u001b[38;2;166;227;161m",
+  "_YELLOW": "\u001b[38;2;249;226;175m",
+  "_RED": "\u001b[38;2;243;139;168m",
+  "_MAUVE": "\u001b[38;2;203;166;247m",
+  "_TEAL": "\u001b[38;2;148;226;213m",
+  "_PEACH": "\u001b[38;2;250;179;135m",
+  "_RESET": "\u001b[0m",
+  "_STATUS": "\\bstatus=([1-5]\\d{2})\\b",
+  "_TOKENS": "\\b(?P<field>status|duration|state|expected|reason|error)=(?P<value>[^\\n]*?)(?=\\s+[a-zA-Z_]\\w*=|[;\\n]|$)|(?P<transition>(?<=state transition: )\\w+|(?<= -> )\\w+)|(?P<backend>\\b(?:KoboldCpp|TabbyAPI|Ollama|Prism|ComfyUI|Qwen SC117|Qwen Orca)\\b)|(?P<completed>\\bcompleted\\b)|(?P<failure>\\bfailed\\b|\\brejected\\b)|(?P<detail>(?<=failed: )(?!\\w+=)[^;\\n]+|(?<=load error: )[^;\\n]+)",
+  "_STRATA_PHASES": {
+    "starting the engine": "\u001b[38;2;250;179;135m",
+    "loading the experts": "\u001b[38;2;250;179;135m",
+    "filling the GPU's expert cache": "\u001b[38;2;250;179;135m",
+    "experts loaded": "\u001b[38;2;250;179;135m",
+    "almost ready": "\u001b[38;2;250;179;135m",
+    "still starting": "\u001b[38;2;250;179;135m",
+    "reading the prompt": "\u001b[38;2;137;180;250m",
+    "thinking": "\u001b[38;2;137;180;250m",
+    "answering": "\u001b[38;2;148;226;213m",
+    "the engine is running again": "\u001b[38;2;166;227;161m",
+    "done": "\u001b[38;2;166;227;161m",
+    "warning": "\u001b[38;2;249;226;175m",
+    "error": "\u001b[38;2;243;139;168m",
+    "failed": "\u001b[38;2;243;139;168m",
+    "fatal": "\u001b[38;2;243;139;168m"
+  },
+  "_STRATA_TOKENS": "(?P<phase>^(?:starting\\ the\\ engine|loading\\ the\\ experts|filling\\ the\\ GPU's\\ expert\\ cache|experts\\ loaded|almost\\ ready|still\\ starting|reading\\ the\\ prompt|thinking|answering|the\\ engine\\ is\\ running\\ again|done|warning|error|failed|fatal)\\b)|(?P<cancel>cancel=True)|(?P<number>\\b\\d[\\d,]*(?:\\.\\d+)?(?:%|\\s+(?:tok/s|tokens|experts|GiB|s)\\b)?)"
+}

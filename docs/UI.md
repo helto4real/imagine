@@ -8,25 +8,49 @@ All application-owned labels, statuses, dialogs and errors are in English.
 
 ## Start
 
-Run the API in one terminal, then the UI in another:
+Run Imagine, the proxy stack, and the UI in separate terminals:
 
 ```sh
 ./start-server.sh
+./start-proxy.sh
 ./start-ui.sh
 ```
+
+`start-proxy.sh` starts all supported LLM backends by default, waits for readiness,
+and exposes their combined model catalog for clients such as Pi. Ctrl-C stops
+the stack; `--log` shows backend logs. Use `ST_PROXY_LLM_BACKEND` to select a
+single backend. CLI options also configure the stack; use `--proxy-only` for
+independently managed backends. ComfyUI is disabled by default and need not run.
+Enable it explicitly with `--comfy-enabled true` when using Comfy routes.
 
 `start-ui.sh` incrementally builds the release client. The API and desktop client
 have separate lifetimes; closing the window does not stop the server or cancel
 an accepted job. Use **Cancel** while a generation is active to request cancellation.
 
-Defaults: API `http://127.0.0.1:8080`, the `local` client token in
+Defaults: proxy API `http://127.0.0.1:8189/imagine`, the `local` client token in
 `.imagine/access.json`. Start the server once to create that file. If the server
 is offline, the window remains usable for writing a prompt and selecting an
-output folder; choose **Reconnect** after starting the API.
+output folder; choose **Reconnect** after starting Imagine and the proxy.
 
 ```sh
-./start-ui.sh --api http://127.0.0.1:8081 --access /private/api-data/access.json --client local
+./start-ui.sh --api http://127.0.0.1:8189/imagine --access /private/api-data/access.json --client local
 ```
+
+The proxy forwards `/imagine/*` on its image port to `--imagine-url` (default
+`http://127.0.0.1:8080`), stripping the `/imagine` prefix. The UI uses that base
+for metadata, uploads, job submissions/polling/cancellation and PNG downloads.
+The proxy preserves bearer credentials and idempotency keys; Imagine enforces
+client ownership and admin permissions. The HTTP forwarding does not reserve a
+second GPU slot: Imagine reserves its job ticket in the shared coordinator FIFO.
+There is no automatic direct fallback when the proxy is unavailable.
+
+The root launchers default to `.imagine/gpu.sock` on both sides and
+`.imagine/access.json` for the proxy's coordinator credentials. For custom paths,
+set `IMAGINE_COORDINATOR_SOCKET` for the server and matching
+`ST_PROXY_COORDINATOR_SOCKET` / `ST_PROXY_IMAGINE_ACCESS_FILE` for the proxy (CLI
+options still override proxy environment defaults). Use `--api` for a different
+proxy address or an explicitly chosen direct API. To run a standalone server
+without coordination, invoke the server binary without `IMAGINE_COORDINATOR_SOCKET`.
 
 The application reads only the selected client token and does not use the admin
 token. Tokens are not accepted on the command line or stored in UI preferences.
@@ -169,3 +193,22 @@ newline, byte-counter rejection, sequential steps and measured ETA, job ownershi
 and stale progress isolation in GET/SSE, UI client delivery and clearing on finish.
 Synthetic progress previews cover wide and compact layouts. The parser is based
 on the frozen source's output format; a new live GPU run has not been performed.
+
+### Proxy route — 2026-10-15
+
+The UI now defaults to the image proxy's `/imagine` namespace. The root launchers
+share a coordinator socket by default. The real UI HTTP client was exercised
+through the real Rust proxy and Imagine API with a fake inference engine and
+synthetic backend controls. Uploads, model defaults, custom generation settings,
+progress, PNG downloads, retry without duplicate generation, output-folder
+recovery and cancellation errors passed. Additional assertions cover anonymous
+401 responses, client/admin separation, cross-client asset/job 404s and SSE.
+A proxy regression test verifies explicit 503/502 errors when coordination or
+Imagine is unavailable, encoded-prefix rejection, and request-counter cleanup.
+
+All 12 UI unit tests, the UI/proxy/API integration, the proxy failure regression,
+workspace Clippy with warnings denied, formatting, release workspace build,
+launch-script `--help` and shell syntax checks passed. Local socket tests used
+approved escalation. No new GPU inference, native window interaction or
+Computer Use was performed. Existing services were not restarted; changes are
+uncommitted.

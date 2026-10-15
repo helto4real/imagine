@@ -1,12 +1,12 @@
 use anyhow::{Context, Result};
 use imagine_ui::{
     app::ImagineApp,
-    settings::{Connection, Preferences},
+    settings::{Connection, DEFAULT_API_URL, Preferences},
 };
 use std::path::PathBuf;
 fn main() -> Result<()> {
     let mut project = std::env::current_dir()?;
-    let mut url = "http://127.0.0.1:8080".to_owned();
+    let mut url = DEFAULT_API_URL.to_owned();
     let mut access = None;
     let mut client = "local".to_owned();
     let mut args = std::env::args().skip(1);
@@ -20,7 +20,7 @@ fn main() -> Result<()> {
             "--client" => client = args.next().context("--client needs a name")?,
             "--help" => {
                 println!(
-                    "imagine-ui [--project PATH] [--api http://127.0.0.1:8080] [--access PATH] [--client local]"
+                    "imagine-ui [--project PATH] [--api http://127.0.0.1:8189/imagine] [--access PATH] [--client local]"
                 );
                 return Ok(());
             }

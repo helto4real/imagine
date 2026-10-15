@@ -1,0 +1,31 @@
+[package]
+name = "st-proxy"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1"
+aes-gcm = "0.10"
+base64 = "0.22"
+hmac = "0.12"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+serde_yaml = "0.9"
+subtle = "2"
+zeroize = "1"
+axum = { version = "0.8", features = ["ws"] }
+fancy-regex = "0.16"
+futures-util = "0.3"
+libc = "0.2"
+percent-encoding = "2"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots"] }
+url = "2"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -1,6 +1,6 @@
 use crate::{
     config::Access,
-    contract::{self, JobRequest},
+    contract::{self},
     engine::EngineState,
     scheduler::{Action, Control, Fault},
     storage::{Store, hash},
@@ -25,6 +25,7 @@ use tokio::sync::{Semaphore, watch};
 
 #[derive(Clone)]
 pub struct App {
+    pub profiles: Arc<crate::profiles::Catalog>,
     pub store: Store,
     pub control: Control,
     pub engine: watch::Receiver<EngineState>,
@@ -47,17 +48,22 @@ impl IntoResponse for Fault {
 }
 pub fn router(app: App) -> Router {
     Router::new()
+        .route("/v1/profiles", get(profiles))
+        .route("/v1/profiles/{id}", get(profile))
+        .route("/v1/jobs/validate", post(validate_job))
         .route("/v1/models", get(models))
         .route("/v1/models/{id}", get(model))
         .route("/v1/assets", post(upload))
         .route("/v1/assets/{id}", get(download))
         .route("/v1/jobs", post(submit))
+        .route("/v1/jobs/batch", post(submit_batch))
         .route("/v1/jobs/{id}", get(job))
         .route("/v1/jobs/{id}/events", get(events))
         .route("/v1/jobs/{id}/cancel", post(cancel))
         .route("/v1/runtime", get(runtime))
         .route("/v1/runtime/unload", post(unload))
         .route("/v1/runtime/resume", post(resume))
+        .route("/v1/runtime/yield", post(yield_gpu))
         .route("/v1/operations/{id}", get(operation))
         .fallback(|| async { Fault::new(404, "not_found") })
         .layer(DefaultBodyLimit::max(32 * 1024 * 1024))
@@ -158,11 +164,16 @@ async fn download(
     )
         .into_response())
 }
-async fn submit(
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BatchRequest {
+    jobs: Vec<Value>,
+}
+async fn submit_batch(
     State(app): State<App>,
     Extension(p): Extension<Principal>,
     headers: HeaderMap,
-    body: Result<Json<JobRequest>, JsonRejection>,
+    body: Result<Json<BatchRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<Value>), Fault> {
     let Json(request) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
     let key = headers
@@ -170,6 +181,33 @@ async fn submit(
         .map(|v| v.to_str().map(str::to_owned))
         .transpose()
         .map_err(|_| Fault::new(400, "invalid_idempotency_key"))?;
+    let mut requests = Vec::with_capacity(request.jobs.len());
+    for request in request.jobs {
+        requests.push(app.profiles.resolve(request, &app.store, &p.owner).await?);
+    }
+    let result = app
+        .control
+        .call(Action::SubmitBatch {
+            owner: p.owner,
+            requests,
+            key,
+        })
+        .await?;
+    Ok((StatusCode::ACCEPTED, Json(result)))
+}
+async fn submit(
+    State(app): State<App>,
+    Extension(p): Extension<Principal>,
+    headers: HeaderMap,
+    body: Result<Json<Value>, JsonRejection>,
+) -> Result<(StatusCode, Json<Value>), Fault> {
+    let Json(request) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
+    let key = headers
+        .get("Idempotency-Key")
+        .map(|v| v.to_str().map(str::to_owned))
+        .transpose()
+        .map_err(|_| Fault::new(400, "invalid_idempotency_key"))?;
+    let request = app.profiles.resolve(request, &app.store, &p.owner).await?;
     let mut result = app
         .control
         .call(Action::Submit {
@@ -302,4 +340,38 @@ async fn operation(
             .await?
             .ok_or(Fault::new(404, "operation_not_found"))?,
     ))
+}
+
+async fn yield_gpu(
+    State(app): State<App>,
+    Extension(p): Extension<Principal>,
+) -> Result<Json<Value>, Fault> {
+    admin(&p)?;
+    Ok(Json(app.control.call(Action::YieldGpu).await?))
+}
+
+async fn profiles(State(app): State<App>) -> Json<Value> {
+    Json(app.profiles.list())
+}
+async fn profile(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Fault> {
+    app.profiles.describe(&id).map(Json)
+}
+async fn validate_job(
+    State(app): State<App>,
+    Extension(p): Extension<Principal>,
+    body: Result<Json<Value>, JsonRejection>,
+) -> Result<Json<Value>, Fault> {
+    let Json(value) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
+    let request = app.profiles.resolve(value, &app.store, &p.owner).await?;
+    for id in &request.inputs.reference_images {
+        if app.store.asset(id, &p.owner).await?.is_none() {
+            return Err(Fault::new(404, "asset_not_found"));
+        }
+    }
+    let mut effective = request.effective();
+    // Validation is safe to expose in MCP results; prompt text stays private.
+    for key in ["prompt", "negative_prompt", "client_metadata"] {
+        effective.as_object_mut().unwrap().remove(key);
+    }
+    Ok(Json(json!({"valid":true,"effective":effective})))
 }

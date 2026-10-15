@@ -1,0 +1,24 @@
+schema_version: 1
+id: qwen-image21-1600x896-v2
+version: 2
+name: Qwen frozen v2
+description: Frozen v2 runtime with its existing default sampling and native reference
+  preprocessing.
+defaults:
+  model: qwen-image-2.1-int8
+  width: 1600
+  height: 896
+  negative_prompt: ''
+  seed: null
+  sampling:
+    steps: 40
+    cfg_scale: 2.5
+    sampler: er_sde
+    scheduler: beta
+    custom_sigmas: []
+  model_options:
+    qwen_image_2_1:
+      reference_max_pixels_per_image: 1000000
+  output:
+    format: png
+    count: 1

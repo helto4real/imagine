@@ -1,0 +1,13 @@
+--- a/src/model/diffusion/qwen_image_2_1.hpp
++++ b/src/model/diffusion/qwen_image_2_1.hpp
+@@ -146,6 +146,10 @@
+             auto weight = params["weight"];
+             if (ctx->weight_adapter) {
+                 weight = ctx->weight_adapter->patch_weight(ctx->ggml_ctx, ctx->backend, weight, prefix + "weight");
++            }
++            // CUDA scale_bias requires F32; BF16 checkpoints retain this norm weight.
++            if (weight->type != GGML_TYPE_F32) {
++                weight = ggml_cast(ctx->ggml_ctx, weight, GGML_TYPE_F32);
+             }
+             weight = ggml_scale_bias(ctx->ggml_ctx, weight, 1.f, 1.f);
+             return ggml_mul(ctx->ggml_ctx, ggml_rms_norm(ctx->ggml_ctx, x, eps), weight);

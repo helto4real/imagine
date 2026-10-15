@@ -1,0 +1,60 @@
+schema_version: 1
+id: image_upscale
+version: 1
+name: Qwen Image 2.1 Upscale
+description: Upscale one registered image with the stored Qwen enhancement prompt. Preserve its aspect
+  ratio; choose max_side and optional seed. Exactly one reference image is required.
+prompt_guidance: null
+references:
+  min: 1
+  max: 1
+nsfw_loras: []
+defaults:
+  model: qwen-image-2.1-turbo
+  negative_prompt: '{"version":1,"schema":"helto.aio-image-generate.v2","encrypted":true,"algorithm":"AES-256-GCM","keyId":"1roEaeczxUSeMw6x","nonce":"FVgw0o0qi-124ZXo","ciphertext":"mhALK6wJ9KKwbiVTNkO7B-j9FOKdsUYTV1WIOA"}'
+  width: 1600
+  height: 896
+  seed: null
+  sampling:
+    steps: 8
+    cfg_scale: 1.0
+    sampler: euler
+    scheduler: simple
+    custom_sigmas:
+    - 1
+    - 0.978453
+    - 0.95418
+    - 0.926626
+    - 0.89508
+    - 0.845148
+    - 0.704534
+    - 0.414568
+    - 0
+  inputs:
+    reference_images: []
+    start_image: null
+    end_image: null
+    mask: null
+  model_options:
+    qwen_image_2_1:
+      reference_max_pixels_per_image: 0
+      generation:
+        diffusion_model: diffusion_models/qwen-image2.1/qwen_image_2.1_turbo_bf16.safetensors
+        text_encoder: text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors
+        vae: vae/qwen-image2.1/texture_fix_vae_for_qwen_image_2.1_bf16.safetensors
+        loras:
+        - path: qwen-image-21/qwen-image-2.1-consistency.safetensors
+          strength: 1
+        zero_negative_conditioning: true
+        color_match_strength: 1.0
+        brightness_strength: 0.0
+        contrast_strength: 0.5
+  output:
+    format: png
+    count: 1
+  video: null
+  client_metadata: {}
+  prompt: '{"version":1,"schema":"helto.aio-image-generate.v2","encrypted":true,"algorithm":"AES-256-GCM","keyId":"1roEaeczxUSeMw6x","nonce":"gVcQLbKe3xbdJTdC","ciphertext":"p3Fr1A0daElseIDBq-Gi4SDSBDUwQO_TtYnfHj92zoxEdMprA3nkMJrnoqOOhpmSzTKNgoiyHnQUOTP1xaZQ_YuzK4aV-LhH82QWH3-dCyQGcJfqx9Tw7SVT3gS02fT3hEbz1le8XiQwZk0vH-tMBoR1anczO95BzEP2ruaK6rtwhHhhRN1XbxzjC6e_xkOCGXTxNw0LPPVpmo9_3l62CwmS4v_4xXL-xIVUjD6xzGgiSAbl-eu7oLGtzu819aURKuCQyU1bBuNdD0pO6atf66F-X5yvGuLRgvLOgWp-wl9twElqt6JjNu1k0gugQTRYiV7w72S4KryojvNp5bWqEYctAS_5NrMmu8Vpq-ifxGmT_9I1bYnM5ZHsJh8aQL8KQ8iF7tEJhTEOqDvONLIBDH148Tp_9lGgZfxaKax8mWiuVQiT6DCk-9C_L0JpnuMy-_NItRWAGIZyJ8vbPvD2BbwIb-fYr6928Yxk8113WDLJJjKQTpNl8aC3vVrUj_gMVtiz0v4"}'
+sizing:
+  max_side: 3200
+  reference_aspect: true

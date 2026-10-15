@@ -13,15 +13,23 @@ use tokio::sync::{Semaphore, watch};
 async fn main() -> Result<()> {
     let mut project = std::env::current_dir()?;
     let mut data = None;
+    let mut profiles = None;
     let mut bind = "127.0.0.1:8080".to_owned();
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--project" => project = PathBuf::from(args.next().context("--project needs a path")?),
+            "--profiles" => {
+                profiles = Some(PathBuf::from(
+                    args.next().context("--profiles needs a path")?,
+                ))
+            }
             "--data" => data = Some(PathBuf::from(args.next().context("--data needs a path")?)),
             "--bind" => bind = args.next().context("--bind needs an address")?,
             "--help" => {
-                println!("imagine-server [--project PATH] [--data PATH] [--bind 127.0.0.1:8080]");
+                println!(
+                    "imagine-server [--project PATH] [--data PATH] [--profiles PATH] [--bind 127.0.0.1:8080]"
+                );
                 return Ok(());
             }
             _ => anyhow::bail!("Unknown option: {arg}"),
@@ -29,6 +37,9 @@ async fn main() -> Result<()> {
     }
     let data = data.unwrap_or_else(|| project.join(".imagine"));
     let (config, _lock) = Config::load(project, data, bind.parse()?)?;
+    let profiles = Arc::new(imagine_server::profiles::Catalog::load(
+        &profiles.unwrap_or_else(|| config.project.join("profiles")),
+    )?);
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
     let store = Store::open(&config.data).await?;
     let (engine_tx, engine_rx) = watch::channel(EngineState {
@@ -37,8 +48,14 @@ async fn main() -> Result<()> {
         ..Default::default()
     });
     let native = Native::new(config.clone(), engine_tx)?;
-    let (control, mut scheduler) = scheduler::start(store.clone(), Box::new(native)).await?;
+    let (control, mut scheduler) = scheduler::start_coordinated(
+        store.clone(),
+        Box::new(native),
+        std::env::var_os("IMAGINE_COORDINATOR_SOCKET").map(PathBuf::from),
+    )
+    .await?;
     let app = App {
+        profiles,
         store,
         control: control.clone(),
         engine: engine_rx,

@@ -8,6 +8,10 @@ Start with [the design](design-document.md), the
 [frozen 1600×896 profile](experiments/qwen-image21-sage/BASELINE.md) and the
 [experiment decision register](experiments/qwen-image21-sage/TEST-DECISIONS.md).
 
+The standalone [Rust st-proxy](proxy/README.md) adds shared LLM/ComfyUI/Imagine
+GPU coordination and MCP generation through Imagine YAML profiles. Its [parity report](proxy/PARITY.md)
+separates synthetic comparisons, real GPU evidence and remaining differences.
+
 ## Start the API
 
 On this configured machine:
@@ -18,6 +22,8 @@ On this configured machine:
 
 This incrementally builds the Rust release server and starts it at
 `http://127.0.0.1:8080`. It loads the native engine only when a job runs.
+The launcher uses the proxy GPU queue at `.imagine/gpu.sock`; start
+`./start-proxy.sh` with your backend options before submitting jobs.
 Ctrl-C stops the server and its worker. Optional arguments:
 `--bind 127.0.0.1:8081 --data /private/path/imagine-data`.
 
@@ -60,7 +66,7 @@ separates simulated lifecycle tests from real native/GPU checks.
 
 ## Desktop UI
 
-With the API running in another terminal:
+With Imagine and the proxy running in separate terminals:
 
 ```sh
 ./start-ui.sh
@@ -72,7 +78,11 @@ upload and reorder reference images, choose **Spara i → Välj mapp**, then
 unique filename in your chosen folder. The folder choice persists across starts.
 
 Default output: `.imagine/images`; preferences: `.imagine/ui-settings.json`.
-The app reads the local client token from `.imagine/access.json`.
+The app connects through `http://127.0.0.1:8189/imagine` and reads the local
+client token from `.imagine/access.json`. `start-server.sh` and `start-proxy.sh`
+use the same `.imagine/gpu.sock` by default. ComfyUI is not required by these
+launchers. MCP images use `/run/media/veracrypt1/mcp-images`, matching Pi.
+No direct-API fallback is used.
 See [UI setup and behavior](docs/UI.md) for custom API paths and recovery.
 
 ## Build the native engine
@@ -165,3 +175,6 @@ Current native baseline: `qwen-image21-1600x896-v2` (accepted 2026-10-15).
 The Rust service and experiment launcher select v2; v1 is retained as control.
 The strip algorithm is dynamic; 1600×896 identifies the validated profile.
 See [current baseline](experiments/qwen-image21-sage/BASELINE.md).
+
+Generation defaults now live in [YAML profiles](profiles/README.md). See the complete
+[Qwen example](profiles/qwen.yaml); API clients select `profile` and send only overrides.

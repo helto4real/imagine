@@ -38,6 +38,11 @@ pub enum Action {
         request: Box<JobRequest>,
         key: Option<String>,
     },
+    SubmitBatch {
+        owner: String,
+        requests: Vec<JobRequest>,
+        key: Option<String>,
+    },
     Cancel {
         owner: String,
         id: String,
@@ -46,6 +51,7 @@ pub enum Action {
         cancel: bool,
     },
     Resume,
+    YieldGpu,
     Shutdown,
 }
 struct Message {
@@ -75,14 +81,28 @@ struct Active {
     task: JoinHandle<Finished>,
 }
 struct Finished {
+    ticket: Option<crate::coordination::Ticket>,
     engine: Box<dyn Backend>,
     result: Result<Vec<u8>>,
     stopped: Result<()>,
+}
+struct Prepared {
+    id: String,
+    effective: String,
+    fingerprint: String,
+}
+struct Pending {
+    id: String,
+    task: JoinHandle<anyhow::Result<crate::coordination::Ticket>>,
 }
 struct Scheduler {
     store: Store,
     engine: Option<Box<dyn Backend>>,
     active: Option<Active>,
+    coordinator: Option<std::path::PathBuf>,
+    tickets: std::collections::HashMap<String, crate::coordination::Ticket>,
+    pending: Option<Pending>,
+    granted: Option<crate::coordination::Ticket>,
     paused: bool,
     unload: Option<String>,
     state: watch::Sender<Value>,
@@ -91,10 +111,21 @@ pub async fn start(
     store: Store,
     engine: Box<dyn Backend>,
 ) -> Result<(Control, JoinHandle<Result<()>>)> {
+    start_coordinated(store, engine, None).await
+}
+pub async fn start_coordinated(
+    store: Store,
+    engine: Box<dyn Backend>,
+    coordinator: Option<std::path::PathBuf>,
+) -> Result<(Control, JoinHandle<Result<()>>)> {
     let paused = store.paused().await?;
     let (tx, rx) = mpsc::channel(128);
     let (state, receiver) = watch::channel(json!({"paused":paused,"active_job":false,"queued":0}));
     let scheduler = Scheduler {
+        coordinator,
+        tickets: Default::default(),
+        pending: None,
+        granted: None,
         store,
         engine: Some(engine),
         active: None,
@@ -128,6 +159,14 @@ impl Scheduler {
                     self.publish().await?;
                     let _=message.reply.send(result);
                 }
+                granted=async {(&mut self.pending.as_mut().unwrap().task).await}, if self.pending.is_some()=> {
+                    let pending=self.pending.take().unwrap();
+                    match granted.context("GPU ticket task panicked")? {
+                        Ok(ticket)=> self.granted=Some(ticket),
+                        Err(_)=> {sqlx::query("UPDATE jobs SET status='failed',error='coordinator_unavailable',finished=? WHERE id=?")
+                            .bind(now()).bind(pending.id).execute(&self.store.db).await?;}
+                    }
+                }
                 finished=async {(&mut self.active.as_mut().unwrap().task).await}, if self.active.is_some()=> {
                     let finished=finished.context("generation task panicked")?;
                     self.complete(finished).await?;
@@ -145,9 +184,68 @@ impl Scheduler {
     }
     async fn command(&mut self, action: Action) -> std::result::Result<Value, Fault> {
         match action {
+            Action::SubmitBatch {
+                owner,
+                requests,
+                key,
+            } => {
+                if requests.is_empty() {
+                    return Err(Fault::new(422, "invalid_request"));
+                }
+                if key.as_ref().is_some_and(|k| k.is_empty() || k.len() > 128) {
+                    return Err(Fault::new(400, "invalid_idempotency_key"));
+                }
+                for request in &requests {
+                    request.validate().map_err(|e| Fault::new(422, e))?;
+                }
+                let fingerprint =
+                    hash(&serde_json::to_vec(&requests).expect("serializable requests"));
+                if let Some(key) = &key
+                    && let Some(row) = sqlx::query("SELECT request_hash,job_ids FROM job_batches WHERE owner=? AND idempotency_key=?")
+                        .bind(&owner).bind(key).fetch_optional(&self.store.db).await? {
+                        if row.get::<String, _>("request_hash") != fingerprint { return Err(Fault::new(409, "idempotency_conflict")); }
+                        let ids: Vec<String> = serde_json::from_str(row.get("job_ids")).map_err(|_| Fault::new(500, "storage_error"))?;
+                        return Ok(json!({"jobs":ids.into_iter().map(|id|json!({"id":id,"reused":true})).collect::<Vec<_>>()}));
+                    }
+                if self.paused {
+                    return Err(Fault::new(409, "runtime_suspended"));
+                }
+                let mut prepared = Vec::new();
+                for request in requests {
+                    prepared.push(self.prepare_request(&owner, request).await?);
+                }
+                let ids: Vec<_> = prepared.iter().map(|p| p.id.clone()).collect();
+                let tickets = if let Some(socket) = &self.coordinator {
+                    let jobs = prepared
+                        .iter()
+                        .map(|p| (p.id.clone(), p.effective.len()))
+                        .collect::<Vec<_>>();
+                    crate::coordination::Ticket::register_many(socket, &jobs)
+                        .await
+                        .map_err(|_| Fault::new(503, "coordinator_unavailable"))?
+                } else {
+                    Vec::new()
+                };
+                let mut tx = self.store.db.begin().await?;
+                for p in prepared {
+                    sqlx::query("INSERT INTO jobs (id,owner,status,request,request_hash,created) VALUES (?,?,'queued',?,?,?)")
+                        .bind(p.id).bind(&owner).bind(p.effective).bind(p.fingerprint).bind(now()).execute(&mut *tx).await?;
+                }
+                if let Some(key) = key {
+                    sqlx::query("INSERT INTO job_batches (owner,idempotency_key,request_hash,job_ids) VALUES (?,?,?,?)")
+                        .bind(owner).bind(key).bind(fingerprint).bind(json!(ids).to_string()).execute(&mut *tx).await?;
+                }
+                tx.commit().await?;
+                for (id, ticket) in ids.iter().zip(tickets) {
+                    self.tickets.insert(id.clone(), ticket);
+                }
+                Ok(
+                    json!({"jobs":ids.into_iter().map(|id|json!({"id":id,"reused":false})).collect::<Vec<_>>()}),
+                )
+            }
             Action::Submit {
                 owner,
-                mut request,
+                request,
                 key,
             } => {
                 request.validate().map_err(|e| Fault::new(422, e))?;
@@ -174,42 +272,22 @@ impl Scheduler {
                 if self.paused {
                     return Err(Fault::new(409, "runtime_suspended"));
                 }
-                let mut reference_preprocessing = Vec::new();
-                for a in &request.inputs.reference_images {
-                    let asset = self
-                        .store
-                        .asset(a, &owner)
-                        .await?
-                        .ok_or(Fault::new(404, "asset_not_found"))?;
-                    let w = asset["width"].as_u64().unwrap();
-                    let h = asset["height"].as_u64().unwrap();
-                    let pixels = u64::from(
-                        request
-                            .model_options
-                            .qwen_image_2_1
-                            .reference_max_pixels_per_image,
+                let p = self.prepare_request(&owner, *request).await?;
+                let ticket = if let Some(socket) = &self.coordinator {
+                    Some(
+                        crate::coordination::Ticket::register(socket, &p.id, p.effective.len())
+                            .await
+                            .map_err(|_| Fault::new(503, "coordinator_unavailable"))?,
                     )
-                    .min(u64::from(request.width) * u64::from(request.height));
-                    let raw_width = ((pixels * w / h) as f64).sqrt();
-                    let width = (raw_width / 32.0).round() as u32 * 32;
-                    let height = (raw_width * h as f64 / w as f64 / 32.0).round() as u32 * 32;
-                    if width == 0 || height == 0 || width > 8192 || height > 8192 {
-                        return Err(Fault::new(422, "unsupported_reference_geometry"));
-                    }
-                    reference_preprocessing.push(json!({"asset_id":a,"source_width":w,"source_height":h,"vae_width":width,"vae_height":height,
-                        "pixels":width*height,"source":"pinned_native_resize_rule"}));
-                }
-                if request.seed.is_none() {
-                    request.seed = Some(u32::from_le_bytes(
-                        uuid::Uuid::new_v4().as_bytes()[..4].try_into().unwrap(),
-                    ));
-                }
-                let id = id("job");
-                let mut effective = request.effective();
-                effective["reference_preprocessing"] = json!(reference_preprocessing);
+                } else {
+                    None
+                };
                 sqlx::query("INSERT INTO jobs (id,owner,status,request,request_hash,idempotency_key,created) VALUES (?,?,'queued',?,?,?,?)")
-                    .bind(&id).bind(owner).bind(effective.to_string()).bind(fingerprint).bind(key).bind(now()).execute(&self.store.db).await?;
-                Ok(json!({"id":id,"reused":false}))
+                    .bind(&p.id).bind(owner).bind(p.effective).bind(p.fingerprint).bind(key).bind(now()).execute(&self.store.db).await?;
+                if let Some(ticket) = ticket {
+                    self.tickets.insert(p.id.clone(), ticket);
+                }
+                Ok(json!({"id":p.id,"reused":false}))
             }
             Action::Cancel { owner, id } => {
                 let job = self
@@ -219,6 +297,13 @@ impl Scheduler {
                     .ok_or(Fault::new(404, "job_not_found"))?;
                 match job["status"].as_str() {
                     Some("queued") => {
+                        self.tickets.remove(&id);
+                        if self.pending.as_ref().is_some_and(|p| p.id == id) {
+                            let pending = self.pending.take().unwrap();
+                            pending.task.abort();
+                            let _ = pending.task.await;
+                        }
+                        self.granted = None;
                         sqlx::query("UPDATE jobs SET status='cancelled',finished=? WHERE id=?")
                             .bind(now())
                             .bind(&id)
@@ -234,6 +319,16 @@ impl Scheduler {
                 Ok(json!({"id":id}))
             }
             Action::Unload { cancel } => {
+                if self.unload.is_some() {
+                    return Err(Fault::new(409, "unload_in_progress"));
+                }
+                self.tickets.clear();
+                self.granted = None;
+                if let Some(pending) = self.pending.take() {
+                    pending.task.abort();
+                    let _ = pending.task.await;
+                }
+
                 if self.unload.is_some() {
                     return Err(Fault::new(409, "unload_in_progress"));
                 }
@@ -257,6 +352,17 @@ impl Scheduler {
                 }
                 Ok(json!({"id":id}))
             }
+            Action::YieldGpu => {
+                if self.active.is_some() {
+                    return Err(Fault::new(409, "gpu_operation_active"));
+                }
+                self.engine
+                    .as_mut()
+                    .ok_or(Fault::new(503, "engine_unavailable"))?
+                    .stop()
+                    .await?;
+                Ok(json!({"released":true}))
+            }
             Action::Resume => {
                 if self.unload.is_some() {
                     return Err(Fault::new(409, "unload_in_progress"));
@@ -267,6 +373,70 @@ impl Scheduler {
             }
             Action::Shutdown => unreachable!(),
         }
+    }
+    async fn prepare_request(
+        &mut self,
+        owner: &str,
+        mut request: JobRequest,
+    ) -> std::result::Result<Prepared, Fault> {
+        request.validate().map_err(|e| Fault::new(422, e))?;
+        let fingerprint = hash(&serde_json::to_vec(&request).expect("serializable request"));
+        let mut reference_preprocessing = Vec::new();
+        for a in &request.inputs.reference_images {
+            let asset = self
+                .store
+                .asset(a, owner)
+                .await?
+                .ok_or(Fault::new(404, "asset_not_found"))?;
+            let w = asset["width"].as_u64().unwrap();
+            let h = asset["height"].as_u64().unwrap();
+            let pixels = u64::from(
+                request
+                    .model_options
+                    .qwen_image_2_1
+                    .reference_max_pixels_per_image,
+            )
+            .min(u64::from(request.width) * u64::from(request.height));
+            let raw_width = ((pixels * w / h) as f64).sqrt();
+            let (width, height) = if request.model_options.qwen_image_2_1.workflow.is_some() {
+                let (_, _, width, height) = crate::workflow_image::dimensions(
+                    w as u32,
+                    h as u32,
+                    request
+                        .model_options
+                        .qwen_image_2_1
+                        .reference_max_pixels_per_image,
+                );
+                (width, height)
+            } else {
+                (
+                    (raw_width / 32.0).round() as u32 * 32,
+                    (raw_width * h as f64 / w as f64 / 32.0).round() as u32 * 32,
+                )
+            };
+            if width == 0 || height == 0 || width > 8192 || height > 8192 {
+                return Err(Fault::new(422, "unsupported_reference_geometry"));
+            }
+            reference_preprocessing.push(json!({"asset_id":a,"source_width":w,"source_height":h,"vae_width":width,"vae_height":height,
+                        "pixels":width*height,"source":"pinned_native_resize_rule"}));
+        }
+        if request.seed.is_none() {
+            // Use only random UUID bytes (exclude version/variant bits), then
+            // mask to the API's complete, exactly representable 53-bit range.
+            let uuid = uuid::Uuid::new_v4();
+            let b = uuid.as_bytes();
+            request.seed = Some(
+                u64::from_le_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[9], b[10]])
+                    & crate::contract::MAX_SEED,
+            );
+        }
+        let mut effective = request.effective();
+        effective["reference_preprocessing"] = json!(reference_preprocessing);
+        Ok(Prepared {
+            id: id("job"),
+            effective: effective.to_string(),
+            fingerprint,
+        })
     }
     async fn cancel_active(&mut self) -> Result<()> {
         if let Some(active) = &self.active {
@@ -279,12 +449,38 @@ impl Scheduler {
         Ok(())
     }
     async fn dispatch(&mut self) -> Result<()> {
-        if self.paused || self.active.is_some() {
+        if self.paused || self.active.is_some() || self.pending.is_some() {
             return Ok(());
         }
         let row=sqlx::query("SELECT id,owner,request FROM jobs WHERE status='queued' ORDER BY created,rowid LIMIT 1").fetch_optional(&self.store.db).await?;
         if let Some(row) = row {
             let job_id: String = row.get("id");
+            if let Some(socket) = &self.coordinator
+                && self.granted.is_none()
+            {
+                let ticket = if let Some(ticket) = self.tickets.remove(&job_id) {
+                    ticket
+                } else {
+                    match crate::coordination::Ticket::register(
+                        socket,
+                        &job_id,
+                        row.get::<String, _>("request").len(),
+                    )
+                    .await
+                    {
+                        Ok(ticket) => ticket,
+                        Err(_) => {
+                            sqlx::query("UPDATE jobs SET status='failed',error='coordinator_unavailable',finished=? WHERE id=?").bind(now()).bind(&job_id).execute(&self.store.db).await?;
+                            return Ok(());
+                        }
+                    }
+                };
+                self.pending = Some(Pending {
+                    id: job_id,
+                    task: tokio::spawn(ticket.acquire()),
+                });
+                return Ok(());
+            }
             let owner: String = row.get("owner");
             let mut value: Value = serde_json::from_str(row.get("request"))?;
             value.as_object_mut().unwrap().remove("profile_revision");
@@ -305,10 +501,12 @@ impl Scheduler {
             let worker_owner = owner.clone();
             let cancel = CancellationToken::new();
             let token = cancel.clone();
+            let mut ticket = self.granted.take();
             let task = tokio::spawn(async move {
                 let result = tokio::select! {
                     biased;
                     _=token.cancelled()=>Err(anyhow::anyhow!("cancelled")),
+                    _=async {ticket.as_mut().unwrap().lost().await}, if ticket.is_some()=>Err(anyhow::anyhow!(EngineError("coordinator_unavailable"))),
                     result=engine.generate(&request,&worker_owner,&store)=>result
                 };
                 let stopped = if result.is_err() {
@@ -317,6 +515,7 @@ impl Scheduler {
                     Ok(())
                 };
                 Finished {
+                    ticket,
                     engine,
                     result,
                     stopped,
@@ -333,6 +532,7 @@ impl Scheduler {
     }
     async fn complete(&mut self, finished: Finished) -> Result<()> {
         let active = self.active.take().unwrap();
+        let ticket = finished.ticket;
         self.engine = Some(finished.engine);
         finished.stopped.context("could not confirm native exit")?;
         if active.cancel.is_cancelled() {
@@ -384,6 +584,9 @@ impl Scheduler {
         if self.unload.is_some() {
             self.finish_unload().await?;
         }
+        if let Some(ticket) = ticket {
+            let _ = ticket.finish().await;
+        }
         Ok(())
     }
     async fn finish_unload(&mut self) -> Result<()> {
@@ -403,11 +606,21 @@ impl Scheduler {
         Ok(())
     }
     async fn shutdown(&mut self) -> Result<()> {
+        self.tickets.clear();
+        self.granted = None;
+        if let Some(pending) = self.pending.take() {
+            pending.task.abort();
+            let _ = pending.task.await;
+        }
         if let Some(active) = self.active.take() {
             active.cancel.cancel();
             let finished = active.task.await?;
             self.engine = Some(finished.engine);
             finished.stopped?;
+            self.engine.as_mut().unwrap().stop().await?;
+            if let Some(ticket) = finished.ticket {
+                let _ = ticket.finish().await;
+            }
             sqlx::query(
                 "UPDATE jobs SET status='interrupted',error='server_stopped',finished=? WHERE id=?",
             )

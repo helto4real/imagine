@@ -1,0 +1,203 @@
+{
+  "MUTATING_METHODS": [
+    "DELETE",
+    "PATCH",
+    "POST",
+    "PUT"
+  ],
+  "WORKFLOW_ROUTES": [
+    [
+      "POST",
+      "/api/prompt"
+    ],
+    [
+      "POST",
+      "/prompt"
+    ]
+  ],
+  "CONTROL_ROUTES": [
+    [
+      "POST",
+      "/api/helto_save_image_advanced/release"
+    ],
+    [
+      "POST",
+      "/api/helto_save_video_advanced/release"
+    ],
+    [
+      "POST",
+      "/api/interrupt"
+    ],
+    [
+      "POST",
+      "/api/queue"
+    ],
+    [
+      "POST",
+      "/helto_director/prompt_optimizer/models/unload"
+    ],
+    [
+      "POST",
+      "/helto_prompt_enhancer/providers/unload"
+    ],
+    [
+      "POST",
+      "/interrupt"
+    ],
+    [
+      "POST",
+      "/queue"
+    ]
+  ],
+  "LIFECYCLE_ROUTES": [
+    [
+      "POST",
+      "/api/free"
+    ],
+    [
+      "POST",
+      "/free"
+    ]
+  ],
+  "BLOCKED_GPU_ROUTES": [
+    [
+      "POST",
+      "/helto_director/prompt_optimizer/optimize"
+    ],
+    [
+      "POST",
+      "/helto_director/prompt_optimizer/optimize/start"
+    ]
+  ],
+  "EXACT_UPSTREAM_ROUTE_ALIASES": {
+    "/api/free": "/free",
+    "/api/interrupt": "/interrupt",
+    "/api/prompt": "/prompt",
+    "/api/queue": "/queue",
+    "/api/users": "/users"
+  },
+  "PREFIX_UPSTREAM_ROUTE_ALIASES": {
+    "/api/settings": "/settings",
+    "/api/userdata": "/userdata"
+  },
+  "SAFE_CORE_MUTATION_PATHS": [
+    "/api/assets",
+    "/api/settings",
+    "/api/userdata",
+    "/api/users",
+    "/history",
+    "/settings",
+    "/upload/image",
+    "/upload/mask",
+    "/userdata",
+    "/users"
+  ],
+  "SAFE_CORE_MUTATION_PREFIXES": [
+    "/api/assets/",
+    "/api/settings/",
+    "/api/userdata/",
+    "/settings/",
+    "/userdata/",
+    "/users/"
+  ],
+  "SAFE_CUSTOM_POST_PATHS": [
+    "/aio_image_generate/ideogram4_prompt_library/prompts",
+    "/aio_image_generate/privacy/decrypt",
+    "/aio_image_generate/privacy/encrypt",
+    "/api/aio-image-gen/api/loras/info",
+    "/api/helto_director/api/loras/info",
+    "/api/helto_director/h3_preview/decrypt",
+    "/api/helto_load_video/folders",
+    "/api/helto_load_video/refresh",
+    "/api/helto_queue_manager/state",
+    "/helto_director/global_settings",
+    "/helto_director/h3_preview/decrypt",
+    "/helto_director/library/assets",
+    "/helto_director/library/characters",
+    "/helto_director/library/items",
+    "/helto_director/library/projects",
+    "/helto_director/media/cache/clear",
+    "/helto_director/media_browser/project_takes",
+    "/helto_director/media_browser/project_takes/delete",
+    "/helto_director/privacy/decrypt",
+    "/helto_director/privacy/encrypt",
+    "/helto_director/privacy/keystore/change_password",
+    "/helto_director/privacy/keystore/init",
+    "/helto_director/privacy/lock",
+    "/helto_director/privacy/unlock",
+    "/helto_director/prompt_optimizer/settings",
+    "/helto_privacy/keystore/change_password",
+    "/helto_privacy/keystore/init",
+    "/helto_privacy/lock",
+    "/helto_privacy/unlock",
+    "/helto_prompt_enhancer/models",
+    "/helto_prompt_enhancer/providers/download",
+    "/helto_prompt_enhancer/providers/models",
+    "/helto_prompt_enhancer/providers/settings",
+    "/helto_prompt_enhancer/system_prompt",
+    "/helto_prompt_enhancer/system_prompt/reset",
+    "/helto_prompt_enhancer/system_prompts",
+    "/helto_prompt_enhancer/system_prompts/default",
+    "/helto_prompt_enhancer/system_prompts/delete",
+    "/helto_prompt_enhancer/system_prompts/reset_default",
+    "/helto_selector/clear_cache",
+    "/helto_selector/decrypt",
+    "/helto_selector/delete_images",
+    "/helto_selector/delete_mask",
+    "/helto_selector/encrypt",
+    "/helto_selector/migrate_masks",
+    "/helto_selector/paste_image",
+    "/helto_selector/register_roots",
+    "/helto_selector/save_mask",
+    "/helto_selector/scan_folders",
+    "/helto_spm/privacy/decrypt",
+    "/helto_spm/privacy/encrypt"
+  ],
+  "SAFE_CUSTOM_MUTATION_ROUTES": [
+    [
+      "DELETE",
+      "/api/helto_load_video/folders"
+    ],
+    [
+      "PUT",
+      "/helto_director/library/privacy"
+    ]
+  ],
+  "SAFE_CUSTOM_MUTATION_PATTERNS": [
+    {
+      "methods": [
+        "DELETE",
+        "PATCH",
+        "PUT"
+      ],
+      "pattern": "^/helto_director/library/(?:projects|characters|assets)/[^/]+$"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "pattern": "^/helto_director/library/(?:projects|characters|assets)/[^/]+/(?:duplicate|use|preview)$"
+    },
+    {
+      "methods": [
+        "DELETE",
+        "POST"
+      ],
+      "pattern": "^/helto_director/media_browser/(?:image|video|audio)/folders$"
+    },
+    {
+      "methods": [
+        "DELETE",
+        "PATCH",
+        "PUT"
+      ],
+      "pattern": "^/aio_image_generate/ideogram4_prompt_library/prompts/[^/]+$"
+    },
+    {
+      "methods": [
+        "POST"
+      ],
+      "pattern": "^/aio_image_generate/ideogram4_prompt_library/prompts/[^/]+/(?:duplicate|use)$"
+    }
+  ]
+}
