@@ -35,14 +35,16 @@ fn main() -> Result<()> {
         client,
     };
     connection.validate()?;
-    let options = eframe::NativeOptions {
+    let mut options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_title("Imagine")
-            .with_inner_size([1180., 760.])
+            .with_inner_size([1280., 800.])
             .with_min_inner_size([600., 540.]),
         renderer: eframe::Renderer::Glow,
         ..Default::default()
     };
+    // NVIDIA EGL/Wayland can block the UI thread in swap_buffers on a hidden workspace.
+    options.glow_options.vsync = false;
     eframe::run_native(
         "Imagine",
         options,

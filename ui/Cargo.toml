@@ -3,6 +3,13 @@ name = "imagine-ui"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+ui-preview = []
+
+[[example]]
+name = "reference-desk"
+required-features = ["ui-preview"]
+
 [dependencies]
 anyhow = "1"
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "wayland", "x11", "accesskit"] }

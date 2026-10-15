@@ -2,6 +2,475 @@
 use super::*;
 use std::collections::HashMap;
 
+struct Desk {
+    ctx: egui::Context,
+    app: ImagineApp,
+    nodes: Vec<(egui::accesskit::NodeId, egui::accesskit::Node)>,
+    _root: tempfile::TempDir,
+}
+impl Desk {
+    fn new() -> Self {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let mut desk = Self {
+            ctx,
+            app,
+            nodes: Vec::new(),
+            _root: root,
+        };
+        for _ in 0..3 {
+            desk.frame(Vec::new());
+        }
+        desk
+    }
+    fn frame(&mut self, events: Vec<egui::Event>) {
+        let mut output = self.ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1280., 800.),
+                )),
+                events,
+                ..Default::default()
+            },
+            |ui| self.app.content(ui),
+        );
+        output.textures_delta.clear();
+        self.nodes = output.platform_output.accesskit_update.unwrap().nodes;
+    }
+    fn control(&self, name: &str) -> &egui::accesskit::Node {
+        self.nodes
+            .iter()
+            .map(|(_, node)| node)
+            .filter(|node| {
+                node.label() == Some(name)
+                    || node.labelled_by().iter().any(|label_id| {
+                        self.nodes.iter().any(|(id, label)| {
+                            id == label_id
+                                && (label.label() == Some(name) || label.value() == Some(name))
+                        })
+                    })
+            })
+            .min_by(|a, b| a.bounds().unwrap().y0.total_cmp(&b.bounds().unwrap().y0))
+            .unwrap_or_else(|| panic!("Missing control: {name}"))
+    }
+    fn click(&mut self, name: &str) {
+        let rect = self.control(name).bounds().unwrap();
+        let pos = egui::pos2(
+            (rect.x0 + rect.x1) as f32 / 2.,
+            (rect.y0 + rect.y1) as f32 / 2.,
+        );
+        for pressed in [true, false] {
+            self.frame(vec![
+                egui::Event::PointerMoved(pos),
+                egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            ]);
+        }
+        self.frame(Vec::new());
+    }
+}
+
+#[test]
+fn prompt_height_can_be_dragged_without_changing_width_or_text() {
+    let mut desk = Desk::new();
+    let text = desk.app.prompt.clone();
+    let before = desk.control("Prompt").bounds().unwrap();
+    let ratio_y = desk.control("Ratio").bounds().unwrap().y0;
+    let start = egui::pos2(before.x1 as f32 - 3., before.y1 as f32 - 3.);
+    desk.frame(vec![egui::Event::PointerMoved(start)]);
+    desk.frame(vec![egui::Event::PointerButton {
+        pos: start,
+        button: egui::PointerButton::Primary,
+        pressed: true,
+        modifiers: egui::Modifiers::NONE,
+    }]);
+    let end = start + egui::vec2(0., 90.);
+    desk.frame(vec![egui::Event::PointerMoved(end)]);
+    desk.frame(Vec::new());
+    desk.frame(vec![egui::Event::PointerButton {
+        pos: end,
+        button: egui::PointerButton::Primary,
+        pressed: false,
+        modifiers: egui::Modifiers::NONE,
+    }]);
+    desk.frame(Vec::new());
+    let after = desk.control("Prompt").bounds().unwrap();
+    assert!(
+        after.height() > before.height() + 70.,
+        "{before:?} -> {after:?}"
+    );
+    assert!((after.width() - before.width()).abs() < 1.);
+    assert!(desk.control("Ratio").bounds().unwrap().y0 > ratio_y + 70.);
+    assert_eq!(desk.app.prompt, text);
+    let resized_ratio_y = desk.control("Ratio").bounds().unwrap().y0;
+    desk.app.prompt = "Synthetic long prompt line\n".repeat(80);
+    desk.frame(Vec::new());
+    desk.frame(Vec::new());
+    assert!((desk.control("Ratio").bounds().unwrap().y0 - resized_ratio_y).abs() < 1.);
+}
+
+#[test]
+fn reference_desk_tabs_settings_and_zoom_are_interactive() {
+    let mut desk = Desk::new();
+    let prompt = desk.app.prompt.clone();
+    desk.click("Video");
+    assert!(desk.app.workspace == Workspace::Video);
+    desk.click("Image");
+    assert!(desk.app.workspace == Workspace::Image);
+    assert_eq!(desk.app.prompt, prompt);
+    assert_eq!(desk.app.references.len(), 2);
+    desk.click("Actual pixels");
+    assert!(desk.app.actual_pixels);
+    desk.click("Pan image");
+    assert!(!desk.app.pan_enabled);
+    desk.click("Fit image");
+    assert!(!desk.app.actual_pixels);
+    assert_eq!(desk.app.image_pan, egui::Vec2::ZERO);
+    desk.click("Pan image");
+    assert!(desk.app.actual_pixels && desk.app.pan_enabled);
+    desk.click("Hide previews");
+    assert!(desk.app.prefs.privacy_mode);
+    assert!(Preferences::load(desk._root.path()).unwrap().privacy_mode);
+    desk.click("Settings");
+    assert!(desk.app.settings_open);
+    desk.click("Close settings");
+    assert!(!desk.app.settings_open);
+    desk.click("Settings");
+    desk.frame(vec![egui::Event::Key {
+        key: egui::Key::Escape,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    }]);
+    assert!(!desk.app.settings_open);
+}
+
+#[test]
+fn reference_order_and_pending_request_controls_are_preserved() {
+    let mut desk = Desk::new();
+    desk.click("Move reference down");
+    assert_eq!(desk.app.references[0].id, "synthetic-reference-2");
+    desk.click("Remove reference");
+    assert_eq!(desk.app.references.len(), 1);
+    assert_eq!(desk.app.references[0].id, "synthetic-reference-1");
+    desk.app.pending = Some(Submission {
+        request: serde_json::json!({}),
+        key: "existing-key".into(),
+        folder: desk._root.path().into(),
+        job: Some("existing-job".into()),
+    });
+    desk.app.error = Some("Synthetic recoverable error".into());
+    desk.frame(Vec::new());
+    assert!(desk.control("Generate").is_disabled());
+    assert!(!desk.control("Retry").is_disabled());
+    assert!(desk.control("Remove reference").is_disabled());
+    desk.click("Remove reference");
+    assert_eq!(desk.app.references.len(), 1);
+    desk.app.working = true;
+    desk.frame(Vec::new());
+    assert!(
+        !desk
+            .nodes
+            .iter()
+            .any(|(_, node)| node.label() == Some("Retry"))
+    );
+    assert!(desk.control("Generate again").is_disabled());
+    assert!(!desk.control("Cancel generation").is_disabled());
+    desk.app.cancelling = true;
+    desk.frame(Vec::new());
+    assert!(desk.control("Cancel generation").is_disabled());
+}
+
+#[test]
+fn regenerate_reuses_successful_inputs_with_a_new_job_identity() {
+    for seed in [Value::Null, serde_json::json!(42)] {
+        let mut desk = Desk::new();
+        assert!(desk.control("Generate again").is_disabled());
+        assert!(desk.app.regeneration().is_none());
+        let request = serde_json::json!({
+            "prompt": "Original synthetic prompt",
+            "negative_prompt": "Original negative prompt",
+            "inputs": {"reference_images": ["ref-2", "ref-1"]},
+            "sampling": {"steps": 40, "cfg_scale": 2.5},
+            "width": 1600, "height": 896, "seed": seed
+        });
+        desk.app.pending = Some(Submission {
+            request: request.clone(),
+            key: "completed-key".into(),
+            job: Some("completed-job".into()),
+            folder: desk._root.path().into(),
+        });
+        desk.app
+            .tx
+            .send(Message::Finished(Ok(Completed {
+                file: desk._root.path().join("synthetic.png"),
+                preview: Preview {
+                    width: 1,
+                    height: 1,
+                    pixels: vec![0, 0, 0, 255],
+                },
+                seed: Some(42),
+            })))
+            .unwrap();
+        desk.frame(Vec::new());
+        assert!(!desk.control("Generate again").is_disabled());
+        assert!(
+            !desk
+                .nodes
+                .iter()
+                .any(|(_, node)| node.label() == Some("Retry"))
+        );
+        desk.app.prompt = "Changed draft".into();
+        desk.app.references.clear();
+        desk.app.prefs.generation.steps = 12;
+        desk.app.prefs.output_folder = desk._root.path().join("new-output");
+        let again = desk.app.regeneration().unwrap();
+        assert_eq!(again.request, request);
+        assert_eq!(again.request["seed"], seed);
+        assert_ne!(again.key, "completed-key");
+        assert_ne!(again.key, desk.app.regeneration().unwrap().key);
+        assert!(again.job.is_none());
+        assert_eq!(again.folder, desk.app.prefs.output_folder);
+        let retry_key = again.key.clone();
+        desk.app.pending = Some(again);
+        desk.app
+            .tx
+            .send(Message::Finished(Err(Failure {
+                message: "Synthetic recoverable error".into(),
+                retryable: true,
+            })))
+            .unwrap();
+        desk.frame(Vec::new());
+        assert!(desk.app.regeneration().is_none());
+        assert!(desk.control("Generate again").is_disabled());
+        assert!(!desk.control("Retry").is_disabled());
+        assert_eq!(desk.app.pending.as_ref().unwrap().key, retry_key);
+        assert_eq!(desk.app.pending.as_ref().unwrap().request, request);
+        desk.app
+            .tx
+            .send(Message::Finished(Err(Failure {
+                message: "Synthetic terminal error".into(),
+                retryable: false,
+            })))
+            .unwrap();
+        desk.frame(Vec::new());
+        assert_eq!(desk.app.regeneration().unwrap().request, request);
+    }
+}
+
+#[test]
+fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
+    fn replace(desk: &mut Desk, bounds: egui::accesskit::Rect, value: &str) {
+        let pos = egui::pos2(
+            (bounds.x0 + bounds.x1) as f32 / 2.,
+            (bounds.y0 + bounds.y1) as f32 / 2.,
+        );
+        for pressed in [true, false] {
+            desk.frame(vec![
+                egui::Event::PointerMoved(pos),
+                egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            ]);
+        }
+        desk.frame(vec![
+            egui::Event::Key {
+                key: egui::Key::A,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: egui::Modifiers {
+                    ctrl: true,
+                    command: true,
+                    ..egui::Modifiers::NONE
+                },
+            },
+            egui::Event::Text(value.into()),
+        ]);
+    }
+    let mut desk = Desk::new();
+    let request = serde_json::json!({"prompt": "Running prompt", "negative_prompt": "Running negative", "sampling": {"steps": 40}});
+    let original_folder = desk.app.prefs.output_folder.clone();
+    desk.app.pending = Some(Submission {
+        request: request.clone(),
+        key: "running-key".into(),
+        job: Some("running-job".into()),
+        folder: original_folder.clone(),
+    });
+    desk.app.working = true;
+    desk.frame(Vec::new());
+    for name in ["Prompt", "Ratio", "Max side", "Seed"] {
+        assert!(!desk.control(name).is_disabled(), "{name}");
+    }
+    assert!(desk.control("Generate").is_disabled());
+    assert!(desk.control("Generate again").is_disabled());
+    let prompt = desk.control("Prompt").bounds().unwrap();
+    replace(&mut desk, prompt, "Next prompt");
+    assert_eq!(desk.app.prompt, "Next prompt");
+    desk.ctx.global_style_mut(|style| style.animation_time = 0.);
+    desk.click("Negative prompt");
+    // The lower of the two multiline fields is the expanded negative prompt.
+    let negative = desk
+        .nodes
+        .iter()
+        .map(|(_, node)| node)
+        .filter(|node| node.role() == egui::accesskit::Role::MultilineTextInput)
+        .max_by(|a, b| a.bounds().unwrap().y0.total_cmp(&b.bounds().unwrap().y0))
+        .unwrap();
+    assert!(!negative.is_disabled());
+    let negative = negative.bounds().unwrap();
+    replace(&mut desk, negative, "Next negative prompt");
+    assert_eq!(desk.app.prefs.negative_prompt, "Next negative prompt");
+    desk.click("Settings");
+    for name in ["Steps", "CFG", "Choose output folder"] {
+        assert!(!desk.control(name).is_disabled(), "{name}");
+    }
+    let steps = desk.control("Steps").bounds().unwrap();
+    replace(&mut desk, steps, "24");
+    desk.frame(vec![egui::Event::Key {
+        key: egui::Key::Enter,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    }]);
+    assert_eq!(desk.app.prefs.generation.steps, 24);
+    let new_folder = desk._root.path().join("next-output");
+    desk.app
+        .tx
+        .send(Message::Folder(Some(new_folder.clone())))
+        .unwrap();
+    desk.app.receive(&desk.ctx);
+    let pending = desk.app.pending.as_ref().unwrap();
+    assert_eq!(pending.request, request);
+    assert_eq!(pending.folder, original_folder);
+    assert_eq!(pending.key, "running-key");
+    desk.app
+        .tx
+        .send(Message::Finished(Ok(Completed {
+            file: original_folder.join("synthetic.png"),
+            preview: Preview {
+                width: 1,
+                height: 1,
+                pixels: vec![0, 0, 0, 255],
+            },
+            seed: Some(42),
+        })))
+        .unwrap();
+    desk.app.receive(&desk.ctx);
+    assert_eq!(desk.app.prompt, "Next prompt");
+    assert_eq!(desk.app.prefs.negative_prompt, "Next negative prompt");
+    assert_eq!(desk.app.prefs.generation.steps, 24);
+    assert_eq!(desk.app.prefs.output_folder, new_folder);
+    assert_eq!(desk.app.last_generation.as_ref(), Some(&request));
+}
+
+#[test]
+fn settings_controls_save_and_report_write_failures() {
+    let mut desk = Desk::new();
+    desk.click("Settings");
+    desk.click("Steps");
+    desk.frame(vec![
+        egui::Event::Key {
+            key: egui::Key::A,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::CTRL,
+        },
+        egui::Event::Text("24".into()),
+        egui::Event::Key {
+            key: egui::Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        },
+    ]);
+    assert_eq!(desk.app.prefs.generation.steps, 24);
+    assert_eq!(
+        Preferences::load(desk._root.path())
+            .unwrap()
+            .generation
+            .steps,
+        24
+    );
+    desk.click("Close settings");
+    let saved = desk._root.path().join(".imagine/ui-settings.json");
+    std::fs::remove_file(&saved).unwrap();
+    std::fs::create_dir(&saved).unwrap();
+    desk.click("Hide previews");
+    assert!(desk.app.settings_error.is_some());
+    std::fs::remove_dir(&saved).unwrap();
+    desk.click("Hide previews");
+    assert!(desk.app.settings_error.is_none());
+    assert!(!Preferences::load(desk._root.path()).unwrap().privacy_mode);
+}
+
+#[test]
+fn headless_reference_desk_and_settings() {
+    let root = tempfile::tempdir().unwrap();
+    for (width, height, name) in [
+        (1680, 850, "reference-desk"),
+        (640, 1000, "reference-desk-compact"),
+    ] {
+        let ctx = egui::Context::default();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let mut combined = egui::FullOutput::default();
+        for _ in 0..3 {
+            combined.append(ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(width as f32, height as f32),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    if width > 1000 {
+                        ui.scope_builder(
+                            egui::UiBuilder::new().max_rect(egui::Rect::from_min_size(
+                                egui::pos2(8., 8.),
+                                egui::vec2(1280., 800.),
+                            )),
+                            |ui| app.content(ui),
+                        );
+                        ui.scope_builder(
+                            egui::UiBuilder::new().max_rect(egui::Rect::from_min_size(
+                                egui::pos2(1310., 8.),
+                                egui::vec2(360., 680.),
+                            )),
+                            |ui| app.settings_content(ui, false),
+                        );
+                    } else {
+                        app.content(ui);
+                    }
+                },
+            ));
+        }
+        if let Some(dir) = std::env::var_os("IMAGINE_UI_PREVIEW_DIR") {
+            let dir = PathBuf::from(dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            render(&ctx, combined, width, height)
+                .save(dir.join(format!("{name}.png")))
+                .unwrap();
+        } else {
+            combined.textures_delta.clear();
+        }
+    }
+}
+
 #[test]
 fn actual_pixels_respects_display_scale_clipping_and_privacy() {
     for pixels_per_point in [1., 2.] {
@@ -24,7 +493,15 @@ fn actual_pixels_respects_display_scale_clipping_and_privacy() {
                     ..Default::default()
                 },
                 |ui| {
-                    image_view(ui, &image, egui::vec2(200., 150.), hidden, actual, &mut pan);
+                    image_view(
+                        ui,
+                        &image,
+                        egui::vec2(200., 150.),
+                        hidden,
+                        actual,
+                        true,
+                        &mut pan,
+                    );
                 },
             );
             output.textures_delta.clear();

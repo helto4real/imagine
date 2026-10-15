@@ -60,13 +60,35 @@ Linux prerequisites include a working Wayland or X11 session, an OpenGL-capable
 display driver and an XDG desktop portal file chooser. The UI uses the host's
 system sans font when `fc-match` is available, with bundled font fallback.
 
+Glow VSync is disabled in both the application and the synthetic native preview.
+This avoids requesting a presentation wait on the UI thread when the window is
+on a hidden workspace. NVIDIA documents a potential indefinite `eglSwapBuffers`
+wait for invisible windows under some Wayland compositor configurations
+([egl-wayland2 compositor requirements](https://github.com/NVIDIA/egl-wayland2#compositor-requirements)).
+This is a targeted mitigation; the reported Imagine hang has not been confirmed
+with a native stack or reproduced in a live generation test.
+
 ## Workflow
 
 1. Enter a **Prompt**. **Negative prompt** is optional and restored from your last edit.
-2. Optionally choose **Add** to upload PNG/JPEG/WebP reference images.
+2. Optionally choose the **+** icon to upload PNG/JPEG/WebP reference images.
    Thumbnails are numbered; the up/down controls change reference order.
-3. Choose **Save to → Choose folder**. The folder choice is saved immediately.
-4. Choose **Generate**. The result is shown after its PNG has been saved locally.
+3. Open **Settings** (gear) and choose the folder icon under **Save to**.
+   The folder choice is saved immediately.
+4. Choose **Generate** (sparkles). The result is shown after its PNG has been saved locally.
+
+The Reference desk layout places ordered references on the left, the image in
+the center, and the prompt/size/seed inspector on the right. Every toolbar action
+uses an outline icon with a tooltip and accessible name. The image and film icons
+switch between Image and Video; switching preserves the image workspace and any
+pending job. Video currently has an explicit unavailable state, not a video engine
+or editing tools.
+
+The gear opens a separate native **Settings** window with **Generation** (Steps,
+CFG), **Storage** (output folder), and **Privacy** (Hide previews). Changes save
+automatically. The close icon or Escape closes only Settings. A failed preference
+write shows **Not saved** and the error; it is never reported as saved. On backends
+without native child windows the same settings content uses egui's embedded window.
 
 No references means `text_to_image`; one or more means `image_edit`. The client
 starts with 1600×896, 40 steps and CFG 2.5. **Steps**, **CFG**, **Seed**, **Ratio**
@@ -88,11 +110,15 @@ the frozen measurement scope is still 1600×896. Large images may exceed memory.
 Restart both the API and UI after updating to enable the new dimensions contract.
 
 Reference count is limited to ten. The existing server upload limits apply.
-The **Privacy: on / off** button toggles privacy for the result and reference images.
-It is on by default and the choice is saved immediately. When on, images use hover-reveal privacy:
-images stay opaque and hidden until the pointer enters that image area. Leaving
-the area or losing window focus hides them immediately. This affects the preview
-only; saved PNGs are unchanged.
+The prompt field has a bottom-right drag handle for changing its height; longer
+text scrolls inside the field. Its height is kept for the current UI session.
+The eye icon and **Hide previews** switch toggle visual privacy for the result,
+reference images, prompt and negative prompt. It is on by default and the choice
+is saved immediately. Each image or text field reveals only while the pointer is
+over it and the window has focus. Leaving the area or losing window focus hides
+it immediately, including selected text and the caret. Editing focus alone does
+not reveal text. This is visual concealment only: prompt content, clipboard
+operations and saved PNGs are unchanged.
 Uploading does not resize the source file: the native per-image resize setting
 controls inference. The client creates small thumbnails only for display. The
 file dialog's order is used initially and can be adjusted before submission.
@@ -107,6 +133,21 @@ model loading, final VAE decoding or disk saving. These stages show status text;
 the image is only reported as **Saved** after the local PNG write completes.
 Neither the bar nor the percentage advances from a timer. Estimates disappear
 when sampling completes or cancellation is requested.
+
+After successful local saving, the footer shows 100% and the measured duration
+of that client attempt (including submission, polling, download and saving).
+This is not a GPU-only benchmark; a recovery attempt measures only that attempt.
+Hovering the footer exposes the saved path.
+
+The circular arrow beside Generate repeats the last successful generation with
+its original prompt, ordered references and settings, using a new job and
+idempotency key. Random seed requests stay random; fixed seeds remain fixed.
+It saves to the currently selected output folder. The last successful request
+is kept only in memory for this UI session. Generate uses the current editor
+values. Retry appears beside a recoverable error and retains the unresolved
+job/idempotency key. Cancel remains a separate icon. Fit and Actual pixels are separate view actions;
+the hand tool enables/disables dragging at actual pixel scale. Selecting the hand
+from Fit enters actual pixel view. Images always preserve their proportions.
 
 The default folder is `<project>/.imagine/images`. Preferences live in
 `<project>/.imagine/ui-settings.json` and contain the output folder, privacy choice
@@ -128,18 +169,23 @@ Network operations, image decoding and generation run off the UI thread.
 After an ambiguous submission it uses the same idempotency key; after acceptance
 it polls/downloads the same job. It does not silently generate a new image.
 If saving fails, select another output folder and retry to download/save the
-completed server asset. The request and reference order are fixed during a
-pending job. In-progress jobs are not restored by the UI after closing it; they
+completed server asset. Prompts and generation settings remain editable while
+an image is being generated; changes prepare the next Generate action. The
+running job keeps its captured request and output folder, and its completion
+does not replace the draft. Retry retains the original request but uses the
+currently selected output folder for saving. Reference order stays locked
+while a job is pending. In-progress jobs are not restored by the UI after closing it; they
 remain accessible through the API until Imagine stops. Server restart clears all
 history and assets; already saved local images remain. The current UI has no history browser.
 
 ## Helto adaptation
 
-`ui/src/helto.rs` maps the canonical Helto tokens and component recipes to native
-egui: Mocha surface hierarchy, peach/gold primary/selection, blue keyboard focus,
-semantic errors/status, 5–6 px control/panel radii and 24 px gradient buttons.
-The main surface has a compact prompt/reference column and an aspect-preserving
-image viewport. Narrow windows stack the two areas with scrolling.
+`ui/src/helto.rs` maps the canonical Helto palette to native egui: Mocha surface
+hierarchy, peach/gold primary/selection, blue keyboard focus, semantic errors/status
+and 5–6 px control/panel radii. The selected Reference desk mockup uses 32 px icon
+controls and 14 px body text. `ui/src/icons.rs` draws the outline glyphs and
+`ui/src/workspace.rs` owns the workspace and settings layout.
+Narrow windows place the image above references and prompt, with scrolling.
 No web font, browser component or JavaScript frontend is involved.
 
 ## Checks
@@ -152,7 +198,17 @@ cargo build --release --locked -p imagine-ui
 ./start-ui.sh --help
 # Optional synthetic software previews; no desktop/window/GPU:
 IMAGINE_UI_PREVIEW_DIR="$PWD/target/ui-previews" cargo test --locked -p imagine-ui --lib headless_layout
+# Reference desk and Settings side by side, plus the compact layout:
+IMAGINE_UI_PREVIEW_DIR="$PWD/target/reference-desk-previews" cargo test --locked -p imagine-ui --lib headless_reference_desk
+# Explicit opt-in native preview with a temporary profile and procedural images:
+cargo run --locked -p imagine-ui --features ui-preview --example reference-desk
 ```
+
+The native preview is excluded from normal builds. It never loads normal runtime
+preferences, media or credentials. Its synthetic client targets unused loopback
+port 1 and never connects at startup; it is for UI interaction, not inference.
+Closing it removes its temporary profile. API behavior is tested separately with
+the real HTTP client and a fake inference backend.
 
 The client integration test uses the actual API router and SQLite with a fake
 inference backend. It covers defaults, ordered uploads, generated PNG saving,
@@ -213,3 +269,27 @@ launch-script `--help` and shell syntax checks passed. Local socket tests used
 approved escalation. No new GPU inference, native window interaction or
 Computer Use was performed. Existing services were not restarted; changes are
 uncommitted.
+
+### Reference desk — 2026-10-15
+
+The selected prototype is implemented as the image/reference/prompt workspace,
+with icon actions, Image/Video tabs and a separate Settings dialog. Video remains
+an unavailable workspace as scoped in the design request.
+
+All 16 UI unit tests and the complete workspace suite passed, including the real
+UI/proxy/API flow with fake inference. New interaction tests exercise tab state,
+reference ordering/removal, pending-job control locking, Settings open/close and
+Escape, numeric preference editing/persistence, preference-write failure/recovery,
+privacy and Fit/Actual/Pan. Existing clipboard, dimensions and privacy-mesh tests
+remain passing. Formatting, workspace/all-features Clippy with warnings denied,
+the release UI build, launcher help and diff checks passed.
+
+Synthetic CPU renderings cover wide, compact, progress and Settings views. Native
+Hyprland interaction also checked the floating dialog's size, close control,
+privacy switch and synchronized toolbar state, concealment of every preview,
+and tab switching without losing the image workspace. The native example used
+only a fresh temporary profile and procedural test pixels. Captures are under
+`target/reference-desk-previews/`; they are validation artifacts, not product media.
+Native file-chooser acceptance and live inference were not exercised. Desktop
+access and local socket tests required approved sandbox escalation. No running
+Imagine service was restarted.

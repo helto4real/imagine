@@ -1,4 +1,5 @@
 //! Native adaptation of the canonical Helto tokens.css/components.css.
+use crate::icons::{self, Icon};
 use eframe::egui::{self, Color32, Stroke};
 
 pub const BG: Color32 = Color32::from_rgb(0x18, 0x18, 0x25);
@@ -56,12 +57,19 @@ pub fn install(ctx: &egui::Context) {
     style.visuals.widgets.active.fg_stroke.color = ACCENT;
     style.spacing.item_spacing = egui::vec2(6., 8.);
     style.spacing.button_padding = egui::vec2(8., 4.);
+    style.spacing.interact_size.y = 32.;
+    style.spacing.combo_height = 260.;
+    style.visuals.window_corner_radius = 10.into();
+    style.visuals.window_stroke = Stroke::new(1., RAISED);
     style
         .text_styles
-        .insert(egui::TextStyle::Body, egui::FontId::proportional(12.));
+        .insert(egui::TextStyle::Monospace, egui::FontId::monospace(13.));
     style
         .text_styles
-        .insert(egui::TextStyle::Button, egui::FontId::proportional(12.));
+        .insert(egui::TextStyle::Body, egui::FontId::proportional(14.));
+    style
+        .text_styles
+        .insert(egui::TextStyle::Button, egui::FontId::proportional(14.));
     style
         .text_styles
         .insert(egui::TextStyle::Small, egui::FontId::proportional(11.));
@@ -90,22 +98,18 @@ pub fn install(ctx: &egui::Context) {
         ctx.set_fonts(fonts);
     }
 }
-pub fn button(ui: &mut egui::Ui, label: &str, primary: bool) -> egui::Response {
-    let font = egui::TextStyle::Button.resolve(ui.style());
-    let galley = ui.painter().layout_no_wrap(
-        label.to_owned(),
-        font,
-        if primary { ACCENT_TEXT } else { TEXT },
-    );
-    let (rect, response) = ui.allocate_exact_size(
-        egui::vec2((galley.size().x + 16.).max(28.), 24.),
-        egui::Sense::click(),
-    );
+pub(crate) fn icon_button(
+    ui: &mut egui::Ui,
+    icon: Icon,
+    label: &str,
+    active: bool,
+) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(32., 32.), egui::Sense::click());
     response.widget_info(|| {
-        egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), label)
+        egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), active, label)
     });
     if ui.is_rect_visible(rect) {
-        let (top, bottom, border) = if primary {
+        let (top, bottom, border) = if active {
             if response.hovered() {
                 (ACCENT_HOVER_TOP, ACCENT_HOVER_BOTTOM, ACCENT_BORDER)
             } else {
@@ -116,23 +120,16 @@ pub fn button(ui: &mut egui::Ui, label: &str, primary: bool) -> egui::Response {
         } else {
             (RAISED, FIELD, RAISED)
         };
-        let alpha = if ui.is_enabled() { 1. } else { 0.4 };
         let painted = if response.is_pointer_button_down_on() {
             rect.translate(egui::vec2(0., 1.))
         } else {
             rect
         };
-        gradient(
-            ui.painter(),
-            painted,
-            5.,
-            top.gamma_multiply(alpha),
-            bottom.gamma_multiply(alpha),
-        );
+        gradient(ui.painter(), painted, 5., top, bottom);
         ui.painter().rect_stroke(
             painted,
             5,
-            Stroke::new(1., border.gamma_multiply(alpha)),
+            Stroke::new(1., border),
             egui::StrokeKind::Inside,
         );
         if response.has_focus() {
@@ -143,14 +140,58 @@ pub fn button(ui: &mut egui::Ui, label: &str, primary: bool) -> egui::Response {
                 egui::StrokeKind::Outside,
             );
         }
-        ui.painter().galley(
-            painted.center() - galley.size() / 2.,
-            galley,
-            if primary { ACCENT_TEXT } else { TEXT },
+        let color = if active {
+            ACCENT_TEXT
+        } else if matches!(icon, Icon::Trash) {
+            ERROR
+        } else {
+            TEXT
+        };
+        icons::paint(ui.painter(), painted.shrink(7.), icon, color);
+    }
+    response
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(label)
+}
+
+pub fn toggle(ui: &mut egui::Ui, value: &mut bool, label: &str) -> egui::Response {
+    let (rect, mut response) = ui.allocate_exact_size(egui::vec2(36., 20.), egui::Sense::click());
+    if response.clicked() {
+        *value = !*value;
+        response.mark_changed();
+    }
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(egui::WidgetType::Checkbox, ui.is_enabled(), *value, label)
+    });
+    let fill = if *value { ACCENT_BOTTOM } else { FIELD };
+    ui.painter().rect_filled(rect, 10, fill);
+    ui.painter().rect_stroke(
+        rect,
+        10,
+        Stroke::new(1., if *value { ACCENT_BORDER } else { RAISED }),
+        egui::StrokeKind::Inside,
+    );
+    let x = if *value {
+        rect.right() - 10.
+    } else {
+        rect.left() + 10.
+    };
+    ui.painter().circle_filled(
+        egui::pos2(x, rect.center().y),
+        7.,
+        if *value { ACCENT } else { TEXT },
+    );
+    if response.has_focus() {
+        ui.painter().rect_stroke(
+            rect.expand(2.),
+            10,
+            Stroke::new(2., FOCUS),
+            egui::StrokeKind::Outside,
         );
     }
-    response.on_hover_cursor(egui::CursorIcon::PointingHand)
+    response.on_hover_text(label)
 }
+
 pub fn gradient(
     painter: &egui::Painter,
     rect: egui::Rect,
@@ -190,18 +231,83 @@ pub fn gradient(
     }
     painter.add(mesh);
 }
-pub fn textarea(ui: &mut egui::Ui, text: &mut String, rows: usize, id: &str) -> egui::Response {
+pub fn textarea(
+    ui: &mut egui::Ui,
+    text: &mut String,
+    rows: usize,
+    id: &str,
+    privacy_mode: bool,
+    resizable: bool,
+) -> egui::Response {
+    let width = ui.available_width();
+    let height = ui.text_style_height(&egui::TextStyle::Monospace) * rows as f32 + 14.;
+    egui::Resize::default()
+        .id_salt((id, "size"))
+        .default_size(egui::vec2(width, height))
+        .min_size(egui::vec2(width, if resizable { 60. } else { height }))
+        .max_size(egui::vec2(width, if resizable { 800. } else { height }))
+        .resizable([false, resizable])
+        .with_stroke(false)
+        .show(ui, |ui| {
+            let rect = ui.available_rect_before_wrap();
+            let hidden = privacy_mode
+                && !(ui.rect_contains_pointer(rect)
+                    && ui.input(|input| {
+                        input.focused
+                            && input
+                                .pointer
+                                .hover_pos()
+                                .is_some_and(|pos| rect.intersect(ui.clip_rect()).contains(pos))
+                    }));
+            ui.painter().rect_filled(rect, 5, FIELD);
+            let response = egui::ScrollArea::vertical()
+                .id_salt((id, "text-scroll"))
+                .auto_shrink([false, false])
+                .max_height(rect.height())
+                .show(ui, |ui| {
+                    textarea_content(ui, text, id, hidden, rect.height())
+                })
+                .inner;
+            ui.painter().rect_stroke(
+                rect,
+                5,
+                Stroke::new(1., if response.has_focus() { FOCUS } else { RAISED }),
+                egui::StrokeKind::Inside,
+            );
+            response
+        })
+}
+
+fn textarea_content(
+    ui: &mut egui::Ui,
+    text: &mut String,
+    id: &str,
+    hidden: bool,
+    height: f32,
+) -> egui::Response {
     ui.scope(|ui| {
         ui.visuals_mut().selection.stroke = Stroke::new(1., FOCUS);
         let id = ui.make_persistent_id(id);
         let previous_selection =
             egui::TextEdit::load_state(ui.ctx(), id).and_then(|state| state.cursor.char_range());
-        let mut output = egui::TextEdit::multiline(text)
-            .id(id)
-            .desired_rows(rows)
-            .desired_width(f32::INFINITY)
-            .margin(egui::vec2(9., 7.))
-            .show(ui);
+        let mut output = ui
+            .scope(|ui| {
+                // Suppress glyphs, selection and caret together, while keeping editing active.
+                // Keep the clipboard menu outside this scope so it remains visible.
+                if hidden {
+                    ui.set_opacity(0.);
+                }
+                egui::TextEdit::multiline(text)
+                    .id(id)
+                    .desired_rows(1)
+                    .frame(egui::Frame::NONE.inner_margin(egui::Margin::symmetric(9, 7)))
+                    .min_size(egui::vec2(0., height))
+                    .desired_width(f32::INFINITY)
+                    .font(egui::TextStyle::Monospace)
+                    .margin(egui::vec2(9., 7.))
+                    .show(ui)
+            })
+            .inner;
         // egui 0.36 moves the caret on any pointer press, including right-click.
         // Preserve the selection that the context-menu action should operate on.
         if output.response.hovered()
@@ -247,14 +353,83 @@ pub fn textarea(ui: &mut egui::Ui, text: &mut String, rows: usize, id: &str) -> 
 mod tests {
     use super::*;
     #[test]
-    fn text_fields_preserve_clipboard_events_and_unicode_selection() {
+    fn private_text_hides_on_leave_even_with_focus_and_selection() {
+        fn contains_text(shape: &egui::Shape) -> bool {
+            match shape {
+                egui::Shape::Text(text) => text.opacity_factor > 0.,
+                egui::Shape::Vec(shapes) => shapes.iter().any(contains_text),
+                _ => false,
+            }
+        }
         for name in ["prompt", "negative-prompt"] {
+            let ctx = egui::Context::default();
+            let mut text = "Synthetic private prompt: åäö".to_owned();
+            let inside = egui::pos2(24., 24.);
+            let outside = egui::pos2(500., 400.);
+            for (events, focused, privacy, visible) in [
+                (vec![], true, true, false),
+                (vec![egui::Event::PointerMoved(inside)], true, true, true),
+                (vec![egui::Event::PointerMoved(outside)], true, true, false),
+                (vec![egui::Event::PointerMoved(inside)], true, true, true),
+                (vec![], false, true, false),
+                (vec![], true, true, true),
+                (vec![egui::Event::PointerGone], true, true, false),
+                (vec![], false, false, true),
+            ] {
+                let mut response = None;
+                let mut output = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(800., 600.),
+                        )),
+                        events,
+                        focused,
+                        ..Default::default()
+                    },
+                    |ui| {
+                        ui.set_width(300.);
+                        response = Some(textarea(ui, &mut text, 8, name, privacy, true));
+                    },
+                );
+                output.textures_delta.clear();
+                assert_eq!(
+                    output
+                        .shapes
+                        .iter()
+                        .any(|shape| contains_text(&shape.shape)),
+                    visible,
+                    "{name}: focused={focused}, privacy={privacy}"
+                );
+                let response = response.unwrap();
+                ctx.memory_mut(|memory| memory.request_focus(response.id));
+                let mut state = egui::TextEdit::load_state(&ctx, response.id).unwrap();
+                state
+                    .cursor
+                    .set_char_range(Some(egui::text::CCursorRange::two(
+                        egui::text::CCursor::new(0),
+                        egui::text::CCursor::new(text.chars().count()),
+                    )));
+                state.store(&ctx, response.id);
+                assert_eq!(text, "Synthetic private prompt: åäö");
+            }
+        }
+    }
+
+    #[test]
+    fn text_fields_preserve_clipboard_events_and_unicode_selection() {
+        for (name, privacy) in [
+            ("prompt", false),
+            ("prompt", true),
+            ("negative-prompt", false),
+            ("negative-prompt", true),
+        ] {
             let ctx = egui::Context::default();
             let mut text = String::new();
             let mut id = None;
             let mut rect = egui::Rect::NOTHING;
             let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
-                let response = textarea(ui, &mut text, 3, name);
+                let response = textarea(ui, &mut text, 3, name, privacy, false);
                 id = Some(response.id);
                 rect = response.rect;
             });
@@ -268,7 +443,7 @@ mod tests {
                     ..Default::default()
                 },
                 |ui| {
-                    textarea(ui, &mut text, 3, name);
+                    textarea(ui, &mut text, 3, name, privacy, false);
                 },
             );
             output.textures_delta.clear();
@@ -298,7 +473,7 @@ mod tests {
                         ..Default::default()
                     },
                     |ui| {
-                        textarea(ui, &mut text, 3, name);
+                        textarea(ui, &mut text, 3, name, privacy, false);
                     },
                 );
                 output.textures_delta.clear();
@@ -314,11 +489,11 @@ mod tests {
             for event in [egui::Event::Copy, egui::Event::Cut] {
                 let mut output = ctx.run_ui(
                     egui::RawInput {
-                        events: vec![event],
+                        events: vec![egui::Event::PointerGone, event],
                         ..Default::default()
                     },
                     |ui| {
-                        textarea(ui, &mut text, 3, name);
+                        textarea(ui, &mut text, 3, name, privacy, false);
                     },
                 );
                 output.textures_delta.clear();
@@ -333,7 +508,7 @@ mod tests {
         install(&ctx);
         let mut id = None;
         let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
-            let response = button(ui, "Generate", true);
+            let response = icon_button(ui, Icon::Generate, "Generate", true);
             id = Some(response.id);
         });
         output.textures_delta.clear();
@@ -352,7 +527,7 @@ mod tests {
                 ..Default::default()
             },
             |ui| {
-                let response = button(ui, "Generate", true);
+                let response = icon_button(ui, Icon::Generate, "Generate", true);
                 focused = response.has_focus();
                 activated = response.clicked();
             },
@@ -362,7 +537,9 @@ mod tests {
         assert!(activated);
         let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
             let r = ui
-                .add_enabled_ui(false, |ui| button(ui, "Generate", true))
+                .add_enabled_ui(false, |ui| {
+                    icon_button(ui, Icon::Generate, "Generate", true)
+                })
                 .inner;
             assert!(!r.enabled());
             assert!(!r.clicked());

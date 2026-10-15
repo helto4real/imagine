@@ -3,7 +3,7 @@ use crate::{
     helto,
     settings::{Connection, Preferences},
 };
-use eframe::egui::{self, RichText};
+use eframe::egui;
 use serde_json::Value;
 use std::{
     path::PathBuf,
@@ -37,6 +37,12 @@ fn runtime() -> tokio::runtime::Runtime {
         .expect("client runtime")
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Workspace {
+    Image,
+    Video,
+}
+
 pub struct ImagineApp {
     project: PathBuf,
     connection: Connection,
@@ -45,17 +51,25 @@ pub struct ImagineApp {
     metadata: Option<Value>,
     prompt: String,
     references: Vec<ReferenceView>,
+    reference_directory: Option<PathBuf>,
     pending: Option<Submission>,
+    last_generation: Option<Value>,
     working: bool,
     uploading: bool,
     connecting: bool,
     picking_folder: bool,
     cancelling: bool,
     status: String,
+    attempt_started: Option<std::time::Instant>,
+    last_elapsed: Option<Duration>,
     sampling: Option<client::SamplingProgress>,
     error: Option<String>,
     result: Option<(egui::TextureHandle, PathBuf, Option<u64>)>,
     actual_pixels: bool,
+    pan_enabled: bool,
+    workspace: Workspace,
+    settings_open: bool,
+    settings_error: Option<String>,
     image_pan: egui::Vec2,
     tx: Sender<Message>,
     rx: Receiver<Message>,
@@ -82,17 +96,25 @@ impl ImagineApp {
             metadata: None,
             prompt: String::new(),
             references: Vec::new(),
+            reference_directory: None,
             pending: None,
+            last_generation: None,
             working: false,
             uploading: false,
             connecting: false,
             picking_folder: false,
             cancelling: false,
             status: String::new(),
+            attempt_started: None,
+            last_elapsed: None,
             sampling: None,
             error: None,
             result: None,
             actual_pixels: false,
+            pan_enabled: true,
+            workspace: Workspace::Image,
+            settings_open: false,
+            settings_error: None,
             image_pan: egui::Vec2::ZERO,
             tx,
             rx,
@@ -138,6 +160,10 @@ impl ImagineApp {
                         self.uploading = false;
                         continue;
                     }
+                    self.reference_directory = paths
+                        .last()
+                        .and_then(|path| path.parent())
+                        .map(|directory| directory.to_path_buf());
                     if paths.len() + self.references.len() > 10 {
                         self.uploading = false;
                         self.error = Some("Up to ten reference images. Select fewer files.".into());
@@ -176,7 +202,10 @@ impl ImagineApp {
                         output_folder: folder,
                         ..self.prefs.clone()
                     };
-                    match prefs.save(&self.project){Ok(())=>self.prefs=prefs,Err(_)=>self.error=Some("Could not save the folder choice. Check write permissions for .imagine.".into())}
+                    match prefs.save(&self.project) {
+                        Ok(()) => { self.prefs = prefs; self.settings_error = None; }
+                        Err(_) => self.settings_error = Some("Could not save the folder choice. Check write permissions for .imagine.".into()),
+                    }
                 }
                 Message::Folder(None) => self.picking_folder = false,
                 Message::Progress(Progress::Submitted(job)) => {
@@ -189,15 +218,17 @@ impl ImagineApp {
                     self.sampling = sampling;
                 }
                 Message::Finished(result) => {
+                    let elapsed = self.attempt_started.take().map(|start| start.elapsed());
                     self.working = false;
                     self.sampling = None;
                     self.cancelling = false;
                     match result {
                         Ok(done) => {
+                            self.last_elapsed = elapsed;
                             self.result =
                                 Some((texture(ctx, &done.preview, "result"), done.file, done.seed));
                             self.image_pan = egui::Vec2::ZERO;
-                            self.pending = None;
+                            self.last_generation = self.pending.take().map(|job| job.request);
                             self.status = "Saved".into();
                             self.error = None;
                         }
@@ -254,6 +285,7 @@ impl ImagineApp {
         let pending = self.pending.as_mut().unwrap();
         pending.folder = self.prefs.output_folder.clone();
         let submission = pending.clone();
+        self.attempt_started = Some(std::time::Instant::now());
         self.working = true;
         self.status = "Submitting".into();
         self.sampling = None;
@@ -266,17 +298,31 @@ impl ImagineApp {
             send(&tx, &ctx, Message::Finished(result));
         });
     }
+    fn regeneration(&self) -> Option<Submission> {
+        if self.working || self.pending.is_some() {
+            return None;
+        }
+        Some(Submission {
+            request: self.last_generation.clone()?,
+            key: uuid::Uuid::new_v4().to_string(),
+            folder: self.prefs.output_folder.clone(),
+            job: None,
+        })
+    }
     fn choose_references(&mut self, ctx: &egui::Context) {
         self.uploading = true;
         self.error = None;
+        let directory = self.reference_directory.clone();
         let tx = self.tx.clone();
         let ctx = ctx.clone();
         std::thread::spawn(move || {
-            let files = rfd::FileDialog::new()
+            let mut dialog = rfd::FileDialog::new()
                 .set_title("Select reference images")
-                .add_filter("Images", &["png", "jpg", "jpeg", "webp"])
-                .pick_files()
-                .unwrap_or_default();
+                .add_filter("Images", &["png", "jpg", "jpeg", "webp"]);
+            if let Some(directory) = directory {
+                dialog = dialog.set_directory(directory);
+            }
+            let files = dialog.pick_files().unwrap_or_default();
             send(&tx, &ctx, Message::Picked(files));
         });
     }
@@ -308,423 +354,22 @@ impl ImagineApp {
             send(&tx, &ctx, Message::Cancelled(job, result));
         });
     }
-    fn editor(&mut self, ui: &mut egui::Ui) {
-        let editable =
-            !self.working && !self.uploading && !self.connecting && self.pending.is_none();
-        let prompt_label = ui.label("Prompt");
-        ui.add_enabled_ui(editable, |ui| {
-            helto::textarea(ui, &mut self.prompt, 8, "prompt").labelled_by(prompt_label.id);
-        });
-        ui.add_enabled_ui(editable, |ui| {
-            egui::CollapsingHeader::new("Negative prompt").show(ui, |ui| {
-                if helto::textarea(ui, &mut self.prefs.negative_prompt, 3, "negative-prompt")
-                    .changed()
-                {
-                    self.save_preferences();
-                }
-            });
-        });
-        ui.add_space(6.);
-        ui.add_enabled_ui(editable, |ui| self.generation_controls(ui));
-        ui.add_space(6.);
-        ui.horizontal(|ui| {
-            ui.label(format!("References · {}/10", self.references.len()));
-            let enabled = editable && self.client.is_some() && self.references.len() < 10;
-            if ui
-                .add_enabled_ui(enabled, |ui| helto::button(ui, "Add", false))
-                .inner
-                .clicked()
-            {
-                self.choose_references(ui.ctx());
-            }
-            if self.uploading {
-                ui.spinner();
-            }
-        });
-        let mut remove = None;
-        let mut swap = None;
-        egui::ScrollArea::vertical()
-            .id_salt("references")
-            .max_height(245.)
-            .show(ui, |ui| {
-                for (index, reference) in self.references.iter().enumerate() {
-                    ui.push_id(&reference.id, |ui| {
-                        egui::Frame::new()
-                            .fill(helto::BG)
-                            .stroke(egui::Stroke::new(1., helto::FIELD))
-                            .corner_radius(6)
-                            .inner_margin(6)
-                            .show(ui, |ui| {
-                                ui.horizontal(|ui| {
-                                    private_image(
-                                        ui,
-                                        &reference.texture,
-                                        egui::vec2(64., 48.),
-                                        self.prefs.privacy_mode,
-                                    );
-                                    ui.vertical(|ui| {
-                                        ui.add(
-                                            egui::Label::new(format!(
-                                                "{}. {}",
-                                                index + 1,
-                                                reference.name
-                                            ))
-                                            .truncate(),
-                                        )
-                                        .on_hover_text(&reference.name);
-                                        ui.add_enabled_ui(editable, |ui| {
-                                            ui.horizontal(|ui| {
-                                                if ui
-                                                    .add_enabled_ui(index > 0, |ui| {
-                                                        helto::button(ui, "Up", false)
-                                                    })
-                                                    .inner
-                                                    .on_hover_text("Move up")
-                                                    .clicked()
-                                                {
-                                                    swap = Some((index, index - 1));
-                                                }
-                                                if ui
-                                                    .add_enabled_ui(
-                                                        index + 1 < self.references.len(),
-                                                        |ui| helto::button(ui, "Down", false),
-                                                    )
-                                                    .inner
-                                                    .on_hover_text("Move down")
-                                                    .clicked()
-                                                {
-                                                    swap = Some((index, index + 1));
-                                                }
-                                                if helto::button(ui, "Remove", false).clicked() {
-                                                    remove = Some(index);
-                                                }
-                                            });
-                                        });
-                                    });
-                                });
-                            });
-                    });
-                }
-            });
-        if let Some(i) = remove {
-            self.references.remove(i);
-        } else if let Some((a, b)) = swap {
-            self.references.swap(a, b);
-        }
-        ui.add_space(6.);
-        ui.label("Save to");
-        ui.horizontal(|ui| {
-            ui.add(
-                egui::Label::new(
-                    RichText::new(self.prefs.output_folder.display().to_string()).color(helto::DIM),
-                )
-                .truncate(),
-            )
-            .on_hover_text(self.prefs.output_folder.display().to_string());
-        });
-        if ui
-            .add_enabled_ui(!self.working && !self.picking_folder, |ui| {
-                helto::button(ui, "Choose folder", false)
-            })
-            .inner
-            .clicked()
-        {
-            self.choose_folder(ui.ctx());
-        }
-        ui.add_space(8.);
-        ui.horizontal(|ui| {
-            let enabled = self.client.is_some()
-                && !self.connecting
-                && !self.working
-                && !self.uploading
-                && !self.picking_folder
-                && (!self.prompt.trim().is_empty() || self.pending.is_some());
-            let label = if self.pending.is_some() && !self.working {
-                "Retry"
-            } else {
-                "Generate"
-            };
-            if ui
-                .add_enabled_ui(enabled, |ui| helto::button(ui, label, true))
-                .inner
-                .clicked()
-            {
-                self.generate(ui.ctx());
-            }
-            if self.working {
-                ui.spinner();
-                if ui
-                    .add_enabled_ui(
-                        !self.cancelling && self.pending.as_ref().is_some_and(|p| p.job.is_some()),
-                        |ui| helto::button(ui, "Cancel", false),
-                    )
-                    .inner
-                    .clicked()
-                {
-                    self.cancel(ui.ctx());
-                }
-            }
-        });
-        if self.working
-            && let Some(progress) = &self.sampling
-        {
-            ui.add(
-                egui::ProgressBar::new(progress.completed as f32 / progress.total as f32)
-                    .fill(helto::ACCENT_TOP)
-                    .text(format!(
-                        "Sampling {} / {} · {:.0}%",
-                        progress.completed,
-                        progress.total,
-                        100. * progress.completed as f32 / progress.total as f32
-                    )),
-            );
-            if !self.cancelling
-                && self.status != "Cancelling"
-                && let Some(finish) = progress.finish_time()
-            {
-                let remaining = finish
-                    .duration_since(std::time::SystemTime::now())
-                    .unwrap_or_default()
-                    .as_secs();
-                ui.label(
-                    RichText::new(format!(
-                        "Sampling ETA ~{}:{:02} · ends ~{}",
-                        remaining / 60,
-                        remaining % 60,
-                        local_time(finish)
-                    ))
-                    .color(helto::DIM),
-                );
-            }
-        }
-        if !self.status.is_empty() && (self.status != "Sampling" || self.sampling.is_none()) {
-            ui.label(RichText::new(&self.status).color(helto::DIM));
-        }
-        if let Some(error) = &self.error {
-            ui.add_space(4.);
-            ui.colored_label(helto::ERROR, error);
-        }
-    }
-    fn generation_controls(&mut self, ui: &mut egui::Ui) {
-        let settings = &mut self.prefs.generation;
-        let before = settings.clone();
-        egui::Grid::new("generation-settings")
-            .spacing([10., 6.])
-            .show(ui, |ui| {
-                let label = ui.label("Steps");
-                ui.add(egui::DragValue::new(&mut settings.steps).range(1..=100))
-                    .labelled_by(label.id);
-                ui.end_row();
-                let label = ui.label("CFG");
-                ui.add(
-                    egui::DragValue::new(&mut settings.cfg_scale)
-                        .range(0.0..=20.0)
-                        .speed(0.1),
-                )
-                .labelled_by(label.id);
-                ui.end_row();
-                let label = ui.label("Seed");
-                egui::ComboBox::from_id_salt("seed-mode")
-                    .selected_text(if settings.random_seed {
-                        "Random each time"
-                    } else {
-                        "Fixed seed"
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut settings.random_seed, true, "Random each time");
-                        ui.selectable_value(&mut settings.random_seed, false, "Fixed seed");
-                    })
-                    .response
-                    .labelled_by(label.id);
-                ui.end_row();
-                if !settings.random_seed {
-                    let label = ui.label("Seed value");
-                    ui.add(egui::DragValue::new(&mut settings.seed).range(0..=u32::MAX))
-                        .labelled_by(label.id);
-                    ui.end_row();
-                }
-                let label = ui.label("Ratio");
-                egui::ComboBox::from_id_salt("aspect-ratio")
-                    .selected_text(&settings.aspect_ratio)
-                    .show_ui(ui, |ui| {
-                        for ratio in crate::settings::ASPECT_RATIOS {
-                            ui.selectable_value(
-                                &mut settings.aspect_ratio,
-                                ratio.to_owned(),
-                                ratio,
-                            );
-                        }
-                    })
-                    .response
-                    .labelled_by(label.id);
-                ui.end_row();
-                let label = ui.label("Max side (px)");
-                ui.add(
-                    egui::DragValue::new(&mut settings.max_side)
-                        .range(256..=4096)
-                        .speed(32.),
-                )
-                .labelled_by(label.id)
-                .on_hover_text("Multiples of 32");
-                ui.end_row();
-            });
-        match settings.dimensions() {
-            Ok((w, h)) => {
-                ui.label(RichText::new(format!("{w} × {h} px")).color(helto::DIM));
-            }
-            Err(e) => {
-                ui.colored_label(helto::ERROR, e.to_string());
-            }
-        }
-        if *settings != before {
-            self.save_preferences();
-        }
-    }
-    fn viewer(&mut self, ui: &mut egui::Ui) {
-        let height = (ui.available_height() - 42.).max(230.);
-        egui::Frame::new()
-            .fill(helto::MEDIA)
-            .stroke(egui::Stroke::new(1., helto::FIELD))
-            .corner_radius(6)
-            .inner_margin(9)
-            .show(ui, |ui| {
-                let size = egui::vec2(ui.available_width().max(1.), height);
-                if let Some((texture, _, _)) = &self.result {
-                    image_view(
-                        ui,
-                        texture,
-                        size,
-                        self.prefs.privacy_mode,
-                        self.actual_pixels,
-                        &mut self.image_pan,
-                    );
-                } else {
-                    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
-                    ui.painter().text(
-                        rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "No image yet",
-                        egui::FontId::proportional(12.),
-                        helto::DIM,
-                    );
-                }
-            });
-        if let Some((_, path, seed)) = &self.result {
-            ui.horizontal_wrapped(|ui| {
-                if helto::button(
-                    ui,
-                    if self.actual_pixels {
-                        "Zoom: Actual pixels"
-                    } else {
-                        "Zoom: Fit"
-                    },
-                    self.actual_pixels,
-                )
-                .clicked()
-                {
-                    self.actual_pixels = !self.actual_pixels;
-                    self.image_pan = egui::Vec2::ZERO;
-                }
-                ui.label(
-                    RichText::new(path.file_name().unwrap_or_default().to_string_lossy())
-                        .color(helto::DIM),
-                )
-                .on_hover_text(path.display().to_string());
-                if let Some(seed) = seed {
-                    ui.label(RichText::new(format!("Seed {seed}")).color(helto::DIM));
-                }
-            });
-        }
-    }
     fn save_preferences(&mut self) {
-        if self.prefs.save(&self.project).is_err() {
-            self.error =
-                Some("Could not save settings. Check write permissions for .imagine.".into());
-        }
-    }
-    pub fn content(&mut self, ui: &mut egui::Ui) {
-        self.receive(ui.ctx());
-        if self.working || self.uploading || self.connecting {
-            ui.ctx().request_repaint_after(Duration::from_millis(100));
-        }
-        egui::Frame::new()
-            .fill(helto::SURFACE)
-            .inner_margin(12)
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.heading("Imagine");
-                    ui.label(RichText::new("Qwen Image 2.1").color(helto::DIM));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if helto::button(
-                            ui,
-                            if self.prefs.privacy_mode {
-                                "Privacy: on"
-                            } else {
-                                "Privacy: off"
-                            },
-                            self.prefs.privacy_mode,
-                        )
-                        .clicked()
-                        {
-                            self.prefs.privacy_mode = !self.prefs.privacy_mode;
-                            self.save_preferences();
-                        }
-                        if (self.client.is_none() || self.error.is_some())
-                            && !self.working
-                            && !self.connecting
-                            && !self.uploading
-                            && self.pending.is_none()
-                            && helto::button(ui, "Reconnect", false).clicked()
-                        {
-                            self.connect(ui.ctx());
-                        }
-                        ui.colored_label(
-                            if self.client.is_some() {
-                                helto::OK
-                            } else {
-                                helto::DIM
-                            },
-                            if self.connecting {
-                                "Connecting"
-                            } else if self.client.is_some() {
-                                "Connected"
-                            } else {
-                                "Disconnected"
-                            },
-                        );
-                    });
-                });
-                ui.add_space(8.);
-                if ui.available_width() < 800. {
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        self.editor(ui);
-                        ui.add_space(12.);
-                        self.viewer(ui);
-                    });
-                } else {
-                    egui::Panel::left("compose")
-                        .resizable(false)
-                        .default_size(330.)
-                        .frame(
-                            egui::Frame::new()
-                                .fill(helto::SURFACE)
-                                .inner_margin(egui::Margin {
-                                    left: 0,
-                                    right: 12,
-                                    top: 0,
-                                    bottom: 0,
-                                }),
-                        )
-                        .show(ui, |ui| {
-                            egui::ScrollArea::vertical().show(ui, |ui| self.editor(ui));
-                        });
-                    egui::CentralPanel::default()
-                        .frame(egui::Frame::new().fill(helto::SURFACE))
-                        .show(ui, |ui| self.viewer(ui));
-                }
-            });
+        self.settings_error = self
+            .prefs
+            .save(&self.project)
+            .err()
+            .map(|_| "Could not save settings. Check write permissions for .imagine.".into());
     }
 }
+
+#[path = "workspace.rs"]
+mod workspace;
+
+#[cfg(any(test, feature = "ui-preview"))]
+#[path = "preview.rs"]
+mod preview;
+
 fn local_time(time: std::time::SystemTime) -> String {
     let Ok(duration) = time.duration_since(std::time::UNIX_EPOCH) else {
         return "—".into();
@@ -752,7 +397,7 @@ fn private_image(
     privacy_mode: bool,
 ) -> egui::Response {
     let mut pan = egui::Vec2::ZERO;
-    image_view(ui, texture, size, privacy_mode, false, &mut pan)
+    image_view(ui, texture, size, privacy_mode, false, false, &mut pan)
 }
 fn image_view(
     ui: &mut egui::Ui,
@@ -760,11 +405,12 @@ fn image_view(
     size: egui::Vec2,
     privacy_mode: bool,
     actual_pixels: bool,
+    pan_enabled: bool,
     pan: &mut egui::Vec2,
 ) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(
         size,
-        if actual_pixels {
+        if actual_pixels && pan_enabled {
             egui::Sense::drag()
         } else {
             egui::Sense::hover()
@@ -791,7 +437,9 @@ fn image_view(
         };
         let image_size = original * scale;
         if actual_pixels {
-            *pan += response.drag_delta();
+            if pan_enabled {
+                *pan += response.drag_delta();
+            }
             let limit = ((image_size - rect.size()) * 0.5).max(egui::Vec2::ZERO);
             *pan = pan.clamp(-limit, limit);
         }
@@ -821,7 +469,7 @@ fn image_view(
             helto::DIM,
         );
     }
-    if actual_pixels {
+    if actual_pixels && pan_enabled {
         let cursor = if response.dragged() {
             egui::CursorIcon::Grabbing
         } else {

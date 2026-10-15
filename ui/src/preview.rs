@@ -1,0 +1,88 @@
+//! Explicit synthetic fixture, excluded from the normal application build.
+use super::*;
+
+impl ImagineApp {
+    /// Uses only a caller-owned temporary directory and procedural pixels.
+    /// Port 1 is deliberately not an Imagine endpoint; this never connects at startup.
+    pub fn synthetic_preview(ctx: &egui::Context, project: PathBuf) -> Self {
+        helto::install(ctx);
+        let access = project.join("preview-access.json");
+        std::fs::write(
+            &access,
+            br#"{"clients":{"preview":"synthetic-preview-token"}}"#,
+        )
+        .unwrap();
+        let connection = Connection {
+            url: "http://127.0.0.1:1".into(),
+            access,
+            client: "preview".into(),
+        };
+        let mut app = Self::empty(
+            project.clone(),
+            connection,
+            Preferences {
+                output_folder: project.join("Pictures/Imagine"),
+                privacy_mode: false,
+                negative_prompt: String::new(),
+                generation: Default::default(),
+            },
+        );
+        app.client = Some(Client::connect(&app.connection).unwrap());
+        app.prompt = "A quiet mountain lake at dawn".into();
+        let sample = synthetic_landscape();
+        for index in 1..=2 {
+            app.references.push(ReferenceView {
+                id: format!("synthetic-reference-{index}"),
+                name: format!("reference-{index}.png"),
+                texture: texture(ctx, &sample, &format!("synthetic-reference-{index}")),
+            });
+        }
+        app.result = Some((
+            texture(ctx, &sample, "synthetic-result"),
+            project.join("Pictures/Imagine/imagine-example.png"),
+            Some(284731),
+        ));
+        app.status = "Saved".into();
+        app.last_elapsed = Some(Duration::from_secs_f64(4.2));
+        app
+    }
+}
+
+fn synthetic_landscape() -> Preview {
+    let (width, height) = (1600, 896);
+    let mut pixels = Vec::with_capacity(width * height * 4);
+    for y in 0..height {
+        for x in 0..width {
+            let nx = x as f32 / width as f32;
+            let ny = y as f32 / height as f32;
+            let reflected = if ny > 0.58 { 1.16 - ny } else { ny };
+            let ridge = 0.16 + 0.2 * (nx * 14.).sin().abs() + 0.045 * (nx * 45.).sin();
+            let mut rgb = if reflected > ridge {
+                [
+                    45. + reflected * 30.,
+                    60. + reflected * 30.,
+                    82. + reflected * 30.,
+                ]
+            } else {
+                [
+                    115. + reflected * 210.,
+                    135. + reflected * 125.,
+                    170. + reflected * 30.,
+                ]
+            };
+            if ny > 0.58 {
+                let wave = ((nx * 80. + ny * 130.).sin() * 0.03) + 0.77;
+                for c in &mut rgb {
+                    *c *= wave;
+                }
+            }
+            pixels.extend(rgb.map(|c| c as u8));
+            pixels.push(255);
+        }
+    }
+    Preview {
+        width,
+        height,
+        pixels,
+    }
+}
