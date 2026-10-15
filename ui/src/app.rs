@@ -25,6 +25,7 @@ enum Message {
     Progress(Progress),
     Finished(Result<Completed, Failure>),
     Cancelled(String, Result<(), Failure>),
+    ClipboardFailed,
 }
 fn send(tx: &Sender<Message>, ctx: &egui::Context, msg: Message) {
     let _ = tx.send(msg);
@@ -44,6 +45,7 @@ enum Workspace {
 }
 
 pub struct ImagineApp {
+    clipboard: Option<crate::clipboard::Clipboard>,
     project: PathBuf,
     connection: Connection,
     prefs: Preferences,
@@ -83,12 +85,17 @@ impl ImagineApp {
     ) -> Self {
         helto::install(ctx);
         let mut app = Self::empty(project, connection, prefs);
+        let tx = app.tx.clone();
+        app.clipboard = crate::clipboard::Clipboard::install(ctx, move || {
+            let _ = tx.send(Message::ClipboardFailed);
+        });
         app.connect(ctx);
         app
     }
     fn empty(project: PathBuf, connection: Connection, prefs: Preferences) -> Self {
         let (tx, rx) = mpsc::channel();
         Self {
+            clipboard: None,
             project,
             connection,
             prefs,
@@ -141,6 +148,9 @@ impl ImagineApp {
     fn receive(&mut self, ctx: &egui::Context) {
         while let Ok(message) = self.rx.try_recv() {
             match message {
+                Message::ClipboardFailed => {
+                    self.error = Some("Could not preserve the clipboard after closing Imagine. Keep the app open and copy again.".into());
+                }
                 Message::Connected(value) => {
                     self.connecting = false;
                     match value {
@@ -488,6 +498,11 @@ fn texture(ctx: &egui::Context, preview: &Preview, id: &str) -> egui::TextureHan
     )
 }
 impl eframe::App for ImagineApp {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        if let Some(clipboard) = &self.clipboard {
+            clipboard.finish();
+        }
+    }
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.receive(ctx);
     }

@@ -301,6 +301,8 @@ pub fn make_request(
     request["height"] = json!(height);
     request["sampling"]["steps"] = json!(settings.steps);
     request["sampling"]["cfg_scale"] = json!(settings.cfg_scale);
+    request["model_options"]["qwen_image_2_1"]["reference_max_pixels_per_image"] =
+        json!(settings.reference_max_pixels_per_image);
     request["seed"] = if settings.random_seed {
         Value::Null
     } else {
@@ -416,6 +418,36 @@ mod tests {
             job_progress(&value),
             Progress::Status { sampling: None, .. }
         ));
+    }
+
+    #[test]
+    fn reference_size_reaches_the_contract_and_rejects_invalid_limits() {
+        let meta = imagine_server::contract::model(MODEL).unwrap();
+        for limit in [262_144, 500_000, 1_000_000, 2_500_000, 4_000_000] {
+            let settings = GenerationSettings {
+                reference_max_pixels_per_image: limit,
+                ..Default::default()
+            };
+            let request =
+                make_request("test", "", &["reference".into()], &meta, &settings).unwrap();
+            let request: imagine_server::contract::JobRequest =
+                serde_json::from_value(request).unwrap();
+            assert_eq!(
+                request
+                    .model_options
+                    .qwen_image_2_1
+                    .reference_max_pixels_per_image,
+                limit
+            );
+            assert!(request.validate().is_ok());
+        }
+        for limit in [0, 262_143, 4_000_001, u32::MAX] {
+            let settings = GenerationSettings {
+                reference_max_pixels_per_image: limit,
+                ..Default::default()
+            };
+            assert!(make_request("test", "", &[], &meta, &settings).is_err());
+        }
     }
 
     #[test]

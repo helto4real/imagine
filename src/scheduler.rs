@@ -390,35 +390,19 @@ impl Scheduler {
                 .ok_or(Fault::new(404, "asset_not_found"))?;
             let w = asset["width"].as_u64().unwrap();
             let h = asset["height"].as_u64().unwrap();
-            let pixels = u64::from(
+            let (_, _, width, height) = crate::workflow_image::dimensions(
+                w as u32,
+                h as u32,
                 request
                     .model_options
                     .qwen_image_2_1
                     .reference_max_pixels_per_image,
-            )
-            .min(u64::from(request.width) * u64::from(request.height));
-            let raw_width = ((pixels * w / h) as f64).sqrt();
-            let (width, height) = if request.model_options.qwen_image_2_1.workflow.is_some() {
-                let (_, _, width, height) = crate::workflow_image::dimensions(
-                    w as u32,
-                    h as u32,
-                    request
-                        .model_options
-                        .qwen_image_2_1
-                        .reference_max_pixels_per_image,
-                );
-                (width, height)
-            } else {
-                (
-                    (raw_width / 32.0).round() as u32 * 32,
-                    (raw_width * h as f64 / w as f64 / 32.0).round() as u32 * 32,
-                )
-            };
+            );
             if width == 0 || height == 0 || width > 8192 || height > 8192 {
                 return Err(Fault::new(422, "unsupported_reference_geometry"));
             }
             reference_preprocessing.push(json!({"asset_id":a,"source_width":w,"source_height":h,"vae_width":width,"vae_height":height,
-                        "pixels":width*height,"source":"pinned_native_resize_rule"}));
+                        "pixels":width*height,"source":"aio_shrink_center_crop_v1"}));
         }
         if request.seed.is_none() {
             // Use only random UUID bytes (exclude version/variant bits), then

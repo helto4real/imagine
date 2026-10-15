@@ -333,7 +333,7 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
     replace(&mut desk, negative, "Next negative prompt");
     assert_eq!(desk.app.prefs.negative_prompt, "Next negative prompt");
     desk.click("Settings");
-    for name in ["Steps", "CFG", "Choose output folder"] {
+    for name in ["Steps", "CFG", "Reference size", "Choose output folder"] {
         assert!(!desk.control(name).is_disabled(), "{name}");
     }
     let steps = desk.control("Steps").bounds().unwrap();
@@ -346,6 +346,26 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
         modifiers: egui::Modifiers::NONE,
     }]);
     assert_eq!(desk.app.prefs.generation.steps, 24);
+    let reference_size = desk.control("Reference size").bounds().unwrap();
+    replace(&mut desk, reference_size, "2.5");
+    desk.frame(vec![egui::Event::Key {
+        key: egui::Key::Enter,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    }]);
+    assert_eq!(
+        desk.app.prefs.generation.reference_max_pixels_per_image,
+        2_500_000
+    );
+    assert_eq!(
+        Preferences::load(desk._root.path())
+            .unwrap()
+            .generation
+            .reference_max_pixels_per_image,
+        2_500_000
+    );
     let new_folder = desk._root.path().join("next-output");
     desk.app
         .tx
@@ -374,6 +394,10 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
     assert_eq!(desk.app.prefs.generation.steps, 24);
     assert_eq!(desk.app.prefs.output_folder, new_folder);
     assert_eq!(desk.app.last_generation.as_ref(), Some(&request));
+    assert_eq!(
+        desk.app.prefs.generation.reference_max_pixels_per_image,
+        2_500_000
+    );
 }
 
 #[test]
@@ -594,6 +618,7 @@ fn preferences_survive_folder_change_and_app_restart() {
         seed: 0,
         aspect_ratio: "9:16".into(),
         max_side: 1024,
+        reference_max_pixels_per_image: 2_000_000,
     };
     app.save_preferences();
     let folder = root.path().join("selected-images");

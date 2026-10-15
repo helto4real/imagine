@@ -779,6 +779,30 @@ impl ImagineApp {
                                 )
                                 .labelled_by(label.id);
                                 ui.end_row();
+                                let label = ui.label("Reference size");
+                                let mut megapixels =
+                                    f64::from(self.prefs.generation.reference_max_pixels_per_image)
+                                        / 1_000_000.;
+                                if ui
+                                    .add_sized(
+                                        [ui.available_width().max(120.), 28.],
+                                        egui::DragValue::new(&mut megapixels)
+                                            .range(0.262144..=4.0)
+                                            .speed(0.1)
+                                            .min_decimals(1)
+                                            .max_decimals(6)
+                                            .suffix(" MP"),
+                                    )
+                                    .labelled_by(label.id)
+                                    .on_hover_text(
+                                        "Maximum megapixels per reference image during generation.",
+                                    )
+                                    .changed()
+                                {
+                                    self.prefs.generation.reference_max_pixels_per_image =
+                                        (megapixels * 1_000_000.).round() as u32;
+                                }
+                                ui.end_row();
                             });
                     });
                     if self.prefs.generation != before {

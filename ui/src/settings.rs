@@ -72,6 +72,7 @@ pub struct GenerationSettings {
     pub seed: u32,
     pub aspect_ratio: String,
     pub max_side: u32,
+    pub reference_max_pixels_per_image: u32,
 }
 impl Default for GenerationSettings {
     fn default() -> Self {
@@ -82,6 +83,7 @@ impl Default for GenerationSettings {
             seed: 42,
             aspect_ratio: "16:9".into(),
             max_side: 1600,
+            reference_max_pixels_per_image: 1_000_000,
         }
     }
 }
@@ -109,6 +111,9 @@ impl GenerationSettings {
     }
     pub fn validate(&self) -> Result<()> {
         self.dimensions()?;
+        if !(262_144..=4_000_000).contains(&self.reference_max_pixels_per_image) {
+            bail!("Reference size must be 0.262144–4 MP per image.");
+        }
         if !(1..=100).contains(&self.steps)
             || !self.cfg_scale.is_finite()
             || !(0.0..=20.0).contains(&self.cfg_scale)
@@ -266,6 +271,7 @@ mod tests {
                 seed: u32::MAX,
                 aspect_ratio: "3:4".into(),
                 max_side: 1024,
+                reference_max_pixels_per_image: 2_500_000,
             },
         };
         p.save(root.path()).unwrap();
@@ -296,5 +302,12 @@ mod tests {
         assert!(loaded.privacy_mode);
         assert!(loaded.negative_prompt.is_empty());
         assert_eq!(loaded.generation, GenerationSettings::default());
+        let previous: GenerationSettings = serde_json::from_value(serde_json::json!({
+            "steps": 24, "max_side": 1024
+        }))
+        .unwrap();
+        assert_eq!(previous.steps, 24);
+        assert_eq!(previous.max_side, 1024);
+        assert_eq!(previous.reference_max_pixels_per_image, 1_000_000);
     }
 }

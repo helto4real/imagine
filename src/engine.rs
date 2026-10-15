@@ -294,16 +294,12 @@ impl Native {
         let mut refs = Vec::new();
         for id in &req.inputs.reference_images {
             let bytes = store.read_asset(id, owner).await?;
-            let bytes = if req.model_options.qwen_image_2_1.workflow.is_some() {
-                crate::workflow_image::prepare(
-                    &bytes,
-                    req.model_options
-                        .qwen_image_2_1
-                        .reference_max_pixels_per_image,
-                )?
-            } else {
-                bytes
-            };
+            let bytes = crate::workflow_image::prepare(
+                &bytes,
+                req.model_options
+                    .qwen_image_2_1
+                    .reference_max_pixels_per_image,
+            )?;
             refs.push(STANDARD.encode(bytes));
         }
         let mut body = json!({"prompt":req.prompt,"negative_prompt":req.negative_prompt,"width":req.width,"height":req.height,
@@ -323,16 +319,7 @@ impl Native {
         }
         if !refs.is_empty() {
             body["ref_images"] = json!(refs);
-            body["ref_image_args"] = if req.model_options.qwen_image_2_1.workflow.is_some() {
-                json!("resize_before_vae=false")
-            } else {
-                json!(format!(
-                    "vae_input_max_pixels={}",
-                    req.model_options
-                        .qwen_image_2_1
-                        .reference_max_pixels_per_image
-                ))
-            };
+            body["ref_image_args"] = json!("resize_before_vae=false");
         }
         self.phase("inference");
         let response: Value = self

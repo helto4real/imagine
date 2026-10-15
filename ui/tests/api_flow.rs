@@ -30,7 +30,7 @@ struct Fake {
 }
 fn png() -> Vec<u8> {
     let mut buf = Cursor::new(Vec::new());
-    image::RgbImage::from_pixel(12, 8, image::Rgb([122, 94, 70]))
+    image::RgbImage::from_pixel(64, 64, image::Rgb([122, 94, 70]))
         .write_to(&mut buf, image::ImageFormat::Png)
         .unwrap();
     buf.into_inner()
@@ -192,6 +192,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         seed: u32::MAX,
         aspect_ratio: "3:4".into(),
         max_side: 1024,
+        reference_max_pixels_per_image: 1_000_000,
     };
     let request = make_request("  Exact prompt  ", "negative", &refs, &meta, &settings).unwrap();
     assert_eq!(request["operation"], "image_edit");

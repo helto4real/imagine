@@ -342,7 +342,7 @@ pub fn model(id: &str) -> Option<Value> {
                 "output_formats":["png"],"max_output_count":1,"loras":false,
                 "reference_images":{"max_count":10,"locally_validated_count":1,"ordered":true,
                     "pixel_limit_min":262144,"pixel_limit_max":4000000,"pixel_limit_scope":"per_image",
-                    "resize":"native VAE cap; dimensions rounded to multiples of 32",
+                    "resize":"CPU Lanczos shrink only; center crop to multiples of 32; shared VAE/vision input",
                     "resource_note":"Multiple references and larger caps can exceed available memory"}
             },
             "defaults":{"width":1600,"height":896,"sampling":Sampling::default(),"output":Output::default(),"model_options":ModelOptions::default()},

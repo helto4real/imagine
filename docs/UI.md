@@ -60,6 +60,16 @@ Linux prerequisites include a working Wayland or X11 session, an OpenGL-capable
 display driver and an XDG desktop portal file chooser. The UI uses the host's
 system sans font when `fc-match` is available, with bundled font fallback.
 
+In a Wayland session, install `wl-clipboard` to keep copied text available after
+Imagine exits. The app hands Copy/Cut text to `wl-copy`, whose background owner
+outlives the window. Text is passed through an anonymous memory-backed descriptor,
+not command-line arguments or application temporary files. Delivery runs on a
+worker with a timeout; shutdown briefly drains the latest pending copy. Paste
+continues through the native clipboard. If the helper fails, the app falls back
+to native copying and reports that persistence failed. Without `wl-copy` or
+outside Wayland, the native clipboard remains in use and persistence depends
+on the desktop's clipboard manager. See the [wl-copy manual](https://man.archlinux.org/man/wl-copy.1.en).
+
 Glow VSync is disabled in both the application and the synthetic native preview.
 This avoids requesting a presentation wait on the UI thread when the window is
 on a hidden workspace. NVIDIA documents a potential indefinite `eglSwapBuffers`
@@ -85,7 +95,7 @@ pending job. Video currently has an explicit unavailable state, not a video engi
 or editing tools.
 
 The gear opens a separate native **Settings** window with **Generation** (Steps,
-CFG), **Storage** (output folder), and **Privacy** (Hide previews). Changes save
+CFG, Reference size), **Storage** (output folder), and **Privacy** (Hide previews). Changes save
 automatically. The close icon or Escape closes only Settings. A failed preference
 write shows **Not saved** and the error; it is never reported as saved. On backends
 without native child windows the same settings content uses egui's embedded window.
@@ -103,8 +113,16 @@ nearest-multiple-of-32 rounding, including ties-to-even. The resulting width and
 height are shown below the controls. Source: AIO `services/dimensions.py`, preset
 ratio mode with `multiple value=32`. For example, 16:9 at 1600 gives 1600×896.
 
-ER-SDE/beta, one PNG and the 1 MP per-reference resize target remain model
-defaults. Native code and the frozen configuration are unchanged. Other output
+**Reference size** sets the maximum megapixels per reference used during inference,
+from 0.262144 to 4 MP, with the existing 1 MP default. It saves automatically and
+can be edited during generation for the next job. The server only shrinks larger
+references with Lanczos, then center-crops to multiples of 32, following AIO's
+geometry. Small references are never enlarged; uploaded originals are unchanged.
+MP here means 1,000,000 pixels (AIO uses 1,048,576). The cap applies independently
+to each reference, not their combined area.
+
+ER-SDE/beta and one PNG remain model defaults. Native code and the frozen
+configuration are unchanged. Other output
 sizes are accepted by the API but have no new live GPU or image-quality validation;
 the frozen measurement scope is still 1600×896. Large images may exceed memory.
 Restart both the API and UI after updating to enable the new dimensions contract.
@@ -119,8 +137,9 @@ over it and the window has focus. Leaving the area or losing window focus hides
 it immediately, including selected text and the caret. Editing focus alone does
 not reveal text. This is visual concealment only: prompt content, clipboard
 operations and saved PNGs are unchanged.
-Uploading does not resize the source file: the native per-image resize setting
-controls inference. The client creates small thumbnails only for display. The
+Uploading does not resize the source file: server preprocessing controls the
+VAE and vision inputs, with further native resizing disabled. The client creates
+small thumbnails only for display. The
 file dialog's order is used initially and can be adjusted before submission.
 Only one reference has local model-quality validation. H3 is not exposed here.
 
@@ -151,7 +170,7 @@ from Fit enters actual pixel view. Images always preserve their proportions.
 
 The default folder is `<project>/.imagine/images`. Preferences live in
 `<project>/.imagine/ui-settings.json` and contain the output folder, privacy choice
-and negative prompt, plus steps, CFG, seed mode/value, ratio and max side. Changes
+and negative prompt, plus steps, CFG, seed mode/value, ratio, max side and reference size. Changes
 are saved automatically; existing folder-only settings
 remain compatible. Both
 are outside Git. A user-selected folder can be anywhere the process can write;
@@ -293,3 +312,9 @@ only a fresh temporary profile and procedural test pixels. Captures are under
 Native file-chooser acceptance and live inference were not exercised. Desktop
 access and local socket tests required approved sandbox escalation. No running
 Imagine service was restarted.
+
+Clipboard persistence checks use synthetic text and an isolated helper process:
+large Unicode input, exact stdin delivery, rapid copies followed by shutdown,
+helper failure/timeout fallback and stale-failure suppression. They do not read
+or replace the desktop clipboard. A real Wayland copy/close/paste check remains
+manual acceptance.

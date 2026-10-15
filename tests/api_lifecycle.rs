@@ -427,12 +427,16 @@ async fn strict_inputs_assets_and_queued_cancel() {
             .1["error"]["code"],
         "model_not_validated"
     );
+    let mut reference = Cursor::new(Vec::new());
+    image::RgbImage::from_pixel(65, 67, image::Rgb([42, 50, 60]))
+        .write_to(&mut reference, image::ImageFormat::Png)
+        .unwrap();
     let upload = Request::builder()
         .method("POST")
         .uri("/v1/assets")
         .header("Authorization", "Bearer alice")
         .header("Content-Type", "image/png")
-        .body(Body::from(png()))
+        .body(Body::from(reference.into_inner()))
         .unwrap();
     let r = h.router.clone().oneshot(upload).await.unwrap();
     assert_eq!(r.status(), 201);
@@ -454,7 +458,7 @@ async fn strict_inputs_assets_and_queued_cancel() {
     );
     let mut edit = request();
     edit["operation"] = json!("image_edit");
-    edit["inputs"] = json!({"reference_images":[id]});
+    edit["inputs"] = json!({"reference_images":[id, id]});
     assert_eq!(
         req(
             &h.router,
@@ -473,10 +477,16 @@ async fn strict_inputs_assets_and_queued_cancel() {
     let job_id = job["id"].as_str().unwrap();
     wait_calls(&h.probe, 1).await;
     let job = h.store.job(job_id, "a").await.unwrap().unwrap();
-    assert_eq!(
-        job["effective"]["reference_preprocessing"][0]["vae_width"],
-        992
-    );
+    let references = job["effective"]["reference_preprocessing"]
+        .as_array()
+        .unwrap();
+    assert_eq!(references.len(), 2);
+    for reference in references {
+        assert_eq!(reference["asset_id"], id);
+        assert_eq!(reference["vae_width"], 64);
+        assert_eq!(reference["vae_height"], 64);
+        assert_eq!(reference["source"], "aio_shrink_center_crop_v1");
+    }
     let (_, queued) = req(
         &h.router,
         "POST",

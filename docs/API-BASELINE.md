@@ -197,15 +197,20 @@ tokens. Multiple references may fail for memory reasons and are never silently
 dropped or reduced in count.
 
 `reference_max_pixels_per_image` defaults to 1,000,000; allowed configured values
-are 262,144–4,000,000. This is the native reference resize target, per image. The
-pinned engine further caps it at the output area (1,433,600 for this profile),
-then rounds each axis independently to 32 pixels. It can upscale small inputs;
-the rounded result is not a strict mathematical maximum and can alter aspect
-ratio slightly. A 1600×896 source at 1,000,000 becomes **1344×736 / 989,184 pixels**.
+are 262,144–4,000,000. The server uses AIO's shrink-only geometry: proportionally
+resize oversized inputs with Lanczos3, then center-crop each axis down to a
+multiple of 32. Small inputs are never enlarged. Each reference has its own
+budget, independent of output area and reference count. The API uses literal
+pixels; AIO's MP control uses 1,048,576 pixels per MP, while Imagine's uses
+1,000,000. A 1600×896 source at 1,000,000 becomes **1312×736 / 965,632 pixels**.
 Extreme reference aspect ratios producing zero or >8192 aligned dimensions are
 rejected. The effective job contains ordered `reference_preprocessing` records
-with source and calculated VAE dimensions, explicitly attributed to the pinned
-native resize rule. These dimensions also affect Qwen's vision conditioning.
+with source and calculated VAE dimensions, attributed to
+`aio_shrink_center_crop_v1`. Preprocessed PNGs go to the unchanged native engine
+with `resize_before_vae=false`, so vision and VAE receive the same geometry.
+The Rust Lanczos3 implementation is not claimed pixel-identical to ComfyUI/Pillow.
+Original uploads are preserved. Historical native-resize timing/quality results
+do not validate this new preprocessing path.
 The 1 MP default is provisional evidence from the portrait/edit comparison,
 not a guarantee of unchanged likeness for all subjects.
 
