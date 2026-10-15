@@ -2,6 +2,13 @@ use anyhow::Result;
 use st_proxy::{config::Config, logging::log, service::Service};
 #[tokio::main]
 async fn main() -> Result<()> {
+    let limit = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    if unsafe { libc::setrlimit(libc::RLIMIT_CORE, &limit) } != 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
     let (config, cli) = match Config::parse(std::env::args().skip(1), &std::env::vars().collect()) {
         Ok(v) => v,
         Err(e) => {

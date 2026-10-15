@@ -528,7 +528,7 @@ async fn strict_inputs_assets_and_queued_cancel() {
 }
 
 #[tokio::test]
-async fn restart_preserves_pause_queue_and_marks_interrupted() {
+async fn restart_starts_empty_and_unpaused() {
     let h = setup().await;
     let (_, first) = req(
         &h.router,
@@ -561,39 +561,24 @@ async fn restart_preserves_pause_queue_and_marks_interrupted() {
     h.control.call(Action::Shutdown).await.unwrap();
     h.task.await.unwrap().unwrap();
     let reopened = Store::open(h.dir.path()).await.unwrap();
-    assert!(reopened.paused().await.unwrap());
-    assert_eq!(
-        reopened
-            .job(first["id"].as_str().unwrap(), "a")
-            .await
-            .unwrap()
-            .unwrap()["status"],
-        "interrupted"
-    );
-    assert_eq!(
-        reopened
-            .job(second["id"].as_str().unwrap(), "a")
-            .await
-            .unwrap()
-            .unwrap()["status"],
-        "queued"
-    );
-    assert_eq!(
+    assert!(!reopened.paused().await.unwrap());
+    for job in [first, second] {
+        assert!(
+            reopened
+                .job(job["id"].as_str().unwrap(), "a")
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+    assert!(
         reopened
             .operation(operation["id"].as_str().unwrap())
             .await
             .unwrap()
-            .unwrap()["status"],
-        "interrupted"
+            .is_none()
     );
-    let probe = Arc::new(Probe::default());
-    let (control, task) = scheduler::start(reopened, Box::new(Fake(probe.clone())))
-        .await
-        .unwrap();
-    control.call(Action::Resume).await.unwrap();
-    wait_calls(&probe, 1).await;
-    control.call(Action::Shutdown).await.unwrap();
-    task.await.unwrap().unwrap();
+    assert!(!h.dir.path().join("imagine.sqlite").exists());
 }
 
 #[tokio::test]
@@ -646,7 +631,7 @@ async fn engine_failure_isolated_next_job_can_run_and_sse_finishes() {
 }
 
 #[tokio::test]
-async fn crash_recovery_does_not_replay_active_rows() {
+async fn crash_recovery_does_not_retain_any_jobs() {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open(dir.path()).await.unwrap();
     for (id, status) in [
@@ -657,18 +642,12 @@ async fn crash_recovery_does_not_replay_active_rows() {
         sqlx::query("INSERT INTO jobs (id,owner,status,request,request_hash,created) VALUES (?,'a',?,'{}','hash',0)")
             .bind(id).bind(status).execute(&store.db).await.unwrap();
     }
-    store.db.close().await;
+    store.close().await.unwrap();
     let reopened = Store::open(dir.path()).await.unwrap();
-    for id in ["active", "cancelling"] {
-        let job = reopened.job(id, "a").await.unwrap().unwrap();
-        assert_eq!(job["status"], "interrupted");
-        assert_eq!(job["error"]["code"], "server_restarted");
-        assert!(job["output"].is_null());
+    for id in ["active", "cancelling", "queued"] {
+        assert!(reopened.job(id, "a").await.unwrap().is_none());
     }
-    assert_eq!(
-        reopened.job("queued", "a").await.unwrap().unwrap()["status"],
-        "queued"
-    );
+    assert!(!dir.path().join("imagine.sqlite").exists());
 }
 
 #[tokio::test]
@@ -1008,5 +987,55 @@ async fn profile_reference_sizing_and_asset_ownership() {
     .await;
     assert_eq!(v["effective"]["width"], 768);
     assert_eq!(v["effective"]["height"], 1024);
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn session_assets_encrypt_at_rest_and_plain_mode_is_explicit() {
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = png();
+    let store = Store::open(dir.path()).await.unwrap();
+    let asset = store.save_asset("a", bytes.clone()).await.unwrap();
+    let id = asset["id"].as_str().unwrap();
+    let path = store.media.join(id);
+    let disk = std::fs::read(&path).unwrap();
+    assert!(disk.starts_with(b"IMAGINE1"));
+    assert_ne!(disk, bytes);
+    assert_eq!(store.read_asset(id, "a").await.unwrap(), bytes);
+    assert!(store.read_asset(id, "other").await.is_err());
+    store.close().await.unwrap();
+    assert!(!path.exists());
+    let plain = Store::open_session(dir.path(), false).await.unwrap();
+    let asset = plain.save_asset("a", bytes.clone()).await.unwrap();
+    let path = plain.media.join(asset["id"].as_str().unwrap());
+    assert_eq!(std::fs::read(&path).unwrap(), bytes);
+    plain.close().await.unwrap();
+    assert!(!path.exists());
+}
+
+#[tokio::test]
+async fn old_session_requests_are_rejected_before_mutation() {
+    let h = setup().await;
+    let (status, session) = req(&h.router, "GET", "/v1/session", "alice", None, None).await;
+    assert_eq!(status, 200);
+    assert_eq!(session["id"], h.store.session.id);
+    assert_eq!(session["encrypted"], true);
+    let response = h
+        .router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/jobs")
+                .header("Authorization", "Bearer alice")
+                .header("Content-Type", "application/json")
+                .header("X-Imagine-Session", "expired-session")
+                .body(Body::from(request().to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 409);
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
     stop(h).await;
 }

@@ -48,6 +48,7 @@ impl IntoResponse for Fault {
 }
 pub fn router(app: App) -> Router {
     Router::new()
+        .route("/v1/session", get(session))
         .route("/v1/profiles", get(profiles))
         .route("/v1/profiles/{id}", get(profile))
         .route("/v1/jobs/validate", post(validate_job))
@@ -98,8 +99,16 @@ async fn authenticate(State(app): State<App>, mut request: Request, next: Next) 
         })
     });
     let mut response = if let Some(principal) = principal {
-        request.extensions_mut().insert(principal);
-        next.run(request).await
+        if request
+            .headers()
+            .get("X-Imagine-Session")
+            .is_some_and(|id| id.as_bytes() != app.store.session.id.as_bytes())
+        {
+            Fault::new(409, "session_changed").into_response()
+        } else {
+            request.extensions_mut().insert(principal);
+            next.run(request).await
+        }
     } else {
         Fault::new(401, "unauthorized").into_response()
     };
@@ -110,6 +119,9 @@ async fn authenticate(State(app): State<App>, mut request: Request, next: Next) 
         .headers_mut()
         .insert(header::X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
     response
+}
+async fn session(State(app): State<App>) -> Json<Value> {
+    Json(json!({"id": app.store.session.id, "encrypted": app.store.session.encrypted()}))
 }
 async fn models() -> Json<Value> {
     Json(contract::models())

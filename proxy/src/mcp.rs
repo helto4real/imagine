@@ -27,6 +27,7 @@ use tokio_util::sync::CancellationToken;
 #[derive(Clone)]
 pub struct Mcp {
     inner: Arc<Inner>,
+    client: Client,
 }
 struct Inner {
     config: Config,
@@ -37,6 +38,11 @@ struct Inner {
     jobs: Mutex<HashMap<String, Job>>,
     key: [u8; 32],
     stop: CancellationToken,
+    storage: crate::mcp_storage::Storage,
+    gate: tokio::sync::Mutex<()>,
+    session: Mutex<Option<String>>,
+    writes: Mutex<()>,
+    epoch: std::sync::atomic::AtomicU64,
 }
 struct Job {
     directory: PathBuf,
@@ -59,16 +65,35 @@ struct SavedImage {
     bytes: u64,
     sha256: String,
 }
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 struct Fault {
     category: String,
     message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
 }
 impl Fault {
     fn new(category: &str, message: impl ToString) -> Self {
         Self {
             category: category.into(),
             message: message.to_string(),
+            code: None,
+        }
+    }
+    fn generation(job: &Value) -> Self {
+        // Forward only Imagine's stable code, never native logs, prompts or paths.
+        let code = job["error"]["code"].as_str().filter(|code| {
+            !code.is_empty()
+                && code.len() <= 128
+                && code.bytes().all(|c| c.is_ascii_lowercase() || c == b'_')
+        });
+        Self {
+            category: "generation".into(),
+            message: code.map_or_else(
+                || "image generation did not complete successfully".into(),
+                |code| format!("image generation failed: {code}"),
+            ),
+            code: code.map(str::to_owned),
         }
     }
 }
@@ -76,7 +101,7 @@ fn validation(e: impl ToString) -> Fault {
     Fault::new("validation", e)
 }
 fn error(f: Fault, id: Option<&str>) -> Value {
-    json!({"job_id":id,"error":{"category":f.category,"message":f.message}})
+    json!({"job_id":id,"error":f})
 }
 fn tool_result(payload: Value) -> Value {
     json!({"content":[{"type":"text","text":python_json(&payload)}],"structuredContent":payload,"isError":payload.get("error").is_some_and(|v|!v.is_null())})
@@ -110,14 +135,15 @@ impl Mcp {
                 .as_ref()
                 .ok_or_else(|| anyhow!("MCP requires output directory"))?,
         );
-        references::private_dir(&root)?;
-        let root = root.canonicalize()?;
         let input = PathBuf::from(&config.mcp_input_dir);
         let input = std::fs::canonicalize(&input).unwrap_or(input);
+        let storage = crate::mcp_storage::Storage::open(&root, &input)?;
+        let root = storage.root.clone();
         let mut key = [0u8; 32];
         use std::io::Read;
         std::fs::File::open("/dev/urandom")?.read_exact(&mut key)?;
-        Ok(Self {
+        let this = Self {
+            client: client.clone(),
             inner: Arc::new(Inner {
                 config,
                 client,
@@ -127,8 +153,33 @@ impl Mcp {
                 jobs: Default::default(),
                 key,
                 stop: CancellationToken::new(),
+                storage,
+                gate: tokio::sync::Mutex::new(()),
+                session: Mutex::new(None),
+                writes: Mutex::new(()),
+                epoch: std::sync::atomic::AtomicU64::new(0),
             }),
-        })
+        };
+        let weak = Arc::downgrade(&this.inner);
+        let stop = this.inner.stop.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = stop.cancelled() => break,
+                    _ = tokio::time::sleep(Duration::from_secs(1)) => {},
+                }
+                let Some(inner) = weak.upgrade() else {
+                    break;
+                };
+                let mcp = Self {
+                    client: inner.client.clone(),
+                    inner,
+                };
+                let _guard = mcp.inner.gate.lock().await;
+                let _ = mcp.refresh_session().await;
+            }
+        });
+        Ok(this)
     }
     pub fn router(&self) -> Router {
         Router::new()
@@ -138,52 +189,109 @@ impl Mcp {
     }
     pub async fn close(&self) {
         self.inner.stop.cancel();
+        let _guard = self.inner.gate.lock().await;
+        if self.clear_session().await.is_err() {
+            log(40, "st_proxy.mcp", "MCP temporary cleanup failed");
+        }
+    }
+    async fn clear_session(&self) -> Result<()> {
+        self.inner
+            .epoch
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let tasks: Vec<_> = self
             .inner
             .jobs
             .lock()
             .unwrap()
             .values_mut()
-            .filter_map(|j| j.task.take())
+            .filter_map(|job| job.task.take())
             .collect();
-        let deadline = tokio::time::Instant::now()
-            + Duration::from_secs_f64(self.inner.config.cleanup_timeout);
-        for mut task in tasks {
-            if tokio::time::timeout_at(deadline, &mut task).await.is_err() {
-                task.abort();
-                let _ = task.await;
-            }
+        // Stop every writer before unlinking exports. Abort is also joined.
+        for task in tasks {
+            task.abort();
+            let _ = task.await;
         }
+        self.inner.jobs.lock().unwrap().clear();
+        self.inner.references.lock().unwrap().clear();
+        *self.inner.session.lock().unwrap() = None;
+        let _writes = self.inner.writes.lock().unwrap();
+        self.inner.storage.clear()
+    }
+    async fn refresh_session(&self) -> Result<()> {
+        if self.inner.stop.is_cancelled() {
+            anyhow::bail!("MCP stopped");
+        }
+        let current = self.client.session().await.ok();
+        let changed = *self.inner.session.lock().unwrap() != current;
+        if changed || current.is_none() {
+            self.clear_session().await?;
+            *self.inner.session.lock().unwrap() = current.clone();
+        }
+        if current.is_none() {
+            anyhow::bail!("Imagine is locked or unavailable");
+        }
+        Ok(())
     }
     pub async fn call(&self, name: &str, args: &Value) -> Value {
+        let guard = self.inner.gate.lock().await;
+        if self.refresh_session().await.is_err() {
+            return tool_result(error(
+                Fault::new(
+                    "privacy",
+                    "Imagine is locked or unavailable; unlock it in the server terminal",
+                ),
+                None,
+            ));
+        }
         let id = args["job_id"].as_str();
-        let result = match name {
-            "list_profiles" => self
+        let active = Self {
+            inner: self.inner.clone(),
+            client: self
                 .inner
                 .client
-                .json(reqwest::Method::GET, "/v1/profiles", None, None)
-                .await
-                .map_err(validation),
-            "describe_profile" => self.profile(args).await,
-            "register_image" => self.register(args).await,
-            "generate" | "generate_batch" => self.generate(args, name == "generate_batch").await,
-            "confirm_saved" => {
-                let this = self.clone();
-                let args = args.clone();
-                tokio::task::spawn_blocking(move || this.confirm_saved(args))
+                .with_session(self.inner.session.lock().unwrap().clone().unwrap()),
+        };
+        let operation = async {
+            match name {
+                "list_profiles" => active
+                    .client
+                    .json(reqwest::Method::GET, "/v1/profiles", None, None)
                     .await
-                    .unwrap_or_else(|_| {
-                        Err(Fault::new(
-                            "storage",
-                            "confirmation could not complete; retry the same confirmation",
-                        ))
-                    })
+                    .map_err(validation),
+                "describe_profile" => active.profile(args).await,
+                "register_image" => active.register(args).await,
+                "generate" | "generate_batch" => {
+                    active.generate(args, name == "generate_batch").await
+                }
+                "confirm_saved" => {
+                    let this = active.clone();
+                    let args = args.clone();
+                    tokio::task::spawn_blocking(move || this.confirm_saved(args))
+                        .await
+                        .unwrap_or_else(|_| {
+                            Err(Fault::new(
+                                "storage",
+                                "confirmation could not complete; retry the same confirmation",
+                            ))
+                        })
+                }
+                "get_job" => active.get(id.unwrap_or(""), false).await,
+                _ => Err(validation(format!("Unknown tool: {name}"))),
             }
-            "get_job" => {
-                self.get(id.unwrap_or(""), args["wait"].as_bool().unwrap_or(true))
-                    .await
-            }
-            _ => Err(validation(format!("Unknown tool: {name}"))),
+        };
+        let result = tokio::select! {
+            _ = self.inner.stop.cancelled() => Err(Fault::new("shutdown", "broker is shutting down")),
+            result = tokio::time::timeout(Duration::from_secs(5), operation) =>
+                result.unwrap_or_else(|_| Err(Fault::new("connection", "Imagine did not respond; retry within the same session"))),
+        };
+        drop(guard);
+        let result = if result.is_ok()
+            && (matches!(name, "generate" | "generate_batch")
+                || (name == "get_job" && args["wait"].as_bool().unwrap_or(true)))
+        {
+            self.get(id.unwrap_or(""), true).await
+        } else {
+            result
         };
         tool_result(match result {
             Ok(v) => v,
@@ -323,8 +431,7 @@ impl Mcp {
                         .all(|b| b.is_ascii_alphanumeric() || b"_-".contains(&b))
             })
             .ok_or_else(|| validation("invalid profile"))?;
-        self.inner
-            .client
+        self.client
             .json(
                 reqwest::Method::GET,
                 &format!("/v1/profiles/{id}"),
@@ -349,9 +456,15 @@ impl Mcp {
         let path = PathBuf::from(path);
         let roots = self.inner.roots.clone();
         let root = self.inner.root.clone();
+        let inner = self.inner.clone();
+        let epoch = inner.epoch.load(std::sync::atomic::Ordering::SeqCst);
         let prepared = tokio::task::spawn_blocking(move || {
             let data = references::read_image(&path, &roots)?;
             let (data, width, height) = references::normalize(&data)?;
+            let _writes = inner.writes.lock().unwrap();
+            if epoch != inner.epoch.load(std::sync::atomic::Ordering::SeqCst) {
+                anyhow::bail!("session ended");
+            }
             let (path, digest) = references::store_preview(&root, &data)?;
             Ok::<_, anyhow::Error>((data, width, height, path, digest))
         })
@@ -367,7 +480,7 @@ impl Mcp {
             }
         })?;
         let (data, width, height, path, digest) = prepared;
-        let asset = self.inner.client.upload(data).await.map_err(validation)?;
+        let asset = self.client.upload(data).await.map_err(validation)?;
         let r = Reference {
             workflow: args["profile"].as_str().unwrap().into(),
             asset,
@@ -402,7 +515,10 @@ impl Mcp {
                 return Ok(value);
             }
             if rx.changed().await.is_err() {
-                return Ok(rx.borrow().clone());
+                return Err(Fault::new(
+                    "privacy",
+                    "Imagine session ended; temporary history was cleared",
+                ));
             }
         }
     }
@@ -433,7 +549,7 @@ impl Mcp {
             })
         };
         match existing {
-            Some(true) => return self.get(id, true).await,
+            Some(true) => return self.get(id, false).await,
             Some(false) => {
                 return Err(Fault::new(
                     "conflict",
@@ -536,7 +652,6 @@ impl Mcp {
             );
             let request = Value::Object(request);
             let validated = self
-                .inner
                 .client
                 .json(
                     reqwest::Method::POST,
@@ -594,8 +709,9 @@ impl Mcp {
                 let job_id = id.to_string();
                 let sender = tx.clone();
                 let output = directory.clone();
+                let epoch = self.inner.epoch.load(std::sync::atomic::Ordering::SeqCst);
                 let task = tokio::spawn(async move {
-                    this.run(job_id, values, batch, sender, output).await;
+                    this.run(job_id, values, batch, sender, output, epoch).await;
                 });
                 jobs.insert(
                     id.into(),
@@ -609,7 +725,7 @@ impl Mcp {
                 );
             }
         }
-        self.get(id, true).await
+        self.get(id, false).await
     }
     async fn run(
         &self,
@@ -618,6 +734,7 @@ impl Mcp {
         batch: bool,
         tx: watch::Sender<Value>,
         directory: PathBuf,
+        epoch: u64,
     ) {
         let result = async {
             let mut requests = Vec::new();
@@ -645,7 +762,6 @@ impl Mcp {
             let body = if batch { json!({"jobs":requests}) } else { requests[0].clone() };
             let response = loop {
                 let response = self
-                .inner
                 .client
                 .json(
                     reqwest::Method::POST,
@@ -695,7 +811,7 @@ impl Mcp {
                 let tx = tx.clone();
                 let directory = directory.clone();
                 futures.push(async move {
-                    this.finish_item(&native_id, index, batch, &tx, &directory).await;
+                    this.finish_item(&native_id, index, batch, &tx, &directory, epoch).await;
                 });
             }
             futures_util::future::join_all(futures).await;
@@ -758,6 +874,7 @@ impl Mcp {
         batch: bool,
         tx: &watch::Sender<Value>,
         directory: &std::path::Path,
+        epoch: u64,
     ) {
         let update = |status: &str, images: Option<Vec<Value>>, error: Option<Value>| {
             tx.send_modify(|v| {
@@ -780,7 +897,6 @@ impl Mcp {
             loop {
                 if self.inner.stop.is_cancelled() || cancelling {
                     let _ = self
-                        .inner
                         .client
                         .json(
                             reqwest::Method::POST,
@@ -792,7 +908,6 @@ impl Mcp {
                     cancelling = true;
                 }
                 let job = match self
-                    .inner
                     .client
                     .json(reqwest::Method::GET, &format!("/v1/jobs/{id}"), None, None)
                     .await {
@@ -834,7 +949,7 @@ impl Mcp {
                         let asset = job["output"]["assets"][0]["id"]
                             .as_str()
                             .ok_or_else(|| Fault::new("result", "image outputs are missing"))?;
-                        let bytes = match self.inner.client.download(asset).await {
+                        let bytes = match self.client.download(asset).await {
                             Ok(bytes) => bytes,
                             Err(_) => {
                                 update("recovering", None, Some(json!({"category":"connection","message":"Imagine result is unavailable; recovering the same job"})));
@@ -843,7 +958,12 @@ impl Mcp {
                             }
                         };
                         let directory = directory.to_path_buf();
+                        let inner = self.inner.clone();
                         let images = tokio::task::spawn_blocking(move || {
+                            let _writes = inner.writes.lock().unwrap();
+                            if epoch != inner.epoch.load(std::sync::atomic::Ordering::SeqCst) {
+                                anyhow::bail!("session ended");
+                            }
                             references::save_result(&directory, index, &bytes)
                         })
                         .await
@@ -857,10 +977,7 @@ impl Mcp {
                         } else if cancelling {
                             Fault::new("shutdown", "broker is shutting down")
                         } else {
-                            Fault::new(
-                                "generation",
-                                "image generation did not complete successfully",
-                            )
+                            Fault::generation(&job)
                         });
                     }
                     _ => {
@@ -876,7 +993,6 @@ impl Mcp {
                     })
                 {
                     let _ = self
-                        .inner
                         .client
                         .json(
                             reqwest::Method::POST,
@@ -903,11 +1019,7 @@ impl Mcp {
                         e.category
                     ),
                 );
-                update(
-                    "failed",
-                    None,
-                    Some(json!({"category":e.category,"message":e.message})),
-                );
+                update("failed", None, Some(json!(e)));
             }
         }
     }
@@ -1227,7 +1339,7 @@ async fn dispatch_rpc(mcp: Mcp, v: Value, modern: bool) -> Value {
 mod profile_tests {
     use super::*;
     #[tokio::test]
-    async fn retry_recovers_completed_job_without_imagine_or_private_session() {
+    async fn offline_imagine_clears_history_and_rejects_recovery() {
         let dir = tempfile::tempdir().unwrap();
         let credentials = dir.path().join("access.json");
         std::fs::write(&credentials, r#"{"admin_token":"synthetic"}"#).unwrap();
@@ -1255,15 +1367,10 @@ mod profile_tests {
             },
         );
         assert_eq!(
-            mcp.call("generate", &args).await["structuredContent"],
-            expected
+            mcp.call("generate", &args).await["structuredContent"]["error"]["category"],
+            "privacy"
         );
-        let mut changed = args;
-        changed["parameters"]["prompt"] = json!("different");
-        assert_eq!(
-            mcp.call("generate", &changed).await["structuredContent"]["error"]["category"],
-            "conflict"
-        );
+        assert!(mcp.inner.jobs.lock().unwrap().is_empty());
     }
 }
 

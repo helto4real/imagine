@@ -20,6 +20,7 @@ pub struct Client {
     http: reqwest::Client,
     base: String,
     token: String,
+    session: Option<String>,
 }
 impl Client {
     pub async fn new(config: &Config) -> Result<Self> {
@@ -42,7 +43,39 @@ impl Client {
                 .build()?,
             base: config.imagine_url.clone(),
             token,
+            session: None,
         })
+    }
+    pub fn with_session(&self, session: String) -> Self {
+        Self {
+            session: Some(session),
+            ..self.clone()
+        }
+    }
+    fn bound(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        if let Some(id) = &self.session {
+            request.header("X-Imagine-Session", id)
+        } else {
+            request
+        }
+    }
+    pub async fn session(&self) -> Result<String> {
+        let response = self
+            .http
+            .get(format!("{}/v1/session", self.base))
+            .bearer_auth(&self.token)
+            .timeout(std::time::Duration::from_secs(2))
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            bail!("Imagine session unavailable");
+        }
+        let value: Value = response.json().await?;
+        value["id"]
+            .as_str()
+            .filter(|s| !s.is_empty() && s.len() <= 64)
+            .map(str::to_owned)
+            .ok_or_else(|| anyhow!("Invalid Imagine session"))
     }
     pub async fn json(
         &self,
@@ -51,10 +84,11 @@ impl Client {
         body: Option<&Value>,
         key: Option<&str>,
     ) -> Result<Value> {
-        let mut req = self
-            .http
-            .request(method, format!("{}{path}", self.base))
-            .bearer_auth(&self.token);
+        let mut req = self.bound(
+            self.http
+                .request(method, format!("{}{path}", self.base))
+                .bearer_auth(&self.token),
+        );
         if let Some(body) = body {
             req = req.json(body)
         }
@@ -78,9 +112,11 @@ impl Client {
     }
     pub async fn upload(&self, bytes: Vec<u8>) -> Result<String> {
         let r = self
-            .http
-            .post(format!("{}/v1/assets", self.base))
-            .bearer_auth(&self.token)
+            .bound(
+                self.http
+                    .post(format!("{}/v1/assets", self.base))
+                    .bearer_auth(&self.token),
+            )
             .header("Content-Type", "image/png")
             .body(bytes)
             .send()
@@ -101,9 +137,11 @@ impl Client {
             bail!("invalid image reference")
         };
         let mut r = self
-            .http
-            .get(format!("{}/v1/assets/{id}", self.base))
-            .bearer_auth(&self.token)
+            .bound(
+                self.http
+                    .get(format!("{}/v1/assets/{id}", self.base))
+                    .bearer_auth(&self.token),
+            )
             .send()
             .await?;
         if !r.status().is_success() {

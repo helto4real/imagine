@@ -901,18 +901,16 @@ impl Coordinator {
     }
 
     pub async fn listen_imagine(&self) -> Result<Option<JoinHandle<()>>> {
-        use std::os::unix::fs::PermissionsExt;
         use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
         let Some(path) = &self.config.coordinator_socket else {
             return Ok(None);
         };
-        let listener = tokio::net::UnixListener::bind(path)?;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+        let socket =
+            crate::coordinator_socket::BoundSocket::bind(std::path::Path::new(path)).await?;
         let this = self.clone();
-        let socket = path.clone();
         Ok(Some(tokio::spawn(async move {
             loop {
-                let stream = tokio::select! {_=this.stop.cancelled()=>break,v=listener.accept()=>match v{Ok((s,_))=>s,Err(_)=>break}};
+                let stream = tokio::select! {_=this.stop.cancelled()=>break,v=socket.listener.accept()=>match v{Ok((s,_))=>s,Err(_)=>break}};
                 let this = this.clone();
                 tokio::spawn(async move {
                     let mut reader = BufReader::new(stream);
@@ -1041,7 +1039,7 @@ impl Coordinator {
                     this.remove_cancelled();
                 });
             }
-            let _ = std::fs::remove_file(socket);
+            drop(socket);
         })))
     }
     fn watch_imagine(

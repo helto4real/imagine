@@ -130,7 +130,8 @@ it polls/downloads the same job. It does not silently generate a new image.
 If saving fails, select another output folder and retry to download/save the
 completed server asset. The request and reference order are fixed during a
 pending job. In-progress jobs are not restored by the UI after closing it; they
-remain accessible through the API. The current UI has no history browser.
+remain accessible through the API until Imagine stops. Server restart clears all
+history and assets; already saved local images remain. The current UI has no history browser.
 
 ## Helto adaptation
 

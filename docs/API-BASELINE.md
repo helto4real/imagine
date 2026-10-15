@@ -9,11 +9,13 @@ adds dynamic VAE strips while preserving precision and memory policy.
 
 ## Scope and architecture
 
-One Rust executable, Axum HTTP, Tokio task/process management, SQLx/SQLite for
-jobs and metadata, local files for media. No ComfyUI or Python dependency in the
-service. Python/Pillow are used only by the optional live acceptance test.
+One Rust executable, Axum HTTP, Tokio task/process management, SQLx/SQLite in memory for
+jobs and metadata, encrypted local files for media. There is no ComfyUI dependency.
+Terminal unlock uses a dedicated Python helper with Helto's FIDO2 provider;
+request handling and generation orchestration remain in Rust. Python/Pillow are
+also used by the optional live acceptance test.
 
-Rust owns validation, authentication, asset ownership, a persistent FIFO queue,
+Rust owns validation, authentication, asset ownership, a session-local FIFO queue,
 idempotency, worker lifecycle and output publication. One job runs at a time.
 Only that job reaches a persistent loopback `sd-server`. It is started lazily,
 with the pinned binary SHA-256, frozen environment and three model paths from
@@ -29,7 +31,7 @@ Module responsibilities:
 | --- | --- |
 | `contract` | Typed requests, semantic validation, model metadata/schema |
 | `api` | HTTP, bearer authentication, ownership, SSE |
-| `storage` | SQLite persistence and atomic media files |
+| `storage` | Session-local SQLite and encrypted atomic media files |
 | `scheduler` | Sole owner of dispatch, cancellation and unload ordering |
 | `engine` | Native process and `/sdcpp/v1` adapter |
 | `config` | Local credentials, single-server lock, project/model paths |
@@ -71,12 +73,13 @@ from the token, never accepted from a job field. Every endpoint requires
 the admin token. An admin token owns its own jobs/assets and does not bypass
 client ownership for media/job reads.
 
-SQLite contains prompts, effective settings and client metadata. Media files
-contain uploads/results. These are local application data, not logs, and are
-excluded from Git under `.imagine/`. There is no automatic deletion, encryption,
-retention policy, or remote storage in v1. Select a private data directory when
-using `--data`; custom directories outside `.imagine/` must also stay out of Git.
-A file lock prevents two servers from sharing the same data directory.
+SQLite holds prompts, settings and metadata only in process memory. Internal
+media is encrypted with a fresh process-only key. Startup and shutdown clear
+history and temporary media. Password or YubiKey unlock happens in the terminal
+before binding HTTP. `--no-encryption` wipes old data before starting without
+unlock or media encryption. See [session privacy](PRIVACY.md) for MCP exports,
+crash behavior, credentials and saved-file exclusions. A file lock prevents two
+servers from sharing a data directory.
 
 ## HTTP contract
 
@@ -86,7 +89,7 @@ A file lock prevents two servers from sharing the same data directory.
 | `GET /v1/models/{id}` | Defaults, constraints and request JSON Schema |
 | `POST /v1/assets` | 201, uploaded image asset metadata |
 | `GET /v1/assets/{id}` | Owned image bytes |
-| `POST /v1/jobs` | 202, persisted ID, status/events URLs |
+| `POST /v1/jobs` | 202, session-local ID, status/events URLs |
 | `GET /v1/jobs/{id}` | Authoritative state, effective settings, output or error |
 | `GET /v1/jobs/{id}/events` | SSE `job` snapshots, closes on terminal state |
 | `POST /v1/jobs/{id}/cancel` | 202 cancellation acceptance |
@@ -230,12 +233,11 @@ States: `queued`, `running`, `cancelling`, `succeeded`, `failed`, `cancelled`,
 `interrupted`. Upload/output files are written to temporary files, synced and
 atomically renamed; asset metadata is committed before a job can become
 `succeeded`. A crash between file publication and the final job update may leave
-an orphan file/asset; it cannot publish a false success. No cleanup daemon is
-included. Accepted queue entries and resolved parameters live in SQLite.
+an orphan encrypted file; it cannot publish a false success. Startup removes
+old media without opening it. Accepted entries and parameters live in memory.
 
-On restart, `running`/`cancelling` become `interrupted`; pending unload operations
-become `interrupted`. Queued work is preserved and starts automatically only if
-the persisted scheduler state is unpaused. `resume` is required when paused.
+Restart creates an empty, unpaused queue and new session ID. Jobs, operations,
+assets and idempotency keys do not survive a session.
 Ctrl-C/SIGTERM stops the owned native process, waits for exit and marks the
 active job interrupted. Linux parent-death signaling and `kill_on_drop` prevent
 an owned native worker surviving server death. This is Linux-targeted process
@@ -285,7 +287,7 @@ python3 tests/live-native.py --run
 ```
 
 The Rust tests use a controlled fake engine for queue/unload ordering,
-idempotency, asset ownership, input validation, cancellation, restart persistence,
+idempotency, asset ownership, input validation, cancellation, restart isolation,
 worker failure recovery and terminal SSE. They are not GPU performance tests.
 The live test uses only synthetic frozen prompts and its own generated reference,
 checks the frozen RGBA hash before and after unload/resume, performs a 1 MP edit,

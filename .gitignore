@@ -37,3 +37,5 @@
 # Rust service and local credentials, SQLite journals and generated media.
 /target/
 /.imagine/
+
+/.venv-privacy/

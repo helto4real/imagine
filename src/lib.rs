@@ -15,3 +15,5 @@ pub mod color_match;
 #[path = "../shared/privacy.rs"]
 pub mod privacy;
 pub mod profiles;
+
+pub mod session;

@@ -1,9 +1,11 @@
 schema_version: 1
 id: image_upscale
-version: 1
+version: 2
 name: Qwen Image 2.1 Upscale
 description: Upscale one registered image with the stored Qwen enhancement prompt. Preserve its aspect
-  ratio; choose max_side and optional seed. Exactly one reference image is required.
+  ratio; choose max_side and optional seed. max_side accepts 256–4096 pixels in multiples
+  of 32; 3200 is only the default when omitted, not the maximum. Exactly one reference
+  image is required.
 prompt_guidance: null
 references:
   min: 1

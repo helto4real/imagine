@@ -8,6 +8,7 @@ anyhow = "1"
 aes-gcm = "0.10"
 base64 = "0.22"
 hmac = "0.12"
+fs2 = "0.4"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 serde_yaml = "0.9"
 subtle = "2"

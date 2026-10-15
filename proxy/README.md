@@ -140,6 +140,9 @@ For real external backend acceptance, reserve the services/GPU, start the coordi
 
 Repeat for each configured backend and for `all` with each `backend/model` ID. This script exercises actual load/unload and can affect existing services; it is prepared but has not been run here. It is not proof of overlap exclusion by itself; the guarded synthetic tests cover that invariant.
 
+Image sizing accepts `max_side` from 256 to **4096 pixels**, in multiples of 32.
+For `image_upscale`, **3200 is only the default** when omitted, not the maximum.
+
 ## Image delivery and temporary storage
 
 Each MCP job has a private `job-<uuid>` directory under `ST_PROXY_MCP_OUTPUT_DIR`
@@ -175,8 +178,8 @@ partial batch):
 Replace the example size and digest with values measured from the copied file.
 The proxy checks all acknowledgements against its own metadata before deleting
 anything. Only confirmed files in that job's staging directory are removed;
-the directory is removed when empty. Unconfirmed files remain without an automatic
-expiry. Identical confirmations are idempotent, including after a lost response.
+the directory is removed when empty. Unconfirmed files remain only for the
+current Imagine/proxy session. Identical confirmations are idempotent, including after a lost response.
 If filesystem cleanup fails partway through, retry the same confirmation;
 `get_job` records which images were already confirmed.
 Confirmed images have `storage: "saved"`, `saved_path`, and `path` pointing to the
@@ -184,8 +187,9 @@ client's persistent copy, including in same-job generation retries.
 
 The proxy relies on the client's integrity check: it does not read destination
 paths that may exist only inside a container. Job lookup and confirmations remain
-process-local; a proxy restart leaves unconfirmed files on disk but loses their
-job lookup. Cleanup is limited to MCP delivery copies; Imagine's asset storage
-and registered reference previews retain their existing lifecycle. To use a saved
+session-local. Imagine session loss, proxy shutdown and proxy startup clear
+MCP history, unconfirmed files and reference previews. The whole MCP output
+directory is disposable and must not contain saved originals. Imagine clears
+its own asset storage on shutdown/startup. See [privacy](../docs/PRIVACY.md). To use a saved
 local copy as a reference, copy it into the configured MCP input directory first
 if its path is outside the allowed input/output roots.

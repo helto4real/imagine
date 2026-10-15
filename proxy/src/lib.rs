@@ -28,3 +28,7 @@ pub mod json_wire;
 pub mod mcp_protocol;
 
 pub mod connection_limit;
+
+mod mcp_storage;
+
+mod coordinator_socket;

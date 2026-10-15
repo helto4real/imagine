@@ -11,13 +11,27 @@ use tokio::sync::{Semaphore, watch};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Session keys and prompts must not be captured by an OS core dump.
+    let limit = libc::rlimit {
+        rlim_cur: 0,
+        rlim_max: 0,
+    };
+    if unsafe { libc::setrlimit(libc::RLIMIT_CORE, &limit) } != 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
     let mut project = std::env::current_dir()?;
     let mut data = None;
+    let mut encrypted = true;
+    let mut unlock = "password".to_owned();
+    let mut enroll = false;
     let mut profiles = None;
     let mut bind = "127.0.0.1:8080".to_owned();
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "--no-encryption" => encrypted = false,
+            "--unlock" => unlock = args.next().context("--unlock needs password or yubikey")?,
+            "--enroll-yubikey" => enroll = true,
             "--project" => project = PathBuf::from(args.next().context("--project needs a path")?),
             "--profiles" => {
                 profiles = Some(PathBuf::from(
@@ -28,7 +42,7 @@ async fn main() -> Result<()> {
             "--bind" => bind = args.next().context("--bind needs an address")?,
             "--help" => {
                 println!(
-                    "imagine-server [--project PATH] [--data PATH] [--profiles PATH] [--bind 127.0.0.1:8080]"
+                    "imagine-server [--project PATH] [--data PATH] [--profiles PATH] [--bind 127.0.0.1:8080] [--unlock password|yubikey] [--enroll-yubikey] [--no-encryption]"
                 );
                 return Ok(());
             }
@@ -37,11 +51,43 @@ async fn main() -> Result<()> {
     }
     let data = data.unwrap_or_else(|| project.join(".imagine"));
     let (config, _lock) = Config::load(project, data, bind.parse()?)?;
+    if !matches!(unlock.as_str(), "password" | "yubikey") || (!encrypted && enroll) {
+        anyhow::bail!("Invalid privacy options");
+    }
+    // Remove legacy/crash remnants before unlock and before the insecure mode can bind.
+    imagine_server::session::purge(&config.data)?;
+    if encrypted {
+        let python = std::env::var_os("IMAGINE_PRIVACY_PYTHON")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| config.project.join(".venv-privacy/bin/python"));
+        let mut command = std::process::Command::new(python);
+        command
+            .arg(config.project.join("scripts/privacy_unlock.py"))
+            .arg("--store")
+            .arg(config.data.join("privacy-keystore.json"))
+            .arg("--method")
+            .arg(unlock);
+        if enroll {
+            command.arg("--enroll-yubikey");
+        }
+        // Terminal interaction stays in the helper; no secrets cross the process boundary.
+        let status = command
+            .status()
+            .context("Privacy helper unavailable; run ./setup-privacy.sh first")?;
+        if !status.success() {
+            anyhow::bail!("Imagine remains locked");
+        }
+        if enroll {
+            return Ok(());
+        }
+    } else {
+        eprintln!("Imagine: encryption disabled for this empty session");
+    }
     let profiles = Arc::new(imagine_server::profiles::Catalog::load(
         &profiles.unwrap_or_else(|| config.project.join("profiles")),
     )?);
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
-    let store = Store::open(&config.data).await?;
+    let store = Store::open_session(&config.data, encrypted).await?;
     let (engine_tx, engine_rx) = watch::channel(EngineState {
         phase: "unloaded".into(),
         pid: None,
@@ -56,7 +102,7 @@ async fn main() -> Result<()> {
     .await?;
     let app = App {
         profiles,
-        store,
+        store: store.clone(),
         control: control.clone(),
         engine: engine_rx,
         access: Arc::new(config.access.clone()),
@@ -74,21 +120,31 @@ async fn main() -> Result<()> {
             .with_graceful_shutdown(stop_http.cancelled_owned())
             .await
     });
-    tokio::select! {
-        _=shutdown_signal()=>{},
-        result=&mut scheduler=>{stop.cancel();server.abort();return result.context("scheduler task")?;},
-        result=&mut server=>{let _=control.call(Action::Shutdown).await; scheduler.await??;return result.context("HTTP task")?.map_err(Into::into);}
-    }
-    // Close SSE/connections promptly; persisted job reads are available after restart.
-    stop.cancel();
-    server.abort();
-    control
-        .call(Action::Shutdown)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.code))?;
-    scheduler.await??;
-    Ok(())
+    let outcome: Result<()> = tokio::select! {
+        _=shutdown_signal()=> {
+            stop.cancel();
+            server.abort();
+            let _ = (&mut server).await;
+            let shutdown = control.call(Action::Shutdown).await;
+            let result = scheduler.await;
+            shutdown.map_err(|e| anyhow::anyhow!(e.code))
+                .and_then(|_| result.context("scheduler task").and_then(|r| r))
+        },
+        result=&mut scheduler=> {
+            stop.cancel(); server.abort(); let _ = server.await;
+            result.context("scheduler task").and_then(|r| r)
+        },
+        result=&mut server=> {
+            let _=control.call(Action::Shutdown).await;
+            let stopped = scheduler.await.context("scheduler task").and_then(|r| r);
+            stopped.and_then(|_| result.context("HTTP task").and_then(|r| r.map_err(Into::into)))
+        }
+    };
+    // All writers are stopped before removing assets and closing the RAM database.
+    let cleaned = store.close().await;
+    outcome.and(cleaned)
 }
+
 async fn shutdown_signal() {
     let mut terminate = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
         .expect("SIGTERM handler");

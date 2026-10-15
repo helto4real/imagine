@@ -27,6 +27,8 @@ struct Probe {
     image: AtomicBool,
     calls: AtomicUsize,
     stops: AtomicUsize,
+    unloads: AtomicUsize,
+    fail_next: AtomicBool,
     release: Notify,
 }
 struct Engine(Arc<Probe>);
@@ -41,6 +43,9 @@ impl Backend for Engine {
             assert!(!self.0.llm.load(Ordering::SeqCst), "LLM overlapped Imagine");
             self.0.image.store(true, Ordering::SeqCst);
             self.0.calls.fetch_add(1, Ordering::SeqCst);
+            if self.0.fail_next.swap(false, Ordering::SeqCst) {
+                return Err(imagine_server::engine::EngineError("native_generation_failed").into());
+            }
             self.0.release.notified().await;
             let mut bytes = Cursor::new(Vec::new());
             image::RgbImage::new(2, 2).write_to(&mut bytes, image::ImageFormat::Png)?;
@@ -129,6 +134,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     let unload = move || {
         let p = p.clone();
         async move {
+            p.unloads.fetch_add(1, Ordering::SeqCst);
             p.llm.store(false, Ordering::SeqCst);
             Json(json!({"status":"unloaded"}))
         }
@@ -178,6 +184,63 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
         blocked.json::<Value>().await.unwrap()["error"]["code"],
         "comfy_disabled"
     );
+
+    // Invalid MCP calls must never unload the agent's already-loaded LLM.
+    let agent_url = format!("http://127.0.0.1:{}/v1/chat/completions", running.chat_port);
+    let mcp_url = format!("http://127.0.0.1:{}/mcp", running.mcp_port.unwrap());
+    assert!(
+        client
+            .post(&agent_url)
+            .json(&json!({"model":"synthetic","messages":[]}))
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    assert!(probe.llm.load(Ordering::SeqCst));
+    let unloads = probe.unloads.load(Ordering::SeqCst);
+    for (tool, args) in [
+        (
+            "generate",
+            json!({"job_id":"bad-size","profile":"qwen","parameters":{"prompt":"synthetic","max_side":4128}}),
+        ),
+        (
+            "generate",
+            json!({"job_id":"bad-sampling","profile":"qwen","parameters":{"prompt":"synthetic","sampling":{"steps":0}}}),
+        ),
+        (
+            "generate",
+            json!({"job_id":"missing-reference","profile":"image_upscale","parameters":{}}),
+        ),
+        (
+            "generate",
+            json!({"job_id":"unknown-profile","profile":"unknown","parameters":{"prompt":"synthetic"}}),
+        ),
+        (
+            "generate_batch",
+            json!({"job_id":"bad-batch","profile":"qwen","items":[{"prompt":"valid"},{"prompt":"invalid","max_side":4128}]}),
+        ),
+    ] {
+        let rejected = mcp(&client, &mcp_url, tool, args).await;
+        assert_eq!(rejected["error"]["category"], "validation", "{rejected}");
+        assert!(probe.llm.load(Ordering::SeqCst));
+        assert_eq!(probe.unloads.load(Ordering::SeqCst), unloads);
+        assert_eq!(probe.calls.load(Ordering::SeqCst), 0);
+        assert_eq!(running.service.coordinator.status()["waiting_images"], 0);
+    }
+    // The next troubleshooting response needs no unload/reload cycle either.
+    assert!(
+        client
+            .post(&agent_url)
+            .json(&json!({"model":"synthetic","messages":[]}))
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    assert_eq!(probe.unloads.load(Ordering::SeqCst), unloads);
 
     let submit = || {
         client
@@ -352,8 +415,32 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     assert_eq!(recovered["items"][0]["images"][0]["storage"], "saved");
     assert_eq!(probe.calls.load(Ordering::SeqCst), 4);
     assert!(after_batch.await.unwrap().status().is_success());
+    // An actual inference failure is distinct from validation. Its stable code
+    // reaches MCP, and the agent can resume through the normal next chat request.
+    probe.fail_next.store(true, Ordering::SeqCst);
+    let failed = mcp(
+        &client,
+        &mcp_url,
+        "generate",
+        json!({"job_id":"engine-failure","profile":"qwen","parameters":{"prompt":"synthetic"}}),
+    )
+    .await;
+    assert_eq!(failed["status"], "failed");
+    assert_eq!(failed["error"]["category"], "generation");
+    assert_eq!(failed["error"]["code"], "native_generation_failed");
+    assert!(
+        client
+            .post(&agent_url)
+            .json(&json!({"model":"synthetic","messages":[]}))
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    assert!(probe.llm.load(Ordering::SeqCst));
     let third: Value = submit().send().await.unwrap().json().await.unwrap();
-    until(|| probe.calls.load(Ordering::SeqCst) == 5).await;
+    until(|| probe.calls.load(Ordering::SeqCst) == 6).await;
     // Abrupt loss of the ticket socket while GPU work is active must stop the engine.
     running.close().await;
     until(|| !probe.image.load(Ordering::SeqCst)).await;

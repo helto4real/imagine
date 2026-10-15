@@ -73,9 +73,6 @@ impl Running {
             task.abort();
             let _ = task.await;
         }
-        if let Some(socket) = &self.service.config.coordinator_socket {
-            let _ = std::fs::remove_file(socket);
-        }
         log(20, LOG, "broker stopped");
     }
 }

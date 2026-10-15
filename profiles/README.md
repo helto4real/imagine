@@ -69,6 +69,10 @@ the existing explicit API contract, including the current UI client.
 neither the profile nor the client specifies it. Set `inputs.reference_images`
 to ordered asset IDs returned by `POST /v1/assets`. Asset ownership is checked.
 
+The maximum longest side is **4096 pixels**. For `image_upscale`, **3200 pixels
+is only the default** when `max_side` is omitted, not the maximum. The upscale
+profile is now version 2; its generation settings are unchanged.
+
 For aspect-based sizing, send `max_side` (256–4096, multiple of 32) and optionally
 `aspect_ratio`, e.g. `"3:4"`. These cannot be combined with explicit width/height.
 Without a ratio, the profile's dimensions supply the ratio. An upscale profile

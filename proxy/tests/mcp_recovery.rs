@@ -59,6 +59,10 @@ async fn ambiguous_submission_and_poll_failures_recover_same_job() {
     let p = Arc::new(Probe::default());
     let router = Router::new()
         .route(
+            "/v1/session",
+            get(|| async { Json(json!({"id":"synthetic-session"})) }),
+        )
+        .route(
             "/v1/profiles/qwen",
             get(|| async { Json(json!({"version":1,"references":{"min":0,"max":10}})) }),
         )
@@ -119,6 +123,54 @@ async fn ambiguous_submission_and_poll_failures_recover_same_job() {
         assert_eq!(keys.len(), 2);
         assert_eq!(keys[0], keys[1]);
     }
-    mcp.close().await;
+    let temporary = std::path::PathBuf::from(
+        result["structuredContent"]["images"][0]["path"]
+            .as_str()
+            .unwrap(),
+    );
+    let saved = dir.path().join("saved.png");
+    std::fs::copy(&temporary, &saved).unwrap();
+    assert!(temporary.exists());
+    // Also interrupt an active recovery. Its HTTP caller must be released.
+    p.available.store(false, Ordering::SeqCst);
+    let previous_polls = p.polls.load(Ordering::SeqCst);
+    let mc = mcp.clone();
+    let pending = tokio::spawn(async move {
+        mc.call(
+            "generate",
+            &json!({"job_id":"pending","profile":"qwen","parameters":{"prompt":"synthetic"}}),
+        )
+        .await
+    });
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while p.polls.load(Ordering::SeqCst) == previous_polls {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .unwrap();
+    // Stopping only Imagine must also purge the still-running proxy's exports.
     server.abort();
+    let _ = server.await;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while temporary.exists() {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert!(saved.exists());
+    let interrupted = tokio::time::timeout(Duration::from_secs(5), pending)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        interrupted["structuredContent"]["error"]["category"],
+        "privacy"
+    );
+    let stale = mcp
+        .call("get_job", &json!({"job_id":"recover","wait":false}))
+        .await;
+    assert_eq!(stale["structuredContent"]["error"]["category"], "privacy");
+    mcp.close().await;
 }

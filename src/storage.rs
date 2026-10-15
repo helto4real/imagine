@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use sqlx::{
     Row, SqlitePool,
-    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
+    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
 };
 use std::{
     io::Cursor,
@@ -16,6 +16,7 @@ use std::{
 pub struct Store {
     pub db: SqlitePool,
     pub media: PathBuf,
+    pub session: std::sync::Arc<crate::session::Session>,
 }
 pub fn now() -> i64 {
     SystemTime::now()
@@ -31,13 +32,20 @@ pub fn hash(data: &[u8]) -> String {
 }
 impl Store {
     pub async fn open(data: &Path) -> Result<Self> {
+        Self::open_session(data, true).await
+    }
+    pub async fn open_session(data: &Path, encrypted: bool) -> Result<Self> {
+        let session = crate::session::Session::new(data, encrypted)?;
         let db = SqlitePoolOptions::new()
+            // Retiring the sole SQLite connection would silently destroy the RAM database.
+            .min_connections(1)
             .max_connections(1)
+            .idle_timeout(None)
+            .max_lifetime(None)
             .connect_with(
                 SqliteConnectOptions::new()
-                    .filename(data.join("imagine.sqlite"))
-                    .create_if_missing(true)
-                    .journal_mode(SqliteJournalMode::Wal)
+                    .in_memory(true)
+                    .pragma("temp_store", "MEMORY")
                     .foreign_keys(true),
             )
             .await?;
@@ -59,14 +67,12 @@ impl Store {
             CREATE TABLE IF NOT EXISTS operations (
               id TEXT PRIMARY KEY, status TEXT NOT NULL, mode TEXT NOT NULL, created INTEGER NOT NULL, finished INTEGER);
         ").execute(&db).await?;
-        sqlx::query("UPDATE jobs SET status='interrupted', error='server_restarted', finished=? WHERE status IN ('running','cancelling')").bind(now()).execute(&db).await?;
-        sqlx::query("UPDATE operations SET status='interrupted',finished=? WHERE status='running'")
-            .bind(now())
-            .execute(&db)
-            .await?;
-        let media = data.join("media");
-        tokio::fs::create_dir_all(&media).await?;
-        Ok(Self { db, media })
+        let media = session.media.clone();
+        Ok(Self { db, media, session })
+    }
+    pub async fn close(&self) -> Result<()> {
+        self.db.close().await;
+        self.session.clear()
     }
     pub async fn paused(&self) -> Result<bool> {
         Ok(
@@ -116,15 +122,22 @@ impl Store {
             bail!("asset_not_found");
         }
         // Only IDs obtained from our database reach the path, never user paths.
-        Ok(tokio::fs::read(self.media.join(id)).await?)
+        self.session
+            .decode(id, &tokio::fs::read(self.media.join(id)).await?)
     }
     pub async fn save_asset(&self, owner: &str, bytes: Vec<u8>) -> Result<Value> {
         let info = tokio::task::spawn_blocking(move || inspect_image(bytes)).await??;
         let asset_id = id("asset");
         let tmp = self.media.join(format!("{asset_id}.partial"));
-        let mut f = tokio::fs::File::create(&tmp).await?;
+        let encoded = self.session.encode(&asset_id, &info.bytes)?;
+        let mut f = tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&tmp)
+            .await?;
         use tokio::io::AsyncWriteExt;
-        f.write_all(&info.bytes).await?;
+        f.write_all(&encoded).await?;
         f.sync_all().await?;
         drop(f);
         tokio::fs::rename(&tmp, self.media.join(&asset_id)).await?;

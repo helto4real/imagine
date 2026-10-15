@@ -136,7 +136,7 @@ impl Catalog {
             ("nsfw", json!({"type":"boolean","default":false})),
             (
                 "max_side",
-                json!({"type":"integer","minimum":256,"maximum":4096,"multipleOf":32}),
+                json!({"type":"integer","minimum":256,"maximum":4096,"multipleOf":32,"description":"Longest image edge in pixels; maximum 4096. For image_upscale, 3200 is only the default when omitted, not the maximum."}),
             ),
             (
                 "aspect_ratio",
