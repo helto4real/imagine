@@ -293,7 +293,10 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
         9007199254740991u64
     );
     assert!(result["items"][0]["parameters"].get("prompt").is_none());
-    assert_eq!(mcp(&client, &mcp_url, "generate_batch", args).await, result);
+    assert_eq!(
+        mcp(&client, &mcp_url, "generate_batch", args.clone()).await,
+        result
+    );
     assert_eq!(probe.calls.load(Ordering::SeqCst), 4);
     assert_eq!(
         result["items"][1]["parameters"]["model"],
@@ -312,6 +315,42 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
         "quick-draft"
     );
     assert!(result["items"][1]["parameters"]["seed"].is_u64());
+    let copies = dir.path().join("client-images");
+    std::fs::create_dir(&copies).unwrap();
+    let mut acknowledgements = Vec::new();
+    let mut paths = Vec::new();
+    for (index, item) in result["items"].as_array().unwrap().iter().enumerate() {
+        let image = &item["images"][0];
+        let path = std::path::PathBuf::from(image["path"].as_str().unwrap());
+        let saved = copies.join(format!("{index}.png"));
+        std::fs::copy(&path, &saved).unwrap();
+        let metadata = std::fs::metadata(&saved).unwrap();
+        assert!(metadata.is_file());
+        let digest = st_proxy::references::hash(&std::fs::read(&saved).unwrap());
+        assert_eq!(image["bytes"], metadata.len());
+        assert_eq!(image["sha256"], digest);
+        assert_eq!(image["storage"], "temporary");
+        acknowledgements.push(json!({"image_id":image["image_id"],"saved_path":saved,"bytes":metadata.len(),"sha256":digest}));
+        paths.push(path);
+    }
+    assert_eq!(paths[0].parent(), paths[1].parent());
+    let acknowledgement = json!({"job_id":"batch-synthetic","images":acknowledgements});
+    let confirmed = mcp(&client, &mcp_url, "confirm_saved", acknowledgement.clone()).await;
+    assert_eq!(confirmed["images"].as_array().unwrap().len(), 2);
+    assert!(!paths[0].parent().unwrap().exists());
+    assert!(copies.join("0.png").is_file());
+    assert!(copies.join("1.png").is_file());
+    assert_eq!(
+        mcp(&client, &mcp_url, "confirm_saved", acknowledgement).await,
+        confirmed
+    );
+    let recovered = mcp(&client, &mcp_url, "generate_batch", args).await;
+    assert_eq!(
+        recovered["items"][0]["images"][0]["path"],
+        json!(copies.join("0.png"))
+    );
+    assert_eq!(recovered["items"][0]["images"][0]["storage"], "saved");
+    assert_eq!(probe.calls.load(Ordering::SeqCst), 4);
     assert!(after_batch.await.unwrap().status().is_success());
     let third: Value = submit().send().await.unwrap().json().await.unwrap();
     until(|| probe.calls.load(Ordering::SeqCst) == 5).await;

@@ -78,7 +78,7 @@ must match `ST_PROXY_MCP_OUTPUT_DIR` if that variable is overridden.
 
 ## Imagine profiles and native compatibility
 
-Imagine owns the [YAML profiles](../profiles/README.md), defaults and override validation. MCP exposes `list_profiles`, `describe_profile`, `register_image`, `generate`, `generate_batch` and `get_job`. Pass `profile` instead of `workflow_id`, and choose `quick-draft` instead of `parameters.mode`. Process-local jobs, retry fingerprints, random or explicit 53-bit seeds, reference registration and consecutive batch ordering remain. MCP calls only authenticated public Imagine endpoints; general Comfy proxy traffic still uses ComfyUI. `nsfw=true` is an explicit LoRA switch. The copied graphs/manifests remain historical fixtures, with their hashes preserved; `--mcp-workflows-dir` no longer controls MCP.
+Imagine owns the [YAML profiles](../profiles/README.md), defaults and override validation. MCP exposes `list_profiles`, `describe_profile`, `register_image`, `generate`, `generate_batch`, `get_job` and `confirm_saved`. Pass `profile` instead of `workflow_id`, and choose `quick-draft` instead of `parameters.mode`. Process-local jobs, retry fingerprints, random or explicit 53-bit seeds, reference registration and consecutive batch ordering remain. MCP calls only authenticated public Imagine endpoints; general Comfy proxy traffic still uses ComfyUI. `nsfw=true` is an explicit LoRA switch. The copied graphs/manifests remain historical fixtures, with their hashes preserved; `--mcp-workflows-dir` no longer controls MCP.
 
 The default v2 model/profile stays on its frozen binary. Only Qwen Turbo selects `.imagine/workflow-native/build/bin/sd-server`, after checking its manifest, base lock, patch and binary hash. The compatibility patch casts the zero-centered RMSNorm weight to F32 before CUDA `scale_bias`; the BF16 Turbo checkpoint otherwise trips the F32 assertion. This is a separate compatibility build, not a change to the accepted v2 inference settings.
 
@@ -139,3 +139,53 @@ For real external backend acceptance, reserve the services/GPU, start the coordi
 ```
 
 Repeat for each configured backend and for `all` with each `backend/model` ID. This script exercises actual load/unload and can affect existing services; it is prepared but has not been run here. It is not proof of overlap exclusion by itself; the guarded synthetic tests cover that invariant.
+
+## Image delivery and temporary storage
+
+Each MCP job has a private `job-<uuid>` directory under `ST_PROXY_MCP_OUTPUT_DIR`
+(default `/run/media/veracrypt1/mcp-images`). Batch items share this directory,
+with one `<item-index>.png` per successful item. Results include `image_id`,
+`path`, `bytes`, `sha256` and `storage: "temporary"`. These delivery image IDs
+are distinct from IDs returned by `register_image`.
+
+The client must copy every successful image to a unique persistent project path,
+check that the destination is a regular file, and compute its byte size and
+SHA-256. Both must match the result metadata. This is a file integrity check:
+do not open, render, visually inspect or analyze the image, or judge whether it
+matches the prompt. Filename existence alone is insufficient.
+
+After the job finishes, acknowledge verified copies (including subsets of a
+partial batch):
+
+```json
+{
+  "name": "confirm_saved",
+  "arguments": {
+    "job_id": "teapot-001",
+    "images": [{
+      "image_id": "<image_id from the result>",
+      "saved_path": "/workspace/images/teapot-001.png",
+      "bytes": 123456,
+      "sha256": "<SHA-256 computed from the destination file>"
+    }]
+  }
+}
+```
+
+Replace the example size and digest with values measured from the copied file.
+The proxy checks all acknowledgements against its own metadata before deleting
+anything. Only confirmed files in that job's staging directory are removed;
+the directory is removed when empty. Unconfirmed files remain without an automatic
+expiry. Identical confirmations are idempotent, including after a lost response.
+If filesystem cleanup fails partway through, retry the same confirmation;
+`get_job` records which images were already confirmed.
+Confirmed images have `storage: "saved"`, `saved_path`, and `path` pointing to the
+client's persistent copy, including in same-job generation retries.
+
+The proxy relies on the client's integrity check: it does not read destination
+paths that may exist only inside a container. Job lookup and confirmations remain
+process-local; a proxy restart leaves unconfirmed files on disk but loses their
+job lookup. Cleanup is limited to MCP delivery copies; Imagine's asset storage
+and registered reference previews retain their existing lifecycle. To use a saved
+local copy as a reference, copy it into the configured MCP input directory first
+if its path is outside the allowed input/output roots.

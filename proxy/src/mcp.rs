@@ -39,10 +39,25 @@ struct Inner {
     stop: CancellationToken,
 }
 struct Job {
+    directory: PathBuf,
     fingerprint: Vec<u8>,
     result: watch::Sender<Value>,
     task: Option<tokio::task::JoinHandle<()>>,
     count: usize,
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SavedImages {
+    job_id: String,
+    images: Vec<SavedImage>,
+}
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SavedImage {
+    image_id: String,
+    saved_path: PathBuf,
+    bytes: u64,
+    sha256: String,
 }
 #[derive(Debug)]
 struct Fault {
@@ -152,6 +167,18 @@ impl Mcp {
             "describe_profile" => self.profile(args).await,
             "register_image" => self.register(args).await,
             "generate" | "generate_batch" => self.generate(args, name == "generate_batch").await,
+            "confirm_saved" => {
+                let this = self.clone();
+                let args = args.clone();
+                tokio::task::spawn_blocking(move || this.confirm_saved(args))
+                    .await
+                    .unwrap_or_else(|_| {
+                        Err(Fault::new(
+                            "storage",
+                            "confirmation could not complete; retry the same confirmation",
+                        ))
+                    })
+            }
             "get_job" => {
                 self.get(id.unwrap_or(""), args["wait"].as_bool().unwrap_or(true))
                     .await
@@ -162,6 +189,129 @@ impl Mcp {
             Ok(v) => v,
             Err(e) => error(e, id),
         })
+    }
+    fn confirm_saved(&self, args: Value) -> std::result::Result<Value, Fault> {
+        let args: SavedImages = serde_json::from_value(args).map_err(|_| {
+            validation("expected job_id and images with image_id, saved_path, bytes and sha256")
+        })?;
+        if args.images.is_empty() {
+            return Err(validation("images must not be empty"));
+        }
+        let jobs = self.inner.jobs.lock().unwrap();
+        let job = jobs
+            .get(&args.job_id)
+            .ok_or_else(|| Fault::new("not_found", "job is unknown in this broker process"))?;
+        let snapshot = job.result.borrow().clone();
+        if !matches!(
+            snapshot["status"].as_str(),
+            Some("succeeded" | "partial" | "failed")
+        ) {
+            return Err(Fault::new(
+                "conflict",
+                "wait for the job to finish before confirming saved images",
+            ));
+        }
+        // Validate the whole acknowledgement before deleting any file. Locations are
+        // indices into our own result, never paths supplied by the caller.
+        let mut locations = Vec::new();
+        let items: Vec<_> = if let Some(items) = snapshot["items"].as_array() {
+            items.iter().collect()
+        } else {
+            vec![&snapshot]
+        };
+        let mut ids = std::collections::HashSet::new();
+        let mut paths = std::collections::HashSet::new();
+        for saved in &args.images {
+            if !ids.insert(&saved.image_id) || !paths.insert(&saved.saved_path) {
+                return Err(validation("duplicate image_id or saved_path"));
+            }
+            if !saved.saved_path.is_absolute()
+                || saved.saved_path.file_name().is_none()
+                || saved.saved_path.starts_with(&self.inner.root)
+                || saved
+                    .saved_path
+                    .components()
+                    .any(|c| matches!(c, std::path::Component::ParentDir))
+            {
+                return Err(validation(
+                    "saved_path must be an absolute local file path outside MCP output storage, without ..",
+                ));
+            }
+            let found = items.iter().enumerate().find_map(|(item_index, item)| {
+                if item["status"] != "succeeded" {
+                    return None;
+                }
+                item["images"]
+                    .as_array()?
+                    .iter()
+                    .enumerate()
+                    .find(|(_, image)| image["image_id"] == saved.image_id)
+                    .map(|(image_index, image)| (item_index, image_index, image))
+            });
+            let (item_index, image_index, image) = found.ok_or_else(|| {
+                validation("image_id does not belong to a successful image in this job")
+            })?;
+            if image["bytes"].as_u64() != Some(saved.bytes) || image["sha256"] != saved.sha256 {
+                return Err(validation(
+                    "file size or SHA-256 does not match; keep the temporary image and verify the local copy",
+                ));
+            }
+            let destination = json!(saved.saved_path);
+            if image["storage"] == "saved" && image["saved_path"] != destination {
+                return Err(Fault::new(
+                    "conflict",
+                    "image was already confirmed at a different saved_path",
+                ));
+            }
+            if items.iter().any(|item| {
+                item["images"].as_array().is_some_and(|images| {
+                    images.iter().any(|other| {
+                        other["image_id"] != saved.image_id && other["saved_path"] == destination
+                    })
+                })
+            }) {
+                return Err(validation(
+                    "saved_path already belongs to another image in this job",
+                ));
+            }
+            locations.push((item_index, image_index));
+        }
+        let mut failure = None;
+        let mut confirmed = Vec::new();
+        job.result.send_modify(|result| {
+            for (saved, (item_index, image_index)) in args.images.iter().zip(locations) {
+                let item = if result["items"].is_array() {
+                    &mut result["items"][item_index]
+                } else {
+                    &mut *result
+                };
+                let image = &mut item["images"][image_index];
+                if image["storage"] != "saved" {
+                    // One output per Imagine item. Derive the filename on the server.
+                    if references::remove_result(
+                        &self.inner.root,
+                        &job.directory,
+                        &format!("{item_index}.png"),
+                    )
+                    .is_err()
+                    {
+                        failure = Some(Fault::new(
+                            "storage",
+                            "temporary image could not be removed; retry the same confirmation",
+                        ));
+                        break;
+                    }
+                    image["storage"] = json!("saved");
+                    image["saved_path"] = json!(saved.saved_path);
+                    image["path"] = json!(saved.saved_path);
+                }
+                confirmed.push(image.clone());
+            }
+        });
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        Ok(json!({"job_id":args.job_id,"images":confirmed}))
     }
     async fn profile(&self, args: &Value) -> std::result::Result<Value, Fault> {
         let id = args["profile"]
@@ -429,15 +579,28 @@ impl Mcp {
                     json!({"job_id":id,"profile":wid,"status":"preparing","parameters":public[0],"images":[],"error":null})
                 };
                 let (tx, _) = watch::channel(result);
+                let directory = self
+                    .inner
+                    .root
+                    .join(format!("job-{}", uuid::Uuid::new_v4().simple()));
+                use std::os::unix::fs::DirBuilderExt;
+                std::fs::DirBuilder::new()
+                    .mode(0o700)
+                    .create(&directory)
+                    .map_err(|_| {
+                        Fault::new("storage", "could not create temporary job directory")
+                    })?;
                 let this = self.clone();
                 let job_id = id.to_string();
                 let sender = tx.clone();
+                let output = directory.clone();
                 let task = tokio::spawn(async move {
-                    this.run(job_id, values, batch, sender).await;
+                    this.run(job_id, values, batch, sender, output).await;
                 });
                 jobs.insert(
                     id.into(),
                     Job {
+                        directory,
                         fingerprint,
                         result: tx,
                         task: Some(task),
@@ -448,7 +611,14 @@ impl Mcp {
         }
         self.get(id, true).await
     }
-    async fn run(&self, id: String, values: Vec<Value>, batch: bool, tx: watch::Sender<Value>) {
+    async fn run(
+        &self,
+        id: String,
+        values: Vec<Value>,
+        batch: bool,
+        tx: watch::Sender<Value>,
+        directory: PathBuf,
+    ) {
         let result = async {
             let mut requests = Vec::new();
             let mut total = 0;
@@ -523,8 +693,9 @@ impl Mcp {
             for (index, native_id) in ids.into_iter().enumerate() {
                 let this = self.clone();
                 let tx = tx.clone();
+                let directory = directory.clone();
                 futures.push(async move {
-                    this.finish_item(&native_id, index, batch, &tx).await;
+                    this.finish_item(&native_id, index, batch, &tx, &directory).await;
                 });
             }
             futures_util::future::join_all(futures).await;
@@ -580,7 +751,14 @@ impl Mcp {
             });
         }
     }
-    async fn finish_item(&self, id: &str, index: usize, batch: bool, tx: &watch::Sender<Value>) {
+    async fn finish_item(
+        &self,
+        id: &str,
+        index: usize,
+        batch: bool,
+        tx: &watch::Sender<Value>,
+        directory: &std::path::Path,
+    ) {
         let update = |status: &str, images: Option<Vec<Value>>, error: Option<Value>| {
             tx.send_modify(|v| {
                 if batch && status == "generating" {
@@ -664,9 +842,9 @@ impl Mcp {
                                 continue;
                             }
                         };
-                        let root = self.inner.root.clone();
+                        let directory = directory.to_path_buf();
                         let images = tokio::task::spawn_blocking(move || {
-                            references::save_result(&root, &bytes)
+                            references::save_result(&directory, index, &bytes)
                         })
                         .await
                         .map_err(|_| Fault::new("result", "image job failed during result"))?
@@ -1069,6 +1247,7 @@ mod profile_tests {
         mcp.inner.jobs.lock().unwrap().insert(
             "retry".into(),
             Job {
+                directory: dir.path().join("output/retry"),
                 fingerprint: mcp.fingerprint(false, &args),
                 result,
                 task: None,
@@ -1087,3 +1266,7 @@ mod profile_tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "mcp_delivery_tests.rs"]
+mod delivery_tests;

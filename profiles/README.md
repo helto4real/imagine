@@ -91,7 +91,7 @@ remain owner-scoped. MCP excludes prompt text and client metadata from results.
 ## MCP
 
 The current tools are `list_profiles`, `describe_profile`, `register_image`,
-`generate`, `generate_batch` and `get_job`. Use `profile`, replacing the old
+`generate`, `generate_batch`, `get_job` and `confirm_saved`. Use `profile`, replacing the old
 `workflow_id`. Select `quick-draft` instead of `parameters.mode`. No Comfy graph
 is consulted. `--mcp-workflows-dir` is accepted only for CLI compatibility and is
 unused by MCP. The reference graphs are retained solely as historical test data.
