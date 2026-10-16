@@ -20,7 +20,7 @@ No native binaries, precision settings or frozen baseline files are changed.
 
 ## API
 
-All routes use the existing bearer authentication and owner isolation:
+All routes use the shared local Imagine workspace without Bearer authentication:
 
 - `GET /v1/profiles`: IDs, names, versions, model IDs and YAML SHA-256 hashes.
 - `GET /v1/profiles/{id}`: defaults (prompts omitted), partial override schema,

@@ -5,7 +5,6 @@ use axum::{
 };
 use imagine_server::{
     api::{self, App},
-    config::Access,
     contract::MODEL,
     engine::{Backend, EngineFuture, EngineState},
     scheduler::{self, Action, Control},
@@ -13,7 +12,6 @@ use imagine_server::{
 };
 use serde_json::{Value, json};
 use std::{
-    collections::BTreeMap,
     io::Cursor,
     sync::{
         Arc,
@@ -96,10 +94,7 @@ async fn setup() -> Harness {
         .await
         .unwrap();
     let (engine_state, engine) = watch::channel(EngineState::default());
-    let access = Access {
-        admin_token: "root".into(),
-        clients: BTreeMap::from([("a".into(), "alice".into()), ("b".into(), "bob".into())]),
-    };
+
     let router = api::router(App {
         profiles: Arc::new(
             imagine_server::profiles::Catalog::load(std::path::Path::new(concat!(
@@ -111,7 +106,7 @@ async fn setup() -> Harness {
         store: store.clone(),
         control: control.clone(),
         engine,
-        access: Arc::new(access),
+
         uploads: Arc::new(Semaphore::new(2)),
     });
     Harness {
@@ -128,14 +123,10 @@ async fn req(
     router: &Router,
     method: &str,
     url: &str,
-    token: &str,
     value: Option<Value>,
     key: Option<&str>,
 ) -> (u16, Value) {
-    let mut builder = Request::builder()
-        .method(method)
-        .uri(url)
-        .header("Authorization", format!("Bearer {token}"));
+    let mut builder = Request::builder().method(method).uri(url);
     if let Some(key) = key {
         builder = builder.header("Idempotency-Key", key);
     }
@@ -189,17 +180,9 @@ async fn stop(h: Harness) {
 }
 
 #[tokio::test]
-async fn progress_is_scoped_to_active_owned_job_in_polling_and_events() {
+async fn progress_is_scoped_to_active_job_in_polling_and_events() {
     let h = setup().await;
-    let (_, job) = req(
-        &h.router,
-        "POST",
-        "/v1/jobs",
-        "alice",
-        Some(request()),
-        None,
-    )
-    .await;
+    let (_, job) = req(&h.router, "POST", "/v1/jobs", Some(request()), None).await;
     let id = job["id"].as_str().unwrap();
     wait_calls(&h.probe, 1).await;
     let url = format!("/v1/jobs/{id}");
@@ -216,20 +199,24 @@ async fn progress_is_scoped_to_active_owned_job_in_polling_and_events() {
         progress: Some(progress.clone()),
         ..Default::default()
     });
-    assert!(req(&h.router, "GET", &url, "alice", None, None).await.1["progress"].is_null());
+    assert!(req(&h.router, "GET", &url, None, None).await.1["progress"].is_null());
     h.engine_state
         .send_modify(|state| state.job_id = Some(id.into()));
-    let data = req(&h.router, "GET", &url, "alice", None, None).await.1;
+    let data = req(&h.router, "GET", &url, None, None).await.1;
     assert_eq!(data["progress"]["completed"], 10);
     assert_eq!(data["progress"]["remaining_seconds"], 24.);
-    assert_eq!(req(&h.router, "GET", &url, "bob", None, None).await.0, 404);
+    assert_eq!(
+        req(&h.router, "GET", "/v1/jobs/job_missing", None, None)
+            .await
+            .0,
+        404
+    );
     let response = h
         .router
         .clone()
         .oneshot(
             Request::builder()
                 .uri(format!("{url}/events"))
-                .header("Authorization", "Bearer alice")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -250,135 +237,72 @@ async fn progress_is_scoped_to_active_owned_job_in_polling_and_events() {
     let text = std::str::from_utf8(&bytes).unwrap();
     assert!(text.contains("\"completed\":10"));
     assert!(text.contains("\"status\":\"succeeded\""));
-    assert!(req(&h.router, "GET", &url, "alice", None, None).await.1["progress"].is_null());
+    assert!(req(&h.router, "GET", &url, None, None).await.1["progress"].is_null());
     stop(h).await;
 }
 
 #[tokio::test]
 async fn queue_idempotency_unload_resume_and_cancel() {
     let h = setup().await;
-    assert_eq!(
-        req(&h.router, "GET", "/v1/models", "invalid", None, None)
-            .await
-            .0,
-        401
-    );
-    assert_eq!(
-        req(&h.router, "GET", "/v1/models", "alice", None, None)
-            .await
-            .0,
-        200
-    );
+    assert_eq!(req(&h.router, "GET", "/v1/models", None, None).await.0, 200);
     assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
-    let (code, first) = req(
-        &h.router,
-        "POST",
-        "/v1/jobs",
-        "alice",
-        Some(request()),
-        Some("same"),
-    )
-    .await;
+    let (code, first) = req(&h.router, "POST", "/v1/jobs", Some(request()), Some("same")).await;
     assert_eq!(code, 202);
     let id = first["id"].as_str().unwrap();
     wait_calls(&h.probe, 1).await;
-    let (_, repeat) = req(
-        &h.router,
-        "POST",
-        "/v1/jobs",
-        "alice",
-        Some(request()),
-        Some("same"),
-    )
-    .await;
+    let (_, repeat) = req(&h.router, "POST", "/v1/jobs", Some(request()), Some("same")).await;
     assert_eq!(first["id"], repeat["id"]);
     let mut different = request();
     different["prompt"] = json!("different");
     assert_eq!(
-        req(
-            &h.router,
-            "POST",
-            "/v1/jobs",
-            "alice",
-            Some(different),
-            Some("same")
-        )
-        .await
-        .0,
+        req(&h.router, "POST", "/v1/jobs", Some(different), Some("same"))
+            .await
+            .0,
         409
     );
     let (_, second) = req(
         &h.router,
         "POST",
         "/v1/jobs",
-        "bob",
         Some(request()),
-        Some("same"),
+        Some("second"),
     )
     .await;
     let second = second["id"].as_str().unwrap();
     assert_ne!(id, second);
     assert_eq!(
-        req(
-            &h.router,
-            "GET",
-            &format!("/v1/jobs/{id}"),
-            "bob",
-            None,
-            None
-        )
-        .await
-        .0,
-        404
-    );
-    assert_eq!(
-        req(
-            &h.router,
-            "POST",
-            "/v1/runtime/unload",
-            "alice",
-            Some(json!({"active_job":"wait"})),
-            None
-        )
-        .await
-        .0,
-        403
+        req(&h.router, "GET", &format!("/v1/jobs/{id}"), None, None)
+            .await
+            .0,
+        200
     );
     let (code, op) = req(
         &h.router,
         "POST",
         "/v1/runtime/unload",
-        "root",
         Some(json!({"active_job":"wait"})),
         None,
     )
     .await;
     assert_eq!(code, 202);
     assert_eq!(
-        req(
-            &h.router,
-            "POST",
-            "/v1/jobs",
-            "alice",
-            Some(request()),
-            None
-        )
-        .await
-        .0,
+        req(&h.router, "POST", "/v1/jobs", Some(request()), None)
+            .await
+            .0,
         409
     );
     assert_eq!(
-        req(&h.router, "POST", "/v1/runtime/resume", "root", None, None)
+        req(&h.router, "POST", "/v1/runtime/resume", None, None)
             .await
             .0,
         409
     );
     h.probe.release.notify_one();
-    let first = wait_status(&h.store, id, "a", "succeeded").await;
+    let first = wait_status(&h.store, id, "local", "succeeded").await;
     assert!(first["effective"]["seed"].is_u64());
     assert_eq!(first["output"]["assets"][0]["width"], 2);
     let asset = first["output"]["assets"][0]["id"].as_str().unwrap();
-    assert!(h.store.read_asset(asset, "a").await.is_ok());
+    assert!(h.store.read_asset(asset, "local").await.is_ok());
     let opid = op["id"].as_str().unwrap();
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
@@ -393,11 +317,11 @@ async fn queue_idempotency_unload_resume_and_cancel() {
     assert_eq!(h.probe.calls.load(Ordering::SeqCst), 1);
     assert_eq!(h.probe.stops.load(Ordering::SeqCst), 1);
     assert_eq!(
-        h.store.job(second, "b").await.unwrap().unwrap()["status"],
+        h.store.job(second, "local").await.unwrap().unwrap()["status"],
         "queued"
     );
     assert_eq!(
-        req(&h.router, "POST", "/v1/runtime/resume", "root", None, None)
+        req(&h.router, "POST", "/v1/runtime/resume", None, None)
             .await
             .0,
         200
@@ -408,7 +332,6 @@ async fn queue_idempotency_unload_resume_and_cancel() {
             &h.router,
             "POST",
             &format!("/v1/jobs/{second}/cancel"),
-            "bob",
             None,
             None
         )
@@ -416,7 +339,7 @@ async fn queue_idempotency_unload_resume_and_cancel() {
         .0,
         202
     );
-    let value = wait_status(&h.store, second, "b", "cancelled").await;
+    let value = wait_status(&h.store, second, "local", "cancelled").await;
     assert!(value["output"].is_null());
     assert!(h.probe.stops.load(Ordering::SeqCst) >= 2);
     stop(h).await;
@@ -428,7 +351,7 @@ async fn strict_inputs_assets_and_queued_cancel() {
     let mut wrong = request();
     wrong["loras"] = json!([]);
     assert_eq!(
-        req(&h.router, "POST", "/v1/jobs", "alice", Some(wrong), None)
+        req(&h.router, "POST", "/v1/jobs", Some(wrong), None)
             .await
             .0,
         422
@@ -436,7 +359,7 @@ async fn strict_inputs_assets_and_queued_cancel() {
     let mut wrong = request();
     wrong["model"] = json!("minimax-h3");
     assert_eq!(
-        req(&h.router, "POST", "/v1/jobs", "alice", Some(wrong), None)
+        req(&h.router, "POST", "/v1/jobs", Some(wrong), None)
             .await
             .1["error"]["code"],
         "model_not_validated"
@@ -448,7 +371,6 @@ async fn strict_inputs_assets_and_queued_cancel() {
     let upload = Request::builder()
         .method("POST")
         .uri("/v1/assets")
-        .header("Authorization", "Bearer alice")
         .header("Content-Type", "image/png")
         .body(Body::from(reference.into_inner()))
         .unwrap();
@@ -458,39 +380,27 @@ async fn strict_inputs_assets_and_queued_cancel() {
         serde_json::from_slice(&to_bytes(r.into_body(), 4096).await.unwrap()).unwrap();
     let id = asset["id"].as_str().unwrap();
     assert_eq!(
-        req(
-            &h.router,
-            "GET",
-            &format!("/v1/assets/{id}"),
-            "bob",
-            None,
-            None
-        )
-        .await
-        .0,
-        404
+        req(&h.router, "GET", &format!("/v1/assets/{id}"), None, None)
+            .await
+            .0,
+        200
     );
     let mut edit = request();
     edit["operation"] = json!("image_edit");
     edit["inputs"] = json!({"reference_images":[id, id]});
+    let mut missing = edit.clone();
+    missing["inputs"] = json!({"reference_images":["asset_missing"]});
     assert_eq!(
-        req(
-            &h.router,
-            "POST",
-            "/v1/jobs",
-            "bob",
-            Some(edit.clone()),
-            None
-        )
-        .await
-        .0,
+        req(&h.router, "POST", "/v1/jobs", Some(missing), None)
+            .await
+            .0,
         404
     );
-    let (code, job) = req(&h.router, "POST", "/v1/jobs", "alice", Some(edit), None).await;
+    let (code, job) = req(&h.router, "POST", "/v1/jobs", Some(edit), None).await;
     assert_eq!(code, 202);
     let job_id = job["id"].as_str().unwrap();
     wait_calls(&h.probe, 1).await;
-    let job = h.store.job(job_id, "a").await.unwrap().unwrap();
+    let job = h.store.job(job_id, "local").await.unwrap().unwrap();
     let references = job["effective"]["reference_preprocessing"]
         .as_array()
         .unwrap();
@@ -501,37 +411,27 @@ async fn strict_inputs_assets_and_queued_cancel() {
         assert_eq!(reference["vae_height"], 64);
         assert_eq!(reference["source"], "aio_shrink_center_crop_v1");
     }
-    let (_, queued) = req(
-        &h.router,
-        "POST",
-        "/v1/jobs",
-        "alice",
-        Some(request()),
-        None,
-    )
-    .await;
+    let (_, queued) = req(&h.router, "POST", "/v1/jobs", Some(request()), None).await;
     let queued = queued["id"].as_str().unwrap();
     req(
         &h.router,
         "POST",
         &format!("/v1/jobs/{queued}/cancel"),
-        "alice",
         None,
         None,
     )
     .await;
-    wait_status(&h.store, queued, "a", "cancelled").await;
+    wait_status(&h.store, queued, "local", "cancelled").await;
     assert_eq!(h.probe.calls.load(Ordering::SeqCst), 1);
     let (_, op) = req(
         &h.router,
         "POST",
         "/v1/runtime/unload",
-        "root",
         Some(json!({"active_job":"cancel"})),
         None,
     )
     .await;
-    wait_status(&h.store, job_id, "a", "cancelled").await;
+    wait_status(&h.store, job_id, "local", "cancelled").await;
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             if h.store
@@ -554,30 +454,13 @@ async fn strict_inputs_assets_and_queued_cancel() {
 #[tokio::test]
 async fn restart_starts_empty_and_unpaused() {
     let h = setup().await;
-    let (_, first) = req(
-        &h.router,
-        "POST",
-        "/v1/jobs",
-        "alice",
-        Some(request()),
-        None,
-    )
-    .await;
+    let (_, first) = req(&h.router, "POST", "/v1/jobs", Some(request()), None).await;
     wait_calls(&h.probe, 1).await;
-    let (_, second) = req(
-        &h.router,
-        "POST",
-        "/v1/jobs",
-        "alice",
-        Some(request()),
-        None,
-    )
-    .await;
+    let (_, second) = req(&h.router, "POST", "/v1/jobs", Some(request()), None).await;
     let (_, operation) = req(
         &h.router,
         "POST",
         "/v1/runtime/unload",
-        "root",
         Some(json!({"active_job":"wait"})),
         None,
     )
@@ -589,7 +472,7 @@ async fn restart_starts_empty_and_unpaused() {
     for job in [first, second] {
         assert!(
             reopened
-                .job(job["id"].as_str().unwrap(), "a")
+                .job(job["id"].as_str().unwrap(), "local")
                 .await
                 .unwrap()
                 .is_none()
@@ -609,38 +492,21 @@ async fn restart_starts_empty_and_unpaused() {
 async fn engine_failure_isolated_next_job_can_run_and_sse_finishes() {
     let h = setup().await;
     h.probe.fail.store(1, Ordering::SeqCst);
-    let (_, first) = req(
-        &h.router,
-        "POST",
-        "/v1/jobs",
-        "alice",
-        Some(request()),
-        None,
-    )
-    .await;
+    let (_, first) = req(&h.router, "POST", "/v1/jobs", Some(request()), None).await;
     wait_calls(&h.probe, 1).await;
-    let (_, second) = req(
-        &h.router,
-        "POST",
-        "/v1/jobs",
-        "alice",
-        Some(request()),
-        None,
-    )
-    .await;
+    let (_, second) = req(&h.router, "POST", "/v1/jobs", Some(request()), None).await;
     h.probe.release.notify_one();
-    wait_status(&h.store, first["id"].as_str().unwrap(), "a", "failed").await;
+    wait_status(&h.store, first["id"].as_str().unwrap(), "local", "failed").await;
     wait_calls(&h.probe, 2).await;
     h.probe.release.notify_one();
     let id = second["id"].as_str().unwrap();
-    wait_status(&h.store, id, "a", "succeeded").await;
+    wait_status(&h.store, id, "local", "succeeded").await;
     let r = h
         .router
         .clone()
         .oneshot(
             Request::builder()
                 .uri(format!("/v1/jobs/{id}/events"))
-                .header("Authorization", "Bearer alice")
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -669,7 +535,7 @@ async fn crash_recovery_does_not_retain_any_jobs() {
     store.close().await.unwrap();
     let reopened = Store::open(dir.path()).await.unwrap();
     for id in ["active", "cancelling", "queued"] {
-        assert!(reopened.job(id, "a").await.unwrap().is_none());
+        assert!(reopened.job(id, "local").await.unwrap().is_none());
     }
     assert!(!dir.path().join("imagine.sqlite").exists());
 }
@@ -683,7 +549,6 @@ async fn batch_is_atomic_and_idempotent_for_the_entire_request() {
         &h.router,
         "POST",
         "/v1/jobs/batch",
-        "alice",
         Some(json!({"jobs":[request(),invalid]})),
         Some("batch"),
     )
@@ -701,7 +566,6 @@ async fn batch_is_atomic_and_idempotent_for_the_entire_request() {
         &h.router,
         "POST",
         "/v1/jobs/batch",
-        "alice",
         Some(batch.clone()),
         Some("batch"),
     )
@@ -711,7 +575,6 @@ async fn batch_is_atomic_and_idempotent_for_the_entire_request() {
         &h.router,
         "POST",
         "/v1/jobs/batch",
-        "alice",
         Some(batch),
         Some("batch"),
     )
@@ -724,7 +587,6 @@ async fn batch_is_atomic_and_idempotent_for_the_entire_request() {
         &h.router,
         "POST",
         "/v1/jobs/batch",
-        "alice",
         Some(json!({"jobs":[request()]})),
         Some("batch"),
     )
@@ -744,13 +606,7 @@ async fn batch_is_atomic_and_idempotent_for_the_entire_request() {
 #[tokio::test]
 async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
     let h = setup().await;
-    assert_eq!(
-        req(&h.router, "GET", "/v1/profiles", "invalid", None, None)
-            .await
-            .0,
-        401
-    );
-    let (status, catalog) = req(&h.router, "GET", "/v1/profiles", "alice", None, None).await;
+    let (status, catalog) = req(&h.router, "GET", "/v1/profiles", None, None).await;
     assert_eq!(status, 200);
     assert!(
         catalog["profiles"]
@@ -759,7 +615,7 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
             .iter()
             .any(|p| p["id"] == "qwen")
     );
-    let (_, description) = req(&h.router, "GET", "/v1/profiles/qwen", "alice", None, None).await;
+    let (_, description) = req(&h.router, "GET", "/v1/profiles/qwen", None, None).await;
     for (profile, original_guidance) in [
         (
             "qwen",
@@ -782,7 +638,6 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
             &h.router,
             "GET",
             &format!("/v1/profiles/{profile}"),
-            "alice",
             None,
             None,
         )
@@ -802,7 +657,6 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
         &h.router,
         "POST",
         "/v1/jobs/validate",
-        "alice",
         Some(body.clone()),
         None,
     )
@@ -818,7 +672,6 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
         &h.router,
         "POST",
         "/v1/jobs",
-        "alice",
         Some(body.clone()),
         Some("profile-retry"),
     )
@@ -826,7 +679,7 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
     assert_eq!(status, 202, "{submitted}");
     let id = submitted["id"].as_str().unwrap();
     wait_calls(&h.probe, 1).await;
-    let effective = h.store.job(id, "a").await.unwrap().unwrap()["effective"].clone();
+    let effective = h.store.job(id, "local").await.unwrap().unwrap()["effective"].clone();
     assert_eq!(effective["resolved_profile"]["id"], "qwen");
     assert_eq!(effective["resolved_profile"]["version"], 2);
     assert_eq!(
@@ -842,17 +695,16 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
         &h.router,
         "POST",
         "/v1/jobs",
-        "alice",
         Some(body),
         Some("profile-retry"),
     )
     .await;
     assert_eq!(retry["id"], id);
     assert_eq!(
-        h.store.job(id, "a").await.unwrap().unwrap()["effective"]["seed"],
+        h.store.job(id, "local").await.unwrap().unwrap()["effective"]["seed"],
         effective["seed"]
     );
-    let (_, cleared) = req(&h.router, "POST", "/v1/jobs/validate", "alice", Some(json!({"profile":"quick-draft","prompt":"synthetic","sampling":{"custom_sigmas":[]},"model_options":{"qwen_image_2_1":{"generation":{"loras":[]}}}})), None).await;
+    let (_, cleared) = req(&h.router, "POST", "/v1/jobs/validate", Some(json!({"profile":"quick-draft","prompt":"synthetic","sampling":{"custom_sigmas":[]},"model_options":{"qwen_image_2_1":{"generation":{"loras":[]}}}})), None).await;
     assert!(
         cleared["effective"]["sampling"]
             .get("custom_sigmas")
@@ -863,7 +715,7 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
         json!([])
     );
     h.probe.release.notify_one();
-    wait_status(&h.store, id, "a", "succeeded").await;
+    wait_status(&h.store, id, "local", "succeeded").await;
     stop(h).await;
 }
 
@@ -920,7 +772,6 @@ async fn profiles_reject_invalid_overrides_before_batch_admission() {
             &h.router,
             "POST",
             "/v1/jobs/batch",
-            "alice",
             Some(json!({"jobs":[{"profile":"qwen","prompt":"valid"},patch]})),
             None,
         )
@@ -939,7 +790,6 @@ async fn profiles_reject_invalid_overrides_before_batch_admission() {
         &h.router,
         "POST",
         "/v1/jobs/validate",
-        "alice",
         Some(json!({"profile":"qwen-image21-1600x896-v2","prompt":"test"})),
         None,
     )
@@ -959,19 +809,22 @@ async fn profiles_reject_invalid_overrides_before_batch_admission() {
 }
 
 #[tokio::test]
-async fn profile_reference_sizing_and_asset_ownership() {
+async fn profile_reference_sizing_and_missing_assets() {
     let h = setup().await;
     let mut bytes = Cursor::new(Vec::new());
     image::RgbImage::new(256, 128)
         .write_to(&mut bytes, image::ImageFormat::Png)
         .unwrap();
-    let asset = h.store.save_asset("a", bytes.into_inner()).await.unwrap();
+    let asset = h
+        .store
+        .save_asset("local", bytes.into_inner())
+        .await
+        .unwrap();
     let body = json!({"profile":"image_upscale","prompt":"synthetic upscale","negative_prompt":"","max_side":512,"inputs":{"reference_images":[asset["id"]]}});
     let (status, v) = req(
         &h.router,
         "POST",
         "/v1/jobs/validate",
-        "alice",
         Some(body.clone()),
         None,
     )
@@ -987,24 +840,18 @@ async fn profile_reference_sizing_and_asset_ownership() {
             .len(),
         1
     );
+    let mut missing = body;
+    missing["inputs"] = json!({"reference_images":["asset_missing"]});
     assert_eq!(
-        req(
-            &h.router,
-            "POST",
-            "/v1/jobs/validate",
-            "bob",
-            Some(body),
-            None
-        )
-        .await
-        .0,
+        req(&h.router, "POST", "/v1/jobs/validate", Some(missing), None)
+            .await
+            .0,
         404
     );
     let (_, v) = req(
         &h.router,
         "POST",
         "/v1/jobs/validate",
-        "alice",
         Some(json!({"profile":"qwen","prompt":"test","max_side":1024,"aspect_ratio":"3:4"})),
         None,
     )
@@ -1019,7 +866,7 @@ async fn session_assets_are_plain_owned_and_removed_on_close() {
     let dir = tempfile::tempdir().unwrap();
     let bytes = png();
     let store = Store::open(dir.path()).await.unwrap();
-    let asset = store.save_asset("a", bytes.clone()).await.unwrap();
+    let asset = store.save_asset("local", bytes.clone()).await.unwrap();
     let id = asset["id"].as_str().unwrap();
     let path = store.media.join(id);
     let disk = std::fs::read(&path).unwrap();
@@ -1029,7 +876,7 @@ async fn session_assets_are_plain_owned_and_removed_on_close() {
         std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
         0o600
     );
-    assert_eq!(store.read_asset(id, "a").await.unwrap(), bytes);
+    assert_eq!(store.read_asset(id, "local").await.unwrap(), bytes);
     assert!(store.read_asset(id, "other").await.is_err());
     store.close().await.unwrap();
     assert!(!path.exists());
@@ -1038,7 +885,7 @@ async fn session_assets_are_plain_owned_and_removed_on_close() {
 #[tokio::test]
 async fn old_session_requests_are_rejected_before_mutation() {
     let h = setup().await;
-    let (status, session) = req(&h.router, "GET", "/v1/session", "alice", None, None).await;
+    let (status, session) = req(&h.router, "GET", "/v1/session", None, None).await;
     assert_eq!(status, 200);
     assert_eq!(session["id"], h.store.session.id);
     assert_eq!(session["encrypted"], false);
@@ -1049,7 +896,6 @@ async fn old_session_requests_are_rejected_before_mutation() {
             Request::builder()
                 .method("POST")
                 .uri("/v1/jobs")
-                .header("Authorization", "Bearer alice")
                 .header("Content-Type", "application/json")
                 .header("X-Imagine-Session", "expired-session")
                 .body(Body::from(request().to_string()))
@@ -1074,7 +920,6 @@ async fn character_sheet_validation_schema_and_sensitive_fields() {
         &h.router,
         "GET",
         "/v1/profiles/qwen-character-sheet",
-        "alice",
         None,
         None,
     )
@@ -1094,7 +939,6 @@ async fn character_sheet_validation_schema_and_sensitive_fields() {
         &h.router,
         "POST",
         "/v1/jobs/validate",
-        "alice",
         Some(sheet_request()),
         None,
     )
@@ -1143,20 +987,19 @@ async fn character_sheet_validation_schema_and_sensitive_fields() {
     body["model_options"] = json!({"qwen_image_2_1":{"reference_max_pixels_per_image":1}});
     cases.push(body);
     for body in cases {
-        let (status, error) = req(&h.router, "POST", "/v1/jobs", "alice", Some(body), None).await;
+        let (status, error) = req(&h.router, "POST", "/v1/jobs", Some(body), None).await;
         assert_eq!(status, 422, "{error}");
         assert!(!error.to_string().contains("SYNTHETIC_SHEET"));
     }
     let guide = imagine_server::character_sheet::pose_guide(64, 64).unwrap();
-    let asset = h.store.save_asset("a", guide).await.unwrap();
+    let asset = h.store.save_asset("local", guide).await.unwrap();
     let mut body = sheet_request();
-    body["inputs"] = json!({"pose_guide":asset["id"]});
+    body["inputs"] = json!({"pose_guide":"asset_missing"});
     assert_eq!(
         req(
             &h.router,
             "POST",
             "/v1/jobs/validate",
-            "bob",
             Some(body.clone()),
             None
         )
@@ -1164,33 +1007,20 @@ async fn character_sheet_validation_schema_and_sensitive_fields() {
         .0,
         404
     );
+    body["inputs"] = json!({"pose_guide":asset["id"]});
     assert_eq!(
-        req(
-            &h.router,
-            "POST",
-            "/v1/jobs/validate",
-            "alice",
-            Some(body),
-            None
-        )
-        .await
-        .0,
+        req(&h.router, "POST", "/v1/jobs/validate", Some(body), None)
+            .await
+            .0,
         200
     );
-    let tiny = h.store.save_asset("a", png()).await.unwrap();
+    let tiny = h.store.save_asset("local", png()).await.unwrap();
     let mut body = sheet_request();
     body["inputs"] = json!({"pose_guide":tiny["id"]});
     assert_eq!(
-        req(
-            &h.router,
-            "POST",
-            "/v1/jobs/validate",
-            "alice",
-            Some(body),
-            None
-        )
-        .await
-        .0,
+        req(&h.router, "POST", "/v1/jobs/validate", Some(body), None)
+            .await
+            .0,
         422
     );
     assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
@@ -1202,7 +1032,7 @@ async fn character_sheet_is_one_job_with_ordered_in_memory_passes_and_three_resu
     let h = setup().await;
     h.probe.sized_output.store(1, Ordering::SeqCst);
     let guide = imagine_server::character_sheet::pose_guide(64, 64).unwrap();
-    let reference = h.store.save_asset("a", guide.clone()).await.unwrap();
+    let reference = h.store.save_asset("local", guide.clone()).await.unwrap();
     let mut body = sheet_request();
     body["seed"] = json!(imagine_server::contract::MAX_SEED);
     body["inputs"] = json!({"reference_images":[reference["id"]],"pose_guide":reference["id"]});
@@ -1210,7 +1040,6 @@ async fn character_sheet_is_one_job_with_ordered_in_memory_passes_and_three_resu
         &h.router,
         "POST",
         "/v1/jobs",
-        "alice",
         Some(body.clone()),
         Some("sheet-once"),
     )
@@ -1222,7 +1051,6 @@ async fn character_sheet_is_one_job_with_ordered_in_memory_passes_and_three_resu
         &h.router,
         "POST",
         "/v1/jobs",
-        "alice",
         Some(body),
         Some("sheet-once"),
     )
@@ -1260,7 +1088,7 @@ async fn character_sheet_is_one_job_with_ordered_in_memory_passes_and_three_resu
         assert!(passes[1].prompt.contains("SYNTHETIC_SHEET_CLOTHES"));
     }
     h.probe.release.notify_one();
-    let result = wait_status(&h.store, id, "a", "succeeded").await;
+    let result = wait_status(&h.store, id, "local", "succeeded").await;
     let assets = result["output"]["assets"].as_array().unwrap();
     assert_eq!(assets.len(), 3);
     for (asset, role) in assets
@@ -1270,7 +1098,7 @@ async fn character_sheet_is_one_job_with_ordered_in_memory_passes_and_three_resu
         assert_eq!(asset["role"], role);
         assert!(
             h.store
-                .read_asset(asset["id"].as_str().unwrap(), "b")
+                .read_asset(asset["id"].as_str().unwrap(), "other")
                 .await
                 .is_err()
         );
@@ -1293,15 +1121,7 @@ async fn character_sheet_cancel_or_second_pass_failure_never_publishes_partial_r
     for cancel in [true, false] {
         let h = setup().await;
         h.probe.sized_output.store(1, Ordering::SeqCst);
-        let (_, job) = req(
-            &h.router,
-            "POST",
-            "/v1/jobs",
-            "alice",
-            Some(sheet_request()),
-            None,
-        )
-        .await;
+        let (_, job) = req(&h.router, "POST", "/v1/jobs", Some(sheet_request()), None).await;
         let id = job["id"].as_str().unwrap();
         wait_calls(&h.probe, 1).await;
         h.probe.release.notify_one();
@@ -1310,7 +1130,7 @@ async fn character_sheet_cancel_or_second_pass_failure_never_publishes_partial_r
             h.control
                 .call(Action::Cancel {
                     id: id.into(),
-                    owner: "a".into(),
+                    owner: "local".into(),
                 })
                 .await
                 .unwrap();
@@ -1321,7 +1141,7 @@ async fn character_sheet_cancel_or_second_pass_failure_never_publishes_partial_r
         wait_status(
             &h.store,
             id,
-            "a",
+            "local",
             if cancel { "cancelled" } else { "failed" },
         )
         .await;
@@ -1342,7 +1162,7 @@ async fn character_sheet_cancel_or_second_pass_failure_never_publishes_partial_r
 async fn output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid() {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open(dir.path()).await.unwrap();
-    sqlx::query("INSERT INTO jobs(id,owner,status,request,request_hash,created) VALUES ('job_test','a','running','{}','test',0)").execute(&store.db).await.unwrap();
+    sqlx::query("INSERT INTO jobs(id,owner,status,request,request_hash,created) VALUES ('job_test','local','running','{}','test',0)").execute(&store.db).await.unwrap();
     let artifacts = vec![
         imagine_server::generation::Artifact {
             role: "character_sheet",
@@ -1355,7 +1175,7 @@ async fn output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid
     ];
     assert!(
         store
-            .publish_output("job_test", "a", artifacts)
+            .publish_output("job_test", "local", artifacts)
             .await
             .is_err()
     );
@@ -1368,7 +1188,7 @@ async fn output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid
     );
     assert_eq!(std::fs::read_dir(&store.media).unwrap().count(), 0);
     assert_eq!(
-        store.job("job_test", "a").await.unwrap().unwrap()["status"],
+        store.job("job_test", "local").await.unwrap().unwrap()["status"],
         "running"
     );
     // A valid output cannot be published to another owner's job either.
@@ -1376,7 +1196,7 @@ async fn output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid
         store
             .publish_output(
                 "job_test",
-                "b",
+                "other",
                 vec![imagine_server::generation::Artifact {
                     role: "image",
                     bytes: png()

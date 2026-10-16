@@ -1,10 +1,12 @@
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
     fs::OpenOptions,
     io::Write,
-    os::unix::fs::{OpenOptionsExt, PermissionsExt},
+    os::{
+        fd::AsRawFd,
+        unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt},
+    },
     path::{Path, PathBuf},
 };
 
@@ -13,26 +15,8 @@ pub const DEFAULT_API_URL: &str = "http://127.0.0.1:8189/imagine";
 #[derive(Clone)]
 pub struct Connection {
     pub url: String,
-    pub access: PathBuf,
-    pub client: String,
 }
 impl Connection {
-    pub fn token(&self) -> Result<String> {
-        #[derive(Deserialize)]
-        struct Access {
-            clients: BTreeMap<String, String>,
-        }
-        let access: Access = serde_json::from_slice(
-            &std::fs::read(&self.access)
-                .context("Start the server with ./start-server.sh, then select Reconnect.")?,
-        )
-        .context("Could not read the API key. Check access.json.")?;
-        access
-            .clients
-            .get(&self.client)
-            .cloned()
-            .context("The client is missing from access.json.")
-    }
     pub fn validate(&self) -> Result<()> {
         let url = reqwest::Url::parse(&self.url).context("Invalid API URL.")?;
         if !matches!(url.scheme(), "http" | "https")
@@ -222,44 +206,140 @@ pub fn check_output_folder(folder: &Path) -> Result<()> {
     std::fs::remove_file(probe)?;
     Ok(())
 }
-pub fn save_image(folder: &Path, bytes: &[u8]) -> Result<PathBuf> {
-    check_output_folder(folder)?;
-    let id = uuid::Uuid::new_v4().simple().to_string();
-    let target = folder.join(format!("imagine-{id}.png"));
-    // create_new refuses overwrites, including on filesystems without hard links.
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(&target)
-        .context("Could not create the image file. Choose another folder and retry.")?;
-    let result = (|| -> Result<PathBuf> {
-        file.write_all(bytes)?;
-        file.sync_all()?;
-        Ok(target.clone())
-    })();
-    drop(file);
-    if result.is_err() {
-        let _ = std::fs::remove_file(&target);
-    }
-    result.context(
-        "The image is ready on the server but could not be saved. Choose a writable folder and retry.",
-    )
+/// Uses the host's local calendar date, captured when the completed result is saved.
+fn dated_folder(folder: &Path, now: std::time::SystemTime) -> Result<PathBuf> {
+    let seconds = libc::time_t::try_from(now.duration_since(std::time::UNIX_EPOCH)?.as_secs())?;
+    let mut local = std::mem::MaybeUninit::<libc::tm>::uninit();
+    // localtime_r initializes caller-owned storage and uses the host timezone.
+    let local = unsafe {
+        if libc::localtime_r(&seconds, local.as_mut_ptr()).is_null() {
+            bail!("Could not determine the local date for saving.");
+        }
+        local.assume_init()
+    };
+    Ok(folder.join(format!(
+        "{:04}-{:02}-{:02}",
+        local.tm_year + 1900,
+        local.tm_mon + 1,
+        local.tm_mday
+    )))
 }
 
-/// Save one complete sheet set, cleaning up only files created by this attempt on failure.
+pub fn save_image(folder: &Path, bytes: &[u8]) -> Result<PathBuf> {
+    let folder = dated_folder(folder, std::time::SystemTime::now())?;
+    Ok(save_outputs(&folder, &[("", bytes)], Naming::Numbered)?.remove(0))
+}
+
+/// Save one complete sheet set with a shared number.
 pub fn save_sheet(folder: &Path, images: &[(&str, &[u8])]) -> Result<Vec<PathBuf>> {
     if images.iter().map(|(role, _)| *role).collect::<Vec<_>>()
         != ["character_sheet", "portrait", "turnaround"]
     {
         bail!("The character sheet result is incomplete.");
     }
-    check_output_folder(folder)?;
-    let id = uuid::Uuid::new_v4().simple().to_string();
+    let folder = dated_folder(folder, std::time::SystemTime::now())?;
+    save_outputs(&folder, images, Naming::Numbered)
+}
+
+/// Keep variants beside their source, including across dates and output-folder changes.
+pub fn save_upscaled(source: &Path, bytes: &[u8]) -> Result<PathBuf> {
+    let folder = source
+        .parent()
+        .context("The original image folder is unavailable.")?;
+    let stem = source
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .context("The original image filename is unavailable.")?;
+    let base = match stem.rsplit_once("_upscaled") {
+        Some((base, suffix))
+            if suffix.is_empty()
+                || suffix
+                    .strip_prefix('_')
+                    .is_some_and(|n| !n.is_empty() && n.bytes().all(|c| c.is_ascii_digit())) =>
+        {
+            base
+        }
+        _ => stem,
+    };
+    Ok(save_outputs(folder, &[("", bytes)], Naming::Upscaled(base))?.remove(0))
+}
+
+enum Naming<'a> {
+    Numbered,
+    Upscaled(&'a str),
+}
+
+fn save_outputs(
+    folder: &Path,
+    images: &[(&str, &[u8])],
+    naming: Naming<'_>,
+) -> Result<Vec<PathBuf>> {
+    if !folder.is_absolute() {
+        bail!("Choose an absolute path for the image folder.");
+    }
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(folder)?;
+    // Directory lock serializes number allocation across UI processes. Closing releases it;
+    // no persistent lock file is needed. create_new also refuses external collisions/symlinks.
+    let lock = std::fs::File::open(folder)?;
+    if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX) } != 0 {
+        return Err(std::io::Error::last_os_error())
+            .context("Could not reserve an image filename.");
+    }
+    let names = std::fs::read_dir(folder)?
+        .map(|entry| entry.map(|e| e.file_name().to_string_lossy().into_owned()))
+        .collect::<std::io::Result<Vec<_>>>()?;
+    let stem = match naming {
+        Naming::Numbered => {
+            let number = names
+                .iter()
+                .filter_map(|name| {
+                    name.strip_prefix("image_")?
+                        .split(['_', '.'])
+                        .next()?
+                        .parse::<u64>()
+                        .ok()
+                })
+                .max()
+                .unwrap_or(0)
+                .checked_add(1)
+                .context("Image numbering is exhausted.")?;
+            format!("image_{number:04}")
+        }
+        Naming::Upscaled(base) => {
+            let prefix = format!("{base}_upscaled");
+            let number = names
+                .iter()
+                .filter_map(|name| {
+                    let suffix = name.strip_prefix(&prefix)?.strip_suffix(".png")?;
+                    if suffix.is_empty() {
+                        Some(1)
+                    } else {
+                        suffix.strip_prefix('_')?.parse::<u64>().ok()
+                    }
+                })
+                .max()
+                .unwrap_or(0)
+                .checked_add(1)
+                .context("Upscale numbering is exhausted.")?;
+            if number == 1 {
+                prefix
+            } else {
+                format!("{prefix}_{number}")
+            }
+        }
+    };
     let mut created = Vec::new();
     let result = (|| -> Result<()> {
         for (role, bytes) in images {
-            let path = folder.join(format!("imagine-{id}-{role}.png"));
+            let suffix = if role.is_empty() {
+                String::new()
+            } else {
+                format!("_{role}")
+            };
+            let path = folder.join(format!("{stem}{suffix}.png"));
             let mut file = OpenOptions::new()
                 .write(true)
                 .create_new(true)
@@ -278,17 +358,113 @@ pub fn save_sheet(folder: &Path, images: &[(&str, &[u8])]) -> Result<Vec<PathBuf
         }
         if cleanup_failed {
             bail!(
-                "Could not save the complete sheet or remove partial files. Check the output folder before retrying."
+                "Could not save the images or remove partial files. Check the output folder before retrying."
             );
         }
     }
-    result.context("The sheet is ready on the server but could not be saved. Choose a writable folder and retry.")?;
+    result.context("The result is ready on the server but could not be saved. Check the destination folder and retry.")?;
     Ok(created)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn dated_numbering_groups_sheets_and_keeps_upscale_variants_beside_source() {
+        let root = tempfile::tempdir().unwrap();
+        let now = std::time::SystemTime::now();
+        let today = dated_folder(root.path(), now).unwrap();
+        let first = save_image(root.path(), b"original").unwrap();
+        assert_eq!(first, today.join("image_0001.png"));
+        let date = today.file_name().unwrap().to_str().unwrap();
+        assert_eq!(date.len(), 10);
+        assert_eq!(&date[4..5], "-");
+        assert_eq!(&date[7..8], "-");
+        let images = [
+            ("character_sheet", b"sheet".as_slice()),
+            ("portrait", b"portrait".as_slice()),
+            ("turnaround", b"views".as_slice()),
+        ];
+        let sheet = save_sheet(root.path(), &images).unwrap();
+        for (file, (role, _)) in sheet.iter().zip(images) {
+            assert_eq!(*file, today.join(format!("image_0002_{role}.png")));
+        }
+        for number in 3..=12 {
+            let file = save_image(root.path(), b"next").unwrap();
+            assert_eq!(file, today.join(format!("image_{number:04}.png")));
+        }
+        let mut names: Vec<_> = std::fs::read_dir(&today)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        names.sort();
+        assert_eq!(names[0], "image_0001.png");
+        assert_eq!(names.last().unwrap(), "image_0012.png");
+        // A previous date keeps its own sequence and all upscale variants.
+        let yesterday = root.path().join("2000-01-01");
+        let old = save_outputs(&yesterday, &[("", b"old")], Naming::Numbered)
+            .unwrap()
+            .remove(0);
+        assert_eq!(old.file_name().unwrap(), "image_0001.png");
+        let upscaled = save_upscaled(&old, b"upscaled").unwrap();
+        assert_eq!(upscaled, yesterday.join("image_0001_upscaled.png"));
+        let again = save_upscaled(&upscaled, b"variant").unwrap();
+        assert_eq!(again, yesterday.join("image_0001_upscaled_2.png"));
+        let third = save_upscaled(&old, b"another").unwrap();
+        assert_eq!(third, yesterday.join("image_0001_upscaled_3.png"));
+        assert_eq!(std::fs::read(&old).unwrap(), b"old");
+        assert_eq!(std::fs::read(&upscaled).unwrap(), b"upscaled");
+        assert_eq!(
+            save_upscaled(&sheet[0], b"big sheet").unwrap(),
+            today.join("image_0002_character_sheet_upscaled.png")
+        );
+        // Existing outputs, including partial sets, reserve their numbers after restart.
+        std::fs::write(today.join("image_0020_portrait.png"), b"partial").unwrap();
+        assert_eq!(
+            save_image(root.path(), b"new session").unwrap(),
+            today.join("image_0021.png")
+        );
+    }
+
+    #[test]
+    fn simultaneous_saves_allocate_distinct_numbers_without_overwriting() {
+        let root = tempfile::tempdir().unwrap();
+        let files = std::thread::scope(|scope| {
+            let handles: Vec<_> = (0..12u8)
+                .map(|n| {
+                    let folder = root.path();
+                    scope.spawn(move || (n, save_image(folder, &[n]).unwrap()))
+                })
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().unwrap())
+                .collect::<Vec<_>>()
+        });
+        let mut names = std::collections::BTreeSet::new();
+        for (n, file) in &files {
+            assert_eq!(std::fs::read(file).unwrap(), [*n]);
+            assert_eq!(
+                std::fs::metadata(file).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+            assert!(names.insert(file.file_name().unwrap().to_owned()));
+        }
+        assert_eq!(names.first().unwrap(), "image_0001.png");
+        assert_eq!(names.last().unwrap(), "image_0012.png");
+        let variants = std::thread::scope(|scope| {
+            let source = &files[0].1;
+            let handles: Vec<_> = (0..4)
+                .map(|_| scope.spawn(move || save_upscaled(source, b"variant").unwrap()))
+                .collect();
+            handles
+                .into_iter()
+                .map(|h| h.join().unwrap())
+                .collect::<std::collections::BTreeSet<_>>()
+        });
+        assert_eq!(variants.len(), 4);
+    }
+
     #[test]
     fn upscale_targets_follow_selected_ratio_with_aligned_short_edge() {
         for (target, long, wide, two_thirds) in [
@@ -331,7 +507,12 @@ mod tests {
             );
         }
         assert!(save_sheet(root.path(), &images[..2]).is_err());
-        assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 6);
+        assert_eq!(
+            std::fs::read_dir(files[0].parent().unwrap())
+                .unwrap()
+                .count(),
+            6
+        );
         let old: Preferences =
             serde_json::from_value(serde_json::json!({"output_folder":root.path()})).unwrap();
         assert_eq!(old.sheet_width, 1536);

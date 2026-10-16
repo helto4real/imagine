@@ -109,6 +109,9 @@ impl Service {
             TcpListener::bind((config.listen_host.as_str(), config.chat_port as u16)).await?;
         let image_listener =
             TcpListener::bind((config.listen_host.as_str(), config.image_port as u16)).await?;
+        if config.coordinator_socket.is_some() && !image_listener.local_addr()?.ip().is_loopback() {
+            anyhow::bail!("Imagine integration requires a loopback listen host");
+        }
         let chat_port = chat_listener.local_addr()?.port();
         let image_port = image_listener.local_addr()?.port();
         let mcp_listener = if let Some(port) = config.mcp_port {
@@ -876,8 +879,9 @@ async fn imagine_handler(s: &Service, mut req: Request<Body>) -> Response<Body> 
         ),
     );
     req.extensions_mut().insert(completion.clone());
-    // Keep the caller's bearer token and idempotency key. The upstream API
-    // enforces owner isolation and admin permissions; never inject admin auth.
+    // Imagine has one local workspace. Preserve session/idempotency headers, but
+    // never forward credentials intended for another proxy endpoint.
+    req.headers_mut().remove(axum::http::header::AUTHORIZATION);
     match http::proxy(
         req,
         s.image.clone(),
@@ -1103,6 +1107,63 @@ fn decoded_path(raw: &str) -> String {
 #[cfg(test)]
 mod imagine_bridge_tests {
     use super::*;
+    #[tokio::test]
+    async fn imagine_rejects_non_loopback_listener_and_strips_forwarded_auth() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = Config {
+            listen_host: "0.0.0.0".into(),
+            chat_port: 0,
+            image_port: 0,
+            coordinator_socket: Some(dir.path().join("gpu.sock").to_string_lossy().into()),
+            ..Default::default()
+        };
+        let error = Service::start(config.clone()).await.err().unwrap();
+        assert!(error.to_string().contains("loopback"));
+
+        let upstream = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}", upstream.local_addr().unwrap());
+        let server = tokio::spawn(async move {
+            axum::serve(
+                upstream,
+                axum::Router::new().route(
+                    "/v1/models",
+                    axum::routing::get(|headers: axum::http::HeaderMap| async move {
+                        assert!(!headers.contains_key("authorization"));
+                        assert_eq!(headers["X-Imagine-Session"], "synthetic-session");
+                        assert_eq!(headers["Idempotency-Key"], "synthetic-key");
+                        axum::Json(json!({"ok":true}))
+                    }),
+                ),
+            )
+            .await
+            .unwrap();
+        });
+        let running = Service::start(Config {
+            listen_host: "127.0.0.1".into(),
+            imagine_url: origin,
+            ..config
+        })
+        .await
+        .unwrap();
+        let response = reqwest::Client::builder()
+            .no_proxy()
+            .build()
+            .unwrap()
+            .get(format!(
+                "http://127.0.0.1:{}/imagine/v1/models",
+                running.image_port
+            ))
+            .bearer_auth("unrelated-proxy-credential")
+            .header("X-Imagine-Session", "synthetic-session")
+            .header("Idempotency-Key", "synthetic-key")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 200);
+        assert_eq!(response.json::<Value>().await.unwrap(), json!({"ok":true}));
+        running.close().await;
+        server.abort();
+    }
 
     #[tokio::test]
     async fn bridge_fails_closed_without_coordination_or_upstream() {
@@ -1118,12 +1179,6 @@ mod imagine_bridge_tests {
                 imagine_url: origin.clone(),
                 coordinator_socket: coordinated
                     .then(|| dir.path().join("gpu.sock").to_string_lossy().into_owned()),
-                imagine_access_file: coordinated.then(|| {
-                    dir.path()
-                        .join("access.json")
-                        .to_string_lossy()
-                        .into_owned()
-                }),
                 ..Default::default()
             })
             .await

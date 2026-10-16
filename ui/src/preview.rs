@@ -6,16 +6,8 @@ impl ImagineApp {
     /// Port 1 is deliberately not an Imagine endpoint; this never connects at startup.
     pub fn synthetic_preview(ctx: &egui::Context, project: PathBuf) -> Self {
         helto::install(ctx);
-        let access = project.join("preview-access.json");
-        std::fs::write(
-            &access,
-            br#"{"clients":{"preview":"synthetic-preview-token"}}"#,
-        )
-        .unwrap();
         let connection = Connection {
             url: "http://127.0.0.1:1".into(),
-            access,
-            client: "preview".into(),
         };
         let mut app = Self::empty(
             project.clone(),
@@ -34,6 +26,7 @@ impl ImagineApp {
         let sample = synthetic_landscape();
         for index in 1..=2 {
             app.image.references.push(ReferenceView {
+                number: 0,
                 id: format!("synthetic-reference-{index}"),
                 name: format!("reference-{index}.png"),
                 texture: texture(ctx, &sample, &format!("synthetic-reference-{index}")),

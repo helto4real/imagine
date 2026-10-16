@@ -4,7 +4,6 @@ use axum::{
 };
 use imagine_server::{
     api::{self, App},
-    config::Access,
     contract::MODEL,
     engine::{Backend, EngineFuture, EngineState},
     scheduler::{self, Action},
@@ -12,7 +11,6 @@ use imagine_server::{
 };
 use serde_json::{Value, json};
 use std::{
-    collections::BTreeMap,
     io::Cursor,
     sync::{
         Arc,
@@ -88,12 +86,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     )
     .await
     .unwrap();
-    let access = Access {
-        admin_token: "synthetic-admin".into(),
-        clients: BTreeMap::from([("client".into(), "synthetic-client".into())]),
-    };
-    let credentials = dir.path().join("access.json");
-    std::fs::write(&credentials, serde_json::to_vec(&access).unwrap()).unwrap();
+
     let (_, engine) = watch::channel(EngineState::default());
     let (imagine, imagine_task) = serve(api::router(App {
         profiles: Arc::new(
@@ -106,7 +99,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
         store: store.clone(),
         control: control.clone(),
         engine,
-        access: Arc::new(access),
+
         uploads: Arc::new(Semaphore::new(2)),
     }))
     .await;
@@ -165,7 +158,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
         comfy_url: "http://127.0.0.1:1".into(),
         coordinator_socket: Some(socket.to_str().unwrap().into()),
         imagine_url: imagine.clone(),
-        imagine_access_file: Some(credentials.to_str().unwrap().into()),
+
         poll_interval: 0.01,
         ..Default::default()
     };
@@ -243,7 +236,6 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     let submit = || {
         client
             .post(format!("{imagine}/v1/jobs"))
-            .bearer_auth("synthetic-client")
             .json(&json!({"model":MODEL,"operation":"text_to_image","prompt":"synthetic"}))
     };
     let first: Value = submit().send().await.unwrap().json().await.unwrap();
@@ -269,7 +261,6 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
             "{imagine}/v1/jobs/{}/cancel",
             cancelled["id"].as_str().unwrap()
         ))
-        .bearer_auth("synthetic-client")
         .send()
         .await
         .unwrap();
@@ -443,7 +434,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     running.close().await;
     until(|| !probe.image.load(Ordering::SeqCst)).await;
     let job = store
-        .job(third["id"].as_str().unwrap(), "client")
+        .job(third["id"].as_str().unwrap(), "local")
         .await
         .unwrap()
         .unwrap();

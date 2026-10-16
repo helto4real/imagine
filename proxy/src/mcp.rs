@@ -1345,12 +1345,11 @@ mod profile_tests {
     #[tokio::test]
     async fn offline_imagine_clears_history_and_rejects_recovery() {
         let dir = tempfile::tempdir().unwrap();
-        let credentials = dir.path().join("access.json");
-        std::fs::write(&credentials, r#"{"admin_token":"synthetic"}"#).unwrap();
+
         let mcp = Mcp::new(Config {
             coordinator_socket: Some(dir.path().join("gpu.sock").to_string_lossy().into()),
             imagine_url: "http://127.0.0.1:1".into(),
-            imagine_access_file: Some(credentials.to_string_lossy().into()),
+
             mcp_input_dir: dir.path().to_string_lossy().into(),
             mcp_output_dir: Some(dir.path().join("output").to_string_lossy().into()),
             ..Default::default()

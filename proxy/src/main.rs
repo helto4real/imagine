@@ -17,7 +17,11 @@ async fn main() -> Result<()> {
         }
     };
     if cli.help {
-        print!("{}", include_str!("../reference/cli-help.txt"));
+        // Retain the imported reference fixture; hide the removed Imagine option.
+        let help = include_str!("../reference/cli-help.txt")
+            .replace("                [--imagine-access-file IMAGINE_ACCESS_FILE]\n", "")
+            .replace("  --imagine-access-file IMAGINE_ACCESS_FILE\n                        operator-owned Imagine access.json for MCP assets and\n                        GPU release\n", "");
+        print!("{help}");
         println!(
             "\n  --comfy-enabled true|false\n                        enable Comfy routes and GPU cleanup (binary default: true; root launcher: false)"
         );

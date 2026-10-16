@@ -1,12 +1,11 @@
 use crate::{
-    config::Access,
     contract::{self},
     engine::EngineState,
     scheduler::{Action, Control, Fault},
-    storage::{Store, hash},
+    storage::Store,
 };
 use axum::{
-    Extension, Json, Router,
+    Json, Router,
     body::Bytes,
     extract::{DefaultBodyLimit, Path, Request, State, rejection::JsonRejection},
     http::{HeaderMap, StatusCode, header},
@@ -20,7 +19,6 @@ use axum::{
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{convert::Infallible, sync::Arc, time::Duration};
-use subtle::ConstantTimeEq;
 use tokio::sync::{Semaphore, watch};
 
 #[derive(Clone)]
@@ -29,14 +27,10 @@ pub struct App {
     pub store: Store,
     pub control: Control,
     pub engine: watch::Receiver<EngineState>,
-    pub access: Arc<Access>,
     pub uploads: Arc<Semaphore>,
 }
-#[derive(Clone)]
-struct Principal {
-    owner: String,
-    admin: bool,
-}
+const LOCAL_OWNER: &str = "local";
+
 impl IntoResponse for Fault {
     fn into_response(self) -> Response {
         (
@@ -68,49 +62,18 @@ pub fn router(app: App) -> Router {
         .route("/v1/operations/{id}", get(operation))
         .fallback(|| async { Fault::new(404, "not_found") })
         .layer(DefaultBodyLimit::max(32 * 1024 * 1024))
-        .layer(middleware::from_fn_with_state(app.clone(), authenticate))
+        .layer(middleware::from_fn_with_state(app.clone(), session_guard))
         .with_state(app)
 }
-async fn authenticate(State(app): State<App>, mut request: Request, next: Next) -> Response {
-    let token = request
+async fn session_guard(State(app): State<App>, request: Request, next: Next) -> Response {
+    let mut response = if request
         .headers()
-        .get(header::AUTHORIZATION)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.strip_prefix("Bearer "));
-    let principal = token.and_then(|token| {
-        let supplied = hash(token.as_bytes());
-        if bool::from(
-            supplied
-                .as_bytes()
-                .ct_eq(hash(app.access.admin_token.as_bytes()).as_bytes()),
-        ) {
-            return Some(Principal {
-                owner: "admin".into(),
-                admin: true,
-            });
-        }
-        app.access.clients.iter().find_map(|(owner, token)| {
-            bool::from(supplied.as_bytes().ct_eq(hash(token.as_bytes()).as_bytes())).then(|| {
-                Principal {
-                    owner: owner.clone(),
-                    admin: false,
-                }
-            })
-        })
-    });
-    let mut response = if let Some(principal) = principal {
-        if request
-            .headers()
-            .get("X-Imagine-Session")
-            .is_some_and(|id| id.as_bytes() != app.store.session.id.as_bytes())
-        {
-            Fault::new(409, "session_changed").into_response()
-        } else {
-            request.extensions_mut().insert(principal);
-            next.run(request).await
-        }
+        .get("X-Imagine-Session")
+        .is_some_and(|id| id.as_bytes() != app.store.session.id.as_bytes())
+    {
+        Fault::new(409, "session_changed").into_response()
     } else {
-        Fault::new(401, "unauthorized").into_response()
+        next.run(request).await
     };
     response
         .headers_mut()
@@ -134,7 +97,6 @@ async fn model(Path(id): Path<String>) -> Result<Json<Value>, Fault> {
 }
 async fn upload(
     State(app): State<App>,
-    Extension(p): Extension<Principal>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Result<(StatusCode, Json<Value>), Fault> {
@@ -152,22 +114,18 @@ async fn upload(
         .map_err(|_| Fault::new(429, "upload_busy"))?;
     let asset = app
         .store
-        .save_asset(&p.owner, body.to_vec())
+        .save_asset(LOCAL_OWNER, body.to_vec())
         .await
         .map_err(|_| Fault::new(422, "invalid_image"))?;
     Ok((StatusCode::CREATED, Json(asset)))
 }
-async fn download(
-    State(app): State<App>,
-    Extension(p): Extension<Principal>,
-    Path(id): Path<String>,
-) -> Result<Response, Fault> {
+async fn download(State(app): State<App>, Path(id): Path<String>) -> Result<Response, Fault> {
     let info = app
         .store
-        .asset(&id, &p.owner)
+        .asset(&id, LOCAL_OWNER)
         .await?
         .ok_or(Fault::new(404, "asset_not_found"))?;
-    let bytes = app.store.read_asset(&id, &p.owner).await?;
+    let bytes = app.store.read_asset(&id, LOCAL_OWNER).await?;
     Ok((
         [
             (header::CONTENT_TYPE, info["mime_type"].as_str().unwrap()),
@@ -184,7 +142,6 @@ struct BatchRequest {
 }
 async fn submit_batch(
     State(app): State<App>,
-    Extension(p): Extension<Principal>,
     headers: HeaderMap,
     body: Result<Json<BatchRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<Value>), Fault> {
@@ -196,12 +153,16 @@ async fn submit_batch(
         .map_err(|_| Fault::new(400, "invalid_idempotency_key"))?;
     let mut requests = Vec::with_capacity(request.jobs.len());
     for request in request.jobs {
-        requests.push(app.profiles.resolve(request, &app.store, &p.owner).await?);
+        requests.push(
+            app.profiles
+                .resolve(request, &app.store, LOCAL_OWNER)
+                .await?,
+        );
     }
     let result = app
         .control
         .call(Action::SubmitBatch {
-            owner: p.owner,
+            owner: LOCAL_OWNER.into(),
             requests,
             key,
         })
@@ -210,7 +171,6 @@ async fn submit_batch(
 }
 async fn submit(
     State(app): State<App>,
-    Extension(p): Extension<Principal>,
     headers: HeaderMap,
     body: Result<Json<Value>, JsonRejection>,
 ) -> Result<(StatusCode, Json<Value>), Fault> {
@@ -220,11 +180,14 @@ async fn submit(
         .map(|v| v.to_str().map(str::to_owned))
         .transpose()
         .map_err(|_| Fault::new(400, "invalid_idempotency_key"))?;
-    let request = app.profiles.resolve(request, &app.store, &p.owner).await?;
+    let request = app
+        .profiles
+        .resolve(request, &app.store, LOCAL_OWNER)
+        .await?;
     let mut result = app
         .control
         .call(Action::Submit {
-            owner: p.owner,
+            owner: LOCAL_OWNER.into(),
             request: Box::new(request),
             key,
         })
@@ -234,12 +197,8 @@ async fn submit(
     result["events_url"] = json!(format!("/v1/jobs/{id}/events"));
     Ok((StatusCode::ACCEPTED, Json(result)))
 }
-async fn job(
-    State(app): State<App>,
-    Extension(p): Extension<Principal>,
-    Path(id): Path<String>,
-) -> Result<Json<Value>, Fault> {
-    Ok(Json(job_snapshot(&app, &id, &p.owner).await?))
+async fn job(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Fault> {
+    Ok(Json(job_snapshot(&app, &id, LOCAL_OWNER).await?))
 }
 async fn job_snapshot(app: &App, id: &str, owner: &str) -> Result<Value, Fault> {
     let mut value = app
@@ -260,30 +219,28 @@ async fn job_snapshot(app: &App, id: &str, owner: &str) -> Result<Value, Fault> 
 }
 async fn cancel(
     State(app): State<App>,
-    Extension(p): Extension<Principal>,
     Path(id): Path<String>,
 ) -> Result<(StatusCode, Json<Value>), Fault> {
     Ok((
         StatusCode::ACCEPTED,
         Json(
             app.control
-                .call(Action::Cancel { owner: p.owner, id })
+                .call(Action::Cancel {
+                    owner: LOCAL_OWNER.into(),
+                    id,
+                })
                 .await?,
         ),
     ))
 }
-async fn events(
-    State(app): State<App>,
-    Extension(p): Extension<Principal>,
-    Path(id): Path<String>,
-) -> Result<Response, Fault> {
-    if app.store.job(&id, &p.owner).await?.is_none() {
+async fn events(State(app): State<App>, Path(id): Path<String>) -> Result<Response, Fault> {
+    if app.store.job(&id, LOCAL_OWNER).await?.is_none() {
         return Err(Fault::new(404, "job_not_found"));
     }
     let stream = async_stream::stream! {
         let mut last=String::new();
         loop {
-            let Ok(value)=job_snapshot(&app,&id,&p.owner).await else {break};
+            let Ok(value)=job_snapshot(&app,&id,LOCAL_OWNER).await else {break};
             let terminal=matches!(value["status"].as_str(),Some("succeeded"|"failed"|"cancelled"|"interrupted"));
             let data=value.to_string();
             if data!=last {yield Ok::<Event,Infallible>(Event::default().event("job").data(&data));last=data;}
@@ -301,13 +258,6 @@ async fn runtime(State(app): State<App>) -> Json<Value> {
     value["api_revision"] = json!(contract::API_REVISION);
     Json(value)
 }
-fn admin(p: &Principal) -> Result<(), Fault> {
-    if p.admin {
-        Ok(())
-    } else {
-        Err(Fault::new(403, "admin_required"))
-    }
-}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Unload {
@@ -321,10 +271,8 @@ enum UnloadMode {
 }
 async fn unload(
     State(app): State<App>,
-    Extension(p): Extension<Principal>,
     body: Result<Json<Unload>, JsonRejection>,
 ) -> Result<(StatusCode, Json<Value>), Fault> {
-    admin(&p)?;
     let Json(body) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
     let mut value = app
         .control
@@ -335,19 +283,10 @@ async fn unload(
     value["status_url"] = json!(format!("/v1/operations/{}", value["id"].as_str().unwrap()));
     Ok((StatusCode::ACCEPTED, Json(value)))
 }
-async fn resume(
-    State(app): State<App>,
-    Extension(p): Extension<Principal>,
-) -> Result<Json<Value>, Fault> {
-    admin(&p)?;
+async fn resume(State(app): State<App>) -> Result<Json<Value>, Fault> {
     Ok(Json(app.control.call(Action::Resume).await?))
 }
-async fn operation(
-    State(app): State<App>,
-    Extension(p): Extension<Principal>,
-    Path(id): Path<String>,
-) -> Result<Json<Value>, Fault> {
-    admin(&p)?;
+async fn operation(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Fault> {
     Ok(Json(
         app.store
             .operation(&id)
@@ -356,11 +295,7 @@ async fn operation(
     ))
 }
 
-async fn yield_gpu(
-    State(app): State<App>,
-    Extension(p): Extension<Principal>,
-) -> Result<Json<Value>, Fault> {
-    admin(&p)?;
+async fn yield_gpu(State(app): State<App>) -> Result<Json<Value>, Fault> {
     Ok(Json(app.control.call(Action::YieldGpu).await?))
 }
 
@@ -372,12 +307,11 @@ async fn profile(State(app): State<App>, Path(id): Path<String>) -> Result<Json<
 }
 async fn validate_job(
     State(app): State<App>,
-    Extension(p): Extension<Principal>,
     body: Result<Json<Value>, JsonRejection>,
 ) -> Result<Json<Value>, Fault> {
     let Json(value) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
-    let request = app.profiles.resolve(value, &app.store, &p.owner).await?;
-    crate::generation::reference_metadata(&request, &p.owner, &app.store).await?;
+    let request = app.profiles.resolve(value, &app.store, LOCAL_OWNER).await?;
+    crate::generation::reference_metadata(&request, LOCAL_OWNER, &app.store).await?;
     let mut effective = request.effective();
     // Validation is safe to expose in MCP results; prompt text stays private.
     for key in ["prompt", "negative_prompt", "client_metadata"] {

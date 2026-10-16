@@ -1,6 +1,5 @@
 use imagine_server::{
     api::{self, App},
-    config::Access,
     engine::{Backend, EngineFuture, EngineState},
     generation::ImagePass,
     scheduler::{self, Action},
@@ -8,14 +7,13 @@ use imagine_server::{
 };
 use imagine_ui::{
     client::{
-        Client, OutputRole, Progress, Submission, make_request, make_sheet_request,
-        make_upscale_request,
+        Client, EditSource, OutputRole, Progress, Submission, make_edit_request, make_request,
+        make_sheet_request, make_upscale_request,
     },
     settings::{Connection, GenerationSettings, UpscaleTarget},
 };
 use serde_json::json;
 use std::{
-    collections::BTreeMap,
     io::Cursor,
     path::PathBuf,
     sync::{
@@ -109,15 +107,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     )
     .await
     .unwrap();
-    let access = Access {
-        admin_token: "unused-admin-token".into(),
-        clients: BTreeMap::from([
-            ("ui-test".into(), "synthetic-test-token".into()),
-            ("other".into(), "other-token".into()),
-        ]),
-    };
-    let access_path = dir.path().join("access.json");
-    std::fs::write(&access_path, serde_json::to_vec(&access).unwrap()).unwrap();
+
     // Keep the shipped upscale settings, with only synthetic plaintext prompts.
     let profiles = dir.path().join("profiles");
     std::fs::create_dir(&profiles).unwrap();
@@ -140,7 +130,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         store,
         control: control.clone(),
         engine,
-        access: Arc::new(access),
+
         uploads: Arc::new(Semaphore::new(2)),
     };
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -163,7 +153,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         llm_url: backend_url.clone(),
         comfy_url: backend_url,
         imagine_url: url,
-        imagine_access_file: Some(access_path.to_string_lossy().into()),
+
         coordinator_socket: Some(socket.to_string_lossy().into()),
         poll_interval: 0.01,
         ..Default::default()
@@ -172,40 +162,22 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     .unwrap();
     let url = format!("http://127.0.0.1:{}/imagine", proxy.image_port);
     let http = reqwest::Client::new();
-    let unauthorized = http.get(format!("{url}/v1/models")).send().await.unwrap();
-    assert_eq!(unauthorized.status(), 401);
-    assert_eq!(unauthorized.headers()["cache-control"], "no-store");
-    let denied = http
-        .post(format!("{url}/v1/runtime/unload"))
-        .bearer_auth("synthetic-test-token")
-        .json(&json!({"active_job":"wait"}))
-        .send()
-        .await
-        .unwrap();
-    assert_eq!(
-        denied.status(),
-        403,
-        "proxy must never substitute admin credentials"
-    );
-    let client = Client::connect(&Connection {
-        url: url.clone(),
-        access: access_path,
-        client: "ui-test".into(),
-    })
-    .unwrap();
+    let catalog_response = http.get(format!("{url}/v1/models")).send().await.unwrap();
+    assert_eq!(catalog_response.status(), 200);
+    assert_eq!(catalog_response.headers()["cache-control"], "no-store");
+    let client = Client::connect(&Connection { url: url.clone() }).unwrap();
     let meta = client.metadata().await.unwrap();
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     let ref_path = dir.path().join("reference.png");
     std::fs::write(&ref_path, png()).unwrap();
     let a = client.upload(&ref_path).await.unwrap();
     let b = client.upload(&ref_path).await.unwrap();
-    let other_asset = http
+    let shared_asset = http
         .get(format!("{url}/v1/assets/{}", a.id))
-        .bearer_auth("other-token")
         .send()
         .await
         .unwrap();
-    assert_eq!(other_asset.status(), 404);
+    assert_eq!(shared_asset.status(), 200);
     let refs = vec![b.id, a.id];
     let settings = GenerationSettings {
         steps: 24,
@@ -225,6 +197,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         1_000_000
     );
     let submission = Submission {
+        upscale_source: None,
         request,
         key: "same-submission".into(),
         folder: dir.path().join("images"),
@@ -247,7 +220,10 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         .await
         .unwrap();
     assert_eq!(std::fs::read(&first.assets[0].file).unwrap(), png());
-    assert_eq!(first.assets[0].file.parent().unwrap(), submission.folder);
+    assert_eq!(
+        first.assets[0].file.parent().unwrap().parent().unwrap(),
+        submission.folder
+    );
     assert_eq!(requests.lock().unwrap()[0].prompt, "  Exact prompt  ");
     assert_eq!(first.seed, Some(u32::MAX as u64));
     assert!(!observed_progress.is_empty());
@@ -262,16 +238,14 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         assert_eq!(received.sampling.steps, 24);
         assert_eq!(received.sampling.cfg_scale, 3.25);
     }
-    let hidden = http
+    let shared_job = http
         .get(format!("{url}/v1/jobs/{}", id.as_ref().unwrap()))
-        .bearer_auth("other-token")
         .send()
         .await
         .unwrap();
-    assert_eq!(hidden.status(), 404);
+    assert_eq!(shared_job.status(), 200);
     let events = http
         .get(format!("{url}/v1/jobs/{}/events", id.as_ref().unwrap()))
-        .bearer_auth("synthetic-test-token")
         .send()
         .await
         .unwrap();
@@ -286,6 +260,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     let blocked = dir.path().join("blocked-output");
     *blocker.lock().unwrap() = Some(blocked.clone());
     let mut submission = Submission {
+        upscale_source: None,
         request: make_request("another", "", &[], &meta, &GenerationSettings::default()).unwrap(),
         key: "disk-error".into(),
         folder: blocked,
@@ -334,6 +309,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     )
     .unwrap();
     let submission = Submission {
+        upscale_source: None,
         request,
         key: "text-sheet".into(),
         folder: dir.path().join("text-sheet"),
@@ -356,7 +332,10 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         [OutputRole::Sheet, OutputRole::Portrait, OutputRole::Views]
     );
     for asset in &completed.assets {
-        assert_eq!(asset.file.parent().unwrap(), submission.folder);
+        assert_eq!(
+            asset.file.parent().unwrap().parent().unwrap(),
+            submission.folder
+        );
         assert!(
             asset
                 .file
@@ -364,7 +343,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
                 .unwrap()
                 .to_str()
                 .unwrap()
-                .ends_with(&format!("-{}.png", asset.role.name()))
+                .ends_with(&format!("_{}.png", asset.role.name()))
         );
         image::load_from_memory(&std::fs::read(&asset.file).unwrap()).unwrap();
     }
@@ -375,11 +354,17 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         ),
         (512, 288)
     );
-    assert_eq!(std::fs::read_dir(&submission.folder).unwrap().count(), 3);
+    assert_eq!(
+        std::fs::read_dir(completed.assets[0].file.parent().unwrap())
+            .unwrap()
+            .count(),
+        3
+    );
     // Reference sheet: failed saving retries the completed job, not either inference pass.
     let blocked = dir.path().join("blocked-sheet");
     *blocker.lock().unwrap() = Some(blocked.clone());
     let mut submission = Submission {
+        upscale_source: None,
         request: make_sheet_request("", "Blue dress", 512, "", &refs, &meta, &settings).unwrap(),
         key: "reference-sheet".into(),
         folder: blocked,
@@ -401,7 +386,12 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     submission.folder = dir.path().join("recovered-sheet");
     let saved = client.generate(submission.clone(), |_| {}).await.unwrap();
     assert_eq!(saved.assets.len(), 3);
-    assert_eq!(std::fs::read_dir(&submission.folder).unwrap().count(), 3);
+    assert_eq!(
+        std::fs::read_dir(saved.assets[0].file.parent().unwrap())
+            .unwrap()
+            .count(),
+        3
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 6);
     {
         let requests = requests.lock().unwrap();
@@ -410,6 +400,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     }
     // Cancellation returns a terminal result and saves no partial sheet.
     let submission = Submission {
+        upscale_source: None,
         request: make_sheet_request("Cancel test", "", 512, "", &[], &meta, &settings).unwrap(),
         key: "cancel-sheet".into(),
         folder: dir.path().join("cancel-sheet"),
@@ -442,30 +433,46 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     ] {
         let source_bytes = std::fs::read(&source.file).unwrap();
         let before = calls.load(Ordering::SeqCst);
-        let blocked = dir.path().join(format!("blocked-upscale-{ratio}"));
-        *blocker.lock().unwrap() = Some(blocked.clone());
         let mut submission = Submission {
+            upscale_source: Some(source.file.clone()),
             request: make_upscale_request(&source.asset_id, target, ratio, &settings).unwrap(),
             key: format!("upscale-{ratio}"),
-            folder: blocked,
+            folder: dir.path().join("ignored-upscale-folder"),
             job: None,
         };
         let mut job = None;
-        let error = client
+        let upscaled = client
             .generate(submission.clone(), |p| {
                 if let Progress::Submitted(id) = p {
                     job = Some(id);
                 }
             })
             .await
+            .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), before + 1);
+        assert!(!submission.folder.exists());
+        submission.job = job;
+        let blocked = dir.path().join(format!("blocked-upscale-{ratio}"));
+        std::fs::write(&blocked, b"blocked").unwrap();
+        submission.upscale_source = Some(blocked.join("image_0001.png"));
+        let error = client
+            .generate(submission.clone(), |_| {})
+            .await
             .err()
             .unwrap();
         assert!(error.retryable);
+        submission.upscale_source = Some(source.file.clone());
+        let recovered = client.generate(submission, |_| {}).await.unwrap();
         assert_eq!(calls.load(Ordering::SeqCst), before + 1);
-        submission.job = job;
-        submission.folder = source.file.parent().unwrap().into();
-        let upscaled = client.generate(submission, |_| {}).await.unwrap();
-        assert_eq!(calls.load(Ordering::SeqCst), before + 1);
+        let stem = source.file.file_stem().unwrap().to_str().unwrap();
+        assert_eq!(
+            upscaled.assets[0].file,
+            source.file.with_file_name(format!("{stem}_upscaled.png"))
+        );
+        assert_eq!(
+            recovered.assets[0].file,
+            source.file.with_file_name(format!("{stem}_upscaled_2.png"))
+        );
         assert_eq!(upscaled.assets.len(), 1);
         let output = &upscaled.assets[0];
         assert_ne!(output.asset_id, source.asset_id);
@@ -484,6 +491,84 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         assert_eq!(request.references.len(), 1);
         assert_eq!(request.references[0].as_ref(), source_bytes);
     }
+    // Editing a registered output with generic, sparsely numbered references.
+    // Save recovery must reuse the completed job and never overwrite the source.
+    let source = &completed.assets[0];
+    let original_bytes = std::fs::read(&source.file).unwrap();
+    let bindings = vec![(1, refs[0].clone()), (3, refs[1].clone())];
+    let edit_prompt = "  Use reference 3 with referens 1.\nKeep the composition.  ";
+    let request = make_edit_request(
+        edit_prompt,
+        "negative",
+        EditSource {
+            asset_id: &source.asset_id,
+            width: 512,
+            height: 288,
+        },
+        &bindings,
+        &meta,
+        &settings,
+    )
+    .unwrap();
+    let before = calls.load(Ordering::SeqCst);
+    let blocked = dir.path().join("blocked-edit");
+    *blocker.lock().unwrap() = Some(blocked.clone());
+    let mut edit = Submission {
+        upscale_source: None,
+        request: request.clone(),
+        key: "edit-version".into(),
+        folder: blocked,
+        job: None,
+    };
+    let mut job = None;
+    let error = client
+        .generate(edit.clone(), |progress| {
+            if let Progress::Submitted(id) = progress {
+                job = Some(id);
+            }
+        })
+        .await
+        .err()
+        .unwrap();
+    assert!(error.retryable);
+    assert_eq!(calls.load(Ordering::SeqCst), before + 1);
+    edit.job = job;
+    edit.folder = dir.path().join("recovered-edit");
+    let saved_edit = client.generate(edit, |_| {}).await.unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), before + 1);
+    assert_ne!(saved_edit.assets[0].file, source.file);
+    assert_eq!(std::fs::read(&source.file).unwrap(), original_bytes);
+    {
+        let requests = requests.lock().unwrap();
+        let received = requests.last().unwrap();
+        assert_eq!((received.width, received.height), (512, 288));
+        assert!(received.prompt.ends_with(edit_prompt));
+        assert!(
+            received
+                .prompt
+                .contains("Reference 3 / referens 3 = <image3>")
+        );
+        assert_eq!(received.references.len(), 3);
+        assert_eq!(received.references[0].as_ref(), original_bytes);
+    }
+    let mut missing = request;
+    missing["inputs"]["reference_images"][0] = json!("asset_missing_source");
+    let error = client
+        .generate(
+            Submission {
+                upscale_source: None,
+                request: missing,
+                key: "missing-edit-source".into(),
+                folder: dir.path().join("missing-edit"),
+                job: None,
+            },
+            |_| {},
+        )
+        .await
+        .err()
+        .unwrap();
+    assert!(!error.retryable);
+    assert_eq!(calls.load(Ordering::SeqCst), before + 1);
     control.call(Action::Shutdown).await.unwrap();
     scheduler.await.unwrap().unwrap();
     proxy.close().await;
@@ -520,8 +605,6 @@ async fn incomplete_sheet_download_saves_nothing_and_retry_reuses_job() {
         ([("content-type", "image/png")], png()).into_response()
     }
     let root = tempfile::tempdir().unwrap();
-    let access = root.path().join("access.json");
-    std::fs::write(&access, br#"{"clients":{"test":"synthetic-token"}}"#).unwrap();
     let state = DownloadState {
         fail: Arc::new(AtomicBool::new(true)),
         submitted: Arc::new(AtomicUsize::new(0)),
@@ -534,13 +617,9 @@ async fn incomplete_sheet_download_saves_nothing_and_retry_reuses_job() {
     let server = tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();
     });
-    let client = Client::connect(&Connection {
-        url,
-        access,
-        client: "test".into(),
-    })
-    .unwrap();
+    let client = Client::connect(&Connection { url }).unwrap();
     let mut submission = Submission {
+        upscale_source: None,
         request: json!({"operation":"character_sheet"}),
         key: "download-sheet".into(),
         folder: root.path().join("outputs"),
@@ -562,7 +641,12 @@ async fn incomplete_sheet_download_saves_nothing_and_retry_reuses_job() {
     state.fail.store(false, Ordering::SeqCst);
     let completed = client.generate(submission.clone(), |_| {}).await.unwrap();
     assert_eq!(completed.assets.len(), 3);
-    assert_eq!(std::fs::read_dir(&submission.folder).unwrap().count(), 3);
+    assert_eq!(
+        std::fs::read_dir(completed.assets[0].file.parent().unwrap())
+            .unwrap()
+            .count(),
+        3
+    );
     assert_eq!(state.submitted.load(Ordering::SeqCst), 1);
     server.abort();
 }

@@ -16,8 +16,8 @@ async def run(kind,root):
     config=BrokerConfig(mcp_output_dir=str(root/'output'),mcp_input_dir=str(root/'input'),mcp_workflows_dir=str(ROOT/'proxy/workflows'))
     jobs=MediaJobs(config,WorkflowCatalog(config.mcp_workflows_dir,config.max_workflow_body_bytes),None,client);await jobs.start();listener=McpListener(jobs,0);await listener.start();url=f'http://127.0.0.1:{listener.port}/mcp'
    else:
-    creds=root/'access.json';creds.write_text(json.dumps({'admin_token':'synthetic'}));env={k:v for k,v in os.environ.items() if not k.startswith('ST_PROXY_')}
-    process=await asyncio.create_subprocess_exec(str(ROOT/'target/debug/st-proxy'),'--chat-port','0','--image-port','0','--mcp-port','0','--mcp-output-dir',str(root/'output'),'--mcp-input-dir',str(root/'input'),'--mcp-workflows-dir',str(ROOT/'proxy/workflows'),'--coordinator-socket',str(root/'gpu.sock'),'--imagine-access-file',str(creds),stderr=asyncio.subprocess.PIPE,env=env)
+    env={k:v for k,v in os.environ.items() if not k.startswith('ST_PROXY_')}
+    process=await asyncio.create_subprocess_exec(str(ROOT/'target/debug/st-proxy'),'--chat-port','0','--image-port','0','--mcp-port','0','--mcp-output-dir',str(root/'output'),'--mcp-input-dir',str(root/'input'),'--mcp-workflows-dir',str(ROOT/'proxy/workflows'),'--coordinator-socket',str(root/'gpu.sock'),stderr=asyncio.subprocess.PIPE,env=env)
     async with asyncio.timeout(10):
      while True:
       line=await process.stderr.readline();assert line,'Rust startup failed';m=re.search(r'MCP ready: (\S+)',line.decode())

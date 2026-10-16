@@ -8,7 +8,7 @@ This does not validate every allowed layout, prompt, reference count or GPU.
 
 ## Request
 
-Use the existing authenticated `POST /v1/jobs` endpoint:
+Use the existing local `POST /v1/jobs` endpoint:
 
 ```json
 {
@@ -36,14 +36,14 @@ Each description is limited to 12,000 UTF-8 bytes. Clothing is sent only to the
 body-view pass. Empty clothing asks the model to retain the reference outfit,
 or choose a coherent outfit when no reference exists.
 
-References are ordered, owner-scoped asset IDs from `POST /v1/assets`. Up to
+References are ordered, session-local asset IDs from `POST /v1/assets`. Up to
 eight identity references are accepted, reserving two of the current ten Qwen
 slots for the generated portrait and pose guide. A full existing character
 sheet is an ordinary identity reference: both panels are regenerated, with no
 promise of exact pixel preservation.
 
 Optional `inputs.pose_guide` is another owned asset ID. It replaces the built-in
-synthetic guide and reaches only the body-view pass. Its ownership and geometry
+synthetic guide and reaches only the body-view pass. Its presence and geometry
 are checked before queue admission, just like identity references.
 
 The output is 16:9. `output_width` is 512–4096 in multiples of 512. The default
@@ -57,7 +57,7 @@ options are unsupported; LoRAs and sampling use the normal Qwen profile options.
 `POST /v1/jobs/validate` performs validation without queueing or inference.
 `GET /v1/profiles/qwen-character-sheet` describes the options. Validation and
 profile descriptions omit character/clothing descriptions and prompt text.
-Owner-authenticated job details retain the effective request within the session.
+Local job details retain the effective request within the session.
 
 The new profile copies the existing explicit Qwen model and sampling defaults.
 Each pass with references selects the accepted hybrid/prefetch native profile.
@@ -98,7 +98,7 @@ A successful job has three entries in `output.assets`, in this order:
 | `turnaround` | Original full-resolution three-view body pass |
 
 `output.count: 1` means one sheet, not one returned artifact. All three assets
-share the existing owner isolation and session cleanup. The CPU compositor
+share the local API workspace and session cleanup. The CPU compositor
 covers/crops the portrait panel and contains the body-view image without
 stretching. RGBA is composited onto white. No generated prompt metadata is
 embedded in PNGs.
@@ -132,7 +132,7 @@ general workflow plugins and inference optimizations are outside this change.
 
 ## Verification boundary
 
-Synthetic tests exercise schema/ownership checks, privacy filtering, geometry,
+Synthetic tests exercise schema/asset checks, privacy filtering, geometry,
 RGBA composition, guide determinism, native reference preprocessing, prompt
 roles, seed wrap, idempotency, sequential passes, cancellation, second-pass
 failure and publication rollback. Existing API, proxy, coordinator and UI-client

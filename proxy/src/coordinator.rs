@@ -1070,18 +1070,11 @@ impl Coordinator {
         if self.config.coordinator_socket.is_none() {
             return Ok(());
         }
-        let access: Value = serde_json::from_slice(
-            &tokio::fs::read(self.config.imagine_access_file.as_ref().unwrap()).await?,
-        )?;
-        let token = access["admin_token"]
-            .as_str()
-            .ok_or_else(|| anyhow!("Imagine credentials unavailable"))?;
         let _permit = self.comfy.limit.acquire().await?;
         let r = self
             .comfy
             .client
             .post(format!("{}/v1/runtime/yield", self.config.imagine_url))
-            .bearer_auth(token)
             .timeout(Duration::from_secs_f64(self.config.unload_timeout))
             .send()
             .await?;

@@ -6,7 +6,6 @@ use serde_json::Value;
 pub struct Config {
     pub coordinator_socket: Option<String>,
     pub imagine_url: String,
-    pub imagine_access_file: Option<String>,
     pub listen_host: String,
     pub chat_port: usize,
     pub image_port: usize,
@@ -55,7 +54,6 @@ impl Default for Config {
         Self {
             coordinator_socket: None,
             imagine_url: "http://127.0.0.1:8080".into(),
-            imagine_access_file: None,
             listen_host: "127.0.0.1".into(),
             chat_port: 5001,
             image_port: 8188,
@@ -270,9 +268,6 @@ impl Config {
         }
         self.comfy_url = normalize_origin(&self.comfy_url)?;
         self.imagine_url = normalize_origin(&self.imagine_url)?;
-        if self.coordinator_socket.is_some() && self.imagine_access_file.is_none() {
-            bail!("Imagine coordination requires --imagine-access-file")
-        }
         if self.chat_port > 65535 || self.image_port > 65535 {
             bail!("listen ports must be between 0 and 65535")
         }

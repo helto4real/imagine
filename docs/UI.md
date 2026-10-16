@@ -27,34 +27,31 @@ Enable it explicitly with `--comfy-enabled true` when using Comfy routes.
 have separate lifetimes; closing the window does not stop the server or cancel
 an accepted job. Use **Cancel** while a generation is active to request cancellation.
 
-Defaults: proxy API `http://127.0.0.1:8189/imagine`, the `local` client token in
-`.imagine/access.json`. Start the server once to create that file. If the server
-is offline, the window remains usable for writing a prompt and selecting an
+Default proxy API: `http://127.0.0.1:8189/imagine`. No token or credentials file
+is needed. If the server is offline, the window remains usable for writing a prompt and selecting an
 output folder; choose **Reconnect** after starting Imagine and the proxy.
 
 ```sh
-./start-ui.sh --api http://127.0.0.1:8189/imagine --access /private/api-data/access.json --client local
+./start-ui.sh --api http://127.0.0.1:8189/imagine
 ```
 
 The proxy forwards `/imagine/*` on its image port to `--imagine-url` (default
 `http://127.0.0.1:8080`), stripping the `/imagine` prefix. The UI uses that base
 for metadata, uploads, job submissions/polling/cancellation and PNG downloads.
-The proxy preserves bearer credentials and idempotency keys; Imagine enforces
-client ownership and admin permissions. The HTTP forwarding does not reserve a
-second GPU slot: Imagine reserves its job ticket in the shared coordinator FIFO.
+The proxy preserves session and idempotency headers and strips Authorization.
+Imagine uses one local workspace for all clients, including runtime controls.
+The HTTP forwarding does not reserve a second GPU slot: Imagine reserves its job ticket in the shared coordinator FIFO.
 There is no automatic direct fallback when the proxy is unavailable.
 
-The root launchers default to `.imagine/gpu.sock` on both sides and
-`.imagine/access.json` for the proxy's coordinator credentials. For custom paths,
-set `IMAGINE_COORDINATOR_SOCKET` for the server and matching
-`ST_PROXY_COORDINATOR_SOCKET` / `ST_PROXY_IMAGINE_ACCESS_FILE` for the proxy (CLI
-options still override proxy environment defaults). Use `--api` for a different
-proxy address or an explicitly chosen direct API. To run a standalone server
+The root launchers default to `.imagine/gpu.sock` on both sides. For custom
+paths, set `IMAGINE_COORDINATOR_SOCKET` for the server and matching
+`ST_PROXY_COORDINATOR_SOCKET` for the proxy (CLI options override environment
+defaults). Use `--api` for a different API address. To run a standalone server
 without coordination, invoke the server binary without `IMAGINE_COORDINATOR_SOCKET`.
 
-The application reads only the selected client token and does not use the admin
-token. Tokens are not accepted on the command line or stored in UI preferences.
-The optional API URL supports HTTPS proxies; HTTP redirects are refused.
+Imagine binds only to loopback. When Imagine coordination is enabled, the proxy
+also requires a loopback image listener. The UI needs only the API URL;
+`--access` and `--client` have been removed. HTTP redirects remain refused.
 
 Linux prerequisites include a working Wayland or X11 session, an OpenGL-capable
 display driver and an XDG desktop portal file chooser. The UI uses the host's
@@ -143,6 +140,55 @@ small thumbnails only for display. The
 file dialog's order is used initially and can be adjusted before submission.
 Only one reference has local model-quality validation. H3 is not exposed here.
 
+## Editing generated images
+
+Choose **Edit image** (pencil) on the Image result to open an independent editing
+draft. The source stays in the viewer; the right panel contains **References**,
+**Prompt**, and **Create version**. The original generation prompt and references
+are preserved separately and are not copied into the editing draft.
+
+Use **Add references** to choose PNG/JPEG/WebP files. References have no content
+categories or assigned semantic roles. Their numbers are stable within the edit
+session: removing Reference 2 does not rename Reference 3, and a newly added image
+gets a new number. Refer to them in the prompt as `Reference 1` or `referens 1`
+(case insensitive). Explicit numbered references that are no longer present are
+rejected before submission. The source occupies one of the model's ten image
+slots, leaving up to nine optional extra references.
+
+The client sends the source asset first and the extra assets in display order.
+A short Qwen binding prefix identifies the source as `<image1>` and maps the
+stable reference numbers to the remaining image positions. The user's prompt
+is appended verbatim; references have only the meanings given by that prompt.
+The output keeps the selected source dimensions and uses the current sampling,
+seed and negative-prompt settings. Model configuration and reference preprocessing
+are unchanged. Number binding does not guarantee model fidelity or unchanged pixels.
+
+Each successful edit saves a new file using the normal dated output folder and
+numbering. The source file is never overwritten. The selector below the viewer
+switches between **Original** and **Version N**; the selected version becomes the
+source for the next edit. **Finish editing** returns the selected result to the
+normal Image view without replacing its generation draft. Reopening editing
+restores the edit draft and versions. A new successful ordinary image generation
+or upscale starts a new editing lineage; saved files remain untouched.
+
+Hover over an edited version to compare it with the image that version was
+created from. The source appears left of the pointer and the edited result right
+of it, separated by a vertical line. Both sides share zoom and pan. Leaving the
+image or unfocusing the window restores the edited result; Original has no
+comparison. Visual privacy applies to both sides.
+
+Uploads and job results return to the editing draft even after switching tabs.
+Requests capture their source, prompt, reference bindings and settings at submission.
+Retry reuses the same request, idempotency key and accepted job; changing a draft
+does not alter that request. References, version selection and leaving the editing
+mode are locked while uploading or while a job/retry is pending. Errors and
+cancellation preserve the draft and earlier versions. If the server session has
+lost an asset, select a current result or upload the missing reference again.
+
+Editing drafts and version links are session-only. Existing visual privacy also
+covers the edit source, all extra references and the prompt. Character-sheet
+editing, masks, brushes and persistent version history are outside this feature.
+
 ## Character sheets
 
 The **Character sheets** tab reuses the image desk's three-panel layout and controls.
@@ -166,8 +212,9 @@ same job semantics as image generation. Async events always return to their
 originating tab, even while another tab is visible.
 
 The client downloads and decodes all three roles before saving them to the
-selected folder as `imagine-<UUID>-character_sheet.png`, `-portrait.png` and
-`-turnaround.png`, sharing one UUID. **Saved** appears only after all files have
+selected folder's local-date subfolder as `image_0001_character_sheet.png`,
+`image_0001_portrait.png` and `image_0001_turnaround.png`, sharing one sequence
+number. **Saved** appears only after all files have
 been synced. Handled write failures remove files created by that save attempt;
 if cleanup itself fails the UI reports partial files. A process/system crash
 can leave partial files. Retry retrieves the existing job and uses the currently
@@ -210,12 +257,9 @@ of that client attempt (including submission, polling, download and saving).
 This is not a GPU-only benchmark; a recovery attempt measures only that attempt.
 Hovering the footer exposes the saved path.
 
-The circular arrow beside Generate repeats the last successful generation with
-its original prompt, ordered references and settings, using a new job and
-idempotency key. Random seed requests stay random; fixed seeds remain fixed.
-It saves to the currently selected output folder. The last successful request
-is kept only in memory for this UI session. Generate uses the current editor
-values. Retry appears beside a recoverable error and retains the unresolved
+Upscale beside Generate enhances the saved result as described above. Generate
+uses the current editor values. Retry appears beside a recoverable error and
+retains the unresolved
 job/idempotency key. Cancel remains a separate icon. Fit and Actual pixels are separate view actions;
 the hand tool enables/disables dragging at actual pixel scale. Selecting the hand
 from Fit enters actual pixel view. Images always preserve their proportions.
@@ -229,8 +273,23 @@ are outside Git. A user-selected folder can be anywhere the process can write;
 files there are normal unencrypted PNGs, subject to that folder's permissions.
 The server retains its original asset according to the API's storage behavior.
 
-Each downloaded image is saved as `imagine-<UUID>.png`. `create_new` prevents
-replacing an existing file; the client syncs the file before reporting success.
+New generations are saved under `<output folder>/YYYY-MM-DD/` using the local
+calendar date when saving begins. Images and character-sheet sets share one
+sequence per date, starting at `image_0001.png`; numbers have at least four digits
+so ordinary name sorting puts 0009 before 0010. Existing filenames determine the
+next number after restarting the UI, including partial sheet sets. Existing
+files are neither renamed nor moved.
+
+Upscale retains the original directory and base name, even on another day or
+after selecting a different output folder: `image_0001_upscaled.png`, followed
+by `image_0001_upscaled_2.png`, `_3.png`, etc. Upscaling an already upscaled image
+continues that same variant sequence. Sheets use
+`image_0002_character_sheet_upscaled.png`; their separate portrait/views files
+keep their names. Number allocation is protected by a directory lock across UI
+processes. The destination filesystem must support this advisory lock.
+
+`create_new` prevents replacing an existing file; the client syncs the file before
+reporting success.
 Handled write failures remove that client's partial file. An abrupt process or
 system crash during writing can leave an incomplete file; it is never announced
 as successfully saved. No hard-link support is required from the destination.
@@ -239,12 +298,15 @@ Network operations, image decoding and generation run off the UI thread.
 **Retry** preserves the original request, idempotency key and known job ID.
 After an ambiguous submission it uses the same idempotency key; after acceptance
 it polls/downloads the same job. It does not silently generate a new image.
-If saving fails, select another output folder and retry to download/save the
-completed server asset. Prompts and generation settings remain editable while
+If saving a new generation fails, select another output folder and retry to
+download/save the completed server asset. For an upscale, restore write access
+to the original image folder and retry; its destination stays beside the source.
+Prompts and generation settings remain editable while
 an image is being generated; changes prepare the next Generate action. The
 running job keeps its captured request and output folder, and its completion
 does not replace the draft. Retry retains the original request but uses the
-currently selected output folder for saving. Reference order stays locked
+currently selected output folder for saving new generations; an upscale retains
+its captured source path. Reference order stays locked
 while a job is pending. In-progress jobs are not restored by the UI after closing it; they
 remain accessible through the API until Imagine stops. Server restart clears all
 history and assets; already saved local images remain. The current UI has no history browser.
@@ -273,6 +335,8 @@ IMAGINE_UI_PREVIEW_DIR="$PWD/target/ui-previews" cargo test --locked -p imagine-
 IMAGINE_UI_PREVIEW_DIR="$PWD/target/reference-desk-previews" cargo test --locked -p imagine-ui --lib headless_reference_desk
 # Character-sheet layouts and all result roles, using only procedural pixels:
 IMAGINE_UI_PREVIEW_DIR="$PWD/target/character-sheet-previews" cargo test --locked -p imagine-ui --lib headless_character_sheet
+# Editing layout and concealment, using only procedural pixels:
+IMAGINE_UI_PREVIEW_DIR="$PWD/target/edit-previews" cargo test --locked -p imagine-ui --lib headless_edit_layout_and_privacy
 # Explicit opt-in native preview with a temporary profile and procedural images:
 cargo run --locked -p imagine-ui --features ui-preview --example reference-desk
 ```
@@ -405,3 +469,63 @@ Formatting, all-targets/all-features Clippy with warnings denied, the release UI
 build and launcher help passed. Synthetic CPU-rendered settings and image/sheet
 layouts were inspected. Local socket tests used sandbox escalation; no live GPU
 generation, native window interaction or service restart was performed.
+
+### Dated output folders — 2026-10-16
+
+All 96 workspace tests passed, including 38 UI unit tests. Synthetic filesystem
+checks cover dated directories, shared image/sheet numbering, sorting beyond nine,
+existing partial sets, concurrent saves and repeated upscales beside an older
+source. The real proxy/API fixture verifies image/sheet file layout, save recovery
+and upscale destination retention without repeating inference. Formatting,
+all-targets/all-features Clippy, release UI build and launcher help passed.
+Only synthetic data was used; socket tests required sandbox escalation. No live
+generation or native window check was run.
+
+### Image editing with generic references — 2026-10-16
+
+All 105 workspace tests passed, including 47 UI unit tests. New checks cover
+stable sparse reference numbers, source-first model bindings, exact user prompt
+preservation, source dimensions, missing references, nine extra inputs, isolated
+drafts, async routing across tabs, version selection, cancellation, upload errors
+and frozen retry requests. The real proxy/API fixture with fake inference edits
+a registered result with extra references, preserves the original file and
+recovers saving without repeating inference. Missing source assets are rejected.
+
+Headless interaction and CPU-rendering checks cover desktop, compact and privacy
+states using procedural images only; those renderings were visually inspected.
+Formatting, workspace/all-targets/all-features Clippy with warnings denied,
+release UI build, launcher help and diff checks passed. The initial socket test
+was blocked by the sandbox; the passing workspace run used approved escalation
+for isolated local test ports. No runtime data, live model generation, Computer
+Use, native window/file-dialog interaction or service restart was involved.
+Multi-reference model fidelity remains unvalidated. Changes are uncommitted.
+
+### Hover comparison in image editing — 2026-10-16
+
+All 49 UI unit tests passed. New synthetic checks cover version source links,
+branches from Original, pointer-driven clipping, shared zoom/pan geometry,
+HiDPI, leaving the image, window focus and privacy. A CPU-rendered comparison
+using procedural pixels was visually inspected. UI all-targets/all-features
+Clippy with warnings denied, workspace formatting, release UI build and diff
+checks passed. No runtime data, model generation or Computer Use was involved;
+native-window interaction remains untested. No escalation was needed for these
+checks. Changes are uncommitted.
+
+### Token-free local API — 2026-10-16
+
+Imagine credentials have been removed from API, UI and proxy integration. This
+supersedes the earlier authentication/owner-separation acceptance notes above.
+The full workspace run passed 106 Rust tests. A final UI-only run against the
+latest UI work passed 49 unit tests and two synthetic HTTP integration tests. Checks cover shared local assets/jobs,
+idempotent retries, cancellation, unload/resume, GPU coordination, stale sessions,
+MCP recovery, refusal of a non-loopback Imagine proxy listener, and stripping
+Authorization while preserving session/idempotency headers. Two isolated actual
+server-binary tests passed without a credentials file or model loading.
+
+Formatting, all-targets/all-features Clippy with warnings denied, release builds
+of all workspace binaries, CLI help checks and syntax checks of six updated
+Python test scripts passed. Socket/bin tests required sandbox escalation. Live
+GPU and native UI acceptance were not run; running services were not restarted.
+Restart API, proxy and UI together to use the new connection contract. Existing
+`access.json` files remain untouched and unused. Helto profile decryption and
+separate proxy MCP authentication retain their existing behavior.

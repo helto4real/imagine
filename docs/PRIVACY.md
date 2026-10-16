@@ -1,8 +1,11 @@
 # Session privacy
 
 Start Imagine with `./start-server.sh`. There is no password or YubiKey login,
-Python authentication helper, or application-level media encryption. API bearer
-credentials remain required, so the UI and MCP keep using their existing tokens.
+Python authentication helper, or application-level media encryption. API, UI and the proxy
+connect without Imagine tokens; all local clients share jobs/assets and runtime
+controls. Loopback binding remains required. `access.json` is no longer created
+or read; an existing file is left unused. Separate MCP endpoint authentication
+and Helto profile decryption are unchanged.
 `--no-encryption` is accepted as a compatibility no-op; plain storage is always used.
 The removed `--unlock` and `--enroll-yubikey` options are no longer supported.
 
@@ -23,7 +26,7 @@ if present, are unused and are not read or removed by the server.
 - Ctrl-C/SIGTERM stops the worker and HTTP service, closes the memory database
   and removes the session's internal media. Core dumps are disabled for Imagine,
   its child processes and the proxy.
-- API tokens are retained across sessions. Submitted prompt text is not written
+- Submitted prompt text is not written
   to ordinary logs or persistent job history. Prompt-based troubleshooting can
   be handled explicitly by the client.
 
@@ -33,7 +36,7 @@ VeraCrypt volume. Imagine does not encrypt MCP exports itself. The output direct
 is exclusively disposable: startup removes all previous contents, including
 registered reference previews. A lock prevents two proxies from sharing it.
 
-The proxy monitors the authenticated Imagine session once per second. Losing
+The proxy monitors the Imagine session once per second. Losing
 that session, or seeing a new session ID, stops old MCP tasks and removes their
 history, reference previews and unconfirmed exports. Requests fail closed while
 Imagine is unavailable. MCP API requests carry `X-Imagine-Session`; the server
@@ -43,8 +46,8 @@ local filesystem work. `confirm_saved` still removes confirmed staging files
 immediately. Proxy shutdown also clears the entire staging area.
 
 Original files under `mcp-inputs`, images copied to client project directories,
-UI-saved images (including `.imagine/images`), UI preferences, profiles, API
-credentials, native builds and baseline evidence are not disposable history.
+UI-saved images (including `.imagine/images`), UI preferences, profiles, unused legacy API
+credential files, native builds and baseline evidence are not disposable history.
 They are not removed or encrypted by this lifecycle.
 
 Deletion unlinks files; it is not a secure overwrite of SSDs, snapshots or
@@ -57,7 +60,7 @@ application's session cleanup.
 ## Verification
 
 Automated checks use disposable stores and synthetic prompts/images. They cover
-plain media, API authentication, ownership, restart isolation, cleanup and MCP
+plain media, token-free local access, restart isolation, cleanup and MCP
 session loss.
 
 ```sh
@@ -68,7 +71,6 @@ python3 scripts/test_server_privacy.py
 ```
 
 The binary test launches the actual server in temporary projects with closed
-stdin, verifies startup without terminal login, plain media, retained API bearer
-authentication, startup purge, SIGTERM cleanup and restart isolation. It also
+stdin, verifies startup without terminal login, plain media, token-free API access, startup purge, SIGTERM cleanup and restart isolation. It also
 checks the legacy `--no-encryption` flag. It never starts a model or accesses
 real credentials/history.

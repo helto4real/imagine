@@ -14,6 +14,7 @@ use std::{
 };
 
 struct ReferenceView {
+    number: usize,
     id: String,
     name: String,
     texture: egui::TextureHandle,
@@ -43,16 +44,19 @@ fn runtime() -> tokio::runtime::Runtime {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Workspace {
     Image,
+    ImageEdit,
     CharacterSheet,
     Video,
 }
 
+#[derive(Clone)]
 struct ResultView {
     asset_id: String,
     role: OutputRole,
     texture: egui::TextureHandle,
     file: PathBuf,
 }
+#[derive(Clone)]
 struct Results {
     assets: Vec<ResultView>,
     seed: Option<u64>,
@@ -128,6 +132,7 @@ pub struct ImagineApp {
     client: Option<Client>,
     metadata: Option<Value>,
     image: GenerationDesk,
+    edit: editing::EditSession,
     sheet: GenerationDesk,
     connecting: bool,
     picking_folder: bool,
@@ -164,6 +169,7 @@ impl ImagineApp {
             client: None,
             metadata: None,
             image: GenerationDesk::default(),
+            edit: editing::EditSession::default(),
             sheet: GenerationDesk {
                 selected_role: OutputRole::Sheet,
                 ..Default::default()
@@ -180,12 +186,14 @@ impl ImagineApp {
     }
     fn desk_for(&self, workspace: Workspace) -> &GenerationDesk {
         match workspace {
+            Workspace::ImageEdit => &self.edit.desk,
             Workspace::CharacterSheet => &self.sheet,
             _ => &self.image,
         }
     }
     fn desk_for_mut(&mut self, workspace: Workspace) -> &mut GenerationDesk {
         match workspace {
+            Workspace::ImageEdit => &mut self.edit.desk,
             Workspace::CharacterSheet => &mut self.sheet,
             _ => &mut self.image,
         }
@@ -197,10 +205,17 @@ impl ImagineApp {
         self.desk_for_mut(self.workspace)
     }
     fn busy(&self) -> bool {
-        self.image.working || self.sheet.working || self.image.uploading || self.sheet.uploading
+        self.image.working
+            || self.sheet.working
+            || self.image.uploading
+            || self.sheet.uploading
+            || self.edit.desk.working
+            || self.edit.desk.uploading
     }
     fn reference_limit(&self) -> usize {
-        if self.workspace == Workspace::CharacterSheet {
+        if self.workspace == Workspace::ImageEdit {
+            9
+        } else if self.workspace == Workspace::CharacterSheet {
             8
         } else {
             10
@@ -209,6 +224,7 @@ impl ImagineApp {
     fn can_generate(&self) -> bool {
         match self.workspace {
             Workspace::Image => !self.image.prompt.trim().is_empty(),
+            Workspace::ImageEdit => !self.edit.desk.prompt.trim().is_empty(),
             Workspace::CharacterSheet => {
                 self.metadata
                     .as_ref()
@@ -267,7 +283,9 @@ impl ImagineApp {
                         .last()
                         .and_then(|path| path.parent())
                         .map(|directory| directory.to_path_buf());
-                    let limit = if workspace == Workspace::CharacterSheet {
+                    let limit = if workspace == Workspace::ImageEdit {
+                        9
+                    } else if workspace == Workspace::CharacterSheet {
                         8
                     } else {
                         10
@@ -301,7 +319,15 @@ impl ImagineApp {
                 Message::Uploaded(workspace, result) => match result {
                     Ok(reference) => {
                         let texture = texture(ctx, &reference.preview, &reference.id);
+                        let number = if workspace == Workspace::ImageEdit {
+                            let number = self.edit.next_reference_number;
+                            self.edit.next_reference_number += 1;
+                            number
+                        } else {
+                            0
+                        };
                         self.desk_for_mut(workspace).references.push(ReferenceView {
+                            number,
                             id: reference.id,
                             name: reference.name,
                             texture,
@@ -385,6 +411,15 @@ impl ImagineApp {
                             state.pending = None;
                             state.status = "Saved".into();
                             state.error = None;
+                            if workspace == Workspace::ImageEdit {
+                                self.edit.versions.push(editing::EditVersion {
+                                    result: self.edit.desk.result.clone().unwrap(),
+                                    source: Some(self.edit.selected),
+                                });
+                                self.edit.selected = self.edit.versions.len() - 1;
+                            } else if workspace == Workspace::Image {
+                                self.edit = editing::EditSession::default();
+                            }
                         }
                         Err(error) => {
                             state.error = Some(error.message);
@@ -422,7 +457,9 @@ impl ImagineApp {
             let Some(metadata) = &self.metadata else {
                 return;
             };
-            let request = if workspace == Workspace::CharacterSheet {
+            let request = if workspace == Workspace::ImageEdit {
+                self.edit_request()
+            } else if workspace == Workspace::CharacterSheet {
                 client::make_sheet_request(
                     &state.character_description,
                     &state.clothing_description,
@@ -449,6 +486,7 @@ impl ImagineApp {
                 }
             };
             self.desk_mut().pending = Some(Submission {
+                upscale_source: None,
                 request,
                 key: uuid::Uuid::new_v4().to_string(),
                 folder: self.prefs.output_folder.clone(),
@@ -485,7 +523,7 @@ impl ImagineApp {
         let role = match self.workspace {
             Workspace::Image => OutputRole::Image,
             Workspace::CharacterSheet => OutputRole::Sheet,
-            Workspace::Video => return None,
+            Workspace::Video | Workspace::ImageEdit => return None,
         };
         self.desk()
             .result
@@ -502,6 +540,7 @@ impl ImagineApp {
             .upscale_source()
             .ok_or_else(|| anyhow::anyhow!("Generate an image before upscaling."))?;
         Ok(Submission {
+            upscale_source: Some(source.file.clone()),
             request: client::make_upscale_request(
                 &source.asset_id,
                 self.prefs.upscale_target,
@@ -581,6 +620,9 @@ impl ImagineApp {
 #[path = "workspace.rs"]
 mod workspace;
 
+#[path = "editing.rs"]
+mod editing;
+
 #[cfg(any(test, feature = "ui-preview"))]
 #[path = "preview.rs"]
 mod preview;
@@ -617,6 +659,26 @@ fn private_image(
 fn image_view(
     ui: &mut egui::Ui,
     texture: &egui::TextureHandle,
+    size: egui::Vec2,
+    privacy_mode: bool,
+    actual_pixels: bool,
+    pan_enabled: bool,
+    pan: &mut egui::Vec2,
+) -> egui::Response {
+    image_view_layers(
+        ui,
+        (texture, None),
+        size,
+        privacy_mode,
+        actual_pixels,
+        pan_enabled,
+        pan,
+    )
+}
+
+fn image_view_layers(
+    ui: &mut egui::Ui,
+    (texture, before): (&egui::TextureHandle, Option<&egui::TextureHandle>),
     size: egui::Vec2,
     privacy_mode: bool,
     actual_pixels: bool,
@@ -668,12 +730,47 @@ fn image_view(
             );
         }
         let image_rect = egui::Rect::from_min_size(origin, image_size);
-        ui.painter().with_clip_rect(visible_rect).image(
-            texture.id(),
-            image_rect,
-            egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1., 1.)),
-            egui::Color32::WHITE,
-        );
+        let visible_image = image_rect.intersect(visible_rect);
+        let split = before.filter(|_| response.hovered()).and_then(|before| {
+            ui.input(|input| {
+                input
+                    .pointer
+                    .hover_pos()
+                    .filter(|pos| input.focused && visible_image.contains(*pos))
+                    .map(|pos| (before, pos.x))
+            })
+        });
+        let uv = egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1., 1.));
+        if let Some((before, x)) = split {
+            let left =
+                egui::Rect::from_min_max(visible_image.min, egui::pos2(x, visible_image.bottom()));
+            let right =
+                egui::Rect::from_min_max(egui::pos2(x, visible_image.top()), visible_image.max);
+            ui.painter().with_clip_rect(left).image(
+                before.id(),
+                image_rect,
+                uv,
+                egui::Color32::WHITE,
+            );
+            ui.painter().with_clip_rect(right).image(
+                texture.id(),
+                image_rect,
+                uv,
+                egui::Color32::WHITE,
+            );
+            ui.painter().with_clip_rect(visible_image).vline(
+                x,
+                visible_image.y_range(),
+                egui::Stroke::new(1., helto::ACCENT),
+            );
+        } else {
+            ui.painter().with_clip_rect(visible_rect).image(
+                texture.id(),
+                image_rect,
+                uv,
+                egui::Color32::WHITE,
+            );
+        }
     } else {
         // Do not submit the private image to the painter while concealed.
         ui.painter().text(

@@ -52,10 +52,12 @@ impl ImagineApp {
             bounds.max - egui::vec2(8., 8.),
         );
         region(ui, "workspace", body, |ui| match self.workspace {
-            Workspace::Image | Workspace::CharacterSheet if body.width() >= 900. => {
+            Workspace::Image | Workspace::ImageEdit | Workspace::CharacterSheet
+                if body.width() >= 900. =>
+            {
                 ui.push_id(self.workspace, |ui| self.image_workspace(ui, body));
             }
-            Workspace::Image | Workspace::CharacterSheet => {
+            Workspace::Image | Workspace::ImageEdit | Workspace::CharacterSheet => {
                 egui::ScrollArea::vertical()
                     .id_salt("compact-workspace")
                     .show(ui, |ui| {
@@ -111,10 +113,19 @@ impl ImagineApp {
         let tabs = Rect::from_center_size(rect.center(), egui::vec2(110., 32.));
         region(ui, "tabs", tabs, |ui| {
             ui.horizontal(|ui| {
-                if helto::icon_button(ui, Icon::Image, "Image", self.workspace == Workspace::Image)
-                    .clicked()
+                if helto::icon_button(
+                    ui,
+                    Icon::Image,
+                    "Image",
+                    matches!(self.workspace, Workspace::Image | Workspace::ImageEdit),
+                )
+                .clicked()
                 {
-                    self.workspace = Workspace::Image;
+                    self.workspace = if self.edit.open {
+                        Workspace::ImageEdit
+                    } else {
+                        Workspace::Image
+                    };
                 }
                 if helto::icon_button(
                     ui,
@@ -198,6 +209,10 @@ impl ImagineApp {
     }
 
     fn image_workspace(&mut self, ui: &mut Ui, rect: Rect) {
+        if self.workspace == Workspace::ImageEdit {
+            self.edit_workspace(ui, rect);
+            return;
+        }
         let (references, viewer, prompt) = if rect.width() >= 900. {
             let refs_width = (rect.width() * 0.195).clamp(180., 320.);
             let prompt_width = (rect.width() * 0.235).clamp(240., 360.);
@@ -232,8 +247,112 @@ impl ImagineApp {
         region(ui, "prompt", prompt.shrink(12.), |ui| self.prompt_panel(ui));
     }
 
+    fn edit_workspace(&mut self, ui: &mut Ui, rect: Rect) {
+        let (viewer, inspector) = if rect.width() >= 900. {
+            let width = (rect.width() * 0.28).clamp(300., 380.);
+            (
+                Rect::from_min_max(
+                    rect.min,
+                    egui::pos2(rect.right() - width - 8., rect.bottom()),
+                ),
+                Rect::from_min_max(egui::pos2(rect.right() - width, rect.top()), rect.max),
+            )
+        } else {
+            (
+                Rect::from_min_size(rect.min, egui::vec2(rect.width(), 360.)),
+                Rect::from_min_max(egui::pos2(rect.left(), rect.top() + 368.), rect.max),
+            )
+        };
+        panel(ui, viewer, true);
+        panel(ui, inspector, false);
+        region(ui, "edit-viewer", viewer.shrink(10.), |ui| self.viewer(ui));
+        region(ui, "edit-inspector", inspector.shrink(12.), |ui| {
+            egui::ScrollArea::vertical()
+                .id_salt("edit-inspector-scroll")
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.label("Edit image");
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            if ui
+                                .add_enabled_ui(self.editable(), |ui| {
+                                    helto::icon_button(ui, Icon::Close, "Finish editing", false)
+                                })
+                                .inner
+                                .clicked()
+                            {
+                                self.finish_editing();
+                            }
+                        });
+                    });
+                    if self.workspace != Workspace::ImageEdit {
+                        return;
+                    }
+                    ui.add_space(12.);
+                    self.reference_panel(ui);
+                    ui.add_space(12.);
+                    let label = ui.label("Prompt");
+                    helto::textarea(
+                        ui,
+                        &mut self.edit.desk.prompt,
+                        6,
+                        "edit-prompt",
+                        self.prefs.privacy_mode,
+                        true,
+                    )
+                    .labelled_by(label.id)
+                    .on_hover_text("Use Reference 1, Reference 2, … in the prompt.");
+                    ui.add_space(12.);
+                    if ui
+                        .add_enabled_ui(
+                            self.editable()
+                                && self.client.is_some()
+                                && !self.picking_folder
+                                && self.can_generate(),
+                            |ui| helto::icon_button(ui, Icon::Generate, "Create version", true),
+                        )
+                        .inner
+                        .clicked()
+                    {
+                        self.generate(ui.ctx());
+                    }
+                    if let Some(result) = self.edit.desk.selected_result() {
+                        let [w, h] = result.texture.size();
+                        ui.label(
+                            RichText::new(format!("{w} × {h} px"))
+                                .small()
+                                .color(helto::DIM),
+                        );
+                    }
+                });
+        });
+    }
+
+    fn edit_version_selector(&mut self, ui: &mut Ui) {
+        let mut selected = self.edit.selected;
+        let name = |index| {
+            if index == 0 {
+                "Original".to_string()
+            } else {
+                format!("Version {index}")
+            }
+        };
+        ui.add_enabled_ui(self.editable(), |ui| {
+            egui::ComboBox::from_id_salt("edit-version")
+                .selected_text(name(selected))
+                .show_ui(ui, |ui| {
+                    for index in 0..self.edit.versions.len() {
+                        ui.selectable_value(&mut selected, index, name(index));
+                    }
+                });
+        });
+        if selected != self.edit.selected {
+            self.select_edit_version(selected);
+        }
+    }
+
     fn reference_panel(&mut self, ui: &mut Ui) {
         let editable = self.editable();
+        let editing = self.workspace == Workspace::ImageEdit;
         ui.horizontal(|ui| {
             ui.label(format!(
                 "References · {}/{}",
@@ -263,10 +382,38 @@ impl ImagineApp {
         let mut swap = None;
         egui::ScrollArea::vertical()
             .id_salt("reference-list")
-            .auto_shrink([false, false])
+            .max_height(if editing { 230. } else { f32::INFINITY })
+            .auto_shrink([false, editing])
             .show(ui, |ui| {
                 for (index, reference) in self.desk().references.iter().enumerate() {
                     ui.push_id(&reference.id, |ui| {
+                        if editing {
+                            ui.horizontal(|ui| {
+                                private_image(
+                                    ui,
+                                    &reference.texture,
+                                    egui::vec2(72., 56.),
+                                    self.prefs.privacy_mode,
+                                );
+                                ui.label(format!("Reference {}", reference.number));
+                                if ui
+                                    .add_enabled_ui(editable, |ui| {
+                                        helto::icon_button(
+                                            ui,
+                                            Icon::Trash,
+                                            &format!("Remove reference {}", reference.number),
+                                            false,
+                                        )
+                                    })
+                                    .inner
+                                    .clicked()
+                                {
+                                    remove = Some(index);
+                                }
+                            });
+                            ui.add_space(6.);
+                            return;
+                        }
                         ui.horizontal(|ui| {
                             let width = (ui.available_width() - 40.).max(64.);
                             let image = private_image(
@@ -538,6 +685,7 @@ impl ImagineApp {
     fn viewer(&mut self, ui: &mut Ui) {
         let bounds = ui.max_rect();
         let sheet = self.workspace == Workspace::CharacterSheet;
+        let editing = self.workspace == Workspace::ImageEdit;
         let stacked_tools = sheet && bounds.width() < 360.;
         let tools_height = if stacked_tools { 70. } else { 32. };
         if sheet {
@@ -577,6 +725,16 @@ impl ImagineApp {
             ),
             |ui| {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if self.workspace == Workspace::Image
+                        && ui
+                            .add_enabled_ui(self.can_edit_image(), |ui| {
+                                helto::icon_button(ui, Icon::Edit, "Edit image", false)
+                            })
+                            .inner
+                            .clicked()
+                    {
+                        self.start_editing();
+                    }
                     ui.add_enabled_ui(self.desk().result.is_some(), |ui| {
                         if helto::icon_button(
                             ui,
@@ -622,24 +780,27 @@ impl ImagineApp {
         let error = self.desk().error.clone().or_else(|| self.connection_error.clone()).or_else(|| self.settings_error.clone()).or_else(|| {
             (sheet && self.metadata.as_ref().is_some_and(|m| !client::supports_character_sheets(m))).then(|| "This server does not support character sheets. Update the server and reconnect.".into())
         });
-        let footer_height = if error.is_some() {
+        let footer_height = (if error.is_some() {
             132.
         } else if self.desk().sampling.is_some() {
             92.
         } else {
             66.
-        };
+        }) + if editing { 38. } else { 0. };
         let image_rect = Rect::from_min_max(
             bounds.min + egui::vec2(0., tools_height + 6.),
             bounds.max - egui::vec2(0., footer_height),
         );
         region(ui, "image", image_rect, |ui| {
             let privacy = self.prefs.privacy_mode;
+            let before = self
+                .edit_comparison_source()
+                .map(|source| source.texture.clone());
             let state = self.desk_mut();
             if let Some(texture) = state.selected_result().map(|r| r.texture.clone()) {
-                image_view(
+                image_view_layers(
                     ui,
-                    &texture,
+                    (&texture, before.as_ref()),
                     image_rect.size(),
                     privacy,
                     state.actual_pixels,
@@ -674,40 +835,48 @@ impl ImagineApp {
             bounds.max,
         );
         region(ui, "generation-actions", footer, |ui| {
+            if editing {
+                self.edit_version_selector(ui);
+            }
             ui.separator();
             let ready =
                 self.client.is_some() && !self.connecting && !self.busy() && !self.picking_folder;
             ui.horizontal(|ui| {
-                if ui
-                    .add_enabled_ui(
-                        ready && self.desk().pending.is_none() && self.can_generate(),
-                        |ui| helto::icon_button(ui, Icon::Generate, "Generate", true),
-                    )
-                    .inner
-                    .clicked()
+                if !editing
+                    && ui
+                        .add_enabled_ui(
+                            ready && self.desk().pending.is_none() && self.can_generate(),
+                            |ui| helto::icon_button(ui, Icon::Generate, "Generate", true),
+                        )
+                        .inner
+                        .clicked()
                 {
                     self.generate(ui.ctx());
                 }
-                if ui
-                    .add_enabled_ui(
-                        ready && self.desk().pending.is_none() && self.upscale_source().is_some(),
-                        |ui| {
-                            helto::icon_button(ui, Icon::Upscale, "Upscale", false).on_hover_text(
-                                self.prefs
-                                    .upscale_target
-                                    .dimensions(self.upscale_ratio())
-                                    .map(|(w, h)| {
-                                        format!(
-                                            "{} · {w} × {h} px",
-                                            if sheet { "Character sheet" } else { "Image" }
-                                        )
-                                    })
-                                    .unwrap_or_else(|e| e.to_string()),
-                            )
-                        },
-                    )
-                    .inner
-                    .clicked()
+                if !editing
+                    && ui
+                        .add_enabled_ui(
+                            ready
+                                && self.desk().pending.is_none()
+                                && self.upscale_source().is_some(),
+                            |ui| {
+                                helto::icon_button(ui, Icon::Upscale, "Upscale", false)
+                                    .on_hover_text(
+                                        self.prefs
+                                            .upscale_target
+                                            .dimensions(self.upscale_ratio())
+                                            .map(|(w, h)| {
+                                                format!(
+                                                    "{} · {w} × {h} px",
+                                                    if sheet { "Character sheet" } else { "Image" }
+                                                )
+                                            })
+                                            .unwrap_or_else(|e| e.to_string()),
+                                    )
+                            },
+                        )
+                        .inner
+                        .clicked()
                 {
                     self.upscale(ui.ctx());
                 }

@@ -2,6 +2,9 @@
 use super::*;
 use std::collections::HashMap;
 
+#[path = "editing_tests.rs"]
+mod editing_tests;
+
 struct Desk {
     ctx: egui::Context,
     app: ImagineApp,
@@ -162,6 +165,7 @@ fn reference_order_and_pending_request_controls_are_preserved() {
     assert_eq!(desk.app.image.references.len(), 1);
     assert_eq!(desk.app.image.references[0].id, "synthetic-reference-1");
     desk.app.image.pending = Some(Submission {
+        upscale_source: None,
         request: serde_json::json!({}),
         key: "existing-key".into(),
         folder: desk._root.path().into(),
@@ -224,6 +228,11 @@ fn upscale_uses_result_id_and_captures_target_ratio_for_retry() {
         assert!(submission.request.get("prompt").is_none());
         assert!(submission.request.get("sampling").is_none());
         assert_ne!(submission.key, desk.app.upscale_submission().unwrap().key);
+        assert_eq!(
+            submission.upscale_source.as_ref(),
+            Some(&desk.app.image.selected_result().unwrap().file)
+        );
+        let source_file = submission.upscale_source.clone();
         let captured = submission.request.clone();
         let key = submission.key.clone();
         desk.app.image.pending = Some(Submission {
@@ -247,6 +256,7 @@ fn upscale_uses_result_id_and_captures_target_ratio_for_retry() {
         assert!(!desk.control("Retry").is_disabled());
         let pending = desk.app.image.pending.as_ref().unwrap();
         assert_eq!(pending.request, captured);
+        assert_eq!(pending.upscale_source, source_file);
         assert_eq!(pending.key, key);
         assert_eq!(pending.job.as_deref(), Some("job_upscale"));
         desk.app
@@ -305,6 +315,7 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
     let request = serde_json::json!({"prompt": "Running prompt", "negative_prompt": "Running negative", "sampling": {"steps": 40}});
     let original_folder = desk.app.prefs.output_folder.clone();
     desk.app.image.pending = Some(Submission {
+        upscale_source: None,
         request: request.clone(),
         key: "running-key".into(),
         job: Some("running-job".into()),
@@ -610,8 +621,6 @@ fn preferences_survive_folder_change_and_app_restart() {
     let ctx = egui::Context::default();
     let connection = Connection {
         url: "http://127.0.0.1:8080".into(),
-        access: root.path().join("unused.json"),
-        client: "test".into(),
     };
     let mut app = ImagineApp::empty(
         root.path().into(),
@@ -751,19 +760,12 @@ fn headless_layout_and_recoverable_job_state() {
             root.path().into(),
             Connection {
                 url: "http://127.0.0.1:8080".into(),
-                access: root.path().join("unused.json"),
-                client: "test".into(),
             },
             Preferences {
                 output_folder: PathBuf::from("/Pictures/Imagine"),
                 ..Preferences::load(root.path()).unwrap()
             },
         );
-        std::fs::write(
-            &app.connection.access,
-            br#"{"clients":{"test":"synthetic-preview-token"}}"#,
-        )
-        .unwrap();
         app.client = Some(Client::connect(&app.connection).unwrap());
         app.image.prompt="A quiet Scandinavian harbor at sunrise, warm light on the waterfront, realistic photography.".into();
         app.metadata = Some(imagine_server::contract::model(client::MODEL).unwrap());
@@ -778,6 +780,7 @@ fn headless_layout_and_recoverable_job_state() {
                 .collect(),
         };
         app.image.references.push(ReferenceView {
+            number: 0,
             id: "synthetic-reference".into(),
             name: "reference.png".into(),
             texture: texture(&ctx, &sample, "synthetic-reference"),
@@ -831,6 +834,7 @@ fn headless_layout_and_recoverable_job_state() {
         }
         // A retrieval/save failure keeps the original job and idempotency key.
         app.image.pending = Some(Submission {
+            upscale_source: None,
             request: serde_json::json!({}),
             key: "original-key".into(),
             folder: root.path().into(),
@@ -1041,6 +1045,7 @@ fn sheet_tab_preserves_image_draft_and_routes_async_results_to_origin() {
     desk.frame(vec![]);
     assert!(!desk.control("Generate").is_disabled());
     desk.app.sheet.pending = Some(Submission {
+        upscale_source: None,
         request: serde_json::json!({"operation":"character_sheet"}),
         key: "sheet-key".into(),
         folder: desk._root.path().into(),
@@ -1160,6 +1165,7 @@ fn sheet_upload_limits_retry_cancel_and_capability_guard() {
     assert!(desk.app.sheet.error.as_deref().unwrap().contains("Up to 8"));
     assert_eq!(desk.app.sheet.references.len(), 1);
     desk.app.sheet.pending = Some(Submission {
+        upscale_source: None,
         request: serde_json::json!({"operation":"character_sheet"}),
         key: "retry-sheet".into(),
         folder: desk._root.path().into(),
@@ -1253,6 +1259,7 @@ fn headless_character_sheet_layout_and_privacy() {
             pixels: [140, 120, 100, 255].repeat(32 * 32),
         };
         app.sheet.references.push(ReferenceView {
+            number: 0,
             id: "ref".into(),
             name: "synthetic-reference".into(),
             texture: texture(&ctx, &sample, "ref"),

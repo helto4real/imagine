@@ -19,7 +19,7 @@ jobs and metadata, disposable local files for media. There is no ComfyUI depende
 Request handling and generation orchestration remain in Rust. Python/Pillow are
 used by the optional live acceptance test.
 
-Rust owns validation, authentication, asset ownership, a session-local FIFO queue,
+Rust owns validation, shared local assets, a session-local FIFO queue,
 idempotency, worker lifecycle and output publication. One job runs at a time.
 Only that job reaches a persistent loopback `sd-server`. It is started lazily,
 with the pinned binary SHA-256, frozen environment and three model paths from
@@ -34,18 +34,18 @@ Module responsibilities:
 | Module | Responsibility |
 | --- | --- |
 | `contract` | Typed requests, semantic validation, model metadata/schema |
-| `api` | HTTP, bearer authentication, ownership, SSE |
+| `api` | HTTP, session checks, local workspace, SSE |
 | `storage` | Session-local SQLite and atomic media files |
 | `scheduler` | Sole owner of dispatch, cancellation and unload ordering |
 | `engine` | Native process and `/sdcpp/v1` adapter |
-| `config` | Local credentials, single-server lock, project/model paths |
+| `config` | Loopback binding, single-server lock, project/model paths |
 
 The backend trait is a small testable boundary, not a plugin framework.
 The v2 environment remains pinned by its accepted manifest. The Qwen reference
 executable is separately pinned by `native/reference-cache/reuse-budget-source-lock.json`;
 changing native profiles stops the previous child before launching another.
 
-## Start and credentials
+## Start and local access
 
 ```sh
 ./start-server.sh
@@ -63,26 +63,22 @@ Model-root precedence: `QWEN_MODEL_ROOT`, then the existing ignored
 `experiments/qwen-image21-sage/local-settings.json`, then project `models/`.
 Relative roots resolve against the project directory.
 
-Default address: `127.0.0.1:8080`. Initial v1 binds to loopback only. Use a
-separately configured authenticated reverse proxy for remote deployments; there
-is no built-in TLS, CORS or browser UI in this slice. The native loopback port is
-internal, dynamically selected and never a public API contract. Local OS users
-are trusted; this is not a sandbox against other processes under the same user.
+Default address: `127.0.0.1:8080`. Imagine binds only to loopback. The proxy
+requires a loopback image listener when Imagine coordination is enabled. There
+is no built-in TLS or CORS. The native engine port remains internal and dynamic.
 
-First start creates `.imagine/access.json` with a separate random admin token
-and a `local` client token. The data directory has mode 0700 and credentials 0600.
-The server prints the credential file path, never tokens. Additional clients
-can be configured in `clients` with distinct tokens (at least 32 characters),
-then restart. Credentials are loaded once at startup. Client identity is derived
-from the token, never accepted from a job field. Every endpoint requires
-`Authorization: Bearer TOKEN`; runtime mutations and operation status require
-the admin token. An admin token owns its own jobs/assets and does not bypass
-client ownership for media/job reads.
+All endpoints work without Authorization, including runtime controls and operation
+status. API, UI and MCP share one local workspace. The storage layer retains its
+internal owner field, always set to `local` by the API; it is not an authorization
+boundary. Idempotency keys share that workspace too. Local processes are trusted.
+`access.json` is neither created nor read; existing files are left untouched.
+The data directory remains mode 0700. `X-Imagine-Session` still rejects stale
+requests after restart, and responses retain `no-store`/`nosniff` headers.
 
 SQLite holds prompts, settings and metadata only in process memory. Internal
 media is stored as ordinary files. Startup and shutdown clear history and
-temporary media. The server starts without terminal login; API bearer tokens
-remain required. See [session privacy](PRIVACY.md) for MCP exports,
+temporary media. The server starts without terminal login; API tokens
+are not required. See [session privacy](PRIVACY.md) for MCP exports,
 crash behavior, credentials and saved-file exclusions. A file lock prevents two
 servers from sharing a data directory.
 
@@ -93,15 +89,15 @@ servers from sharing a data directory.
 | `GET /v1/models` | Configured model capabilities; no GPU loading |
 | `GET /v1/models/{id}` | Defaults, constraints and request JSON Schema |
 | `POST /v1/assets` | 201, uploaded image asset metadata |
-| `GET /v1/assets/{id}` | Owned image bytes |
+| `GET /v1/assets/{id}` | Local workspace image bytes |
 | `POST /v1/jobs` | 202, session-local ID, status/events URLs |
 | `GET /v1/jobs/{id}` | Authoritative state, effective settings, output or error |
 | `GET /v1/jobs/{id}/events` | SSE `job` snapshots, closes on terminal state |
 | `POST /v1/jobs/{id}/cancel` | 202 cancellation acceptance |
 | `GET /v1/runtime` | Paused state, queue count, active flag, native phase/PID |
-| `POST /v1/runtime/unload` | Admin; 202 unload operation ID/status URL |
-| `POST /v1/runtime/resume` | Admin; 200, scheduler unpaused |
-| `GET /v1/operations/{id}` | Admin; unload operation status |
+| `POST /v1/runtime/unload` | 202 unload operation ID/status URL |
+| `POST /v1/runtime/resume` | 200, scheduler unpaused |
+| `GET /v1/operations/{id}` | Unload operation status |
 
 Requests and responses use JSON except media upload/download and SSE. Uploads
 are raw PNG/JPEG/WebP bytes with the matching `Content-Type`, not multipart.
@@ -140,8 +136,7 @@ inference settings are unchanged; previews remain disabled. Progress is scoped
 to the active public job ID and cleared at terminal states. Unknown progress is
 never replaced by a timer estimate. HTTP responses have `Cache-Control: no-store`.
 
-Errors use `{"error":{"code":"..."}}`. Typical errors: 401 `unauthorized`,
-403 `admin_required`, 404 `asset_not_found`/`job_not_found`, 409
+Errors use `{"error":{"code":"..."}}`. Typical errors: 404 `asset_not_found`/`job_not_found`, 409
 `runtime_suspended`/`idempotency_conflict`/`unload_in_progress`, 422
 `invalid_request` or a semantic validation code. Oversized bodies may use Axum's
 413 rejection. Unknown request fields and unsupported settings are rejected,
@@ -265,7 +260,7 @@ produces a successful unload; the scheduler/server stops instead.
 {"active_job":"wait"}
 ```
 
-Or `{"active_job":"cancel"}`. Only an administrator can affect all clients:
+Or `{"active_job":"cancel"}`. Runtime controls apply to the shared local queue:
 
 1. Persist scheduler pause before acknowledging unload. No further dispatch.
 2. `wait` finishes only the active job. It does not drain the queue.
@@ -297,7 +292,7 @@ python3 tests/live-native.py --run
 ```
 
 The Rust tests use a controlled fake engine for queue/unload ordering,
-idempotency, asset ownership, input validation, cancellation, restart isolation,
+idempotency, shared local API access, input validation, cancellation, restart isolation,
 worker failure recovery and terminal SSE. They are not GPU performance tests.
 The live test uses only synthetic frozen prompts and its own generated reference,
 checks the frozen RGBA hash before and after unload/resume, performs a 1 MP edit,

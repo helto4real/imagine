@@ -26,12 +26,13 @@ async def main():
   proc=await asyncio.create_subprocess_exec(str(ROOT/'target/release/imagine-server'),'--project',str(ROOT),'--profiles',str(profiles),'--data',str(data),'--bind',f'127.0.0.1:{ip}',env=env,stdout=log,stderr=log);processes.append(proc)
   async with ClientSession(timeout=ClientTimeout(total=900)) as client:
    for _ in range(200):
-    if (data/'access.json').exists():
-     access=json.loads((data/'access.json').read_text());break
+    try:
+     async with client.get(base+'/v1/session') as r:
+      if r.status==200:break
+    except OSError:pass
     await asyncio.sleep(.1)
    else:raise RuntimeError('Imagine did not start')
-   auth={'Authorization':'Bearer '+access['admin_token']}
-   proxy=await asyncio.create_subprocess_exec(str(ROOT/'target/release/st-proxy'),'--chat-port',str(cp),'--image-port',str(pp),'--llm-backend','sc117','--llm-url',f'http://127.0.0.1:{fakeport}','--comfy-url',f'http://127.0.0.1:{fakeport}','--coordinator-socket',str(sock),'--imagine-url',base,'--imagine-access-file',str(data/'access.json'),'--mcp-port',str(mp),'--mcp-input-dir',str(out),'--mcp-output-dir',str(out/'output'),'--poll-interval','0.1',env=env,stdout=proxylog,stderr=proxylog);processes.append(proxy)
+   proxy=await asyncio.create_subprocess_exec(str(ROOT/'target/release/st-proxy'),'--chat-port',str(cp),'--image-port',str(pp),'--llm-backend','sc117','--llm-url',f'http://127.0.0.1:{fakeport}','--comfy-url',f'http://127.0.0.1:{fakeport}','--coordinator-socket',str(sock),'--imagine-url',base,'--mcp-port',str(mp),'--mcp-input-dir',str(out),'--mcp-output-dir',str(out/'output'),'--poll-interval','0.1',env=env,stdout=proxylog,stderr=proxylog);processes.append(proxy)
    for _ in range(200):
     try:
      async with client.get(f'http://127.0.0.1:{cp}/broker/status') as r:
@@ -55,7 +56,7 @@ async def main():
     assert result['parameters']['resolved_profile']['id']==profile
     assert 'prompt' not in result['parameters'] and 'negative_prompt' not in result['parameters']
     references.append(result['images'][0]['path']);assert await call('generate',args)==result
-   async with client.post(base+'/v1/runtime/yield',headers=auth) as r:assert (await r.json())['released']
+   async with client.post(base+'/v1/runtime/yield') as r:assert (await r.json())['released']
  finally:
   for proc in reversed(processes):
    if proc.returncode is None:proc.terminate()

@@ -73,16 +73,19 @@ async fn ambiguous_submission_and_poll_failures_recover_same_job() {
         .route("/v1/jobs", post(submit))
         .route("/v1/jobs/one-job", get(status))
         .route("/v1/assets/image", get(download))
-        .with_state(p.clone());
+        .with_state(p.clone())
+        .layer(axum::middleware::from_fn(
+            |request: axum::extract::Request, next: axum::middleware::Next| async move {
+                assert!(!request.headers().contains_key("authorization"));
+                next.run(request).await
+            },
+        ));
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
     let dir = tempfile::tempdir().unwrap();
-    let access = dir.path().join("access.json");
-    std::fs::write(&access, r#"{"admin_token":"synthetic"}"#).unwrap();
     let mcp = Mcp::new(Config {
         imagine_url: url,
-        imagine_access_file: Some(access.to_string_lossy().into()),
         coordinator_socket: Some(dir.path().join("gpu.sock").to_string_lossy().into()),
         mcp_output_dir: Some(dir.path().join("output").to_string_lossy().into()),
         poll_interval: 0.01,

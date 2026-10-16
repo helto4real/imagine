@@ -52,7 +52,7 @@ for args,env in config_cases:
  args=['--mcp-workflows-dir','/synthetic/workflows',*args]
  with unittest.mock.patch.dict(os.environ,env,clear=True),contextlib.redirect_stderr(io.StringIO()):
   try:
-   value=dataclasses.asdict(config_from_args(build_parser().parse_args(args)));value.pop('test_mode');value.pop('test_registry');value.update(comfy_enabled=True,coordinator_socket=None,imagine_url='http://127.0.0.1:8080',imagine_access_file=None)
+   value=dataclasses.asdict(config_from_args(build_parser().parse_args(args)));value.pop('test_mode');value.pop('test_registry');value.update(comfy_enabled=True,coordinator_socket=None,imagine_url='http://127.0.0.1:8080')
   except Exception as e:value={'error':str(e)}
  add(dict(op='config',args=args,env=env),value)
 from st_proxy.llm.prism_diagnostics import PrismDiagnostics

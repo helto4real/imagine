@@ -24,29 +24,28 @@ This incrementally builds the Rust release server and starts it at
 `http://127.0.0.1:8080`. It loads the native engine only when a job runs.
 The launcher uses the proxy GPU queue at `.imagine/gpu.sock`; start
 `./start-proxy.sh` with your backend options before submitting jobs.
-The server starts without password or YubiKey login. API bearer tokens remain
-required. Prompts and job history stay in memory; temporary images are ordinary
+The server starts without a password, YubiKey login or API token. Prompts and job history stay in memory; temporary images are ordinary
 files removed at session end. See [session privacy](docs/PRIVACY.md).
 Ctrl-C clears history and stops the server and its worker. Optional arguments:
 `--bind 127.0.0.1:8081 --data /private/path/imagine-data`.
 
-First start creates `.imagine/access.json` with a client token and a separate
-admin token. Local credentials, jobs and media are ignored by Git. Use Rust/Cargo
+Imagine uses one shared local workspace for API, UI and MCP clients. It does
+not create or read `access.json`; existing credential files are left unused.
+Local jobs and media are ignored by Git. Use Rust/Cargo
 and the frozen native executable/model files described below. A fresh clone must
 restore the frozen binary; the API does not substitute a different build.
 
 With `curl` and `jq`, from the project root:
 
 ```sh
-TOKEN=$(jq -r '.clients.local' .imagine/access.json)
-curl -sS -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8080/v1/models
-curl -sS -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+curl -sS http://127.0.0.1:8080/v1/models
+curl -sS -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: first-lighthouse' \
   -d '{"model":"qwen-image-2.1-int8","operation":"text_to_image","prompt":"A lighthouse on a rocky coast at sunrise, realistic photography","seed":42}' \
   http://127.0.0.1:8080/v1/jobs
 ```
 
-Follow the returned `status_url` or `events_url` with the same bearer token.
+Follow the returned `status_url` or `events_url`.
 When `status` is `succeeded`, download `/v1/assets/{id}` using the ID in
 `output.assets[0].id`. Defaults are 1600×896, 40 ER-SDE/beta steps, CFG 2.5 and PNG.
 Editing accepts ordered reference asset IDs, with a default 1 MP resize target
@@ -55,15 +54,14 @@ per image. Other resolutions and H3 execution are deliberately unavailable in v1
 To release all model VRAM owned by this service and pause the queue:
 
 ```sh
-ADMIN=$(jq -r '.admin_token' .imagine/access.json)
-curl -sS -H "Authorization: Bearer $ADMIN" -H 'Content-Type: application/json' \
+curl -sS -H 'Content-Type: application/json' \
   -d '{"active_job":"wait"}' http://127.0.0.1:8080/v1/runtime/unload
 # Follow the returned operation status URL; then resume when wanted:
-curl -sS -X POST -H "Authorization: Bearer $ADMIN" http://127.0.0.1:8080/v1/runtime/resume
+curl -sS -X POST http://127.0.0.1:8080/v1/runtime/resume
 ```
 
 Use `active_job:"cancel"` to stop an active generation immediately. Read the
-[frozen API contract](docs/API-BASELINE.md) for ownership, reference limits,
+[frozen API contract](docs/API-BASELINE.md) for local access, reference limits,
 restart behavior, schema and examples. [Validation](docs/API-VALIDATION.md)
 separates simulated lifecycle tests from real native/GPU checks.
 
@@ -81,8 +79,7 @@ upload and reorder reference images, choose **Spara i → Välj mapp**, then
 unique filename in your chosen folder. The folder choice persists across starts.
 
 Default output: `.imagine/images`; preferences: `.imagine/ui-settings.json`.
-The app connects through `http://127.0.0.1:8189/imagine` and reads the local
-client token from `.imagine/access.json`. `start-server.sh` and `start-proxy.sh`
+The app connects through `http://127.0.0.1:8189/imagine` without credentials. `start-server.sh` and `start-proxy.sh`
 use the same `.imagine/gpu.sock` by default. ComfyUI is not required by these
 launchers. MCP images use `/run/media/veracrypt1/mcp-images`, matching Pi.
 No direct-API fallback is used.

@@ -1,4 +1,4 @@
-"""Actual binary lifecycle tests. Every credential/image/path is synthetic."""
+"""Actual binary lifecycle tests. Every image/path is synthetic."""
 import json
 import os
 from pathlib import Path
@@ -43,9 +43,8 @@ class Server:
                 time.sleep(.05)
         raise AssertionError('Synthetic server did not start without terminal input')
     def request(self, path, body=None):
-        access = json.loads((self.project / '.imagine/access.json').read_text())
         r = urllib.request.Request(f'http://127.0.0.1:{self.port}{path}', data=body,
-            headers={'Authorization': 'Bearer ' + access['clients']['local'], 'Content-Type': 'image/png'})
+            headers={'Content-Type': 'image/png'})
         with urllib.request.urlopen(r, timeout=3) as response:
             return json.load(response)
     def stop(self):
@@ -89,10 +88,11 @@ class Tests(unittest.TestCase):
         self.assert_purged()
         self.assertFalse(session['encrypted'])
         self.assertFalse((self.root / '.imagine/privacy-keystore.json').exists())
-        with self.assertRaises(urllib.error.HTTPError) as error:
-            urllib.request.urlopen(f'http://127.0.0.1:{server.port}/v1/session', timeout=3)
-        self.assertEqual(error.exception.code, 401)
-        error.exception.close()
+        self.assertFalse((self.root / '.imagine/access.json').exists())
+        with urllib.request.urlopen(f'http://127.0.0.1:{server.port}/v1/session', timeout=3) as response:
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers['Cache-Control'], 'no-store')
+            self.assertEqual(json.load(response)['id'], session['id'])
         asset = server.request('/v1/assets', png())
         path = self.root / '.imagine/media' / session['id'] / asset['id']
         self.assertEqual(path.read_bytes(), png())

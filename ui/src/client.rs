@@ -1,5 +1,6 @@
 use crate::settings::{
     Connection, GenerationSettings, UpscaleTarget, check_output_folder, save_image, save_sheet,
+    save_upscaled,
 };
 use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
@@ -14,7 +15,6 @@ pub const MODEL: &str = "qwen-image-2.1-int8";
 pub struct Client {
     http: reqwest::Client,
     base: String,
-    token: String,
 }
 #[derive(Debug)]
 pub struct Failure {
@@ -37,6 +37,8 @@ impl Failure {
 }
 #[derive(Clone)]
 pub struct Submission {
+    /// Local naming context only; never included in the API request.
+    pub upscale_source: Option<PathBuf>,
     pub request: Value,
     pub key: String,
     pub folder: PathBuf,
@@ -158,18 +160,13 @@ impl Client {
                 .timeout(Duration::from_secs(30))
                 .build()?,
             base: c.url.trim_end_matches('/').into(),
-            token: c.token()?,
         })
     }
     fn get(&self, path: &str) -> reqwest::RequestBuilder {
-        self.http
-            .get(format!("{}{path}", self.base))
-            .bearer_auth(&self.token)
+        self.http.get(format!("{}{path}", self.base))
     }
     fn post(&self, path: &str) -> reqwest::RequestBuilder {
-        self.http
-            .post(format!("{}{path}", self.base))
-            .bearer_auth(&self.token)
+        self.http.post(format!("{}{path}", self.base))
     }
     pub async fn metadata(&self) -> std::result::Result<Value, Failure> {
         Self::json(self.get(&format!("/v1/models/{MODEL}")).send().await).await
@@ -224,7 +221,19 @@ impl Client {
         submission: Submission,
         mut progress: impl FnMut(Progress),
     ) -> std::result::Result<Completed, Failure> {
-        check_output_folder(&submission.folder).map_err(|e| Failure::retry(e.to_string()))?;
+        let destination = submission
+            .upscale_source
+            .as_deref()
+            .and_then(Path::parent)
+            .unwrap_or(&submission.folder);
+        check_output_folder(destination).map_err(|e| {
+            Failure::retry(if submission.upscale_source.is_some() {
+                "Cannot write beside the original image. Restore access to that folder and retry."
+                    .into()
+            } else {
+                e.to_string()
+            })
+        })?;
         let job = match submission.job {
             Some(id) => id,
             None => {
@@ -299,7 +308,11 @@ impl Client {
             downloads.push((role, bytes, preview, asset));
         }
         let files = if roles == [OutputRole::Image] {
-            save_image(&submission.folder, &downloads[0].1).map(|file| vec![file])
+            match &submission.upscale_source {
+                Some(source) => save_upscaled(source, &downloads[0].1),
+                None => save_image(&submission.folder, &downloads[0].1),
+            }
+            .map(|file| vec![file])
         } else {
             save_sheet(
                 &submission.folder,
@@ -470,6 +483,84 @@ pub fn make_request(
     };
     Ok(request)
 }
+pub struct EditSource<'a> {
+    pub asset_id: &'a str,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[cfg(test)]
+#[path = "edit_request_tests.rs"]
+mod edit_request_tests;
+
+/// Bind stable UI reference numbers to Qwen's positional image labels without
+/// rewriting the user's instruction. The source always occupies image1.
+pub fn make_edit_request(
+    prompt: &str,
+    negative: &str,
+    source: EditSource<'_>,
+    references: &[(usize, String)],
+    metadata: &Value,
+    settings: &GenerationSettings,
+) -> Result<Value> {
+    if source.asset_id.is_empty() {
+        bail!("The source image is missing. Select an available result to edit.");
+    }
+    if references.len() > 9 {
+        bail!("Up to nine extra references; the source image uses one image slot.");
+    }
+    if !(128..=4096).contains(&source.width)
+        || !(128..=4096).contains(&source.height)
+        || source.width.max(source.height) < 256
+        || !source.width.is_multiple_of(32)
+        || !source.height.is_multiple_of(32)
+    {
+        bail!("The source dimensions are not supported for editing.");
+    }
+    let mut numbers = std::collections::HashSet::new();
+    for (number, asset) in references {
+        if *number == 0 || !numbers.insert(*number) || asset.is_empty() {
+            bail!("Invalid reference binding. Remove the reference and add it again.");
+        }
+    }
+    let words: Vec<_> = prompt
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .filter(|word| !word.is_empty())
+        .collect();
+    for pair in words.windows(2) {
+        if (pair[0].eq_ignore_ascii_case("reference") || pair[0].eq_ignore_ascii_case("referens"))
+            && pair[1].bytes().all(|c| c.is_ascii_digit())
+            && !pair[1]
+                .parse::<usize>()
+                .ok()
+                .is_some_and(|n| numbers.contains(&n))
+        {
+            bail!(
+                "Reference {} is missing. Update the prompt or add the reference.",
+                pair[1]
+            );
+        }
+    }
+    let mut ids = vec![source.asset_id.to_owned()];
+    ids.extend(references.iter().map(|(_, asset)| asset.clone()));
+    let mut request = make_request(prompt, negative, &ids, metadata, settings)?;
+    let mut binding = String::from(
+        "Edit <image1>, the source image, according to the instruction below. Other images are references whose use is defined by that instruction.\n",
+    );
+    for (index, (number, _)) in references.iter().enumerate() {
+        binding.push_str(&format!(
+            "Reference {number} / referens {number} = <image{}>.\n",
+            index + 2
+        ));
+    }
+    binding.push_str("\nInstruction:\n");
+    binding.push_str(prompt);
+    request["prompt"] = json!(binding);
+    request["width"] = json!(source.width);
+    request["height"] = json!(source.height);
+    Ok(request)
+}
+
 fn read_reference(path: &Path) -> Result<(Vec<u8>, &'static str, Preview)> {
     let mut bytes = Vec::new();
     std::fs::File::open(path)
@@ -519,12 +610,11 @@ pub fn error_message(code: &str) -> String {
         "imagine_upstream_unavailable" => "The proxy cannot reach Imagine. Start ./start-server.sh and retry.",
         "unsupported_resolution"=>"This server does not accept the selected image size. Restart the updated server or choose a supported size.",
         "unsupported_sampling"=>"Choose steps between 1 and 100 and CFG between 0 and 20.",
-        "unauthorized"=>"The API key was rejected. Check access.json and reconnect.",
         "runtime_suspended"=>"The server is suspended. Resume it through the API before generating.",
         "model_weights_missing"=>"Model files are missing. Check QWEN_MODEL_ROOT on the server.",
         "frozen_binary_unavailable"|"frozen_binary_hash_mismatch"=>"The frozen inference engine is missing or has changed on the server.",
         "native_startup_failed"=>"The inference engine could not start. Check the GPU and model files on the server.",
-        "asset_not_found"=>"A reference is missing on the server. Remove it and upload it again.",
+        "asset_not_found"=>"A source or reference image is missing on the server. Select a current result or upload the reference again.",
         "invalid_image"=>"The image is unreadable. Choose PNG, JPEG or WebP within the server size limits.",
         "upload_busy"=>"The server is handling other uploads. Retry.",
         "invalid_prompt_length"=>"Text exceeds the allowed length: 12,000 UTF-8 bytes per sheet description or 32,768 per prompt.",

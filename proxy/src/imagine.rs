@@ -1,4 +1,4 @@
-//! Authenticated Imagine API client. Profiles and validation belong to Imagine.
+//! Local Imagine API client. Profiles and validation belong to Imagine.
 use crate::config::Config;
 use anyhow::{Result, anyhow, bail};
 use serde_json::Value;
@@ -19,22 +19,10 @@ pub fn retryable(error: &anyhow::Error) -> bool {
 pub struct Client {
     http: reqwest::Client,
     base: String,
-    token: String,
     session: Option<String>,
 }
 impl Client {
     pub async fn new(config: &Config) -> Result<Self> {
-        let access: Value = serde_json::from_slice(
-            &tokio::fs::read(config.imagine_access_file.as_ref().ok_or_else(|| {
-                anyhow!("MCP Imagine integration requires --imagine-access-file")
-            })?)
-            .await?,
-        )?;
-        // Admin requests retain their own Imagine owner; other clients cannot access MCP assets.
-        let token = access["admin_token"]
-            .as_str()
-            .ok_or_else(|| anyhow!("Imagine credentials unavailable"))?
-            .to_string();
         Ok(Self {
             http: reqwest::Client::builder()
                 .no_proxy()
@@ -42,7 +30,6 @@ impl Client {
                 .timeout(std::time::Duration::from_secs_f64(config.request_timeout))
                 .build()?,
             base: config.imagine_url.clone(),
-            token,
             session: None,
         })
     }
@@ -63,7 +50,6 @@ impl Client {
         let response = self
             .http
             .get(format!("{}/v1/session", self.base))
-            .bearer_auth(&self.token)
             .timeout(std::time::Duration::from_secs(2))
             .send()
             .await?;
@@ -84,11 +70,7 @@ impl Client {
         body: Option<&Value>,
         key: Option<&str>,
     ) -> Result<Value> {
-        let mut req = self.bound(
-            self.http
-                .request(method, format!("{}{path}", self.base))
-                .bearer_auth(&self.token),
-        );
+        let mut req = self.bound(self.http.request(method, format!("{}{path}", self.base)));
         if let Some(body) = body {
             req = req.json(body)
         }
@@ -112,11 +94,7 @@ impl Client {
     }
     pub async fn upload(&self, bytes: Vec<u8>) -> Result<String> {
         let r = self
-            .bound(
-                self.http
-                    .post(format!("{}/v1/assets", self.base))
-                    .bearer_auth(&self.token),
-            )
+            .bound(self.http.post(format!("{}/v1/assets", self.base)))
             .header("Content-Type", "image/png")
             .body(bytes)
             .send()
@@ -137,11 +115,7 @@ impl Client {
             bail!("invalid image reference")
         };
         let mut r = self
-            .bound(
-                self.http
-                    .get(format!("{}/v1/assets/{id}", self.base))
-                    .bearer_auth(&self.token),
-            )
+            .bound(self.http.get(format!("{}/v1/assets/{id}", self.base)))
             .send()
             .await?;
         if !r.status().is_success() {

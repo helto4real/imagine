@@ -71,14 +71,9 @@ async fn main() -> Result<()> {
         store: store.clone(),
         control: control.clone(),
         engine: engine_rx,
-        access: Arc::new(config.access.clone()),
         uploads: Arc::new(Semaphore::new(2)),
     };
-    eprintln!(
-        "Imagine listening on http://{}; credentials: {}",
-        listener.local_addr()?,
-        config.data.join("access.json").display()
-    );
+    eprintln!("Imagine listening on http://{}", listener.local_addr()?);
     let stop = tokio_util::sync::CancellationToken::new();
     let stop_http = stop.clone();
     let mut server = tokio::spawn(async move {

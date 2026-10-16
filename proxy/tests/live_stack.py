@@ -7,7 +7,7 @@ import argparse, asyncio, json, pathlib, time
 from aiohttp import ClientSession, ClientTimeout
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--run',action='store_true');p.add_argument('--chat-url',required=True);p.add_argument('--image-url',required=True)
-p.add_argument('--imagine-url',required=True);p.add_argument('--access-file',type=pathlib.Path,required=True)
+p.add_argument('--imagine-url',required=True)
 p.add_argument('--model',required=True,help='Exact selected model ID (backend/model in all mode)')
 p.add_argument('--backend',choices=['koboldcpp','tabbyapi','ollama','prism','sc117','orca','sc117_128k','orca_128k','all'],required=True)
 p.add_argument('--comfy-workflow',type=pathlib.Path,required=True,help='Explicit synthetic API-format graph')
@@ -15,7 +15,6 @@ p.add_argument('--output',type=pathlib.Path,required=True)
 a=p.parse_args()
 if not a.run:p.exit(message='Pass --run after reserving the GPU and these services for this smoke test.\n')
 async def main():
- auth={'Authorization':'Bearer '+json.loads(a.access_file.read_text())['admin_token']}
  evidence={'backend':a.backend,'model':a.model,'real_services':True,'checks':[]}
  async with ClientSession(timeout=ClientTimeout(total=1800)) as client:
   async def request(base,path,payload=None,headers=None):
@@ -26,14 +25,14 @@ async def main():
    else:path='/v1/chat/completions';body={'model':a.model,'messages':[{'role':'user','content':'Reply with only the word blue.'}],'max_tokens':8,'stream':False}
    await request(a.chat_url,path,body);evidence['checks'].append('chat completed')
   await chat()
-  direct=await request(a.imagine_url,'/v1/jobs',{'model':'qwen-image-2.1-int8','operation':'text_to_image','prompt':'A blue ceramic teapot on a white table, studio photograph.','seed':42},auth)
+  direct=await request(a.imagine_url,'/v1/jobs',{'model':'qwen-image-2.1-int8','operation':'text_to_image','prompt':'A blue ceramic teapot on a white table, studio photograph.','seed':42})
   # Submit Comfy and LLM while direct Imagine work is pending or active.
   image_task=asyncio.create_task(request(a.image_url,'/prompt',{'prompt':json.loads(a.comfy_workflow.read_text())}))
   chat_task=asyncio.create_task(chat())
   prompt=await image_task
   started=time.monotonic()
   while True:
-   job=await request(a.imagine_url,'/v1/jobs/'+direct['id'],headers=auth)
+   job=await request(a.imagine_url,'/v1/jobs/'+direct['id'])
    history=await request(a.image_url,'/history/'+str(prompt['prompt_id']))
    entry=history.get(str(prompt['prompt_id']),{});status=entry.get('status',{})
    if job['status'] in ('failed','cancelled'):raise AssertionError(job)

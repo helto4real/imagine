@@ -3,8 +3,7 @@ use std::path::Path;
 
 async fn setup() -> (tempfile::TempDir, Mcp) {
     let dir = tempfile::tempdir().unwrap();
-    let access = dir.path().join("access.json");
-    std::fs::write(&access, r#"{"admin_token":"synthetic"}"#).unwrap();
+
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     let router = Router::new().route(
@@ -17,7 +16,7 @@ async fn setup() -> (tempfile::TempDir, Mcp) {
     let mcp = Mcp::new(Config {
         coordinator_socket: Some(dir.path().join("gpu.sock").to_string_lossy().into()),
         imagine_url: url,
-        imagine_access_file: Some(access.to_string_lossy().into()),
+
         mcp_output_dir: Some(dir.path().join("output").to_string_lossy().into()),
         ..Default::default()
     })

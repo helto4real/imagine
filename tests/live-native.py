@@ -34,12 +34,10 @@ with socket.socket() as sock:
 base = f'http://127.0.0.1:{port}'
 log = (out / 'server.log').open('w')
 proc = subprocess.Popen([str(root / 'start-server.sh'), '--data', str(out / 'data'), '--bind', f'127.0.0.1:{port}'], cwd=root, stdout=log, stderr=log)
-access = None
 results = {'profile': manifest['id'], 'tests': []}
 
-def api(method, path, data=None, admin=False):
-    token = access['admin_token'] if admin else access['clients']['local']
-    headers = {'Authorization': f'Bearer {token}'}
+def api(method, path, data=None):
+    headers = {}
     if data is not None:
         headers['Content-Type'] = 'application/json'
         data = json.dumps(data).encode()
@@ -79,7 +77,7 @@ def consume(job, label, started, expected=None):
     return asset
 
 def unloaded(op,pid):
-    value = api('GET',f'/v1/operations/{op}',admin=True)
+    value = api('GET',f'/v1/operations/{op}')
     if value['status']!='succeeded':
         return None
     state = api('GET','/v1/runtime')
@@ -89,13 +87,8 @@ def unloaded(op,pid):
 
 try:
     def ready():
-        global access
         if proc.poll() is not None:
             raise RuntimeError('API startup failed; inspect this test run server.log')
-        path = out/'data/access.json'
-        if not path.exists():
-            return False
-        access = json.loads(path.read_text())
         try:
             return api('GET','/v1/models')
         except (OSError,urllib.error.URLError):
@@ -114,14 +107,14 @@ try:
     second = api('POST','/v1/jobs',edit)['id']
     until(lambda: api('GET',f'/v1/jobs/{second}')['status']=='running')
     queued = api('POST','/v1/jobs',request)['id']
-    op = api('POST','/v1/runtime/unload',{'active_job':'wait'},admin=True)['id']
+    op = api('POST','/v1/runtime/unload',{'active_job':'wait'})['id']
     consume(second,'reference-edit-1mp',start)
     until(lambda: unloaded(op,pid))
     assert api('GET',f'/v1/jobs/{queued}')['status']=='queued'
     api('POST',f'/v1/jobs/{queued}/cancel')
     assert api('GET',f'/v1/jobs/{queued}')['status']=='cancelled'
     results['tests'].append({'case':'unload_wait','worker_exit_confirmed':True,'queued_job_preserved':True})
-    api('POST','/v1/runtime/resume',admin=True)
+    api('POST','/v1/runtime/resume')
     start = time.monotonic()
     third = api('POST','/v1/jobs',request)['id']
     consume(third,'baseline-after-resume',start,manifest['reference_rgba_sha256'])
@@ -129,7 +122,7 @@ try:
     assert pid2 and pid2 != pid
     fourth = api('POST','/v1/jobs',request)['id']
     until(lambda: api('GET',f'/v1/jobs/{fourth}')['status']=='running')
-    op = api('POST','/v1/runtime/unload',{'active_job':'cancel'},admin=True)['id']
+    op = api('POST','/v1/runtime/unload',{'active_job':'cancel'})['id']
     until(lambda: unloaded(op,pid2))
     assert api('GET',f'/v1/jobs/{fourth}')['status']=='cancelled'
     results['tests'].append({'case':'unload_cancel','worker_exit_confirmed':True,'active_job_cancelled':True})
