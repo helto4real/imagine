@@ -1,5 +1,29 @@
 # Qwen experiment decisions — read before proposing more optimization
 
+## 2026-10-16 — same-LoRA fusion attribution, unchanged optimizations
+
+User-authorized kernel/copy-only CUPTI profiling reproduced the same CFG 1 test:
+20.476 → 44.792 s warm. Gate/up-SwiGLU, BF16 projection output, projection
+residual and norm/cast/scale-ConvRot fusions disappear; paired Q/K RMS-RoPE and
+Sage remain. Source-grounded trace accounting gives +4.691 GPU s in net fusion
+replacement and +19.697 GPU s in LoRA-side GEMMs, conversions, scaling and adds.
+Warm transfer counts/bytes are unchanged. This is observational attribution,
+not an ablation or a promised speedup. Zero dropped records; all eight requests
+HTTP 200. No native code or optimization flags changed. See
+[fusion attribution](profiling/LORA-FUSIONS.md).
+
+## 2026-10-16 — one-LoRA CFG 1 comparison
+
+User-requested frozen-v2 INT8 comparison at 1600×896, CFG 1, with an identical
+woman-portrait prompt and only `lenovo_qwen21.safetensors` at strength 1. Warm
+client times: 19.926 s without versus 44.493 s with (2.233×); removing the LoRA
+in the same native process returned to 19.904 s warm. This establishes a
+repeatable slowdown for that workload independently of Rust process restarts.
+No stage/kernel/peak-memory attribution or image validation was performed;
+no inference optimization was changed. See [LoRA CFG 1](profiling/LORA-CFG1.md).
+
+---
+
 Consolidated 2026-10-14, after Tomas accepted
 [qwen-image21-1600x896-v1](BASELINE.md). This is the current decision register;
 individual reports preserve the original chronology and detailed evidence.

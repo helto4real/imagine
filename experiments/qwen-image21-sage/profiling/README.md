@@ -22,7 +22,7 @@ From the project root, build and run:
 
 ```bash
 mkdir -p experiments/qwen-image21-sage/runs/activity-profiler
-g++ -std=c++17 -O2 -Wall -Wextra -shared -fPIC \
+g++ -std=c++17 -O2 -Wall -Wextra -shared -fPIC -pthread \
   experiments/qwen-image21-sage/profiling/activity.cpp \
   -I/opt/cuda/targets/x86_64-linux/include \
   -L/opt/cuda/targets/x86_64-linux/lib \

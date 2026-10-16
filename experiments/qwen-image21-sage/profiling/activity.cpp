@@ -8,12 +8,18 @@
 #include <set>
 #include <execinfo.h>
 #include <dlfcn.h>
+#include <atomic>
+#include <chrono>
+#include <thread>
+#include <unistd.h>
 
 struct Trace { FILE* file; std::mutex mutex; size_t dropped = 0; };
 static Trace* trace;
 static FILE* stacks;
 static CUpti_SubscriberHandle subscriber;
 static std::set<size_t>* sampled_sizes;
+static std::atomic<bool> stop_flush{false};
+static std::thread* flush_thread;
 static void check(CUptiResult result) {
     if (result == CUPTI_SUCCESS) return;
     const char* message = nullptr;
@@ -105,6 +111,24 @@ __attribute__((constructor)) static void start() {
     check(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
     check(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_MEMCPY));
     check(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_MEMSET));
+    // Optional explicit checkpoint for servers stopped by SIGTERM. No GPU
+    // synchronization; the client requests this only after its last response.
+    if (const char* path = std::getenv("QWEN_ACTIVITY_FLUSH")) {
+        flush_thread = new std::thread([path]() {
+            while (!stop_flush.load()) {
+                if (access(path, F_OK) == 0) {
+                    check(cuptiActivityFlushAll(0));
+                    {
+                        std::lock_guard<std::mutex> lock(trace->mutex);
+                        std::fprintf(trace->file, "# checkpoint_dropped_records=%zu\n", trace->dropped);
+                        std::fflush(trace->file);
+                    }
+                    unlink(path);
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
+        });
+    }
     if (const char* stack_path = std::getenv("QWEN_COPY_STACKS")) {
         stacks = std::fopen(stack_path, "w");
         if (!stacks) std::_Exit(2);
@@ -116,6 +140,8 @@ __attribute__((constructor)) static void start() {
 }
 __attribute__((destructor)) static void finish() {
     if (!trace) return;
+    stop_flush.store(true);
+    if (flush_thread) { flush_thread->join(); delete flush_thread; }
     check(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
     std::fprintf(trace->file, "# dropped_records=%zu\n", trace->dropped);
     std::fclose(trace->file);
