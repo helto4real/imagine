@@ -93,7 +93,8 @@ impl Store {
             .fetch_optional(&self.db)
             .await?;
         row.map(|r| -> Result<Value> {
-            let req: Value = serde_json::from_str(r.get("request"))?;
+            let mut req: Value = serde_json::from_str(r.get("request"))?;
+            req.as_object_mut().unwrap().remove("resolved_models");
             let output: Option<String> = r.get("output");
             let error: Option<String> = r.get("error");
             let started: Option<i64> = r.get("started"); let finished: Option<i64> = r.get("finished");

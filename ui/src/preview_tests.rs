@@ -1441,3 +1441,6 @@ fn sheet_upscale_replaces_only_whole_sheet_even_when_viewing_portrait() {
         serde_json::json!(["asset_upscaled_sheet"])
     );
 }
+
+#[path = "model_ui_tests.rs"]
+mod model_ui_tests;

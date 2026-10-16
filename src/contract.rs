@@ -13,6 +13,9 @@ pub const API_REVISION: &str = "imagine-api-v1";
 #[serde(deny_unknown_fields)]
 pub struct JobRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(skip)]
+    pub resolved_models: Option<crate::model_library::ResolvedModels>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resolved_profile: Option<ResolvedProfile>,
     pub model: String,
     pub operation: Operation,

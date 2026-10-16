@@ -12,6 +12,7 @@ use std::sync::Arc;
 /// Internal inference input: resolved settings and owned pixels, no asset IDs or store.
 #[derive(Clone)]
 pub struct ImagePass {
+    pub resolved_models: Option<crate::model_library::ResolvedModels>,
     pub model: String,
     pub model_options: ModelOptions,
     pub sampling: Sampling,
@@ -54,6 +55,7 @@ pub async fn generate(
 ) -> Result<Vec<Artifact>> {
     let task = Task::resolve(request)?;
     let mut pass = ImagePass {
+        resolved_models: request.resolved_models.clone(),
         model: request.model.clone(),
         model_options: request.model_options.clone(),
         sampling: request.sampling.clone(),

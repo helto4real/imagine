@@ -21,3 +21,5 @@ pub mod session;
 pub mod character_sheet;
 pub mod generation;
 pub mod model_adapter;
+
+pub mod model_library;

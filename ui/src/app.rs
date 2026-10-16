@@ -20,7 +20,9 @@ struct ReferenceView {
     texture: egui::TextureHandle,
 }
 enum Message {
-    Connected(Result<(Client, Value), String>),
+    Connected(Result<(Client, crate::model_catalog::LibrarySnapshot), String>),
+    Library(Result<crate::model_catalog::LibrarySnapshot, String>),
+    ModelFolder(Option<PathBuf>),
     Picked(Workspace, Vec<PathBuf>),
     Folder(Option<PathBuf>),
     Uploaded(Workspace, Result<Reference, Failure>),
@@ -131,6 +133,7 @@ pub struct ImagineApp {
     prefs: Preferences,
     client: Option<Client>,
     metadata: Option<Value>,
+    models: models::ModelUi,
     image: GenerationDesk,
     edit: editing::EditSession,
     sheet: GenerationDesk,
@@ -168,6 +171,7 @@ impl ImagineApp {
             prefs,
             client: None,
             metadata: None,
+            models: Default::default(),
             image: GenerationDesk::default(),
             edit: editing::EditSession::default(),
             sheet: GenerationDesk {
@@ -222,6 +226,9 @@ impl ImagineApp {
         }
     }
     fn can_generate(&self) -> bool {
+        if self.models.catalog.is_some() && self.model_selection().is_err() {
+            return false;
+        }
         match self.workspace {
             Workspace::Image => !self.image.prompt.trim().is_empty(),
             Workspace::ImageEdit => !self.edit.desk.prompt.trim().is_empty(),
@@ -244,10 +251,7 @@ impl ImagineApp {
         std::thread::spawn(move || {
             let result = runtime().block_on(async {
                 let client = Client::connect(&connection).map_err(|e| e.to_string())?;
-                let data = client.metadata().await.map_err(|e| e.message)?;
-                if data["available"] != true {
-                    return Err("The model is unavailable on the server.".into());
-                }
+                let data = client.library(None, false).await.map_err(|e| e.message)?;
                 Ok((client, data))
             });
             send(&tx, &ctx, Message::Connected(result));
@@ -256,6 +260,26 @@ impl ImagineApp {
     fn receive(&mut self, ctx: &egui::Context) {
         while let Ok(message) = self.rx.try_recv() {
             match message {
+                Message::Library(result) => {
+                    self.models.loading = false;
+                    match result {
+                        Ok(data) => {
+                            self.models.error = None;
+                            self.accept_library(data);
+                        }
+                        Err(error) => self.models.error = Some(error),
+                    }
+                }
+                Message::ModelFolder(path) => {
+                    self.models.loading = false;
+                    if let Some(path) = path
+                        && let Some(library) = &self.models.catalog
+                    {
+                        let mut settings = library.settings.clone();
+                        settings.root = path;
+                        self.load_library(ctx, Some(settings));
+                    }
+                }
                 Message::ClipboardFailed => {
                     self.desk_mut().error = Some("Could not preserve the clipboard after closing Imagine. Keep the app open and copy again.".into());
                 }
@@ -264,7 +288,7 @@ impl ImagineApp {
                     match value {
                         Ok((client, data)) => {
                             self.client = Some(client);
-                            self.metadata = Some(data);
+                            self.accept_library(data);
                         }
                         Err(e) => {
                             self.client = None;
@@ -478,7 +502,7 @@ impl ImagineApp {
                     &self.prefs.generation,
                 )
             };
-            let request = match request {
+            let request = match request.and_then(|r| self.apply_model_selection(r)) {
                 Ok(v) => v,
                 Err(e) => {
                     self.desk_mut().error = Some(e.to_string());
@@ -609,6 +633,16 @@ impl ImagineApp {
         });
     }
     fn save_preferences(&mut self) {
+        if self
+            .prefs
+            .model_groups
+            .values()
+            .flat_map(|g| &g.loras)
+            .any(|l| !l.strength.is_finite())
+        {
+            self.settings_error = Some("Enter a finite LoRA strength before saving.".into());
+            return;
+        }
         self.settings_error = self
             .prefs
             .save(&self.project)
@@ -801,6 +835,9 @@ fn texture(ctx: &egui::Context, preview: &Preview, id: &str) -> egui::TextureHan
 }
 impl eframe::App for ImagineApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        if self.models.dirty {
+            self.save_preferences();
+        }
         if let Some(clipboard) = &self.clipboard {
             clipboard.finish();
         }
@@ -816,3 +853,6 @@ impl eframe::App for ImagineApp {
 #[cfg(test)]
 #[path = "preview_tests.rs"]
 mod tests;
+
+#[path = "models.rs"]
+mod models;

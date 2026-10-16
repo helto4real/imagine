@@ -121,6 +121,17 @@ impl Native {
         });
     }
     async fn ready(&mut self, request: &ImagePass) -> Result<()> {
+        if let Some(resolved) = &request.resolved_models {
+            resolved
+                .verify()
+                .map_err(|_| EngineError("model_files_changed"))?;
+        }
+        let model_root = request
+            .resolved_models
+            .as_ref()
+            .map(|r| &r.root)
+            .unwrap_or(&self.config.model_root)
+            .clone();
         let cache_enabled = reference_cache_enabled(
             std::env::var("IMAGINE_QWEN_REFERENCE_CACHE")
                 .ok()
@@ -129,8 +140,23 @@ impl Native {
         let profile = NativeProfile::for_pass(request, cache_enabled);
         let workflow = request.model_options.qwen_image_2_1.workflow.as_ref();
         let weights = workflow
-            .map(|w| serde_json::json!([w.diffusion_model, w.text_encoder, w.vae]).to_string())
-            .unwrap_or_default();
+            .map(|w| {
+                serde_json::json!([
+                    model_root,
+                    w.diffusion_model,
+                    w.text_encoder,
+                    w.vae,
+                    request.resolved_models
+                ])
+                .to_string()
+            })
+            .unwrap_or_else(|| {
+                request
+                    .resolved_models
+                    .as_ref()
+                    .map(|r| serde_json::to_string(r).unwrap())
+                    .unwrap_or_default()
+            });
         if self
             .loaded_profile
             .is_some_and(|current| current != profile)
@@ -229,10 +255,7 @@ impl Native {
             manifest["models"].clone()
         };
         for (key, rel) in models.as_object().context("model paths")? {
-            let path = self
-                .config
-                .model_root
-                .join(rel.as_str().context("model filename")?);
+            let path = model_root.join(rel.as_str().context("model filename")?);
             if !path.is_file() {
                 bail!(EngineError("model_weights_missing"));
             }
@@ -247,7 +270,7 @@ impl Native {
         if workflow.is_some() {
             command
                 .arg("--lora-model-dir")
-                .arg(self.config.model_root.join("loras"));
+                .arg(model_root.join("loras"));
         }
         command.args([
             "--width",
@@ -552,6 +575,7 @@ mod tests {
     use super::*;
     fn synthetic_pass(reference_count: usize) -> ImagePass {
         ImagePass {
+            resolved_models: None,
             model: crate::contract::MODEL.into(),
             model_options: Default::default(),
             sampling: Default::default(),
@@ -656,6 +680,7 @@ mod tests {
         let mut options = ModelOptions::default();
         options.qwen_image_2_1.reference_max_pixels_per_image = 4096;
         let pass = ImagePass {
+            resolved_models: None,
             model: crate::contract::MODEL.into(),
             model_options: options,
             sampling: Sampling::default(),

@@ -79,6 +79,9 @@ upload and reorder reference images, choose **Spara i → Välj mapp**, then
 unique filename in your chosen folder. The folder choice persists across starts.
 
 Default output: `.imagine/images`; preferences: `.imagine/ui-settings.json`.
+Choose the model folder in **Settings → Models** and select a model beside the
+prompt. The LoRA button opens the saved group-specific list. See
+[Models and LoRAs](docs/MODELS.md) for the ComfyUI-compatible folder structure.
 The app connects through `http://127.0.0.1:8189/imagine` without credentials. `start-server.sh` and `start-proxy.sh`
 use the same `.imagine/gpu.sock` by default. ComfyUI is not required by these
 launchers. MCP images use `/run/media/veracrypt1/mcp-images`, matching Pi.

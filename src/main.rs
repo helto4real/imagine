@@ -59,6 +59,12 @@ async fn main() -> Result<()> {
         pid: None,
         ..Default::default()
     });
+    let library = Arc::new(std::sync::Mutex::new(
+        imagine_server::model_library::Library::load(
+            config.model_root.clone(),
+            config.data.join("model-library.json"),
+        )?,
+    ));
     let native = Native::new(config.clone(), engine_tx)?;
     let (control, mut scheduler) = scheduler::start_coordinated(
         store.clone(),
@@ -67,6 +73,7 @@ async fn main() -> Result<()> {
     )
     .await?;
     let app = App {
+        library,
         profiles,
         store: store.clone(),
         control: control.clone(),

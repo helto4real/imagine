@@ -23,6 +23,7 @@ use tokio::sync::{Semaphore, watch};
 
 #[derive(Clone)]
 pub struct App {
+    pub library: Arc<std::sync::Mutex<crate::model_library::Library>>,
     pub profiles: Arc<crate::profiles::Catalog>,
     pub store: Store,
     pub control: Control,
@@ -46,6 +47,11 @@ pub fn router(app: App) -> Router {
         .route("/v1/profiles", get(profiles))
         .route("/v1/profiles/{id}", get(profile))
         .route("/v1/jobs/validate", post(validate_job))
+        .route(
+            "/v1/model-library",
+            get(model_library).put(update_model_library),
+        )
+        .route("/v1/model-library/refresh", post(refresh_model_library))
         .route("/v1/models", get(models))
         .route("/v1/models/{id}", get(model))
         .route("/v1/assets", post(upload))
@@ -153,11 +159,7 @@ async fn submit_batch(
         .map_err(|_| Fault::new(400, "invalid_idempotency_key"))?;
     let mut requests = Vec::with_capacity(request.jobs.len());
     for request in request.jobs {
-        requests.push(
-            app.profiles
-                .resolve(request, &app.store, LOCAL_OWNER)
-                .await?,
-        );
+        requests.push(resolve_request(&app, request).await?);
     }
     let result = app
         .control
@@ -180,10 +182,7 @@ async fn submit(
         .map(|v| v.to_str().map(str::to_owned))
         .transpose()
         .map_err(|_| Fault::new(400, "invalid_idempotency_key"))?;
-    let request = app
-        .profiles
-        .resolve(request, &app.store, LOCAL_OWNER)
-        .await?;
+    let request = resolve_request(&app, request).await?;
     let mut result = app
         .control
         .call(Action::Submit {
@@ -310,11 +309,16 @@ async fn validate_job(
     body: Result<Json<Value>, JsonRejection>,
 ) -> Result<Json<Value>, Fault> {
     let Json(value) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
-    let request = app.profiles.resolve(value, &app.store, LOCAL_OWNER).await?;
+    let request = resolve_request(&app, value).await?;
     crate::generation::reference_metadata(&request, LOCAL_OWNER, &app.store).await?;
     let mut effective = request.effective();
     // Validation is safe to expose in MCP results; prompt text stays private.
-    for key in ["prompt", "negative_prompt", "client_metadata"] {
+    for key in [
+        "prompt",
+        "negative_prompt",
+        "client_metadata",
+        "resolved_models",
+    ] {
         effective.as_object_mut().unwrap().remove(key);
     }
     if let Some(sheet) = effective
@@ -325,4 +329,73 @@ async fn validate_job(
         sheet.remove("clothing_description");
     }
     Ok(Json(json!({"valid":true,"effective":effective})))
+}
+
+async fn resolve_request(app: &App, value: Value) -> Result<crate::contract::JobRequest, Fault> {
+    let library = app.library.clone();
+    let (value, resolved) = tokio::task::spawn_blocking(move || {
+        library
+            .lock()
+            .map_err(|_| Fault::new(500, "model_library_unavailable"))?
+            .prepare(value)
+    })
+    .await
+    .map_err(|_| Fault::new(500, "model_library_unavailable"))??;
+    let mut request = app.profiles.resolve(value, &app.store, LOCAL_OWNER).await?;
+    request.resolved_models = if resolved.is_some() {
+        resolved
+    } else {
+        let library = app.library.clone();
+        let request = request.clone();
+        tokio::task::spawn_blocking(move || {
+            library
+                .lock()
+                .map_err(|_| Fault::new(500, "model_library_unavailable"))?
+                .pin_explicit(&request)
+        })
+        .await
+        .map_err(|_| Fault::new(500, "model_library_unavailable"))??
+    };
+    Ok(request)
+}
+async fn model_library(
+    State(app): State<App>,
+) -> Result<Json<crate::model_library::LibrarySnapshot>, Fault> {
+    library_action(app, None, false).await
+}
+async fn refresh_model_library(
+    State(app): State<App>,
+) -> Result<Json<crate::model_library::LibrarySnapshot>, Fault> {
+    library_action(app, None, true).await
+}
+async fn update_model_library(
+    State(app): State<App>,
+    body: Result<Json<crate::model_library::LibrarySettings>, JsonRejection>,
+) -> Result<Json<crate::model_library::LibrarySnapshot>, Fault> {
+    let Json(settings) = body.map_err(|_| Fault::new(422, "invalid_library_settings"))?;
+    library_action(app, Some(settings), false).await
+}
+async fn library_action(
+    app: App,
+    settings: Option<crate::model_library::LibrarySettings>,
+    refresh: bool,
+) -> Result<Json<crate::model_library::LibrarySnapshot>, Fault> {
+    tokio::task::spawn_blocking(move || {
+        let mut library = app
+            .library
+            .lock()
+            .map_err(|_| Fault::new(500, "model_library_unavailable"))?;
+        if let Some(settings) = settings {
+            library
+                .update(settings)
+                .map_err(|_| Fault::new(422, "model_library_update_failed"))?;
+        } else if refresh {
+            library
+                .scan()
+                .map_err(|_| Fault::new(422, "model_library_scan_failed"))?;
+        }
+        Ok(Json(library.snapshot()))
+    })
+    .await
+    .map_err(|_| Fault::new(500, "model_library_unavailable"))?
 }

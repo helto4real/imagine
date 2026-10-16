@@ -34,6 +34,10 @@ impl Connection {
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Preferences {
+    #[serde(default = "default_model_group")]
+    pub model_group: String,
+    #[serde(default)]
+    pub model_groups: std::collections::BTreeMap<String, ModelGroupSettings>,
     pub output_folder: PathBuf,
     #[serde(default = "privacy_default")]
     pub privacy_mode: bool,
@@ -157,6 +161,8 @@ impl Preferences {
         let path = project.join(".imagine/ui-settings.json");
         if !path.exists() {
             return Ok(Self {
+                model_group: default_model_group(),
+                model_groups: Default::default(),
                 output_folder: project.join(".imagine/images"),
                 privacy_mode: true,
                 negative_prompt: String::new(),
@@ -572,6 +578,8 @@ mod tests {
     fn settings_and_unique_files() {
         let root = tempfile::tempdir().unwrap();
         let p = Preferences {
+            model_group: default_model_group(),
+            model_groups: Default::default(),
             output_folder: root.path().join("pictures"),
             privacy_mode: false,
             negative_prompt: "  artifacts, suddig\nextra fingrar  ".into(),
@@ -623,4 +631,21 @@ mod tests {
         assert_eq!(previous.max_side, 1024);
         assert_eq!(previous.reference_max_pixels_per_image, 1_000_000);
     }
+}
+
+fn default_model_group() -> String {
+    crate::model_catalog::QWEN_GROUP.into()
+}
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ModelGroupSettings {
+    pub variant: String,
+    pub loras: Vec<LoraSetting>,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LoraSetting {
+    pub id: String,
+    pub name: String,
+    pub strength: f32,
+    pub enabled: bool,
 }

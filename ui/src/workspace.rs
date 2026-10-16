@@ -34,7 +34,7 @@ fn panel(ui: &Ui, rect: Rect, media: bool) {
 }
 
 impl ImagineApp {
-    fn editable(&self) -> bool {
+    pub(super) fn editable(&self) -> bool {
         !self.busy() && !self.connecting && self.desk().pending.is_none()
     }
 
@@ -77,6 +77,9 @@ impl ImagineApp {
                 );
             }
         });
+        if self.models.open {
+            self.loras_window(ui.ctx());
+        }
         if self.settings_open {
             self.settings_window(ui.ctx());
         }
@@ -105,7 +108,7 @@ impl ImagineApp {
                         ui.add_space(8.);
                         ui.separator();
                         ui.add_space(8.);
-                        ui.label(RichText::new("Qwen Image 2.1").color(helto::DIM));
+                        ui.label(RichText::new(self.selected_model_name()).color(helto::DIM));
                     }
                 });
             },
@@ -290,6 +293,8 @@ impl ImagineApp {
                     ui.add_space(12.);
                     self.reference_panel(ui);
                     ui.add_space(12.);
+                    self.model_controls(ui);
+                    ui.add_space(8.);
                     let label = ui.label("Prompt");
                     helto::textarea(
                         ui,
@@ -499,6 +504,8 @@ impl ImagineApp {
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     ui.scope(|ui| {
+                        self.model_controls(ui);
+                        ui.add_space(8.);
                         let privacy = self.prefs.privacy_mode;
                         if self.workspace == Workspace::CharacterSheet {
                             let label = ui.label("Character");
@@ -1064,6 +1071,8 @@ impl ImagineApp {
                 .id_salt("settings-scroll")
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
+                    self.model_settings(ui);
+                    ui.add_space(18.);
                     ui.label(
                         RichText::new("Generation")
                             .strong()

@@ -529,3 +529,27 @@ GPU and native UI acceptance were not run; running services were not restarted.
 Restart API, proxy and UI together to use the new connection contract. Existing
 `access.json` files remain untouched and unused. Helto profile decryption and
 separate proxy MCP authentication retain their existing behavior.
+
+### Model selection and LoRA desk
+
+Model selection and the LoRA button are beside the prompt in generation and
+editing. Settings contains the model root, refresh and component selectors.
+LoRA choices persist per model group; missing active choices block submission.
+See [Models and LoRAs](MODELS.md) for supported files, discovery, API and persistence.
+
+Validation: all **125 workspace tests** passed, including the actual UI HTTP
+client through the proxy/API with synthetic model headers and fake inference.
+New catalog and UI checks cover discovery, persistence, group/variant isolation,
+missing/replaced files, component ambiguity, queued snapshots and widget-driven
+LoRA add/remove/close. Regression checks also cover LoRAs four directories deep,
+unfiltered LoRA selection regardless of headers or metadata, and visible Settings controls with long
+paths and 40 collapsed scan warnings. Widget tests verify immediate multi-word
+search across path segments, reversed word order, case, whitespace, no matches
+and clearing the query. CPU-rendered desktop, compact, LoRA and
+Settings views were inspected. Local test ports required sandbox escalation. No runtime data,
+live model generation, Computer Use or service restart was involved. Native
+window/file-dialog acceptance and real LoRA compatibility remain untested.
+
+Formatting, workspace/all-targets/all-features Clippy with warnings denied,
+release workspace builds, UI launcher help and diff checks also passed. The
+implementation builds on baseline commit `c81e0af`.

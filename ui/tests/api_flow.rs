@@ -125,7 +125,11 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         .collect::<Vec<_>>()
         .join("\n");
     std::fs::write(profiles.join("image_upscale.yaml"), profile).unwrap();
+    let library = Arc::new(std::sync::Mutex::new(
+        imagine_server::model_library::Library::default(),
+    ));
     let app = App {
+        library: library.clone(),
         profiles: Arc::new(imagine_server::profiles::Catalog::load(&profiles).unwrap()),
         store,
         control: control.clone(),
@@ -569,6 +573,70 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         .unwrap();
     assert!(!error.retryable);
     assert_eq!(calls.load(Ordering::SeqCst), before + 1);
+    // Catalog choices travel through the actual native client's HTTP transport and proxy.
+    let model_root = dir.path().join("synthetic-models");
+    model_fixture::models(&model_root);
+    *library.lock().unwrap() = imagine_server::model_library::Library::load(
+        model_root,
+        dir.path().join("model-library.json"),
+    )
+    .unwrap();
+    let catalog = client.library(None, true).await.unwrap();
+    let selected = catalog
+        .models
+        .iter()
+        .find(|m| m["model"] == imagine_server::contract::MODEL)
+        .unwrap();
+    let lora = catalog
+        .files
+        .iter()
+        .find(|f| f.path == "loras/nested/style.safetensors")
+        .unwrap();
+    let mut catalog_request = make_request(
+        "Synthetic catalog selection",
+        "",
+        &[],
+        selected,
+        &GenerationSettings::default(),
+    )
+    .unwrap();
+    catalog_request["model_selection"] =
+        json!({"diffusion":selected["id"],"loras":[{"id":lora.id,"strength":0.4}]});
+    let before = calls.load(Ordering::SeqCst);
+    client
+        .generate(
+            Submission {
+                request: catalog_request,
+                key: "catalog-ui".into(),
+                folder: dir.path().join("catalog-output"),
+                job: None,
+                upscale_source: None,
+            },
+            |_| {},
+        )
+        .await
+        .unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), before + 1);
+    assert_eq!(
+        requests
+            .lock()
+            .unwrap()
+            .last()
+            .unwrap()
+            .model_options
+            .qwen_image_2_1
+            .workflow
+            .as_ref()
+            .unwrap()
+            .loras[0]
+            .strength,
+        0.4
+    );
+    let refreshed = client
+        .library(Some(&catalog.settings), false)
+        .await
+        .unwrap();
+    assert_eq!(refreshed.models.len(), 2);
     control.call(Action::Shutdown).await.unwrap();
     scheduler.await.unwrap().unwrap();
     proxy.close().await;
@@ -650,3 +718,6 @@ async fn incomplete_sheet_download_saves_nothing_and_retry_reuses_job() {
     assert_eq!(state.submitted.load(Ordering::SeqCst), 1);
     server.abort();
 }
+
+#[path = "../../shared/model_catalog_fixture.rs"]
+mod model_fixture;

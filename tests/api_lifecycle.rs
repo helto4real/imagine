@@ -78,6 +78,7 @@ impl Backend for Fake {
     }
 }
 struct Harness {
+    library: Arc<std::sync::Mutex<imagine_server::model_library::Library>>,
     engine_state: watch::Sender<EngineState>,
     dir: tempfile::TempDir,
     store: Store,
@@ -95,7 +96,11 @@ async fn setup() -> Harness {
         .unwrap();
     let (engine_state, engine) = watch::channel(EngineState::default());
 
+    let library = Arc::new(std::sync::Mutex::new(
+        imagine_server::model_library::Library::default(),
+    ));
     let router = api::router(App {
+        library: library.clone(),
         profiles: Arc::new(
             imagine_server::profiles::Catalog::load(std::path::Path::new(concat!(
                 env!("CARGO_MANIFEST_DIR"),
@@ -110,6 +115,7 @@ async fn setup() -> Harness {
         uploads: Arc::new(Semaphore::new(2)),
     });
     Harness {
+        library,
         engine_state,
         dir,
         store,
@@ -1207,4 +1213,141 @@ async fn output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid
     );
     assert_eq!(std::fs::read_dir(&store.media).unwrap().count(), 0);
     store.close().await.unwrap();
+}
+
+#[path = "../shared/model_catalog_fixture.rs"]
+mod model_fixture;
+#[tokio::test]
+async fn model_library_api_freezes_queued_selection_and_validates_before_admission() {
+    let h = setup().await;
+    let first_root = h.dir.path().join("models-a");
+    let second_root = h.dir.path().join("models-b");
+    model_fixture::models(&first_root);
+    model_fixture::models(&second_root);
+    *h.library.lock().unwrap() = imagine_server::model_library::Library::load(
+        first_root.clone(),
+        h.dir.path().join("model-library.json"),
+    )
+    .unwrap();
+    let (status, library) = req(&h.router, "GET", "/v1/model-library", None, None).await;
+    assert_eq!(status, 200);
+    let files = library["files"].as_array().unwrap();
+    let diffusion = files.iter().find(|f| f["model"] == MODEL).unwrap()["id"].clone();
+    let lora = files
+        .iter()
+        .find(|f| f["path"] == "loras/nested/style.safetensors")
+        .unwrap()["id"]
+        .clone();
+    let mut value = request();
+    value["model_selection"] = json!({"diffusion":diffusion,"loras":[{"id":lora,"strength":0.75}]});
+    let (status, validated) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/validate",
+        Some(value.clone()),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{validated}");
+    assert!(!validated.to_string().contains(first_root.to_str().unwrap()));
+    let (status, first) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs",
+        Some(value.clone()),
+        Some("library-first"),
+    )
+    .await;
+    assert_eq!(status, 202, "{first}");
+    wait_calls(&h.probe, 1).await;
+    let (status, second) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs",
+        Some(value.clone()),
+        Some("library-second"),
+    )
+    .await;
+    assert_eq!(status, 202);
+    let mut settings = library["settings"].clone();
+    settings["root"] = json!(second_root);
+    let (status, _) = req(&h.router, "PUT", "/v1/model-library", Some(settings), None).await;
+    assert_eq!(status, 200);
+    h.probe.release.notify_one();
+    wait_calls(&h.probe, 2).await;
+    {
+        let passes = h.probe.passes.lock().unwrap();
+        let second = &passes[1];
+        assert_eq!(second.resolved_models.as_ref().unwrap().root, first_root);
+        assert_eq!(
+            second
+                .model_options
+                .qwen_image_2_1
+                .workflow
+                .as_ref()
+                .unwrap()
+                .loras[0]
+                .strength,
+            0.75
+        );
+    }
+    h.probe.release.notify_one();
+    let completed = wait_status(
+        &h.store,
+        second["id"].as_str().unwrap(),
+        "local",
+        "succeeded",
+    )
+    .await;
+    assert!(completed["effective"].get("resolved_models").is_none());
+    value["model_selection"]["loras"] = json!([]);
+    let (status, next) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs",
+        Some(value.clone()),
+        Some("library-next"),
+    )
+    .await;
+    assert_eq!(status, 202);
+    wait_calls(&h.probe, 3).await;
+    {
+        let passes = h.probe.passes.lock().unwrap();
+        let pass = &passes[2];
+        assert_eq!(pass.resolved_models.as_ref().unwrap().root, second_root);
+        assert!(
+            pass.model_options
+                .qwen_image_2_1
+                .workflow
+                .as_ref()
+                .unwrap()
+                .loras
+                .is_empty()
+        );
+    }
+    h.probe.release.notify_one();
+    wait_status(&h.store, next["id"].as_str().unwrap(), "local", "succeeded").await;
+    value["resolved_models"] = json!({"root":"/"});
+    assert_eq!(
+        req(&h.router, "POST", "/v1/jobs", Some(value.clone()), None)
+            .await
+            .0,
+        422
+    );
+    value.as_object_mut().unwrap().remove("resolved_models");
+    value["model_selection"]["loras"] = json!([{"id":"missing","strength":1}]);
+    assert_eq!(
+        req(
+            &h.router,
+            "POST",
+            "/v1/jobs/batch",
+            Some(json!({"jobs":[value]})),
+            None
+        )
+        .await
+        .0,
+        422
+    );
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 3);
+    stop(h).await;
 }

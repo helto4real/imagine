@@ -168,6 +168,25 @@ impl Client {
     fn post(&self, path: &str) -> reqwest::RequestBuilder {
         self.http.post(format!("{}{path}", self.base))
     }
+    pub async fn library(
+        &self,
+        settings: Option<&crate::model_catalog::LibrarySettings>,
+        refresh: bool,
+    ) -> std::result::Result<crate::model_catalog::LibrarySnapshot, Failure> {
+        let response = if let Some(settings) = settings {
+            self.http
+                .put(format!("{}/v1/model-library", self.base))
+                .json(settings)
+                .send()
+                .await
+        } else if refresh {
+            self.post("/v1/model-library/refresh").send().await
+        } else {
+            self.get("/v1/model-library").send().await
+        };
+        serde_json::from_value(Self::json(response).await?)
+            .map_err(|_| Failure::retry("Invalid model catalog from server."))
+    }
     pub async fn metadata(&self) -> std::result::Result<Value, Failure> {
         Self::json(self.get(&format!("/v1/models/{MODEL}")).send().await).await
     }
@@ -459,8 +478,26 @@ pub fn make_request(
         .get("defaults")
         .and_then(Value::as_object)
         .context("The server did not provide default settings.")?;
+    if let Some(sigmas) = defaults
+        .get("sampling")
+        .and_then(|s| s["custom_sigmas"].as_array())
+        && !sigmas.is_empty()
+        && settings.steps as usize + 1 != sigmas.len()
+    {
+        bail!(
+            "This model requires {} steps. Update Steps in Settings.",
+            sigmas.len() - 1
+        );
+    }
+    if metadata["model"] == "qwen-image-2.1-turbo" && settings.cfg_scale != 1. {
+        bail!("Qwen Image 2.1 Turbo requires CFG 1. Update CFG in Settings.");
+    }
     let mut request = Value::Object(defaults.clone());
-    request["model"] = json!(MODEL);
+    request["model"] = metadata
+        .get("model")
+        .or_else(|| metadata.get("id"))
+        .cloned()
+        .context("Missing model ID.")?;
     request["operation"] = json!(if refs.is_empty() {
         "text_to_image"
     } else {
@@ -605,6 +642,16 @@ fn decode(bytes: &[u8], thumbnail: bool) -> Result<Preview> {
 }
 pub fn error_message(code: &str) -> String {
     match code {
+        "model_library_update_failed" => "Could not save the model folder or assignments. Check the folder, compatibility and server write permissions.",
+        "model_library_scan_failed" => "Could not scan the model folder. Check permissions and folder depth, then refresh.",
+        "model_file_missing"|"model_component_missing" => "A model or LoRA file is missing. Refresh Models in Settings and update your selection.",
+        "choose_model_components" => "Select the text encoder and VAE in Settings.",
+        "incompatible_component"|"incompatible_lora" => "The selected component or LoRA does not belong to this model group.",
+        "unsupported_model_file" => "The file does not match a supported model. Select another model or check the files in Settings.",
+        "model_catalog_stale" => "A model file changed. Refresh Models in Settings and try again.",
+        "invalid_sigma_schedule" => "This model has a fixed sampling schedule. Restore the required step count in Settings.",
+        "unsupported_zero_negative_conditioning" => "This model requires CFG 1. Update CFG in Settings.",
+        "model_files_changed" => "A selected model file changed after submission. Refresh Models and submit a new job.",
         "coordinator_unavailable" => "The GPU queue is unavailable. Check that Imagine and the proxy use the same coordinator socket." ,
         "imagine_proxy_not_configured" => "Restart the proxy with ./start-proxy.sh to enable Imagine coordination.",
         "imagine_upstream_unavailable" => "The proxy cannot reach Imagine. Start ./start-server.sh and retry.",

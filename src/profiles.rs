@@ -189,7 +189,10 @@ impl Catalog {
         owner: &str,
     ) -> Result<JobRequest, Fault> {
         let object = value.as_object_mut().ok_or(invalid("invalid_request"))?;
-        if object.contains_key("resolved_profile") || object.contains_key("execution_plan") {
+        if object.contains_key("resolved_models")
+            || object.contains_key("resolved_profile")
+            || object.contains_key("execution_plan")
+        {
             return Err(invalid("read_only_profile_metadata"));
         }
         let selected = object.remove("profile");
@@ -356,7 +359,7 @@ impl Profile {
         let object = value
             .as_object_mut()
             .context("defaults must be an object")?;
-        if object.contains_key("resolved_profile") {
+        if object.contains_key("resolved_models") || object.contains_key("resolved_profile") {
             bail!("defaults cannot set resolved_profile");
         }
         let sheet_profile = object.get("operation") == Some(&json!("character_sheet"));
