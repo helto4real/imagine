@@ -89,9 +89,9 @@ with a native stack or reproduced in a live generation test.
 
 The Reference desk layout places ordered references on the left, the image in
 the center, and the prompt/size/seed inspector on the right. Every toolbar action
-uses an outline icon with a tooltip and accessible name. The image and film icons
-switch between Image and Video; switching preserves the image workspace and any
-pending job. Video currently has an explicit unavailable state, not a video engine
+uses an outline icon with a tooltip and accessible name. The image, character-card
+and film icons switch between Image, Character sheets and Video. Switching keeps
+each workspace's drafts, references, results and pending job intact. Video currently has an explicit unavailable state, not a video engine
 or editing tools.
 
 The gear opens a separate native **Settings** window with **Generation** (Steps,
@@ -142,6 +142,36 @@ VAE and vision inputs, with further native resizing disabled. The client creates
 small thumbnails only for display. The
 file dialog's order is used initially and can be adjusted before submission.
 Only one reference has local model-quality validation. H3 is not exposed here.
+
+## Character sheets
+
+The **Character sheets** tab reuses the image desk's three-panel layout and controls.
+**Character** and **Clothing & accessories** replace Prompt. Both fields resize,
+scroll and follow the existing hover-to-reveal privacy setting. Add up to eight
+identity references, or describe the character without references. Clothing is
+text-only; this tab does not assign separate clothing-reference roles.
+
+**Ratio** is fixed at 16:9. **Width** accepts 512–4096 in steps of 512 and starts at
+1536 × 864; it is saved separately from the image tab's size. Portrait fraction
+stays at 45%. Steps, CFG, negative prompt, seed mode/value, reference size and
+output folder use the shared controls. Descriptions and reference selections
+stay in memory. Generate requires server support for the operation and either
+a character description or a reference.
+
+**Sheet / Portrait / Views** select the three outputs of one job in the same
+viewer. Changing the selection resets to Fit; 1:1 and Pan apply to the selected
+output. The existing progress area names Portrait, Views and Composing; sampling
+percentage and ETA refer only to the current pass. Cancel and Retry retain the
+same job semantics as image generation. Async events always return to their
+originating tab, even while another tab is visible.
+
+The client downloads and decodes all three roles before saving them to the
+selected folder as `imagine-<UUID>-character_sheet.png`, `-portrait.png` and
+`-turnaround.png`, sharing one UUID. **Saved** appears only after all files have
+been synced. Handled write failures remove files created by that save attempt;
+if cleanup itself fails the UI reports partial files. A process/system crash
+can leave partial files. Retry retrieves the existing job and uses the currently
+selected output folder, without rerunning inference.
 
 ## Output folder and recovery
 
@@ -219,6 +249,8 @@ cargo build --release --locked -p imagine-ui
 IMAGINE_UI_PREVIEW_DIR="$PWD/target/ui-previews" cargo test --locked -p imagine-ui --lib headless_layout
 # Reference desk and Settings side by side, plus the compact layout:
 IMAGINE_UI_PREVIEW_DIR="$PWD/target/reference-desk-previews" cargo test --locked -p imagine-ui --lib headless_reference_desk
+# Character-sheet layouts and all result roles, using only procedural pixels:
+IMAGINE_UI_PREVIEW_DIR="$PWD/target/character-sheet-previews" cargo test --locked -p imagine-ui --lib headless_character_sheet
 # Explicit opt-in native preview with a temporary profile and procedural images:
 cargo run --locked -p imagine-ui --features ui-preview --example reference-desk
 ```
@@ -318,3 +350,22 @@ large Unicode input, exact stdin delivery, rapid copies followed by shutdown,
 helper failure/timeout fallback and stale-failure suppression. They do not read
 or replace the desktop clipboard. A real Wayland copy/close/paste check remains
 manual acceptance.
+
+### Character sheets — 2026-10-16
+
+The new tab reuses the existing Reference desk and Helto components. The complete
+workspace suite passed: 90 tests, including 32 UI unit tests and two HTTP client
+integration tests. The real proxy/API with fake inference covers text-only and
+reference sheets, both sampling stages, all three saved roles, cancellation and
+save recovery without rerunning inference. A separate isolated HTTP fixture
+verifies that an interrupted third download saves nothing and retries the same job.
+Headless interaction checks cover per-tab drafts/results, async upload/job routing,
+reference limits, width persistence, result selection/zoom reset, unavailable
+server support and pending-job controls.
+
+Formatting, workspace/all-targets/all-features Clippy with warnings denied, the
+release UI build and launcher help passed. Synthetic CPU renderings of the actual
+UI were inspected for desktop, compact, progress and privacy states. These are
+procedural fixtures, not runtime images or native compositor captures. Local
+socket tests required sandbox escalation; native window/file-dialog acceptance
+and live GPU generation were not run. Existing services were not restarted.

@@ -1,5 +1,7 @@
 use crate::{
-    client::{self, Client, Completed, Failure, Preview, Progress, Reference, Submission},
+    client::{
+        self, Client, Completed, Failure, OutputRole, Preview, Progress, Reference, Submission,
+    },
     helto,
     settings::{Connection, Preferences},
 };
@@ -18,13 +20,13 @@ struct ReferenceView {
 }
 enum Message {
     Connected(Result<(Client, Value), String>),
-    Picked(Vec<PathBuf>),
+    Picked(Workspace, Vec<PathBuf>),
     Folder(Option<PathBuf>),
-    Uploaded(Result<Reference, Failure>),
-    UploadsFinished,
-    Progress(Progress),
-    Finished(Result<Completed, Failure>),
-    Cancelled(String, Result<(), Failure>),
+    Uploaded(Workspace, Result<Reference, Failure>),
+    UploadsFinished(Workspace),
+    Progress(Workspace, Progress),
+    Finished(Workspace, Result<Completed, Failure>),
+    Cancelled(Workspace, String, Result<(), Failure>),
     ClipboardFailed,
 }
 fn send(tx: &Sender<Message>, ctx: &egui::Context, msg: Message) {
@@ -38,12 +40,87 @@ fn runtime() -> tokio::runtime::Runtime {
         .expect("client runtime")
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Workspace {
     Image,
+    CharacterSheet,
     Video,
 }
 
+struct ResultView {
+    role: OutputRole,
+    texture: egui::TextureHandle,
+    file: PathBuf,
+}
+struct Results {
+    assets: Vec<ResultView>,
+    seed: Option<u64>,
+}
+struct GenerationDesk {
+    prompt: String,
+    character_description: String,
+    clothing_description: String,
+    references: Vec<ReferenceView>,
+    reference_directory: Option<PathBuf>,
+    pending: Option<Submission>,
+    last_generation: Option<Value>,
+    working: bool,
+    uploading: bool,
+    cancelling: bool,
+    status: String,
+    attempt_started: Option<std::time::Instant>,
+    last_elapsed: Option<Duration>,
+    sampling: Option<client::SamplingProgress>,
+    error: Option<String>,
+    result: Option<Results>,
+    selected_role: OutputRole,
+    actual_pixels: bool,
+    pan_enabled: bool,
+    image_pan: egui::Vec2,
+}
+impl Default for GenerationDesk {
+    fn default() -> Self {
+        Self {
+            prompt: String::new(),
+            character_description: String::new(),
+            clothing_description: String::new(),
+            references: Vec::new(),
+            reference_directory: None,
+            pending: None,
+            last_generation: None,
+            working: false,
+            uploading: false,
+            cancelling: false,
+            status: String::new(),
+            attempt_started: None,
+            last_elapsed: None,
+            sampling: None,
+            error: None,
+            result: None,
+            selected_role: OutputRole::Image,
+            actual_pixels: false,
+            pan_enabled: true,
+            image_pan: egui::Vec2::ZERO,
+        }
+    }
+}
+impl GenerationDesk {
+    fn selected_result(&self) -> Option<&ResultView> {
+        self.result
+            .as_ref()?
+            .assets
+            .iter()
+            .find(|asset| asset.role == self.selected_role)
+    }
+    fn select_result(&mut self, role: OutputRole) {
+        if self.selected_role != role {
+            self.selected_role = role;
+            self.actual_pixels = false;
+            self.pan_enabled = true;
+            self.image_pan = egui::Vec2::ZERO;
+        }
+    }
+}
 pub struct ImagineApp {
     clipboard: Option<crate::clipboard::Clipboard>,
     project: PathBuf,
@@ -51,28 +128,14 @@ pub struct ImagineApp {
     prefs: Preferences,
     client: Option<Client>,
     metadata: Option<Value>,
-    prompt: String,
-    references: Vec<ReferenceView>,
-    reference_directory: Option<PathBuf>,
-    pending: Option<Submission>,
-    last_generation: Option<Value>,
-    working: bool,
-    uploading: bool,
+    image: GenerationDesk,
+    sheet: GenerationDesk,
     connecting: bool,
     picking_folder: bool,
-    cancelling: bool,
-    status: String,
-    attempt_started: Option<std::time::Instant>,
-    last_elapsed: Option<Duration>,
-    sampling: Option<client::SamplingProgress>,
-    error: Option<String>,
-    result: Option<(egui::TextureHandle, PathBuf, Option<u64>)>,
-    actual_pixels: bool,
-    pan_enabled: bool,
+    connection_error: Option<String>,
     workspace: Workspace,
     settings_open: bool,
     settings_error: Option<String>,
-    image_pan: egui::Vec2,
     tx: Sender<Message>,
     rx: Receiver<Message>,
 }
@@ -101,35 +164,65 @@ impl ImagineApp {
             prefs,
             client: None,
             metadata: None,
-            prompt: String::new(),
-            references: Vec::new(),
-            reference_directory: None,
-            pending: None,
-            last_generation: None,
-            working: false,
-            uploading: false,
+            image: GenerationDesk::default(),
+            sheet: GenerationDesk {
+                selected_role: OutputRole::Sheet,
+                ..Default::default()
+            },
             connecting: false,
             picking_folder: false,
-            cancelling: false,
-            status: String::new(),
-            attempt_started: None,
-            last_elapsed: None,
-            sampling: None,
-            error: None,
-            result: None,
-            actual_pixels: false,
-            pan_enabled: true,
+            connection_error: None,
             workspace: Workspace::Image,
             settings_open: false,
             settings_error: None,
-            image_pan: egui::Vec2::ZERO,
             tx,
             rx,
         }
     }
+    fn desk_for(&self, workspace: Workspace) -> &GenerationDesk {
+        match workspace {
+            Workspace::CharacterSheet => &self.sheet,
+            _ => &self.image,
+        }
+    }
+    fn desk_for_mut(&mut self, workspace: Workspace) -> &mut GenerationDesk {
+        match workspace {
+            Workspace::CharacterSheet => &mut self.sheet,
+            _ => &mut self.image,
+        }
+    }
+    fn desk(&self) -> &GenerationDesk {
+        self.desk_for(self.workspace)
+    }
+    fn desk_mut(&mut self) -> &mut GenerationDesk {
+        self.desk_for_mut(self.workspace)
+    }
+    fn busy(&self) -> bool {
+        self.image.working || self.sheet.working || self.image.uploading || self.sheet.uploading
+    }
+    fn reference_limit(&self) -> usize {
+        if self.workspace == Workspace::CharacterSheet {
+            8
+        } else {
+            10
+        }
+    }
+    fn can_generate(&self) -> bool {
+        match self.workspace {
+            Workspace::Image => !self.image.prompt.trim().is_empty(),
+            Workspace::CharacterSheet => {
+                self.metadata
+                    .as_ref()
+                    .is_some_and(client::supports_character_sheets)
+                    && (!self.sheet.character_description.trim().is_empty()
+                        || !self.sheet.references.is_empty())
+            }
+            Workspace::Video => false,
+        }
+    }
     fn connect(&mut self, ctx: &egui::Context) {
         self.connecting = true;
-        self.error = None;
+        self.connection_error = None;
         let connection = self.connection.clone();
         let tx = self.tx.clone();
         let ctx = ctx.clone();
@@ -149,7 +242,7 @@ impl ImagineApp {
         while let Ok(message) = self.rx.try_recv() {
             match message {
                 Message::ClipboardFailed => {
-                    self.error = Some("Could not preserve the clipboard after closing Imagine. Keep the app open and copy again.".into());
+                    self.desk_mut().error = Some("Could not preserve the clipboard after closing Imagine. Keep the app open and copy again.".into());
                 }
                 Message::Connected(value) => {
                     self.connecting = false;
@@ -161,26 +254,34 @@ impl ImagineApp {
                         Err(e) => {
                             self.client = None;
                             self.metadata = None;
-                            self.error = Some(e);
+                            self.connection_error = Some(e);
                         }
                     }
                 }
-                Message::Picked(paths) => {
+                Message::Picked(workspace, paths) => {
+                    let state = self.desk_for_mut(workspace);
                     if paths.is_empty() {
-                        self.uploading = false;
+                        state.uploading = false;
                         continue;
                     }
-                    self.reference_directory = paths
+                    state.reference_directory = paths
                         .last()
                         .and_then(|path| path.parent())
                         .map(|directory| directory.to_path_buf());
-                    if paths.len() + self.references.len() > 10 {
-                        self.uploading = false;
-                        self.error = Some("Up to ten reference images. Select fewer files.".into());
+                    let limit = if workspace == Workspace::CharacterSheet {
+                        8
+                    } else {
+                        10
+                    };
+                    if paths.len() + state.references.len() > limit {
+                        state.uploading = false;
+                        state.error = Some(format!(
+                            "Up to {limit} reference images. Select fewer files."
+                        ));
                         continue;
                     }
                     let Some(client) = self.client.clone() else {
-                        self.uploading = false;
+                        self.desk_for_mut(workspace).uploading = false;
                         continue;
                     };
                     let tx = self.tx.clone();
@@ -188,24 +289,30 @@ impl ImagineApp {
                     std::thread::spawn(move || {
                         runtime().block_on(async {
                             for path in paths {
-                                send(&tx, &ctx, Message::Uploaded(client.upload(&path).await));
+                                send(
+                                    &tx,
+                                    &ctx,
+                                    Message::Uploaded(workspace, client.upload(&path).await),
+                                );
                             }
                         });
-                        send(&tx, &ctx, Message::UploadsFinished);
+                        send(&tx, &ctx, Message::UploadsFinished(workspace));
                     });
                 }
-                Message::Uploaded(result) => match result {
+                Message::Uploaded(workspace, result) => match result {
                     Ok(reference) => {
                         let texture = texture(ctx, &reference.preview, &reference.id);
-                        self.references.push(ReferenceView {
+                        self.desk_for_mut(workspace).references.push(ReferenceView {
                             id: reference.id,
                             name: reference.name,
                             texture,
                         });
                     }
-                    Err(e) => self.error = Some(e.message),
+                    Err(e) => self.desk_for_mut(workspace).error = Some(e.message),
                 },
-                Message::UploadsFinished => self.uploading = false,
+                Message::UploadsFinished(workspace) => {
+                    self.desk_for_mut(workspace).uploading = false
+                }
                 Message::Folder(Some(folder)) => {
                     self.picking_folder = false;
                     let prefs = Preferences {
@@ -218,111 +325,151 @@ impl ImagineApp {
                     }
                 }
                 Message::Folder(None) => self.picking_folder = false,
-                Message::Progress(Progress::Submitted(job)) => {
-                    if let Some(p) = &mut self.pending {
+                Message::Progress(workspace, Progress::Submitted(job)) => {
+                    if let Some(p) = &mut self.desk_for_mut(workspace).pending {
                         p.job = Some(job);
                     }
                 }
-                Message::Progress(Progress::Status { label, sampling }) => {
-                    self.status = label;
-                    self.sampling = sampling;
+                Message::Progress(workspace, Progress::Status { label, sampling }) => {
+                    self.desk_for_mut(workspace).status = label;
+                    self.desk_for_mut(workspace).sampling = sampling;
                 }
-                Message::Finished(result) => {
-                    let elapsed = self.attempt_started.take().map(|start| start.elapsed());
-                    self.working = false;
-                    self.sampling = None;
-                    self.cancelling = false;
+                Message::Finished(workspace, result) => {
+                    let state = self.desk_for_mut(workspace);
+                    let elapsed = state.attempt_started.take().map(|start| start.elapsed());
+                    state.working = false;
+                    state.sampling = None;
+                    state.cancelling = false;
                     match result {
                         Ok(done) => {
-                            self.last_elapsed = elapsed;
-                            self.result =
-                                Some((texture(ctx, &done.preview, "result"), done.file, done.seed));
-                            self.image_pan = egui::Vec2::ZERO;
-                            self.last_generation = self.pending.take().map(|job| job.request);
-                            self.status = "Saved".into();
-                            self.error = None;
+                            state.last_elapsed = elapsed;
+                            state.selected_role = if workspace == Workspace::CharacterSheet {
+                                OutputRole::Sheet
+                            } else {
+                                OutputRole::Image
+                            };
+                            state.result = Some(Results {
+                                assets: done
+                                    .assets
+                                    .into_iter()
+                                    .map(|asset| ResultView {
+                                        role: asset.role,
+                                        texture: texture(ctx, &asset.preview, asset.role.name()),
+                                        file: asset.file,
+                                    })
+                                    .collect(),
+                                seed: done.seed,
+                            });
+                            state.actual_pixels = false;
+                            state.image_pan = egui::Vec2::ZERO;
+                            state.last_generation = state.pending.take().map(|job| job.request);
+                            state.status = "Saved".into();
+                            state.error = None;
                         }
                         Err(error) => {
-                            self.error = Some(error.message);
-                            self.status.clear();
+                            state.error = Some(error.message);
+                            state.status.clear();
                             if !error.retryable {
-                                self.pending = None;
+                                state.pending = None;
                             }
                         }
                     }
                 }
-                Message::Cancelled(job, result) => {
-                    if self.pending.as_ref().and_then(|p| p.job.as_ref()) != Some(&job) {
+                Message::Cancelled(workspace, job, result) => {
+                    let state = self.desk_for_mut(workspace);
+                    if state.pending.as_ref().and_then(|p| p.job.as_ref()) != Some(&job) {
                         continue;
                     }
                     if let Err(e) = result {
-                        self.cancelling = false;
-                        self.error = Some(e.message);
+                        state.cancelling = false;
+                        state.error = Some(e.message);
                     }
                 }
             }
         }
     }
     fn generate(&mut self, ctx: &egui::Context) {
+        if self.busy() || self.connecting || self.workspace == Workspace::Video {
+            return;
+        }
         let Some(client) = self.client.clone() else {
             return;
         };
-        if self.pending.is_none() {
-            let refs: Vec<_> = self.references.iter().map(|r| r.id.clone()).collect();
+        let workspace = self.workspace;
+        if self.desk().pending.is_none() {
+            let state = self.desk();
+            let refs: Vec<_> = state.references.iter().map(|r| r.id.clone()).collect();
             let Some(metadata) = &self.metadata else {
                 return;
             };
-            let request = match client::make_request(
-                &self.prompt,
-                &self.prefs.negative_prompt,
-                &refs,
-                metadata,
-                &self.prefs.generation,
-            ) {
+            let request = if workspace == Workspace::CharacterSheet {
+                client::make_sheet_request(
+                    &state.character_description,
+                    &state.clothing_description,
+                    self.prefs.sheet_width,
+                    &self.prefs.negative_prompt,
+                    &refs,
+                    metadata,
+                    &self.prefs.generation,
+                )
+            } else {
+                client::make_request(
+                    &state.prompt,
+                    &self.prefs.negative_prompt,
+                    &refs,
+                    metadata,
+                    &self.prefs.generation,
+                )
+            };
+            let request = match request {
                 Ok(v) => v,
                 Err(e) => {
-                    self.error = Some(e.to_string());
+                    self.desk_mut().error = Some(e.to_string());
                     return;
                 }
             };
-            self.pending = Some(Submission {
+            self.desk_mut().pending = Some(Submission {
                 request,
                 key: uuid::Uuid::new_v4().to_string(),
                 folder: self.prefs.output_folder.clone(),
                 job: None,
             });
         }
-        let pending = self.pending.as_mut().unwrap();
-        pending.folder = self.prefs.output_folder.clone();
+        let folder = self.prefs.output_folder.clone();
+        let state = self.desk_mut();
+        let pending = state.pending.as_mut().unwrap();
+        pending.folder = folder;
         let submission = pending.clone();
-        self.attempt_started = Some(std::time::Instant::now());
-        self.working = true;
-        self.status = "Submitting".into();
-        self.sampling = None;
-        self.error = None;
+        state.attempt_started = Some(std::time::Instant::now());
+        state.working = true;
+        state.status = "Submitting".into();
+        state.sampling = None;
+        state.error = None;
         let tx = self.tx.clone();
         let ctx = ctx.clone();
         std::thread::spawn(move || {
-            let result = runtime()
-                .block_on(client.generate(submission, |p| send(&tx, &ctx, Message::Progress(p))));
-            send(&tx, &ctx, Message::Finished(result));
+            let result = runtime().block_on(client.generate(submission, |p| {
+                send(&tx, &ctx, Message::Progress(workspace, p))
+            }));
+            send(&tx, &ctx, Message::Finished(workspace, result));
         });
     }
     fn regeneration(&self) -> Option<Submission> {
-        if self.working || self.pending.is_some() {
+        if self.busy() || self.desk().pending.is_some() {
             return None;
         }
         Some(Submission {
-            request: self.last_generation.clone()?,
+            request: self.desk().last_generation.clone()?,
             key: uuid::Uuid::new_v4().to_string(),
             folder: self.prefs.output_folder.clone(),
             job: None,
         })
     }
     fn choose_references(&mut self, ctx: &egui::Context) {
-        self.uploading = true;
-        self.error = None;
-        let directory = self.reference_directory.clone();
+        self.desk_mut().uploading = true;
+        let workspace = self.workspace;
+        self.desk_mut().error = None;
+        let directory = self.desk().reference_directory.clone();
         let tx = self.tx.clone();
         let ctx = ctx.clone();
         std::thread::spawn(move || {
@@ -333,7 +480,7 @@ impl ImagineApp {
                 dialog = dialog.set_directory(directory);
             }
             let files = dialog.pick_files().unwrap_or_default();
-            send(&tx, &ctx, Message::Picked(files));
+            send(&tx, &ctx, Message::Picked(workspace, files));
         });
     }
     fn choose_folder(&mut self, ctx: &egui::Context) {
@@ -350,18 +497,19 @@ impl ImagineApp {
         });
     }
     fn cancel(&mut self, ctx: &egui::Context) {
-        let Some(job) = self.pending.as_ref().and_then(|p| p.job.clone()) else {
+        let Some(job) = self.desk().pending.as_ref().and_then(|p| p.job.clone()) else {
             return;
         };
         let Some(client) = self.client.clone() else {
             return;
         };
-        self.cancelling = true;
+        self.desk_mut().cancelling = true;
+        let workspace = self.workspace;
         let tx = self.tx.clone();
         let ctx = ctx.clone();
         std::thread::spawn(move || {
             let result = runtime().block_on(client.cancel(&job));
-            send(&tx, &ctx, Message::Cancelled(job, result));
+            send(&tx, &ctx, Message::Cancelled(workspace, job, result));
         });
     }
     fn save_preferences(&mut self) {

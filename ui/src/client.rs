@@ -1,4 +1,6 @@
-use crate::settings::{Connection, GenerationSettings, check_output_folder, save_image};
+use crate::settings::{
+    Connection, GenerationSettings, check_output_folder, save_image, save_sheet,
+};
 use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
 use std::{
@@ -40,9 +42,30 @@ pub struct Submission {
     pub folder: PathBuf,
     pub job: Option<String>,
 }
-pub struct Completed {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OutputRole {
+    Image,
+    Sheet,
+    Portrait,
+    Views,
+}
+impl OutputRole {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Image => "image",
+            Self::Sheet => "character_sheet",
+            Self::Portrait => "portrait",
+            Self::Views => "turnaround",
+        }
+    }
+}
+pub struct CompletedAsset {
+    pub role: OutputRole,
     pub file: PathBuf,
     pub preview: Preview,
+}
+pub struct Completed {
+    pub assets: Vec<CompletedAsset>,
     pub seed: Option<u64>,
 }
 pub struct Preview {
@@ -105,9 +128,23 @@ fn job_progress(value: &Value) -> Progress {
             _ => "Generating",
         },
     };
+    let label = if status == "running" {
+        match value["stage"].as_str() {
+            Some("portrait") => format!("Portrait · {label}"),
+            Some("turnaround") => format!("Views · {label}"),
+            Some("compose") => "Composing".into(),
+            _ => label.into(),
+        }
+    } else {
+        label.into()
+    };
     Progress::Status {
-        label: label.into(),
-        sampling,
+        label,
+        sampling: if value["stage"] == "compose" {
+            None
+        } else {
+            sampling
+        },
     }
 }
 impl Client {
@@ -230,34 +267,138 @@ impl Client {
             label: "Saving".into(),
             sampling: None,
         });
-        let asset = identifier(&result["output"]["assets"][0]["id"])?;
-        let response = self
-            .get(&format!("/v1/assets/{asset}"))
-            .send()
-            .await
-            .map_err(|_| {
-                Failure::retry("The image is ready but could not be downloaded. Retry.")
+        let roles: &[OutputRole] = if submission.request["operation"] == "character_sheet" {
+            &[OutputRole::Sheet, OutputRole::Portrait, OutputRole::Views]
+        } else {
+            &[OutputRole::Image]
+        };
+        let ids = result_assets(&result, roles)?;
+        // Download and decode the complete set before touching the output folder.
+        let mut downloads = Vec::new();
+        for (role, asset) in ids {
+            let response = self
+                .get(&format!("/v1/assets/{asset}"))
+                .send()
+                .await
+                .map_err(|_| {
+                    Failure::retry("The result is ready but could not be downloaded. Retry.")
+                })?;
+            if !response.status().is_success() {
+                return Err(Failure::retry(
+                    "Could not download the result. Check the connection and retry.",
+                ));
+            }
+            let bytes = response
+                .bytes()
+                .await
+                .map_err(|_| Failure::retry("The image download was interrupted. Retry."))?;
+            let preview = decode(&bytes, false).map_err(|_| {
+                Failure::retry("Could not decode the image from the server. Retry.")
             })?;
-        if !response.status().is_success() {
-            return Err(Failure::retry(
-                "Could not download the image. Check the connection and retry.",
-            ));
+            downloads.push((role, bytes, preview));
         }
-        let bytes = response
-            .bytes()
-            .await
-            .map_err(|_| Failure::retry("The image download was interrupted. Retry."))?;
-        let preview = decode(&bytes, false)
-            .map_err(|_| Failure::retry("Could not decode the image from the server. Retry."))?;
-        let file =
-            save_image(&submission.folder, &bytes).map_err(|e| Failure::retry(e.to_string()))?;
+        let files = if roles == [OutputRole::Image] {
+            save_image(&submission.folder, &downloads[0].1).map(|file| vec![file])
+        } else {
+            save_sheet(
+                &submission.folder,
+                &downloads
+                    .iter()
+                    .map(|(role, bytes, _)| (role.name(), bytes.as_ref()))
+                    .collect::<Vec<_>>(),
+            )
+        }
+        .map_err(|e| Failure::retry(e.to_string()))?;
         Ok(Completed {
-            file,
-            preview,
+            assets: downloads
+                .into_iter()
+                .zip(files)
+                .map(|((role, _, preview), file)| CompletedAsset {
+                    role,
+                    file,
+                    preview,
+                })
+                .collect(),
             seed: result["effective"]["seed"].as_u64(),
         })
     }
 }
+fn result_assets(
+    result: &Value,
+    roles: &[OutputRole],
+) -> std::result::Result<Vec<(OutputRole, String)>, Failure> {
+    let assets = result["output"]["assets"]
+        .as_array()
+        .ok_or_else(|| Failure::retry("The result is incomplete. Retry to retrieve it."))?;
+    if assets.len() != roles.len() {
+        return Err(Failure::retry(
+            "The result is incomplete. Retry to retrieve it.",
+        ));
+    }
+    roles
+        .iter()
+        .map(|&role| {
+            let matches: Vec<_> = assets
+                .iter()
+                .filter(|a| {
+                    a["role"] == role.name() || (role == OutputRole::Image && a["role"].is_null())
+                })
+                .collect();
+            if matches.len() != 1 {
+                return Err(Failure::retry(
+                    "Unexpected result roles from the server. Retry.",
+                ));
+            }
+            Ok((role, identifier(&matches[0]["id"])?))
+        })
+        .collect()
+}
+
+pub fn supports_character_sheets(metadata: &Value) -> bool {
+    metadata["operations"]
+        .as_array()
+        .is_some_and(|ops| ops.iter().any(|op| op == "character_sheet"))
+}
+
+pub fn make_sheet_request(
+    character: &str,
+    clothing: &str,
+    width: u32,
+    negative: &str,
+    refs: &[String],
+    metadata: &Value,
+    settings: &GenerationSettings,
+) -> Result<Value> {
+    if !supports_character_sheets(metadata) {
+        bail!("This server does not support character sheets. Update the server and reconnect.");
+    }
+    if character.trim().is_empty() && refs.is_empty() {
+        bail!("Describe the character or add a reference image.");
+    }
+    if character.len() > 12000 || clothing.len() > 12000 {
+        bail!("Each description must be at most 12,000 UTF-8 bytes.");
+    }
+    if refs.len() > 8 {
+        bail!("Up to eight identity references.");
+    }
+    if !(512..=4096).contains(&width) || !width.is_multiple_of(512) {
+        bail!("Width must be 512–4096 px in steps of 512.");
+    }
+    // Only common sampling/seed settings are shared; the image tab's geometry is independent.
+    let settings = GenerationSettings {
+        aspect_ratio: "16:9".into(),
+        max_side: width,
+        ..settings.clone()
+    };
+    let mut request = make_request("character sheet", negative, refs, metadata, &settings)?;
+    request["operation"] = json!("character_sheet");
+    for field in ["prompt", "width", "height"] {
+        request.as_object_mut().unwrap().remove(field);
+    }
+    request["character_sheet"] = json!({"character_description":character,"clothing_description":clothing,"layout":{"output_width":width,"portrait_fraction":0.45}});
+    Ok(request)
+}
+
 fn identifier(value: &Value) -> std::result::Result<String, Failure> {
     let id = value.as_str().filter(|s| {
         !s.is_empty()
@@ -367,7 +508,11 @@ pub fn error_message(code: &str) -> String {
         "asset_not_found"=>"A reference is missing on the server. Remove it and upload it again.",
         "invalid_image"=>"The image is unreadable. Choose PNG, JPEG or WebP within the server size limits.",
         "upload_busy"=>"The server is handling other uploads. Retry.",
-        "invalid_prompt_length"=>"The prompt must contain 1–32,768 UTF-8 bytes.",
+        "invalid_prompt_length"=>"Text exceeds the allowed length: 12,000 UTF-8 bytes per sheet description or 32,768 per prompt.",
+        "character_description_or_reference_required"=>"Describe the character or add a reference image.",
+        "invalid_character_sheet_layout"|"conflicting_dimensions"=>"Choose a sheet width of 512–4096 px in steps of 512.",
+        "invalid_reference_count"=>"Use at most eight identity references for a character sheet, or ten for an image.",
+        "unsupported_character_sheet_model"=>"This model does not support character sheets.",
         "generation_failed"|"native_generation_failed"=>"Generation failed. Check available GPU memory and try a smaller image or fewer references.",
         "job_not_found"=>"The job is missing on the server. Start a new generation.",
         _=>"The server could not complete the request. Check the connection and settings."
@@ -377,6 +522,99 @@ pub fn error_message(code: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sheet_request_preserves_descriptions_and_validates_against_server_contract() {
+        let meta = imagine_server::contract::model(MODEL).unwrap();
+        let settings = GenerationSettings {
+            aspect_ratio: "3:4".into(),
+            max_side: 1024,
+            random_seed: false,
+            seed: 17,
+            ..Default::default()
+        };
+        for refs in [vec![], vec!["b".into(), "a".into()], vec!["ref".into(); 8]] {
+            for width in [512, 1536, 4096] {
+                let request = make_sheet_request(
+                    "  Character\nexact  ",
+                    "  Outfit  ",
+                    width,
+                    "negative",
+                    &refs,
+                    &meta,
+                    &settings,
+                )
+                .unwrap();
+                for field in ["prompt", "width", "height"] {
+                    assert!(request.get(field).is_none());
+                }
+                assert_eq!(
+                    request["character_sheet"]["character_description"],
+                    "  Character\nexact  "
+                );
+                assert_eq!(
+                    request["character_sheet"]["clothing_description"],
+                    "  Outfit  "
+                );
+                assert_eq!(request["inputs"]["reference_images"], json!(refs));
+                assert_eq!(request["seed"], 17);
+                assert_eq!(
+                    request["sampling"]["sampler"],
+                    meta["defaults"]["sampling"]["sampler"]
+                );
+                let request: imagine_server::contract::JobRequest =
+                    serde_json::from_value(request).unwrap();
+                request.validate().unwrap();
+            }
+        }
+        assert!(make_sheet_request("", "outfit", 1536, "", &[], &meta, &settings).is_err());
+        assert!(
+            make_sheet_request("", "outfit", 1536, "", &["ref".into()], &meta, &settings).is_ok()
+        );
+        for width in [0, 511, 1600, 4097] {
+            assert!(make_sheet_request("x", "", width, "", &[], &meta, &settings).is_err());
+        }
+        assert!(
+            make_sheet_request("x", "", 1536, "", &vec!["ref".into(); 9], &meta, &settings)
+                .is_err()
+        );
+        assert!(
+            make_sheet_request(&"x".repeat(12001), "", 1536, "", &[], &meta, &settings).is_err()
+        );
+        assert!(make_sheet_request("x", "", 1536, "", &[], &json!({}), &settings).is_err());
+    }
+    #[test]
+    fn sheet_roles_are_order_independent_and_partial_results_are_retryable() {
+        let roles = [OutputRole::Sheet, OutputRole::Portrait, OutputRole::Views];
+        let mut result = json!({"output":{"assets":[{"id":"v","role":"turnaround"},{"id":"s","role":"character_sheet"},{"id":"p","role":"portrait"}]}});
+        let assets = result_assets(&result, &roles).unwrap();
+        assert_eq!(
+            assets,
+            vec![
+                (OutputRole::Sheet, "s".into()),
+                (OutputRole::Portrait, "p".into()),
+                (OutputRole::Views, "v".into())
+            ]
+        );
+        result["output"]["assets"][0]["role"] = json!("portrait");
+        assert!(result_assets(&result, &roles).unwrap_err().retryable);
+        result["output"]["assets"].as_array_mut().unwrap().pop();
+        assert!(result_assets(&result, &roles).unwrap_err().retryable);
+    }
+    #[test]
+    fn sheet_progress_labels_current_pass_and_clears_sampling_for_composition() {
+        for (stage, expected) in [
+            ("portrait", "Portrait · Sampling"),
+            ("turnaround", "Views · Sampling"),
+            ("compose", "Composing"),
+        ] {
+            let value = json!({"status":"running","phase":"sampling","stage":stage,"progress":{"completed":12,"total":40,"remaining_seconds":20.,"updated_at_ms":100}});
+            let Progress::Status { label, sampling } = job_progress(&value) else {
+                panic!()
+            };
+            assert_eq!(label, expected);
+            assert_eq!(sampling.is_some(), stage != "compose");
+        }
+    }
     #[test]
     fn progress_does_not_invent_counts_or_full_job_eta() {
         let value = json!({"status":"running","phase":"loading_model"});

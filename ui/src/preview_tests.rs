@@ -80,7 +80,7 @@ impl Desk {
 #[test]
 fn prompt_height_can_be_dragged_without_changing_width_or_text() {
     let mut desk = Desk::new();
-    let text = desk.app.prompt.clone();
+    let text = desk.app.image.prompt.clone();
     let before = desk.control("Prompt").bounds().unwrap();
     let ratio_y = desk.control("Ratio").bounds().unwrap().y0;
     let start = egui::pos2(before.x1 as f32 - 3., before.y1 as f32 - 3.);
@@ -108,9 +108,9 @@ fn prompt_height_can_be_dragged_without_changing_width_or_text() {
     );
     assert!((after.width() - before.width()).abs() < 1.);
     assert!(desk.control("Ratio").bounds().unwrap().y0 > ratio_y + 70.);
-    assert_eq!(desk.app.prompt, text);
+    assert_eq!(desk.app.image.prompt, text);
     let resized_ratio_y = desk.control("Ratio").bounds().unwrap().y0;
-    desk.app.prompt = "Synthetic long prompt line\n".repeat(80);
+    desk.app.image.prompt = "Synthetic long prompt line\n".repeat(80);
     desk.frame(Vec::new());
     desk.frame(Vec::new());
     assert!((desk.control("Ratio").bounds().unwrap().y0 - resized_ratio_y).abs() < 1.);
@@ -119,22 +119,22 @@ fn prompt_height_can_be_dragged_without_changing_width_or_text() {
 #[test]
 fn reference_desk_tabs_settings_and_zoom_are_interactive() {
     let mut desk = Desk::new();
-    let prompt = desk.app.prompt.clone();
+    let prompt = desk.app.image.prompt.clone();
     desk.click("Video");
     assert!(desk.app.workspace == Workspace::Video);
     desk.click("Image");
     assert!(desk.app.workspace == Workspace::Image);
-    assert_eq!(desk.app.prompt, prompt);
-    assert_eq!(desk.app.references.len(), 2);
+    assert_eq!(desk.app.image.prompt, prompt);
+    assert_eq!(desk.app.image.references.len(), 2);
     desk.click("Actual pixels");
-    assert!(desk.app.actual_pixels);
+    assert!(desk.app.image.actual_pixels);
     desk.click("Pan image");
-    assert!(!desk.app.pan_enabled);
+    assert!(!desk.app.image.pan_enabled);
     desk.click("Fit image");
-    assert!(!desk.app.actual_pixels);
-    assert_eq!(desk.app.image_pan, egui::Vec2::ZERO);
+    assert!(!desk.app.image.actual_pixels);
+    assert_eq!(desk.app.image.image_pan, egui::Vec2::ZERO);
     desk.click("Pan image");
-    assert!(desk.app.actual_pixels && desk.app.pan_enabled);
+    assert!(desk.app.image.actual_pixels && desk.app.image.pan_enabled);
     desk.click("Hide previews");
     assert!(desk.app.prefs.privacy_mode);
     assert!(Preferences::load(desk._root.path()).unwrap().privacy_mode);
@@ -157,24 +157,24 @@ fn reference_desk_tabs_settings_and_zoom_are_interactive() {
 fn reference_order_and_pending_request_controls_are_preserved() {
     let mut desk = Desk::new();
     desk.click("Move reference down");
-    assert_eq!(desk.app.references[0].id, "synthetic-reference-2");
+    assert_eq!(desk.app.image.references[0].id, "synthetic-reference-2");
     desk.click("Remove reference");
-    assert_eq!(desk.app.references.len(), 1);
-    assert_eq!(desk.app.references[0].id, "synthetic-reference-1");
-    desk.app.pending = Some(Submission {
+    assert_eq!(desk.app.image.references.len(), 1);
+    assert_eq!(desk.app.image.references[0].id, "synthetic-reference-1");
+    desk.app.image.pending = Some(Submission {
         request: serde_json::json!({}),
         key: "existing-key".into(),
         folder: desk._root.path().into(),
         job: Some("existing-job".into()),
     });
-    desk.app.error = Some("Synthetic recoverable error".into());
+    desk.app.image.error = Some("Synthetic recoverable error".into());
     desk.frame(Vec::new());
     assert!(desk.control("Generate").is_disabled());
     assert!(!desk.control("Retry").is_disabled());
     assert!(desk.control("Remove reference").is_disabled());
     desk.click("Remove reference");
-    assert_eq!(desk.app.references.len(), 1);
-    desk.app.working = true;
+    assert_eq!(desk.app.image.references.len(), 1);
+    desk.app.image.working = true;
     desk.frame(Vec::new());
     assert!(
         !desk
@@ -184,7 +184,7 @@ fn reference_order_and_pending_request_controls_are_preserved() {
     );
     assert!(desk.control("Generate again").is_disabled());
     assert!(!desk.control("Cancel generation").is_disabled());
-    desk.app.cancelling = true;
+    desk.app.image.cancelling = true;
     desk.frame(Vec::new());
     assert!(desk.control("Cancel generation").is_disabled());
 }
@@ -202,7 +202,7 @@ fn regenerate_reuses_successful_inputs_with_a_new_job_identity() {
             "sampling": {"steps": 40, "cfg_scale": 2.5},
             "width": 1600, "height": 896, "seed": seed
         });
-        desk.app.pending = Some(Submission {
+        desk.app.image.pending = Some(Submission {
             request: request.clone(),
             key: "completed-key".into(),
             job: Some("completed-job".into()),
@@ -210,15 +210,21 @@ fn regenerate_reuses_successful_inputs_with_a_new_job_identity() {
         });
         desk.app
             .tx
-            .send(Message::Finished(Ok(Completed {
-                file: desk._root.path().join("synthetic.png"),
-                preview: Preview {
-                    width: 1,
-                    height: 1,
-                    pixels: vec![0, 0, 0, 255],
-                },
-                seed: Some(42),
-            })))
+            .send(Message::Finished(
+                Workspace::Image,
+                Ok(Completed {
+                    assets: vec![client::CompletedAsset {
+                        role: OutputRole::Image,
+                        file: desk._root.path().join("synthetic.png"),
+                        preview: Preview {
+                            width: 1,
+                            height: 1,
+                            pixels: vec![0, 0, 0, 255],
+                        },
+                    }],
+                    seed: Some(42),
+                }),
+            ))
             .unwrap();
         desk.frame(Vec::new());
         assert!(!desk.control("Generate again").is_disabled());
@@ -228,8 +234,8 @@ fn regenerate_reuses_successful_inputs_with_a_new_job_identity() {
                 .iter()
                 .any(|(_, node)| node.label() == Some("Retry"))
         );
-        desk.app.prompt = "Changed draft".into();
-        desk.app.references.clear();
+        desk.app.image.prompt = "Changed draft".into();
+        desk.app.image.references.clear();
         desk.app.prefs.generation.steps = 12;
         desk.app.prefs.output_folder = desk._root.path().join("new-output");
         let again = desk.app.regeneration().unwrap();
@@ -240,26 +246,32 @@ fn regenerate_reuses_successful_inputs_with_a_new_job_identity() {
         assert!(again.job.is_none());
         assert_eq!(again.folder, desk.app.prefs.output_folder);
         let retry_key = again.key.clone();
-        desk.app.pending = Some(again);
+        desk.app.image.pending = Some(again);
         desk.app
             .tx
-            .send(Message::Finished(Err(Failure {
-                message: "Synthetic recoverable error".into(),
-                retryable: true,
-            })))
+            .send(Message::Finished(
+                Workspace::Image,
+                Err(Failure {
+                    message: "Synthetic recoverable error".into(),
+                    retryable: true,
+                }),
+            ))
             .unwrap();
         desk.frame(Vec::new());
         assert!(desk.app.regeneration().is_none());
         assert!(desk.control("Generate again").is_disabled());
         assert!(!desk.control("Retry").is_disabled());
-        assert_eq!(desk.app.pending.as_ref().unwrap().key, retry_key);
-        assert_eq!(desk.app.pending.as_ref().unwrap().request, request);
+        assert_eq!(desk.app.image.pending.as_ref().unwrap().key, retry_key);
+        assert_eq!(desk.app.image.pending.as_ref().unwrap().request, request);
         desk.app
             .tx
-            .send(Message::Finished(Err(Failure {
-                message: "Synthetic terminal error".into(),
-                retryable: false,
-            })))
+            .send(Message::Finished(
+                Workspace::Image,
+                Err(Failure {
+                    message: "Synthetic terminal error".into(),
+                    retryable: false,
+                }),
+            ))
             .unwrap();
         desk.frame(Vec::new());
         assert_eq!(desk.app.regeneration().unwrap().request, request);
@@ -302,13 +314,13 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
     let mut desk = Desk::new();
     let request = serde_json::json!({"prompt": "Running prompt", "negative_prompt": "Running negative", "sampling": {"steps": 40}});
     let original_folder = desk.app.prefs.output_folder.clone();
-    desk.app.pending = Some(Submission {
+    desk.app.image.pending = Some(Submission {
         request: request.clone(),
         key: "running-key".into(),
         job: Some("running-job".into()),
         folder: original_folder.clone(),
     });
-    desk.app.working = true;
+    desk.app.image.working = true;
     desk.frame(Vec::new());
     for name in ["Prompt", "Ratio", "Max side", "Seed"] {
         assert!(!desk.control(name).is_disabled(), "{name}");
@@ -317,7 +329,7 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
     assert!(desk.control("Generate again").is_disabled());
     let prompt = desk.control("Prompt").bounds().unwrap();
     replace(&mut desk, prompt, "Next prompt");
-    assert_eq!(desk.app.prompt, "Next prompt");
+    assert_eq!(desk.app.image.prompt, "Next prompt");
     desk.ctx.global_style_mut(|style| style.animation_time = 0.);
     desk.click("Negative prompt");
     // The lower of the two multiline fields is the expanded negative prompt.
@@ -372,28 +384,34 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
         .send(Message::Folder(Some(new_folder.clone())))
         .unwrap();
     desk.app.receive(&desk.ctx);
-    let pending = desk.app.pending.as_ref().unwrap();
+    let pending = desk.app.image.pending.as_ref().unwrap();
     assert_eq!(pending.request, request);
     assert_eq!(pending.folder, original_folder);
     assert_eq!(pending.key, "running-key");
     desk.app
         .tx
-        .send(Message::Finished(Ok(Completed {
-            file: original_folder.join("synthetic.png"),
-            preview: Preview {
-                width: 1,
-                height: 1,
-                pixels: vec![0, 0, 0, 255],
-            },
-            seed: Some(42),
-        })))
+        .send(Message::Finished(
+            Workspace::Image,
+            Ok(Completed {
+                assets: vec![client::CompletedAsset {
+                    role: OutputRole::Image,
+                    file: original_folder.join("synthetic.png"),
+                    preview: Preview {
+                        width: 1,
+                        height: 1,
+                        pixels: vec![0, 0, 0, 255],
+                    },
+                }],
+                seed: Some(42),
+            }),
+        ))
         .unwrap();
     desk.app.receive(&desk.ctx);
-    assert_eq!(desk.app.prompt, "Next prompt");
+    assert_eq!(desk.app.image.prompt, "Next prompt");
     assert_eq!(desk.app.prefs.negative_prompt, "Next negative prompt");
     assert_eq!(desk.app.prefs.generation.steps, 24);
     assert_eq!(desk.app.prefs.output_folder, new_folder);
-    assert_eq!(desk.app.last_generation.as_ref(), Some(&request));
+    assert_eq!(desk.app.image.last_generation.as_ref(), Some(&request));
     assert_eq!(
         desk.app.prefs.generation.reference_max_pixels_per_image,
         2_500_000
@@ -624,7 +642,7 @@ fn preferences_survive_folder_change_and_app_restart() {
     let folder = root.path().join("selected-images");
     app.tx.send(Message::Folder(Some(folder.clone()))).unwrap();
     app.receive(&ctx);
-    assert!(app.error.is_none());
+    assert!(app.image.error.is_none());
     let restarted = ImagineApp::empty(
         root.path().into(),
         connection,
@@ -756,7 +774,7 @@ fn headless_layout_and_recoverable_job_state() {
         )
         .unwrap();
         app.client = Some(Client::connect(&app.connection).unwrap());
-        app.prompt="A quiet Scandinavian harbor at sunrise, warm light on the waterfront, realistic photography.".into();
+        app.image.prompt="A quiet Scandinavian harbor at sunrise, warm light on the waterfront, realistic photography.".into();
         app.metadata = Some(imagine_server::contract::model(client::MODEL).unwrap());
         let sample = Preview {
             width: 160,
@@ -768,21 +786,24 @@ fn headless_layout_and_recoverable_job_state() {
                 })
                 .collect(),
         };
-        app.references.push(ReferenceView {
+        app.image.references.push(ReferenceView {
             id: "synthetic-reference".into(),
             name: "reference.png".into(),
             texture: texture(&ctx, &sample, "synthetic-reference"),
         });
-        app.result = Some((
-            texture(&ctx, &sample, "synthetic-result"),
-            PathBuf::from("/Pictures/Imagine/imagine-example.png"),
-            Some(42),
-        ));
-        app.status = "Saved".into();
+        app.image.result = Some(Results {
+            assets: vec![ResultView {
+                role: OutputRole::Image,
+                texture: texture(&ctx, &sample, "synthetic-result"),
+                file: PathBuf::from("/Pictures/Imagine/imagine-example.png"),
+            }],
+            seed: Some(42),
+        });
+        app.image.status = "Saved".into();
         if name.starts_with("progress") {
-            app.working = true;
-            app.status = "Sampling".into();
-            app.sampling = Some(client::SamplingProgress {
+            app.image.working = true;
+            app.image.status = "Sampling".into();
+            app.image.sampling = Some(client::SamplingProgress {
                 completed: 12,
                 total: 40,
                 remaining_seconds: 25.,
@@ -817,34 +838,40 @@ fn headless_layout_and_recoverable_job_state() {
             combined.textures_delta.clear();
         }
         // A retrieval/save failure keeps the original job and idempotency key.
-        app.pending = Some(Submission {
+        app.image.pending = Some(Submission {
             request: serde_json::json!({}),
             key: "original-key".into(),
             folder: root.path().into(),
             job: Some("job_original".into()),
         });
-        app.working = true;
+        app.image.working = true;
         app.tx
-            .send(Message::Finished(Err(Failure {
-                message: "disk full".into(),
-                retryable: true,
-            })))
+            .send(Message::Finished(
+                Workspace::Image,
+                Err(Failure {
+                    message: "disk full".into(),
+                    retryable: true,
+                }),
+            ))
             .unwrap();
         app.receive(&ctx);
-        assert!(!app.working);
-        assert!(app.sampling.is_none());
+        assert!(!app.image.working);
+        assert!(app.image.sampling.is_none());
         assert_eq!(
-            app.pending.as_ref().unwrap().job.as_deref(),
+            app.image.pending.as_ref().unwrap().job.as_deref(),
             Some("job_original")
         );
         app.tx
-            .send(Message::Finished(Err(Failure {
-                message: "cancelled".into(),
-                retryable: false,
-            })))
+            .send(Message::Finished(
+                Workspace::Image,
+                Err(Failure {
+                    message: "cancelled".into(),
+                    retryable: false,
+                }),
+            ))
             .unwrap();
         app.receive(&ctx);
-        assert!(app.pending.is_none());
+        assert!(app.image.pending.is_none());
     }
 }
 
@@ -956,4 +983,359 @@ fn render(
         }
     }
     image
+}
+
+fn sheet_result(folder: &std::path::Path) -> Completed {
+    Completed {
+        assets: [
+            (OutputRole::Sheet, 1536, 864),
+            (OutputRole::Portrait, 704, 864),
+            (OutputRole::Views, 832, 864),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(i, (role, width, height))| client::CompletedAsset {
+            role,
+            file: folder.join(format!("{}.png", role.name())),
+            preview: Preview {
+                width,
+                height,
+                pixels: [90 + i as u8 * 30, 100, 130, 255].repeat(width * height),
+            },
+        })
+        .collect(),
+        seed: Some(42),
+    }
+}
+
+#[test]
+fn sheet_tab_preserves_image_draft_and_routes_async_results_to_origin() {
+    let mut desk = Desk::new();
+    desk.app.metadata = Some(imagine_server::contract::model(client::MODEL).unwrap());
+    let prompt = desk.app.image.prompt.clone();
+    let image_path = desk.app.image.selected_result().unwrap().file.clone();
+    let settings = desk.app.prefs.generation.clone();
+    desk.click("Character sheets");
+    assert_eq!(desk.app.workspace, Workspace::CharacterSheet);
+    assert!(desk.control("Generate").is_disabled());
+    assert!(desk.control("Ratio").is_disabled());
+    desk.click("Width");
+    desk.frame(vec![
+        egui::Event::Key {
+            key: egui::Key::A,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::CTRL,
+        },
+        egui::Event::Text("2048".into()),
+        egui::Event::Key {
+            key: egui::Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        },
+    ]);
+    assert_eq!(desk.app.prefs.sheet_width, 2048);
+    assert_eq!(
+        Preferences::load(desk._root.path()).unwrap().sheet_width,
+        2048
+    );
+    assert_eq!(desk.app.prefs.generation, settings);
+    desk.app.sheet.character_description = "SYNTHETIC CHARACTER".into();
+    desk.app.sheet.clothing_description = "SYNTHETIC CLOTHING".into();
+    desk.frame(vec![]);
+    assert!(!desk.control("Generate").is_disabled());
+    desk.app.sheet.pending = Some(Submission {
+        request: serde_json::json!({"operation":"character_sheet"}),
+        key: "sheet-key".into(),
+        folder: desk._root.path().into(),
+        job: None,
+    });
+    desk.app.sheet.working = true;
+    desk.click("Image");
+    assert!(desk.control("Generate").is_disabled());
+    desk.app
+        .tx
+        .send(Message::Progress(
+            Workspace::CharacterSheet,
+            Progress::Submitted("sheet-job".into()),
+        ))
+        .unwrap();
+    desk.app
+        .tx
+        .send(Message::Progress(
+            Workspace::CharacterSheet,
+            Progress::Status {
+                label: "Views · Sampling".into(),
+                sampling: None,
+            },
+        ))
+        .unwrap();
+    desk.app.receive(&desk.ctx);
+    assert_eq!(
+        desk.app.sheet.pending.as_ref().unwrap().job.as_deref(),
+        Some("sheet-job")
+    );
+    assert_eq!(desk.app.sheet.status, "Views · Sampling");
+    assert_eq!(desk.app.image.status, "Saved");
+    desk.app
+        .tx
+        .send(Message::Finished(
+            Workspace::CharacterSheet,
+            Ok(sheet_result(desk._root.path())),
+        ))
+        .unwrap();
+    desk.app.receive(&desk.ctx);
+    assert_eq!(desk.app.image.selected_result().unwrap().file, image_path);
+    assert_eq!(desk.app.image.prompt, prompt);
+    assert_eq!(desk.app.prefs.generation, settings);
+    assert_eq!(desk.app.sheet.status, "Saved");
+    desk.click("Character sheets");
+    assert_eq!(desk.app.sheet.result.as_ref().unwrap().assets.len(), 3);
+    assert_eq!(
+        desk.app.sheet.selected_result().unwrap().role,
+        OutputRole::Sheet
+    );
+    desk.click("Actual pixels");
+    desk.app.sheet.image_pan = egui::vec2(20., 20.);
+    desk.click("Portrait");
+    assert_eq!(
+        desk.app.sheet.selected_result().unwrap().role,
+        OutputRole::Portrait
+    );
+    assert!(!desk.app.sheet.actual_pixels);
+    assert_eq!(desk.app.sheet.image_pan, egui::Vec2::ZERO);
+    desk.click("Views");
+    assert_eq!(
+        desk.app.sheet.selected_result().unwrap().role,
+        OutputRole::Views
+    );
+    let again = desk.app.regeneration().unwrap();
+    assert_eq!(again.request["operation"], "character_sheet");
+    assert_ne!(again.key, "sheet-key");
+    assert!(again.job.is_none());
+    desk.click("Image");
+    assert_eq!(desk.app.image.references.len(), 2);
+    assert_eq!(desk.app.image.prompt, prompt);
+}
+
+#[test]
+fn sheet_upload_limits_retry_cancel_and_capability_guard() {
+    let mut desk = Desk::new();
+    desk.click("Character sheets");
+    desk.app.metadata = Some(imagine_server::contract::model(client::MODEL).unwrap());
+    desk.app.sheet.uploading = true;
+    desk.click("Image");
+    desk.app
+        .tx
+        .send(Message::Uploaded(
+            Workspace::CharacterSheet,
+            Ok(Reference {
+                id: "sheet-ref".into(),
+                name: "synthetic.png".into(),
+                preview: Preview {
+                    width: 1,
+                    height: 1,
+                    pixels: vec![0, 0, 0, 255],
+                },
+            }),
+        ))
+        .unwrap();
+    desk.app
+        .tx
+        .send(Message::UploadsFinished(Workspace::CharacterSheet))
+        .unwrap();
+    desk.app.receive(&desk.ctx);
+    assert_eq!(desk.app.image.references.len(), 2);
+    assert_eq!(desk.app.sheet.references.len(), 1);
+    assert!(!desk.app.sheet.uploading);
+    desk.click("Character sheets");
+    assert!(
+        !desk.control("Generate").is_disabled(),
+        "reference alone is sufficient"
+    );
+    desk.app
+        .tx
+        .send(Message::Picked(
+            Workspace::CharacterSheet,
+            vec![PathBuf::from("unused"); 8],
+        ))
+        .unwrap();
+    desk.app.receive(&desk.ctx);
+    assert!(desk.app.sheet.error.as_deref().unwrap().contains("Up to 8"));
+    assert_eq!(desk.app.sheet.references.len(), 1);
+    desk.app.sheet.pending = Some(Submission {
+        request: serde_json::json!({"operation":"character_sheet"}),
+        key: "retry-sheet".into(),
+        folder: desk._root.path().into(),
+        job: Some("sheet-job".into()),
+    });
+    desk.app.sheet.working = true;
+    desk.frame(vec![]);
+    assert!(!desk.control("Cancel generation").is_disabled());
+    desk.click("Image");
+    assert!(desk.control("Cancel generation").is_disabled());
+    desk.app
+        .tx
+        .send(Message::Finished(
+            Workspace::CharacterSheet,
+            Err(Failure {
+                message: "Save failed".into(),
+                retryable: true,
+            }),
+        ))
+        .unwrap();
+    desk.app.receive(&desk.ctx);
+    assert_eq!(
+        desk.app.sheet.pending.as_ref().unwrap().job.as_deref(),
+        Some("sheet-job")
+    );
+    assert!(desk.app.image.pending.is_none());
+    desk.click("Character sheets");
+    assert!(!desk.control("Retry").is_disabled());
+    desk.app
+        .tx
+        .send(Message::Finished(
+            Workspace::CharacterSheet,
+            Err(Failure {
+                message: "Generation cancelled.".into(),
+                retryable: false,
+            }),
+        ))
+        .unwrap();
+    desk.app.receive(&desk.ctx);
+    assert!(desk.app.sheet.pending.is_none());
+    desk.app.metadata = Some(serde_json::json!({"operations":["text_to_image","image_edit"]}));
+    desk.frame(vec![]);
+    assert!(desk.control("Generate").is_disabled());
+}
+
+#[test]
+fn headless_character_sheet_layout_and_privacy() {
+    for (name, width, height, role, hidden, progress) in [
+        ("sheet-desktop", 1280, 800, OutputRole::Sheet, false, false),
+        (
+            "sheet-portrait",
+            1280,
+            800,
+            OutputRole::Portrait,
+            false,
+            false,
+        ),
+        ("sheet-views", 1280, 800, OutputRole::Views, false, false),
+        ("sheet-narrow", 600, 1000, OutputRole::Sheet, false, false),
+        (
+            "sheet-stacked-tools",
+            920,
+            800,
+            OutputRole::Sheet,
+            false,
+            false,
+        ),
+        ("sheet-progress", 1280, 800, OutputRole::Sheet, false, true),
+        ("sheet-hidden", 1280, 800, OutputRole::Sheet, true, false),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.workspace = Workspace::CharacterSheet;
+        app.metadata = Some(imagine_server::contract::model(client::MODEL).unwrap());
+        app.prefs.privacy_mode = hidden;
+        app.sheet.character_description = "SYNTHETIC CHARACTER".into();
+        app.sheet.clothing_description = "SYNTHETIC CLOTHING".into();
+        app.tx
+            .send(Message::Finished(
+                Workspace::CharacterSheet,
+                Ok(sheet_result(root.path())),
+            ))
+            .unwrap();
+        app.receive(&ctx);
+        app.sheet.select_result(role);
+        let sample = Preview {
+            width: 32,
+            height: 32,
+            pixels: [140, 120, 100, 255].repeat(32 * 32),
+        };
+        app.sheet.references.push(ReferenceView {
+            id: "ref".into(),
+            name: "synthetic-reference".into(),
+            texture: texture(&ctx, &sample, "ref"),
+        });
+        if progress {
+            app.sheet.working = true;
+            app.sheet.status = "Views · Sampling".into();
+            app.sheet.sampling = Some(client::SamplingProgress {
+                completed: 12,
+                total: 40,
+                remaining_seconds: 20.,
+                updated_at_ms: 1,
+            });
+        }
+        let mut output = egui::FullOutput::default();
+        for _ in 0..3 {
+            output.append(ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(width as f32, height as f32),
+                    )),
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            ));
+        }
+        let nodes = &output
+            .platform_output
+            .accesskit_update
+            .as_ref()
+            .unwrap()
+            .nodes;
+        let bounds = |label| {
+            nodes
+                .iter()
+                .find_map(|(_, n)| (n.label() == Some(label)).then(|| n.bounds()).flatten())
+                .unwrap()
+        };
+        assert!(
+            bounds("Views").x1 < bounds("Fit image").x0
+                || bounds("Views").y1 <= bounds("Fit image").y0
+        );
+        if hidden {
+            let private_ids: Vec<_> = app
+                .sheet
+                .result
+                .as_ref()
+                .unwrap()
+                .assets
+                .iter()
+                .map(|a| a.texture.id())
+                .chain(app.sheet.references.iter().map(|r| r.texture.id()))
+                .collect();
+            let shapes = output.shapes.clone();
+            assert!(!ctx.tessellate(shapes,output.pixels_per_point).iter().any(|p|matches!(&p.primitive,egui::epaint::Primitive::Mesh(m) if private_ids.contains(&m.texture_id))));
+            fn visible_text(shape: &egui::Shape) -> bool {
+                match shape {
+                    egui::Shape::Text(t) => {
+                        t.opacity_factor > 0. && t.galley.text().contains("SYNTHETIC")
+                    }
+                    egui::Shape::Vec(v) => v.iter().any(visible_text),
+                    _ => false,
+                }
+            }
+            assert!(!output.shapes.iter().any(|s| visible_text(&s.shape)));
+        }
+        if let Some(dir) = std::env::var_os("IMAGINE_UI_PREVIEW_DIR") {
+            let dir = PathBuf::from(dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            render(&ctx, output, width, height)
+                .save(dir.join(format!("{name}.png")))
+                .unwrap();
+        } else {
+            output.textures_delta.clear();
+        }
+    }
 }

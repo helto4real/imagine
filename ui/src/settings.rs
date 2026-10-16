@@ -57,6 +57,8 @@ pub struct Preferences {
     pub negative_prompt: String,
     #[serde(default)]
     pub generation: GenerationSettings,
+    #[serde(default = "sheet_width")]
+    pub sheet_width: u32,
 }
 // AIO services/dimensions.py, preset ratio mode with multiple value 32.
 pub const ASPECT_RATIOS: [&str; 9] = [
@@ -123,6 +125,9 @@ impl GenerationSettings {
         Ok(())
     }
 }
+fn sheet_width() -> u32 {
+    1536
+}
 fn privacy_default() -> bool {
     true
 }
@@ -135,6 +140,7 @@ impl Preferences {
                 privacy_mode: true,
                 negative_prompt: String::new(),
                 generation: GenerationSettings::default(),
+                sheet_width: sheet_width(),
             });
         }
         serde_json::from_slice(&std::fs::read(path)?).context("Could not read ui-settings.json.")
@@ -203,9 +209,73 @@ pub fn save_image(folder: &Path, bytes: &[u8]) -> Result<PathBuf> {
     )
 }
 
+/// Save one complete sheet set, cleaning up only files created by this attempt on failure.
+pub fn save_sheet(folder: &Path, images: &[(&str, &[u8])]) -> Result<Vec<PathBuf>> {
+    if images.iter().map(|(role, _)| *role).collect::<Vec<_>>()
+        != ["character_sheet", "portrait", "turnaround"]
+    {
+        bail!("The character sheet result is incomplete.");
+    }
+    check_output_folder(folder)?;
+    let id = uuid::Uuid::new_v4().simple().to_string();
+    let mut created = Vec::new();
+    let result = (|| -> Result<()> {
+        for (role, bytes) in images {
+            let path = folder.join(format!("imagine-{id}-{role}.png"));
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&path)?;
+            created.push(path);
+            file.write_all(bytes)?;
+            file.sync_all()?;
+        }
+        Ok(())
+    })();
+    if result.is_err() {
+        let mut cleanup_failed = false;
+        for path in &created {
+            cleanup_failed |= std::fs::remove_file(path).is_err();
+        }
+        if cleanup_failed {
+            bail!(
+                "Could not save the complete sheet or remove partial files. Check the output folder before retrying."
+            );
+        }
+    }
+    result.context("The sheet is ready on the server but could not be saved. Choose a writable folder and retry.")?;
+    Ok(created)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sheet_files_share_a_unique_prefix_and_keep_private_permissions() {
+        let root = tempfile::tempdir().unwrap();
+        let images = [
+            ("character_sheet", b"sheet".as_slice()),
+            ("portrait", b"portrait".as_slice()),
+            ("turnaround", b"views".as_slice()),
+        ];
+        let files = save_sheet(root.path(), &images).unwrap();
+        let again = save_sheet(root.path(), &images).unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        for ((path, (_, bytes)), other) in files.iter().zip(images).zip(again) {
+            assert_eq!(std::fs::read(path).unwrap(), bytes);
+            assert_ne!(*path, other);
+            assert_eq!(
+                std::fs::metadata(path).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+        assert!(save_sheet(root.path(), &images[..2]).is_err());
+        assert_eq!(std::fs::read_dir(root.path()).unwrap().count(), 6);
+        let old: Preferences =
+            serde_json::from_value(serde_json::json!({"output_folder":root.path()})).unwrap();
+        assert_eq!(old.sheet_width, 1536);
+    }
     #[test]
     fn dimensions_match_aio_presets_and_ties_to_even() {
         // Values independently obtained from AIO services/dimensions.py.
@@ -264,6 +334,7 @@ mod tests {
             output_folder: root.path().join("pictures"),
             privacy_mode: false,
             negative_prompt: "  artifacts, suddig\nextra fingrar  ".into(),
+            sheet_width: 1536,
             generation: GenerationSettings {
                 steps: 24,
                 cfg_scale: 3.,

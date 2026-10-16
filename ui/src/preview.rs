@@ -25,25 +25,29 @@ impl ImagineApp {
                 privacy_mode: false,
                 negative_prompt: String::new(),
                 generation: Default::default(),
+                sheet_width: 1536,
             },
         );
         app.client = Some(Client::connect(&app.connection).unwrap());
-        app.prompt = "A quiet mountain lake at dawn".into();
+        app.image.prompt = "A quiet mountain lake at dawn".into();
         let sample = synthetic_landscape();
         for index in 1..=2 {
-            app.references.push(ReferenceView {
+            app.image.references.push(ReferenceView {
                 id: format!("synthetic-reference-{index}"),
                 name: format!("reference-{index}.png"),
                 texture: texture(ctx, &sample, &format!("synthetic-reference-{index}")),
             });
         }
-        app.result = Some((
-            texture(ctx, &sample, "synthetic-result"),
-            project.join("Pictures/Imagine/imagine-example.png"),
-            Some(284731),
-        ));
-        app.status = "Saved".into();
-        app.last_elapsed = Some(Duration::from_secs_f64(4.2));
+        app.image.result = Some(Results {
+            assets: vec![ResultView {
+                role: OutputRole::Image,
+                texture: texture(ctx, &sample, "synthetic-result"),
+                file: project.join("Pictures/Imagine/imagine-example.png"),
+            }],
+            seed: Some(284731),
+        });
+        app.image.status = "Saved".into();
+        app.image.last_elapsed = Some(Duration::from_secs_f64(4.2));
         app
     }
 }

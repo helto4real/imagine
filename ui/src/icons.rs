@@ -4,6 +4,7 @@ use eframe::egui::{self, Color32, Painter, Rect, Stroke};
 #[derive(Clone, Copy)]
 pub enum Icon {
     Image,
+    CharacterSheet,
     Video,
     Settings,
     Eye,
@@ -46,6 +47,15 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
             box_at(3., 3., 18., 18., 2);
             painter.circle_stroke(pos(8., 8.), 1.5 * s, stroke);
             line(&[[3., 17.], [9., 11.], [13., 15.], [16., 12.], [21., 17.]]);
+        }
+        Icon::CharacterSheet => {
+            box_at(2., 3., 20., 18., 2);
+            line(&[[11., 3.], [11., 21.]]);
+            painter.circle_stroke(pos(6.5, 9.), 2. * s, stroke);
+            line(&[[4., 17.], [4., 14.], [9., 14.], [9., 17.]]);
+            for y in [8., 12., 16.] {
+                line(&[[14., y], [19., y]]);
+            }
         }
         Icon::Video => {
             box_at(3., 3., 18., 18., 2);

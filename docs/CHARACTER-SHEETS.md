@@ -106,8 +106,8 @@ embedded in PNGs.
 The existing MCP `generate` tool can select this profile and supply structured
 sheet parameters and its usual identity references. Its existing delivery path
 exports the primary sheet only. Custom pose-guide upload and access to all
-three result roles are available through the HTTP API. No UI controls or
-separate recompose endpoint are introduced in this slice.
+three result roles are available through the HTTP API and the native
+[Character sheets tab](UI.md#character-sheets). There is no separate recompose endpoint.
 
 ## Responsibility boundaries
 

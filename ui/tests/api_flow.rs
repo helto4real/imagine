@@ -7,7 +7,7 @@ use imagine_server::{
     storage::Store,
 };
 use imagine_ui::{
-    client::{Client, Progress, Submission, make_request},
+    client::{Client, OutputRole, Progress, Submission, make_request, make_sheet_request},
     settings::{Connection, GenerationSettings},
 };
 use serde_json::json;
@@ -43,6 +43,12 @@ impl Backend for Fake {
             ..Default::default()
         });
     }
+    fn stage(&mut self, stage: Option<&str>) {
+        self.state.send_modify(|s| {
+            s.stage = stage.map(str::to_owned);
+            s.progress = None;
+        });
+    }
     fn generate<'a>(&'a mut self, req: &'a ImagePass) -> EngineFuture<'a, Vec<u8>> {
         Box::pin(async move {
             self.calls.fetch_add(1, Ordering::SeqCst);
@@ -65,7 +71,14 @@ impl Backend for Fake {
                 std::fs::remove_dir(&folder)?;
                 std::fs::write(folder, b"blocked")?;
             }
-            Ok(png())
+            if self.state.borrow().stage.is_some() {
+                let mut buf = Cursor::new(Vec::new());
+                image::RgbImage::from_pixel(req.width, req.height, image::Rgb([122, 94, 70]))
+                    .write_to(&mut buf, image::ImageFormat::Png)?;
+                Ok(buf.into_inner())
+            } else {
+                Ok(png())
+            }
         })
     }
     fn stop(&mut self) -> EngineFuture<'_, ()> {
@@ -219,8 +232,8 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         })
         .await
         .unwrap();
-    assert_eq!(std::fs::read(&first.file).unwrap(), png());
-    assert_eq!(first.file.parent().unwrap(), submission.folder);
+    assert_eq!(std::fs::read(&first.assets[0].file).unwrap(), png());
+    assert_eq!(first.assets[0].file.parent().unwrap(), submission.folder);
     assert_eq!(requests.lock().unwrap()[0].prompt, "  Exact prompt  ");
     assert_eq!(first.seed, Some(u32::MAX as u64));
     assert!(!observed_progress.is_empty());
@@ -252,7 +265,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     let events = events.text().await.unwrap();
     assert!(events.contains("succeeded"));
     let duplicate = client.generate(submission, |_| {}).await.unwrap();
-    assert_ne!(first.file, duplicate.file);
+    assert_ne!(first.assets[0].file, duplicate.assets[0].file);
     assert_eq!(duplicate.seed, first.seed);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     // Disk failure after generation: changing output folder retries retrieval, not inference.
@@ -279,7 +292,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     submission.job = job;
     submission.folder = dir.path().join("recovered-output");
     let recovered = client.generate(submission, |_| {}).await.unwrap();
-    assert!(recovered.file.is_file());
+    assert!(recovered.assets[0].file.is_file());
     assert!(recovered.seed.is_some());
     assert_eq!(calls.load(Ordering::SeqCst), 2);
     let cancelled = client.cancel(id.as_ref().unwrap()).await.err().unwrap();
@@ -295,9 +308,193 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         )
         .is_err()
     );
+    // Complete sheet via the real proxy/API, using only a synthetic backend.
+    let request = make_sheet_request(
+        "Synthetic identity",
+        "Green dress",
+        512,
+        "negative",
+        &[],
+        &meta,
+        &settings,
+    )
+    .unwrap();
+    let submission = Submission {
+        request,
+        key: "text-sheet".into(),
+        folder: dir.path().join("text-sheet"),
+        job: None,
+    };
+    let mut stages = Vec::new();
+    let completed = client
+        .generate(submission.clone(), |p| {
+            if let Progress::Status { label, .. } = p {
+                stages.push(label);
+            }
+        })
+        .await
+        .unwrap();
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
+    assert!(stages.iter().any(|s| s == "Portrait · Sampling"));
+    assert!(stages.iter().any(|s| s == "Views · Sampling"));
+    assert_eq!(
+        completed.assets.iter().map(|a| a.role).collect::<Vec<_>>(),
+        [OutputRole::Sheet, OutputRole::Portrait, OutputRole::Views]
+    );
+    for asset in &completed.assets {
+        assert_eq!(asset.file.parent().unwrap(), submission.folder);
+        assert!(
+            asset
+                .file
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .ends_with(&format!("-{}.png", asset.role.name()))
+        );
+        image::load_from_memory(&std::fs::read(&asset.file).unwrap()).unwrap();
+    }
+    assert_eq!(
+        (
+            completed.assets[0].preview.width,
+            completed.assets[0].preview.height
+        ),
+        (512, 288)
+    );
+    assert_eq!(std::fs::read_dir(&submission.folder).unwrap().count(), 3);
+    // Reference sheet: failed saving retries the completed job, not either inference pass.
+    let blocked = dir.path().join("blocked-sheet");
+    *blocker.lock().unwrap() = Some(blocked.clone());
+    let mut submission = Submission {
+        request: make_sheet_request("", "Blue dress", 512, "", &refs, &meta, &settings).unwrap(),
+        key: "reference-sheet".into(),
+        folder: blocked,
+        job: None,
+    };
+    let mut job = None;
+    let error = client
+        .generate(submission.clone(), |p| {
+            if let Progress::Submitted(id) = p {
+                job = Some(id)
+            }
+        })
+        .await
+        .err()
+        .unwrap();
+    assert!(error.retryable);
+    assert_eq!(calls.load(Ordering::SeqCst), 6);
+    submission.job = job;
+    submission.folder = dir.path().join("recovered-sheet");
+    let saved = client.generate(submission.clone(), |_| {}).await.unwrap();
+    assert_eq!(saved.assets.len(), 3);
+    assert_eq!(std::fs::read_dir(&submission.folder).unwrap().count(), 3);
+    assert_eq!(calls.load(Ordering::SeqCst), 6);
+    {
+        let requests = requests.lock().unwrap();
+        assert_eq!(requests[4].references.len(), 2);
+        assert_eq!(requests[5].references.len(), 4);
+    }
+    // Cancellation returns a terminal result and saves no partial sheet.
+    let submission = Submission {
+        request: make_sheet_request("Cancel test", "", 512, "", &[], &meta, &settings).unwrap(),
+        key: "cancel-sheet".into(),
+        folder: dir.path().join("cancel-sheet"),
+        job: None,
+    };
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let generation = client.generate(submission.clone(), |p| {
+        if let Progress::Submitted(id) = p {
+            tx.send(id).unwrap()
+        }
+    });
+    let cancel = async {
+        let id = rx.recv().await.unwrap();
+        client.cancel(&id).await.unwrap();
+    };
+    let (result, ()) = tokio::join!(generation, cancel);
+    let error = result.err().unwrap();
+    assert!(!error.retryable);
+    assert_eq!(error.message, "Generation cancelled.");
+    assert_eq!(std::fs::read_dir(&submission.folder).unwrap().count(), 0);
     control.call(Action::Shutdown).await.unwrap();
     scheduler.await.unwrap().unwrap();
     proxy.close().await;
     server.abort();
     backend_server.abort();
+}
+
+#[tokio::test]
+async fn incomplete_sheet_download_saves_nothing_and_retry_reuses_job() {
+    use axum::{
+        Router,
+        extract::{Path, State},
+        http::StatusCode,
+        response::IntoResponse,
+        routing::{get, post},
+    };
+    use std::sync::atomic::AtomicBool;
+    #[derive(Clone)]
+    struct DownloadState {
+        fail: Arc<AtomicBool>,
+        submitted: Arc<AtomicUsize>,
+    }
+    async fn submit(State(s): State<DownloadState>) -> axum::Json<serde_json::Value> {
+        s.submitted.fetch_add(1, Ordering::SeqCst);
+        axum::Json(json!({"id":"job_sheet"}))
+    }
+    async fn asset(
+        State(s): State<DownloadState>,
+        Path(id): Path<String>,
+    ) -> axum::response::Response {
+        if id == "views" && s.fail.load(Ordering::SeqCst) {
+            return StatusCode::SERVICE_UNAVAILABLE.into_response();
+        }
+        ([("content-type", "image/png")], png()).into_response()
+    }
+    let root = tempfile::tempdir().unwrap();
+    let access = root.path().join("access.json");
+    std::fs::write(&access, br#"{"clients":{"test":"synthetic-token"}}"#).unwrap();
+    let state = DownloadState {
+        fail: Arc::new(AtomicBool::new(true)),
+        submitted: Arc::new(AtomicUsize::new(0)),
+    };
+    let router=Router::new().route("/v1/jobs",post(submit)).route("/v1/jobs/{id}",get(||async {
+        axum::Json(json!({"status":"succeeded","effective":{"seed":42},"output":{"assets":[{"id":"views","role":"turnaround"},{"id":"sheet","role":"character_sheet"},{"id":"portrait","role":"portrait"}]}}))
+    })).route("/v1/assets/{id}",get(asset)).with_state(state.clone());
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move {
+        axum::serve(listener, router).await.unwrap();
+    });
+    let client = Client::connect(&Connection {
+        url,
+        access,
+        client: "test".into(),
+    })
+    .unwrap();
+    let mut submission = Submission {
+        request: json!({"operation":"character_sheet"}),
+        key: "download-sheet".into(),
+        folder: root.path().join("outputs"),
+        job: None,
+    };
+    let mut job = None;
+    let failure = client
+        .generate(submission.clone(), |p| {
+            if let Progress::Submitted(id) = p {
+                job = Some(id)
+            }
+        })
+        .await
+        .err()
+        .unwrap();
+    assert!(failure.retryable);
+    assert_eq!(std::fs::read_dir(&submission.folder).unwrap().count(), 0);
+    submission.job = job;
+    state.fail.store(false, Ordering::SeqCst);
+    let completed = client.generate(submission.clone(), |_| {}).await.unwrap();
+    assert_eq!(completed.assets.len(), 3);
+    assert_eq!(std::fs::read_dir(&submission.folder).unwrap().count(), 3);
+    assert_eq!(state.submitted.load(Ordering::SeqCst), 1);
+    server.abort();
 }

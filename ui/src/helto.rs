@@ -154,6 +154,44 @@ pub(crate) fn icon_button(
         .on_hover_text(label)
 }
 
+pub fn select_button(ui: &mut egui::Ui, label: &str, active: bool) -> egui::Response {
+    let galley = ui.painter().layout_no_wrap(
+        label.into(),
+        egui::FontId::proportional(14.),
+        if active { ACCENT_TEXT } else { TEXT },
+    );
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(galley.size().x + 20., 32.), egui::Sense::click());
+    response.widget_info(|| {
+        egui::WidgetInfo::selected(
+            egui::WidgetType::SelectableLabel,
+            ui.is_enabled(),
+            active,
+            label,
+        )
+    });
+    let (top, bottom, border) = match (active, response.hovered()) {
+        (true, true) => (ACCENT_HOVER_TOP, ACCENT_HOVER_BOTTOM, ACCENT_BORDER),
+        (true, false) => (ACCENT_TOP, ACCENT_BOTTOM, ACCENT_BORDER),
+        (false, true) => (HOVER, RAISED, BORDER_HOVER),
+        (false, false) => (RAISED, FIELD, RAISED),
+    };
+    gradient(ui.painter(), rect, 5., top, bottom);
+    ui.painter()
+        .rect_stroke(rect, 5, Stroke::new(1., border), egui::StrokeKind::Inside);
+    ui.painter()
+        .galley(rect.center() - galley.size() * 0.5, galley, TEXT);
+    if response.has_focus() {
+        ui.painter().rect_stroke(
+            rect.expand(2.),
+            6,
+            Stroke::new(2., FOCUS),
+            egui::StrokeKind::Outside,
+        );
+    }
+    response.on_hover_cursor(egui::CursorIcon::PointingHand)
+}
+
 pub fn toggle(ui: &mut egui::Ui, value: &mut bool, label: &str) -> egui::Response {
     let (rect, mut response) = ui.allocate_exact_size(egui::vec2(36., 20.), egui::Sense::click());
     if response.clicked() {

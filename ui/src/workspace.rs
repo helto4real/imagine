@@ -35,12 +35,12 @@ fn panel(ui: &Ui, rect: Rect, media: bool) {
 
 impl ImagineApp {
     fn editable(&self) -> bool {
-        !self.working && !self.uploading && !self.connecting && self.pending.is_none()
+        !self.busy() && !self.connecting && self.desk().pending.is_none()
     }
 
     pub fn content(&mut self, ui: &mut Ui) {
         self.receive(ui.ctx());
-        if self.working || self.uploading || self.connecting {
+        if self.busy() || self.connecting {
             ui.ctx().request_repaint_after(Duration::from_millis(100));
         }
         let bounds = ui.max_rect();
@@ -52,14 +52,16 @@ impl ImagineApp {
             bounds.max - egui::vec2(8., 8.),
         );
         region(ui, "workspace", body, |ui| match self.workspace {
-            Workspace::Image if body.width() >= 900. => self.image_workspace(ui, body),
-            Workspace::Image => {
+            Workspace::Image | Workspace::CharacterSheet if body.width() >= 900. => {
+                ui.push_id(self.workspace, |ui| self.image_workspace(ui, body));
+            }
+            Workspace::Image | Workspace::CharacterSheet => {
                 egui::ScrollArea::vertical()
                     .id_salt("compact-workspace")
                     .show(ui, |ui| {
                         let size = egui::vec2(ui.available_width(), body.height().max(920.));
                         let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
-                        self.image_workspace(ui, rect);
+                        ui.push_id(self.workspace, |ui| self.image_workspace(ui, rect));
                     });
             }
             Workspace::Video => {
@@ -106,13 +108,23 @@ impl ImagineApp {
                 });
             },
         );
-        let tabs = Rect::from_center_size(rect.center(), egui::vec2(72., 32.));
+        let tabs = Rect::from_center_size(rect.center(), egui::vec2(110., 32.));
         region(ui, "tabs", tabs, |ui| {
             ui.horizontal(|ui| {
                 if helto::icon_button(ui, Icon::Image, "Image", self.workspace == Workspace::Image)
                     .clicked()
                 {
                     self.workspace = Workspace::Image;
+                }
+                if helto::icon_button(
+                    ui,
+                    Icon::CharacterSheet,
+                    "Character sheets",
+                    self.workspace == Workspace::CharacterSheet,
+                )
+                .clicked()
+                {
+                    self.workspace = Workspace::CharacterSheet;
                 }
                 if helto::icon_button(ui, Icon::Video, "Video", self.workspace == Workspace::Video)
                     .clicked()
@@ -147,11 +159,12 @@ impl ImagineApp {
                     {
                         self.settings_open = !self.settings_open;
                     }
-                    let reconnect = (self.client.is_none() || self.error.is_some())
-                        && !self.working
+                    let reconnect = (self.client.is_none()
+                        || self.connection_error.is_some()
+                        || self.desk().error.is_some())
+                        && !self.busy()
                         && !self.connecting
-                        && !self.uploading
-                        && self.pending.is_none();
+                        && self.desk().pending.is_none();
                     if reconnect
                         && helto::icon_button(ui, Icon::Retry, "Reconnect", false).clicked()
                     {
@@ -222,11 +235,17 @@ impl ImagineApp {
     fn reference_panel(&mut self, ui: &mut Ui) {
         let editable = self.editable();
         ui.horizontal(|ui| {
-            ui.label(format!("References · {}/10", self.references.len()));
+            ui.label(format!(
+                "References · {}/{}",
+                self.desk().references.len(),
+                self.reference_limit()
+            ));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 if ui
                     .add_enabled_ui(
-                        editable && self.client.is_some() && self.references.len() < 10,
+                        editable
+                            && self.client.is_some()
+                            && self.desk().references.len() < self.reference_limit(),
                         |ui| helto::icon_button(ui, Icon::Plus, "Add references", false),
                     )
                     .inner
@@ -237,7 +256,7 @@ impl ImagineApp {
             });
         });
         ui.separator();
-        if self.uploading {
+        if self.desk().uploading {
             ui.spinner();
         }
         let mut remove = None;
@@ -246,7 +265,7 @@ impl ImagineApp {
             .id_salt("reference-list")
             .auto_shrink([false, false])
             .show(ui, |ui| {
-                for (index, reference) in self.references.iter().enumerate() {
+                for (index, reference) in self.desk().references.iter().enumerate() {
                     ui.push_id(&reference.id, |ui| {
                         ui.horizontal(|ui| {
                             let width = (ui.available_width() - 40.).max(64.);
@@ -279,7 +298,7 @@ impl ImagineApp {
                                 }
                                 if ui
                                     .add_enabled_ui(
-                                        editable && index + 1 < self.references.len(),
+                                        editable && index + 1 < self.desk().references.len(),
                                         |ui| {
                                             helto::icon_button(
                                                 ui,
@@ -315,9 +334,9 @@ impl ImagineApp {
                 }
             });
         if let Some(index) = remove {
-            self.references.remove(index);
+            self.desk_mut().references.remove(index);
         } else if let Some((a, b)) = swap {
-            self.references.swap(a, b);
+            self.desk_mut().references.swap(a, b);
         }
     }
 
@@ -332,17 +351,35 @@ impl ImagineApp {
                 .id_salt("prompt-scroll")
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
-                    let label = ui.label("Prompt");
                     ui.scope(|ui| {
-                        helto::textarea(
-                            ui,
-                            &mut self.prompt,
-                            8,
-                            "prompt",
-                            self.prefs.privacy_mode,
-                            true,
-                        )
-                        .labelled_by(label.id);
+                        let privacy = self.prefs.privacy_mode;
+                        if self.workspace == Workspace::CharacterSheet {
+                            let label = ui.label("Character");
+                            helto::textarea(
+                                ui,
+                                &mut self.sheet.character_description,
+                                6,
+                                "character",
+                                privacy,
+                                true,
+                            )
+                            .labelled_by(label.id);
+                            ui.add_space(8.);
+                            let label = ui.label("Clothing & accessories");
+                            helto::textarea(
+                                ui,
+                                &mut self.sheet.clothing_description,
+                                5,
+                                "clothing",
+                                privacy,
+                                true,
+                            )
+                            .labelled_by(label.id);
+                        } else {
+                            let label = ui.label("Prompt");
+                            helto::textarea(ui, &mut self.image.prompt, 8, "prompt", privacy, true)
+                                .labelled_by(label.id);
+                        }
                         ui.add_space(8.);
                         egui::Frame::new()
                             .fill(helto::FIELD)
@@ -371,7 +408,7 @@ impl ImagineApp {
                     });
                 });
         });
-        if let Some((_, _, Some(seed))) = &self.result {
+        if let Some(seed) = self.desk().result.as_ref().and_then(|r| r.seed) {
             let footer = Rect::from_min_max(
                 egui::pos2(ui.max_rect().left(), bottom - 26.),
                 ui.max_rect().max,
@@ -390,43 +427,81 @@ impl ImagineApp {
 
     fn image_controls(&mut self, ui: &mut Ui) {
         let before = self.prefs.generation.clone();
+        let before_width = self.prefs.sheet_width;
+        let sheet = self.workspace == Workspace::CharacterSheet;
         let settings = &mut self.prefs.generation;
         let field_width = (ui.available_width() - 80.).max(90.);
         egui::Grid::new("image-settings")
             .num_columns(2)
             .spacing([10., 10.])
             .show(ui, |ui| {
-                let label = ui.label("Ratio");
-                egui::ComboBox::from_id_salt("aspect-ratio")
-                    .width(field_width)
-                    .selected_text(&settings.aspect_ratio)
-                    .show_ui(ui, |ui| {
-                        for ratio in crate::settings::ASPECT_RATIOS {
-                            ui.selectable_value(
-                                &mut settings.aspect_ratio,
-                                ratio.to_owned(),
-                                ratio,
-                            );
-                        }
-                    })
-                    .response
+                if sheet {
+                    let label = ui.label("Ratio");
+                    ui.add_enabled(
+                        false,
+                        egui::Button::new("16:9").min_size(egui::vec2(field_width, 32.)),
+                    )
                     .labelled_by(label.id);
-                ui.end_row();
-                let label = ui.label("Max side");
-                ui.add_sized(
-                    [field_width, 32.],
-                    egui::DragValue::new(&mut settings.max_side)
-                        .range(256..=4096)
-                        .speed(32.),
-                )
-                .labelled_by(label.id)
-                .on_hover_text("Pixels · multiples of 32");
-                ui.end_row();
-                ui.label("");
-                if let Ok((w, h)) = settings.dimensions() {
-                    ui.label(RichText::new(format!("{w} × {h} px")).color(helto::DIM));
+                    ui.end_row();
+                    let label = ui.label("Width");
+                    ui.add_sized(
+                        [field_width, 32.],
+                        egui::DragValue::new(&mut self.prefs.sheet_width)
+                            .range(512..=4096)
+                            .speed(512.)
+                            .custom_parser(|s| {
+                                let value: u32 = s.parse().ok()?;
+                                (value.is_multiple_of(512)).then_some(value as f64)
+                            }),
+                    )
+                    .labelled_by(label.id)
+                    .on_hover_text("Pixels · multiples of 512");
+                    self.prefs.sheet_width =
+                        (self.prefs.sheet_width.clamp(512, 4096) + 256) / 512 * 512;
+                    ui.end_row();
+                    ui.label("");
+                    ui.label(
+                        RichText::new(format!(
+                            "{} × {} px",
+                            self.prefs.sheet_width,
+                            self.prefs.sheet_width * 9 / 16
+                        ))
+                        .color(helto::DIM),
+                    );
+                    ui.end_row();
+                } else {
+                    let label = ui.label("Ratio");
+                    egui::ComboBox::from_id_salt("aspect-ratio")
+                        .width(field_width)
+                        .selected_text(&settings.aspect_ratio)
+                        .show_ui(ui, |ui| {
+                            for ratio in crate::settings::ASPECT_RATIOS {
+                                ui.selectable_value(
+                                    &mut settings.aspect_ratio,
+                                    ratio.to_owned(),
+                                    ratio,
+                                );
+                            }
+                        })
+                        .response
+                        .labelled_by(label.id);
+                    ui.end_row();
+                    let label = ui.label("Max side");
+                    ui.add_sized(
+                        [field_width, 32.],
+                        egui::DragValue::new(&mut settings.max_side)
+                            .range(256..=4096)
+                            .speed(32.),
+                    )
+                    .labelled_by(label.id)
+                    .on_hover_text("Pixels · multiples of 32");
+                    ui.end_row();
+                    ui.label("");
+                    if let Ok((w, h)) = settings.dimensions() {
+                        ui.label(RichText::new(format!("{w} × {h} px")).color(helto::DIM));
+                    }
+                    ui.end_row();
                 }
-                ui.end_row();
                 let label = ui.label("Seed");
                 egui::ComboBox::from_id_salt("seed-mode")
                     .width(field_width)
@@ -452,76 +527,124 @@ impl ImagineApp {
                     ui.end_row();
                 }
             });
-        if let Err(e) = settings.dimensions() {
+        if !sheet && let Err(e) = settings.dimensions() {
             ui.colored_label(helto::ERROR, e.to_string());
         }
-        if *settings != before {
+        if *settings != before || self.prefs.sheet_width != before_width {
             self.save_preferences();
         }
     }
 
     fn viewer(&mut self, ui: &mut Ui) {
         let bounds = ui.max_rect();
+        let sheet = self.workspace == Workspace::CharacterSheet;
+        let stacked_tools = sheet && bounds.width() < 360.;
+        let tools_height = if stacked_tools { 70. } else { 32. };
+        if sheet {
+            let selectors = Rect::from_min_size(
+                bounds.min,
+                egui::vec2(
+                    if stacked_tools {
+                        bounds.width()
+                    } else {
+                        bounds.width() - 118.
+                    },
+                    32.,
+                ),
+            );
+            region(ui, "result-selector", selectors, |ui| {
+                ui.horizontal(|ui| {
+                    for (role, label) in [
+                        (OutputRole::Sheet, "Sheet"),
+                        (OutputRole::Portrait, "Portrait"),
+                        (OutputRole::Views, "Views"),
+                    ] {
+                        if helto::select_button(ui, label, self.desk().selected_role == role)
+                            .clicked()
+                        {
+                            self.desk_mut().select_result(role);
+                        }
+                    }
+                });
+            });
+        }
         region(
             ui,
             "view-tools",
-            Rect::from_min_size(bounds.min, egui::vec2(bounds.width(), 32.)),
+            Rect::from_min_size(
+                bounds.min + egui::vec2(0., if stacked_tools { 38. } else { 0. }),
+                egui::vec2(bounds.width(), 32.),
+            ),
             |ui| {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    ui.add_enabled_ui(self.result.is_some(), |ui| {
+                    ui.add_enabled_ui(self.desk().result.is_some(), |ui| {
                         if helto::icon_button(
                             ui,
                             Icon::Hand,
                             "Pan image",
-                            self.actual_pixels && self.pan_enabled,
+                            self.desk().actual_pixels && self.desk().pan_enabled,
                         )
                         .clicked()
                         {
-                            if !self.actual_pixels {
-                                self.actual_pixels = true;
-                                self.pan_enabled = true;
+                            if !self.desk().actual_pixels {
+                                self.desk_mut().actual_pixels = true;
+                                self.desk_mut().pan_enabled = true;
                             } else {
-                                self.pan_enabled = !self.pan_enabled;
+                                self.desk_mut().pan_enabled = !self.desk().pan_enabled;
                             }
                         }
-                        if helto::icon_button(ui, Icon::Actual, "Actual pixels", self.actual_pixels)
-                            .clicked()
+                        if helto::icon_button(
+                            ui,
+                            Icon::Actual,
+                            "Actual pixels",
+                            self.desk().actual_pixels,
+                        )
+                        .clicked()
                         {
-                            self.actual_pixels = true;
-                            self.image_pan = Vec2::ZERO;
+                            self.desk_mut().actual_pixels = true;
+                            self.desk_mut().image_pan = Vec2::ZERO;
                         }
-                        if helto::icon_button(ui, Icon::Fit, "Fit image", !self.actual_pixels)
-                            .clicked()
+                        if helto::icon_button(
+                            ui,
+                            Icon::Fit,
+                            "Fit image",
+                            !self.desk().actual_pixels,
+                        )
+                        .clicked()
                         {
-                            self.actual_pixels = false;
-                            self.image_pan = Vec2::ZERO;
+                            self.desk_mut().actual_pixels = false;
+                            self.desk_mut().image_pan = Vec2::ZERO;
                         }
                     });
                 });
             },
         );
-        let error = self.error.clone().or_else(|| self.settings_error.clone());
+        let error = self.desk().error.clone().or_else(|| self.connection_error.clone()).or_else(|| self.settings_error.clone()).or_else(|| {
+            (sheet && self.metadata.as_ref().is_some_and(|m| !client::supports_character_sheets(m))).then(|| "This server does not support character sheets. Update the server and reconnect.".into())
+        });
         let footer_height = if error.is_some() {
             132.
-        } else if self.sampling.is_some() {
+        } else if self.desk().sampling.is_some() {
             92.
         } else {
             66.
         };
         let image_rect = Rect::from_min_max(
-            bounds.min + egui::vec2(0., 38.),
+            bounds.min + egui::vec2(0., tools_height + 6.),
             bounds.max - egui::vec2(0., footer_height),
         );
         region(ui, "image", image_rect, |ui| {
-            if let Some((texture, _, _)) = &self.result {
+            let privacy = self.prefs.privacy_mode;
+            let state = self.desk_mut();
+            if let Some(texture) = state.selected_result().map(|r| r.texture.clone()) {
                 image_view(
                     ui,
-                    texture,
+                    &texture,
                     image_rect.size(),
-                    self.prefs.privacy_mode,
-                    self.actual_pixels,
-                    self.pan_enabled,
-                    &mut self.image_pan,
+                    privacy,
+                    state.actual_pixels,
+                    state.pan_enabled,
+                    &mut state.image_pan,
                 );
             } else {
                 icons::paint(
@@ -536,7 +659,11 @@ impl ImagineApp {
                 ui.painter().text(
                     image_rect.center() + egui::vec2(0., 24.),
                     egui::Align2::CENTER_CENTER,
-                    "No image yet",
+                    if sheet {
+                        "No character sheet yet"
+                    } else {
+                        "No image yet"
+                    },
                     egui::FontId::proportional(12.),
                     helto::DIM,
                 );
@@ -548,15 +675,12 @@ impl ImagineApp {
         );
         region(ui, "generation-actions", footer, |ui| {
             ui.separator();
-            let ready = self.client.is_some()
-                && !self.connecting
-                && !self.working
-                && !self.uploading
-                && !self.picking_folder;
+            let ready =
+                self.client.is_some() && !self.connecting && !self.busy() && !self.picking_folder;
             ui.horizontal(|ui| {
                 if ui
                     .add_enabled_ui(
-                        ready && self.pending.is_none() && !self.prompt.trim().is_empty(),
+                        ready && self.desk().pending.is_none() && self.can_generate(),
                         |ui| helto::icon_button(ui, Icon::Generate, "Generate", true),
                     )
                     .inner
@@ -566,21 +690,27 @@ impl ImagineApp {
                 }
                 if ui
                     .add_enabled_ui(
-                        ready && self.pending.is_none() && self.last_generation.is_some(),
+                        ready
+                            && self.desk().pending.is_none()
+                            && self.desk().last_generation.is_some(),
                         |ui| helto::icon_button(ui, Icon::Retry, "Generate again", false),
                     )
                     .inner
                     .clicked()
                     && let Some(submission) = self.regeneration()
                 {
-                    self.pending = Some(submission);
+                    self.desk_mut().pending = Some(submission);
                     self.generate(ui.ctx());
                 }
                 if ui
                     .add_enabled_ui(
-                        self.working
-                            && !self.cancelling
-                            && self.pending.as_ref().is_some_and(|p| p.job.is_some()),
+                        self.desk().working
+                            && !self.desk().cancelling
+                            && self
+                                .desk()
+                                .pending
+                                .as_ref()
+                                .is_some_and(|p| p.job.is_some()),
                         |ui| helto::icon_button(ui, Icon::Stop, "Cancel generation", false),
                     )
                     .inner
@@ -589,8 +719,8 @@ impl ImagineApp {
                     self.cancel(ui.ctx());
                 }
                 ui.add_space(6.);
-                if self.working
-                    && let Some(progress) = &self.sampling
+                if self.desk().working
+                    && let Some(progress) = &self.desk().sampling
                 {
                     ui.add(
                         egui::ProgressBar::new(progress.completed as f32 / progress.total as f32)
@@ -603,10 +733,10 @@ impl ImagineApp {
                         100. * progress.completed as f32 / progress.total as f32
                     ));
                 } else {
-                    if self.working {
+                    if self.desk().working {
                         ui.spinner();
                     }
-                    if self.status == "Saved" && self.result.is_some() {
+                    if self.desk().status == "Saved" && self.desk().result.is_some() {
                         let progress = ui.add(
                             egui::ProgressBar::new(1.)
                                 .desired_width((ui.available_width() - 110.).max(40.))
@@ -615,27 +745,33 @@ impl ImagineApp {
                         );
                         progress.on_hover_text("Saved");
                         ui.label("100%");
-                        if let Some(elapsed) = self.last_elapsed {
+                        if let Some(elapsed) = self.desk().last_elapsed {
                             ui.label(
                                 RichText::new(format!("{:.1}s", elapsed.as_secs_f64()))
                                     .color(helto::DIM),
                             )
                             .on_hover_text("Generation and saving time in this client");
                         }
-                        if let Some((_, path, _)) = &self.result {
-                            ui.response().on_hover_text(path.display().to_string());
+                        if let Some(result) = self.desk().selected_result() {
+                            ui.response()
+                                .on_hover_text(result.file.display().to_string());
                         }
                     } else {
-                        ui.label(RichText::new(&self.status).color(helto::DIM));
+                        ui.label(RichText::new(&self.desk().status).color(helto::DIM));
                     }
                 }
             });
-            if self.working
-                && let Some(progress) = &self.sampling
+            if self.desk().working
+                && let Some(progress) = &self.desk().sampling
             {
-                let mut text = format!("Sampling {} / {}", progress.completed, progress.total);
-                if !self.cancelling
-                    && self.status != "Cancelling"
+                let mut text = format!(
+                    "{} {} / {}",
+                    self.desk().status,
+                    progress.completed,
+                    progress.total
+                );
+                if !self.desk().cancelling
+                    && self.desk().status != "Cancelling"
                     && let Some(finish) = progress.finish_time()
                 {
                     let remaining = finish
@@ -643,7 +779,8 @@ impl ImagineApp {
                         .unwrap_or_default()
                         .as_secs();
                     text.push_str(&format!(
-                        " · ETA ~{}:{:02} · ends ~{}",
+                        " · {}ETA ~{}:{:02} · ends ~{}",
+                        if sheet { "phase " } else { "" },
                         remaining / 60,
                         remaining % 60,
                         local_time(finish)
@@ -653,8 +790,8 @@ impl ImagineApp {
             }
             if let Some(error) = error {
                 ui.horizontal(|ui| {
-                    if self.pending.is_some()
-                        && !self.working
+                    if self.desk().pending.is_some()
+                        && !self.desk().working
                         && ui
                             .add_enabled_ui(ready, |ui| {
                                 helto::icon_button(ui, Icon::Retry, "Retry", false)
