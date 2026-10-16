@@ -14,6 +14,8 @@ import subprocess
 
 
 def category(name):
+    if "lora_output_f16_f32" in name:
+        return "fused_lora_output"
     if "DefaultGemmWithVisitor" in name:
         if "VisitorSwiGLUStore" in name:
             return "int8_gate_up_swiglu"

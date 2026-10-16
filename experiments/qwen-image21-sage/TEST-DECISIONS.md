@@ -1,5 +1,27 @@
 # Qwen experiment decisions — read before proposing more optimization
 
+## 2026-10-16 — requested ComfyUI comparison with the same LoRA
+
+Installed Comfy/AIO headless, same INT8 files, Lenovo LoRA strength 1, source
+portrait fixture, 1600×896, 40 ER-SDE/beta, CFG 1, seed 42: warm total **20.776 s
+with LoRA / 21.592 s without**. Extra guarded generation confirms the LoRA adds
+model patches and completes. Latest native candidate was 44.611 s off / 39.892 s
+on; those native runs had CUPTI, this Comfy run did not, and transport/precision
+boundaries differ. No image parity claim or inference change. See
+[matched comparison](comfy-headless/LORA-CFG1.md).
+
+## 2026-10-16 — opt-in LoRA output step
+
+Implemented a separate frozen-v2 candidate with `GGML_CUDA_FUSED_LORA_OUTPUT=1`,
+off by default. Same FP16 cuBLAS computation and ordered F32 scale/add rounding;
+13 synthetic graph cases match all 594,411,008 bytes, with 0/10 fused calls off/on.
+Same final binary and original CFG 1 test: warm LoRA **44.611 → 39.892 s**,
+**4.720 s / 10.579%** saved. Live profile confirms 7,680 fused calls replacing
+7,680 conversions, 8,960 scales and 7,680 additions per image. All 16 requests
+succeed, zero dropped records, unchanged warm transfer bytes. No end-to-end
+image identity or peak-VRAM check. Production/frozen/reference engines remain
+unchanged. See [implementation and result](profiling/LORA-OUTPUT.md).
+
 ## 2026-10-16 — same-LoRA fusion attribution, unchanged optimizations
 
 User-authorized kernel/copy-only CUPTI profiling reproduced the same CFG 1 test:

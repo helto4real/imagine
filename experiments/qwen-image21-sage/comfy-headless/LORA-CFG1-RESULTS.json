@@ -1,0 +1,247 @@
+{
+  "run": "experiments/qwen-image21-sage/runs/comfy-lora-cfg1-paypkc8q",
+  "environment": {
+    "comfy_revision": "ba994879b88d0ebd9950b1e5c1e923d928f216ba",
+    "aio_revision": "52ecbf87dda674f51e1e0a798f8f56d0d37d303d",
+    "torch": "2.13.0+cu130",
+    "cuda": "13.0",
+    "kitchen": "0.2.37",
+    "cpu_threads": 23,
+    "width": 1600,
+    "height": 896,
+    "steps": 40,
+    "cfg": 1,
+    "seed": 42,
+    "sampler": "er_sde",
+    "scheduler": "beta",
+    "attention": "comfy_kitchen_int8",
+    "profiled": false,
+    "sequence": [
+      "without_first",
+      "without_warm_1",
+      "without_warm_2",
+      "with_first",
+      "with_warm_1",
+      "with_warm_2",
+      "without_return_first",
+      "without_return_warm"
+    ],
+    "measurement": "adapter.generate through PNG encoded in memory, discarded"
+  },
+  "requests": [
+    {
+      "name": "without_first",
+      "phases": {
+        "prepare_models": [
+          0.6489581030327827
+        ],
+        "conditioning": [
+          4.069707719958387
+        ],
+        "sampling": [
+          21.063767832005396
+        ],
+        "vae": [
+          1.14852558192797
+        ]
+      },
+      "steps_executed": 40,
+      "generation_seconds": 26.93698148103431,
+      "total_seconds": 27.427644173032604
+    },
+    {
+      "name": "without_warm_1",
+      "phases": {
+        "prepare_models": [
+          1.019746217993088
+        ],
+        "conditioning": [
+          0.004804399912245572
+        ],
+        "sampling": [
+          19.402059877989814
+        ],
+        "vae": [
+          0.6639743209816515
+        ]
+      },
+      "steps_executed": 40,
+      "generation_seconds": 21.091063710046,
+      "total_seconds": 21.56287375697866
+    },
+    {
+      "name": "without_warm_2",
+      "phases": {
+        "prepare_models": [
+          0.9855400490341708
+        ],
+        "conditioning": [
+          0.013425803044810891
+        ],
+        "sampling": [
+          19.47487319994252
+        ],
+        "vae": [
+          0.6699538379907608
+        ]
+      },
+      "steps_executed": 40,
+      "generation_seconds": 21.146962906001136,
+      "total_seconds": 21.621415477013215
+    },
+    {
+      "name": "with_first",
+      "phases": {
+        "prepare_models": [
+          0.28619389107916504
+        ],
+        "conditioning": [
+          0.00038862996734678745
+        ],
+        "sampling": [
+          19.043942824937403
+        ],
+        "vae": [
+          0.6750969160348177
+        ]
+      },
+      "steps_executed": 40,
+      "generation_seconds": 20.006148888962343,
+      "total_seconds": 20.49202313099522
+    },
+    {
+      "name": "with_warm_1",
+      "phases": {
+        "prepare_models": [
+          0.2907013260992244
+        ],
+        "conditioning": [
+          0.0009914770489558578
+        ],
+        "sampling": [
+          18.90404531103559
+        ],
+        "vae": [
+          0.6699635760160163
+        ]
+      },
+      "steps_executed": 40,
+      "generation_seconds": 19.866209668922238,
+      "total_seconds": 20.35976911196485
+    },
+    {
+      "name": "with_warm_2",
+      "phases": {
+        "prepare_models": [
+          0.8429225360741839
+        ],
+        "conditioning": [
+          0.0030428129248321056
+        ],
+        "sampling": [
+          19.147859395015985
+        ],
+        "vae": [
+          0.7052905380260199
+        ]
+      },
+      "steps_executed": 40,
+      "generation_seconds": 20.69965364492964,
+      "total_seconds": 21.19180517096538
+    },
+    {
+      "name": "without_return_first",
+      "phases": {
+        "prepare_models": [
+          0.8332980590639636
+        ],
+        "conditioning": [
+          0.008857553009875119
+        ],
+        "sampling": [
+          19.75817728205584
+        ],
+        "vae": [
+          0.6559894769452512
+        ]
+      },
+      "steps_executed": 40,
+      "generation_seconds": 21.26176114298869,
+      "total_seconds": 21.71900442498736
+    },
+    {
+      "name": "without_return_warm",
+      "phases": {
+        "prepare_models": [
+          0.3695069510722533
+        ],
+        "conditioning": [
+          0.0003963010385632515
+        ],
+        "sampling": [
+          19.659892386989668
+        ],
+        "vae": [
+          0.7529073279583827
+        ]
+      },
+      "steps_executed": 40,
+      "generation_seconds": 20.783142623957247,
+      "total_seconds": 21.257071092026308
+    }
+  ],
+  "warm_means": {
+    "without": {
+      "generation_seconds": 21.11901330802357,
+      "total_seconds": 21.592144616995938,
+      "sampling_seconds": 19.438466538966168
+    },
+    "with": {
+      "generation_seconds": 20.28293165692594,
+      "total_seconds": 20.775787141465116,
+      "sampling_seconds": 19.025952353025787
+    }
+  },
+  "source_sha256": {
+    "/home/thhel/git/ComfyUI/comfy/ops.py": "a0b8c7f32a146b383a795363bef35e480ffa84b5b3e9c9503f323b1446876f45",
+    "/home/thhel/git/ComfyUI/comfy/quant_ops.py": "37f0054dfbd8430524ac2c73dafd25b8ad4eabc490a2b7490eeebde8dffbc749",
+    "/home/thhel/git/ComfyUI/comfy/model_patcher.py": "7edc88d9eae6a88637625d257dc73684cfc012a29446bf88e70d22e3a6be3994",
+    "/home/thhel/git/ComfyUI/comfy/lora.py": "24ace0806193466947662dc408642e2615f255259f5a45393043b67a47174f17",
+    "/home/thhel/git/ComfyUI/comfy/sd.py": "06489116d4a1192bbdc4b56a2405d0c138d558fc3e66c12a78fcbb8fe59bdded",
+    "/home/thhel/git/ComfyUI/comfy/ldm/qwen_image21/model.py": "a69dff15ff6fa369fab5ca0d3261f8aaf19aaedd3fc66414e20a1cf7df0aa5ac",
+    "/home/thhel/git/ComfyUI/nodes.py": "8c5a0239a4d3b9709085348a96d25184d28fa2267c2421b7f354614c03f3139c",
+    "/home/thhel/git/comfyui-all-on-one-image-generation-node/adapters/qwen_image_2_1.py": "31f434fbda426afd764ffe072d5849cd0dc1742f2a17e9b5115646d974bc3cfc",
+    "/home/thhel/git/comfyui-all-on-one-image-generation-node/services/qwen_image_2_1.py": "11e83a14dbb5bcff03f9b81495c4b257a927ce625106bb668d550f4550ccf1d4",
+    "/home/thhel/git/comfyui-all-on-one-image-generation-node/services/pipeline.py": "77cc4ccc9d57a3f6f1bfc505da20829c2ee7245ffe48f6915f132c2c055d517e",
+    "/home/thhel/git/comfyui-all-on-one-image-generation-node/services/lora_application.py": "79af8fd5e58f60d0bd876f5b9bd84e43f99adba6c093a2e7eb7b238a3b9dec05",
+    "/home/thhel/git/comfyui-all-on-one-image-generation-node/services/lora_config.py": "8c898de19e41e5b81280b9e2614aa38ec157ae3d960bb765deea394d985cd6a7",
+    "/home/thhel/git/comfyui-all-on-one-image-generation-node/services/qwen_encoding_cache.py": "b1ea58a4f6c3811fd86c848f3e56ceee1b99025bc30400ebae5039e65ea2ce31",
+    "/home/thhel/git/comfyui-all-on-one-image-generation-node/services/dimensions.py": "6f04e690f66f68b37814abab62d949b78402fcd8c6abb4069702c7cf0144590b"
+  },
+  "verification": {
+    "run": "runs/comfy-lora-cfg1-3_rer5yt",
+    "application_assertions_passed": true,
+    "requests": [
+      {
+        "name": "with_verification",
+        "phases": {
+          "prepare_models": [
+            0.39702319202478975
+          ],
+          "conditioning": [
+            2.239108781097457
+          ],
+          "sampling": [
+            21.084152986994013
+          ],
+          "vae": [
+            1.0986611450789496
+          ]
+        },
+        "steps_executed": 40,
+        "generation_seconds": 24.825787104084156,
+        "total_seconds": 25.326357135083526
+      }
+    ]
+  }
+}

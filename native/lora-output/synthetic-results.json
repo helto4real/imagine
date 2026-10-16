@@ -1,0 +1,16 @@
+{
+  "cases": 13,
+  "bytes_compared": 594411008,
+  "output_sha256": "9b4a7dc9ee56f8d3638e1c9e5e4301a336e397eac914446c4e65986556cb017b",
+  "fused_calls_off": 0,
+  "fused_calls_on": 10,
+  "dropped_records": 0,
+  "manifest": {
+    "binary_path": ".imagine/lora-output/build/bin/sd-server",
+    "binary_sha256": "8982e808790507113edb287c7754b115f1cb4f31b00fc1cd7339013abc070f9e",
+    "source_lock_sha256": "70d81ba06ea813a643c5f28d00cf1e636ee95a45b3377077febc0935122b9bb9",
+    "base_binary_sha256": "9fd49b0e5cb3426043ebd85271ad167555551ac65252590cde5ac25bed44bbb0"
+  },
+  "test_source_sha256": "fd05fa046455602495d53ea1e6e4efa3114aa114d06bc2866812a6682f1d4bbf",
+  "fixture_note": "Initial control assertion exposed missing retained-input lifetime in test; fixture corrected before off/on equivalence. No kernel change was needed."
+}

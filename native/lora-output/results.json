@@ -1,0 +1,332 @@
+{
+  "candidate": {
+    "binary_path": ".imagine/lora-output/build/bin/sd-server",
+    "binary_sha256": "8982e808790507113edb287c7754b115f1cb4f31b00fc1cd7339013abc070f9e",
+    "source_lock_sha256": "70d81ba06ea813a643c5f28d00cf1e636ee95a45b3377077febc0935122b9bb9",
+    "base_binary_sha256": "9fd49b0e5cb3426043ebd85271ad167555551ac65252590cde5ac25bed44bbb0"
+  },
+  "modes": {
+    "off": {
+      "run": "experiments/qwen-image21-sage/runs/lora-cfg1-wp3nkzzx",
+      "wall_mean_seconds": 44.6111049070023,
+      "kernel_mean_seconds": 43.20705029950001,
+      "gpu_union_mean_seconds": 43.536722892499995,
+      "without_lora_wall_mean_seconds": 20.541528223024216,
+      "requests": [
+        {
+          "case": "without_first",
+          "seconds": 23.852388016995974,
+          "http_status": 200
+        },
+        {
+          "case": "without_warm_1",
+          "seconds": 20.52509078104049,
+          "http_status": 200
+        },
+        {
+          "case": "without_warm_2",
+          "seconds": 20.55796566500794,
+          "http_status": 200
+        },
+        {
+          "case": "with_first",
+          "seconds": 45.44656874798238,
+          "http_status": 200
+        },
+        {
+          "case": "with_warm_1",
+          "seconds": 44.55336062202696,
+          "http_status": 200
+        },
+        {
+          "case": "with_warm_2",
+          "seconds": 44.66884919197764,
+          "http_status": 200
+        },
+        {
+          "case": "without_return_first",
+          "seconds": 20.926049795001745,
+          "http_status": 200
+        },
+        {
+          "case": "without_return_warm",
+          "seconds": 20.471672588028014,
+          "http_status": 200
+        }
+      ],
+      "groups": {
+        "attention_input_scale": {
+          "count": 1280,
+          "seconds": 0.4089730029999997,
+          "bytes": 0
+        },
+        "attention_output_scale": {
+          "count": 1280,
+          "seconds": 0.36372035950000037,
+          "bytes": 0
+        },
+        "bf16_to_f32": {
+          "count": 1415,
+          "seconds": 0.31704480499999976,
+          "bytes": 0
+        },
+        "convrot_f32": {
+          "count": 5120,
+          "seconds": 1.6738553875000004,
+          "bytes": 0
+        },
+        "copy_kind_1": {
+          "count": 397,
+          "seconds": 0.1492629099999994,
+          "bytes": 1853081660
+        },
+        "copy_kind_2": {
+          "count": 41,
+          "seconds": 0.0038443059999999996,
+          "bytes": 80281600
+        },
+        "copy_kind_8": {
+          "count": 6770,
+          "seconds": 0.17547572599999944,
+          "bytes": 48878170112
+        },
+        "elementwise_add": {
+          "count": 8157,
+          "seconds": 6.76375347700001,
+          "bytes": 0
+        },
+        "elementwise_scale": {
+          "count": 16156,
+          "seconds": 5.3765160460003765,
+          "bytes": 0
+        },
+        "f16_to_f32": {
+          "count": 15665,
+          "seconds": 3.44165189050008,
+          "bytes": 0
+        },
+        "f32_to_bf16": {
+          "count": 3911,
+          "seconds": 0.9419822620000007,
+          "bytes": 0
+        },
+        "f32_to_f16": {
+          "count": 15360,
+          "seconds": 2.3817963405001343,
+          "bytes": 0
+        },
+        "gated_residual": {
+          "count": 2496,
+          "seconds": 0.8137421660000008,
+          "bytes": 0
+        },
+        "int8_f32_output": {
+          "count": 7680,
+          "seconds": 10.68298211099999,
+          "bytes": 0
+        },
+        "memset": {
+          "count": 1376,
+          "seconds": 0.0010896510000000057,
+          "bytes": 1006080
+        },
+        "norm_modulation": {
+          "count": 2496,
+          "seconds": 0.5515955720000005,
+          "bytes": 0
+        },
+        "other_gemm": {
+          "count": 15750,
+          "seconds": 2.1480642770000022,
+          "bytes": 0
+        },
+        "other_kernel": {
+          "count": 55646,
+          "seconds": 2.3289384604995096,
+          "bytes": 0
+        },
+        "paired_qk_rms_rope": {
+          "count": 1280,
+          "seconds": 0.5112433700000003,
+          "bytes": 0
+        },
+        "sage_attention_core": {
+          "count": 1280,
+          "seconds": 2.7072578529999998,
+          "bytes": 0
+        },
+        "standalone_swiglu": {
+          "count": 1280,
+          "seconds": 1.793932918999999,
+          "bytes": 0
+        }
+      },
+      "dropped_records": 0
+    },
+    "on": {
+      "run": "experiments/qwen-image21-sage/runs/lora-cfg1-2qo8sxe8",
+      "wall_mean_seconds": 39.891510438523255,
+      "kernel_mean_seconds": 38.52879898250001,
+      "gpu_union_mean_seconds": 38.8512849385,
+      "without_lora_wall_mean_seconds": 20.296705361979548,
+      "requests": [
+        {
+          "case": "without_first",
+          "seconds": 23.661015935009345,
+          "http_status": 200
+        },
+        {
+          "case": "without_warm_1",
+          "seconds": 20.441123937955126,
+          "http_status": 200
+        },
+        {
+          "case": "without_warm_2",
+          "seconds": 20.15228678600397,
+          "http_status": 200
+        },
+        {
+          "case": "with_first",
+          "seconds": 39.45852396602277,
+          "http_status": 200
+        },
+        {
+          "case": "with_warm_1",
+          "seconds": 40.548551487969235,
+          "http_status": 200
+        },
+        {
+          "case": "with_warm_2",
+          "seconds": 39.234469389077276,
+          "http_status": 200
+        },
+        {
+          "case": "without_return_first",
+          "seconds": 20.755007331026718,
+          "http_status": 200
+        },
+        {
+          "case": "without_return_warm",
+          "seconds": 20.967653026920743,
+          "http_status": 200
+        }
+      ],
+      "groups": {
+        "attention_input_scale": {
+          "count": 1280,
+          "seconds": 0.4097344144999999,
+          "bytes": 0
+        },
+        "attention_output_scale": {
+          "count": 1280,
+          "seconds": 0.37105383000000025,
+          "bytes": 0
+        },
+        "bf16_to_f32": {
+          "count": 1415,
+          "seconds": 0.3251180519999999,
+          "bytes": 0
+        },
+        "convrot_f32": {
+          "count": 5120,
+          "seconds": 1.6891511359999987,
+          "bytes": 0
+        },
+        "copy_kind_1": {
+          "count": 397,
+          "seconds": 0.1474149259999996,
+          "bytes": 1853081660
+        },
+        "copy_kind_2": {
+          "count": 41,
+          "seconds": 0.0034285585,
+          "bytes": 80281600
+        },
+        "copy_kind_8": {
+          "count": 6770,
+          "seconds": 0.17052844350000126,
+          "bytes": 48878170112
+        },
+        "elementwise_add": {
+          "count": 477,
+          "seconds": 0.10929803299999995,
+          "bytes": 0
+        },
+        "elementwise_scale": {
+          "count": 7196,
+          "seconds": 0.5257263909999943,
+          "bytes": 0
+        },
+        "f16_to_f32": {
+          "count": 7985,
+          "seconds": 0.03451268799999972,
+          "bytes": 0
+        },
+        "f32_to_bf16": {
+          "count": 3911,
+          "seconds": 0.9084065925000003,
+          "bytes": 0
+        },
+        "f32_to_f16": {
+          "count": 15360,
+          "seconds": 2.3990966345001272,
+          "bytes": 0
+        },
+        "fused_lora_output": {
+          "count": 7680,
+          "seconds": 10.063934165499997,
+          "bytes": 0
+        },
+        "gated_residual": {
+          "count": 2496,
+          "seconds": 0.8041320954999998,
+          "bytes": 0
+        },
+        "int8_f32_output": {
+          "count": 7680,
+          "seconds": 10.796221603499987,
+          "bytes": 0
+        },
+        "memset": {
+          "count": 1376,
+          "seconds": 0.0011140280000000034,
+          "bytes": 1006080
+        },
+        "norm_modulation": {
+          "count": 2496,
+          "seconds": 0.5464366580000004,
+          "bytes": 0
+        },
+        "other_gemm": {
+          "count": 15750,
+          "seconds": 2.1537322639999985,
+          "bytes": 0
+        },
+        "other_kernel": {
+          "count": 55646,
+          "seconds": 2.3467948069994966,
+          "bytes": 0
+        },
+        "paired_qk_rms_rope": {
+          "count": 1280,
+          "seconds": 0.5141740349999998,
+          "bytes": 0
+        },
+        "sage_attention_core": {
+          "count": 1280,
+          "seconds": 2.7346668084999983,
+          "bytes": 0
+        },
+        "standalone_swiglu": {
+          "count": 1280,
+          "seconds": 1.7966087740000007,
+          "bytes": 0
+        }
+      },
+      "dropped_records": 0
+    }
+  },
+  "saved_wall_seconds": 4.719594468479045,
+  "wall_reduction_percent": 10.57941622005924,
+  "speedup": 1.1183107487432045
+}

@@ -1,0 +1,15 @@
+{
+  "base_lock_sha256": "dff1196594bfc9a454ea0e8c3d69b0b2815feb91c6beafd86221d0d68a4303ea",
+  "base_profile": "qwen-image21-1600x896-v2",
+  "files": {
+    "ggml/src/ggml-cuda/ggml-cuda.cu": {
+      "before": "db613f631d01b8399bcffd833854b2bf3e755fad062d1be2cb3d42c319bdf060",
+      "after": "3b7f3721bf81fe372d963df28db622184461907f7a843dfc0b3c9e1f10aa8255"
+    },
+    "src/model/adapter/lora.hpp": {
+      "before": "4ebd32e0d76bd4be25f3965b12b91d4e4d22175e9dedb5515075d0e011781cd6",
+      "after": "dd6e15aabcb3e856118abc413ce07058417e4d8fcd6b4d792e217fb9968b7429"
+    }
+  },
+  "patch_sha256": "01f3137cb071b9db7fefca107aac638d3123c2be9fa04fb03bee9e9a93d6841c"
+}

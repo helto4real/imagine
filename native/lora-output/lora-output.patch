@@ -1,0 +1,131 @@
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -2183,8 +2183,27 @@
+     return prefer_f32_output;
+ }
+ 
++struct ggml_cuda_lora_output {
++    const float * base;
++    float * output;
++    float scales[2];
++    float biases[2];
++    int count;
++};
++
++static __global__ void lora_output_f16_f32(const half * input, ggml_cuda_lora_output epilogue, int64_t n) {
++    const int64_t i = int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
++    if (i >= n) return;
++    float value = __half2float(input[i]);
++    // Each SCALE keeps its own F32 rounding, including the attention rescale.
++    for (int j = 0; j < epilogue.count; ++j) {
++        value = __fmaf_rn(epilogue.scales[j], value, epilogue.biases[j]);
++    }
++    epilogue.output[i] = __fadd_rn(epilogue.base[i], value);
++}
++
+ template<ggml_type compute_type>
+-static void ggml_cuda_mul_mat_cublas_impl(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
++static void ggml_cuda_mul_mat_cublas_impl(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst, const ggml_cuda_lora_output * lora_output = nullptr) {
+     using traits = batched_mul_mat_traits<compute_type>;
+     using cuda_t = typename traits::cuda_type;
+ 
+@@ -2382,6 +2401,15 @@
+                 ne23,
+                 cu_compute_type,
+                 CUBLAS_GEMM_DEFAULT_TENSOR_OP));
++    }
++
++    if constexpr (compute_type == GGML_TYPE_F16) {
++        if (lora_output) {
++            GGML_ASSERT(cu_data_type == CUDA_R_16F);
++            lora_output_f16_f32<<<(ne_dst + 255) / 256, 256, 0, main_stream>>>(dst_temp.get(), *lora_output, ne_dst);
++            CUDA_CHECK(cudaGetLastError());
++            return;
++        }
+     }
+ 
+     // Convert output back to F32 if needed
+@@ -4202,6 +4230,65 @@
+     return false;
+ }
+ 
++static int ggml_cuda_try_lora_output(ggml_backend_cuda_context & ctx, ggml_cgraph * graph, int i) {
++    static const bool enabled = [] {
++        const char * value = getenv("GGML_CUDA_FUSED_LORA_OUTPUT");
++        return value && strcmp(value, "1") == 0;
++    }();
++    if (!enabled || i + 2 >= graph->n_nodes || ctx.curr_stream_no != 0 ||
++        !ctx.stream_context().concurrent_events.empty()) return 0;
++    ggml_tensor * mat = graph->nodes[i];
++    if (mat->op != GGML_OP_MUL_MAT || mat->type != GGML_TYPE_F32) return 0;
++    const ggml_tensor * w = mat->src[0], * x = mat->src[1];
++    const int cc = ggml_cuda_info().devices[ctx.device].cc;
++    if (cc != GGML_CUDA_CC_ADA_LOVELACE || w->type != GGML_TYPE_F16 || x->type != GGML_TYPE_F32 ||
++        w->ne[0] > 256 || w->ne[1] < 512 || x->ne[1] < 512 ||
++        w->ne[2] != 1 || w->ne[3] != 1 || x->ne[2] != 1 || x->ne[3] != 1 ||
++        !ggml_is_contiguous(w) || !ggml_is_contiguous(x) || !ggml_is_contiguous(mat) ||
++        ggml_cuda_cublas_compute_type(cc, w, x, mat) != GGML_TYPE_F16 ||
++        ggml_cuda_cublas_f32_output(GGML_TYPE_F16, cc) ||
++        ggml_cuda_should_use_mmvf(w->type, cc, w->ne, w->nb, x->ne[1]) ||
++        ggml_cuda_should_use_mmf(w->type, cc, ggml_cuda_info().devices[ctx.device].warp_size,
++                               w->ne, w->nb, x->ne[1], false)) return 0;
++
++    int end = i + 1;
++    ggml_tensor * previous = mat;
++    ggml_cuda_lora_output epilogue{};
++    while (end < graph->n_nodes && epilogue.count < 2 && graph->nodes[end]->op == GGML_OP_SCALE) {
++        const ggml_tensor * scale = graph->nodes[end];
++        if (scale->src[0] != previous || scale->type != GGML_TYPE_F32 ||
++            !ggml_are_same_shape(scale, mat) || !ggml_is_contiguous(scale)) return 0;
++        epilogue.scales[epilogue.count] = ggml_get_op_params_f32(scale, 0);
++        epilogue.biases[epilogue.count++] = ggml_get_op_params_f32(scale, 1);
++        previous = graph->nodes[end++];
++    }
++    if (epilogue.count == 0 || end >= graph->n_nodes) return 0;
++    ggml_tensor * add = graph->nodes[end];
++    if (add->op != GGML_OP_ADD || strcmp(add->name, "lora_output_sum") != 0 || add->src[1] != previous ||
++        add->type != GGML_TYPE_F32 || !ggml_are_same_shape(add, mat) || !ggml_is_contiguous(add)) return 0;
++    const ggml_tensor * base = add->src[0];
++    if (base->type != GGML_TYPE_F32 || !ggml_are_same_shape(base, mat) || !ggml_is_contiguous(base)) return 0;
++    const ggml_op ops1[] = {GGML_OP_MUL_MAT, GGML_OP_SCALE, GGML_OP_ADD};
++    const ggml_op ops2[] = {GGML_OP_MUL_MAT, GGML_OP_SCALE, GGML_OP_SCALE, GGML_OP_ADD};
++    if (!ggml_can_fuse_subgraph(graph, i, end - i + 1, epilogue.count == 1 ? ops1 : ops2, &end, 1)) return 0;
++
++    // Exact in-place accumulation is safe; partial overlap is not. Keep GEMM
++    // inputs and the previous base result independent of the final write.
++    auto overlaps = [](const ggml_tensor * a, const ggml_tensor * b) {
++        const uintptr_t p = (uintptr_t) a->data, q = (uintptr_t) b->data;
++        return p < q + ggml_nbytes(b) && q < p + ggml_nbytes(a);
++    };
++    if ((base->data != add->data && overlaps(base, add)) || overlaps(w, add) || overlaps(x, add)) return 0;
++    const ggml_tensor * buffers[] = {w, x, mat, base, add};
++    for (const ggml_tensor * tensor : buffers) {
++        if (!tensor->buffer || tensor->buffer->buft != ggml_backend_cuda_buffer_type(ctx.device)) return 0;
++    }
++    epilogue.base = (const float *) base->data;
++    epilogue.output = (float *) add->data;
++    ggml_cuda_mul_mat_cublas_impl<GGML_TYPE_F16>(ctx, w, x, mat, &epilogue);
++    return end - i;
++}
++
+ // try and fuse nodes and return the number of nodes to skip
+ static int ggml_cuda_try_fuse(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph * cgraph, int i) {
+ 
+@@ -4211,6 +4298,7 @@
+     }
+ 
+     ggml_tensor * node = cgraph->nodes[i];
++    if (int skipped = ggml_cuda_try_lora_output(*cuda_ctx, cgraph, i)) return skipped;
+ 
+     static const bool bf16_attention = []() {
+         const char * value = getenv("SD_QWEN21_BF16_ATTENTION");
+--- a/src/model/adapter/lora.hpp
++++ b/src/model/adapter/lora.hpp
+@@ -1101,6 +1101,7 @@
+             ggml_tensor* out_diff = lora_model->get_out_diff(ctx, backend, x, w, forward_params, prefix + "weight");
+             if (out_diff != nullptr) {
+                 output = ggml_add_inplace(ctx, output, out_diff);
++                ggml_set_name(output, "lora_output_sum");
+             }
+         }
+         return output;

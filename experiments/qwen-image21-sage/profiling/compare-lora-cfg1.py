@@ -69,6 +69,10 @@ def main():
     parser.add_argument("--run", action="store_true")
     parser.add_argument("--trace-library", type=Path,
                         help="Opt-in kernel/copy timings only; requires permission to read diagnostic runtime data")
+    parser.add_argument("--candidate-manifest", type=Path,
+                        help="Verified separate native candidate; frozen baseline is still checked")
+    parser.add_argument("--lora-output", choices=("0", "1"),
+                        help="Only with --candidate-manifest: toggle the LoRA output fusion")
     args = parser.parse_args()
     manifest = json.loads((BASELINE / "manifest.json").read_text())
     for name, expected in manifest["files_sha256"].items():
@@ -77,6 +81,19 @@ def main():
     binary = BASELINE / "sd-server"
     if hashlib.sha256(binary.read_bytes()).hexdigest() != manifest["binary_sha256"]:
         raise RuntimeError("Frozen binary hash mismatch")
+    binary_hash = manifest["binary_sha256"]
+    if (args.lora_output is not None) != (args.candidate_manifest is not None):
+        parser.error("--candidate-manifest and --lora-output must be supplied together")
+    if args.candidate_manifest:
+        candidate = json.loads(args.candidate_manifest.read_text())
+        source_lock = PROJECT / "native/lora-output/source-lock.json"
+        if (hashlib.sha256(source_lock.read_bytes()).hexdigest() != candidate["source_lock_sha256"]
+                or candidate["base_binary_sha256"] != manifest["binary_sha256"]):
+            raise RuntimeError("Candidate provenance does not match the source lock and frozen baseline")
+        binary = PROJECT / candidate["binary_path"]
+        binary_hash = hashlib.sha256(binary.read_bytes()).hexdigest()
+        if binary_hash != candidate["binary_sha256"]:
+            raise RuntimeError("Candidate binary hash mismatch")
     lora = args.lora.resolve(strict=True)
     if not lora.is_file():
         raise RuntimeError("LoRA is not a file")
@@ -93,9 +110,12 @@ def main():
         raise RuntimeError("Profiling injection must be disabled")
     env = {k: v for k, v in os.environ.items() if not k.startswith(("SD_", "GGML_"))}
     env.update(json.loads((BASELINE / "baseline-environment.json").read_text()))
+    if args.lora_output is not None:
+        env["GGML_CUDA_FUSED_LORA_OUTPUT"] = args.lora_output
     library = args.trace_library.resolve(strict=True) if args.trace_library else None
     plan = {
-        "baseline": manifest["id"], "binary_sha256": manifest["binary_sha256"],
+        "baseline": manifest["id"], "binary_sha256": binary_hash,
+        "lora_output_fusion": args.lora_output,
         "width": 1600, "height": 896, "steps": 40, "cfg": 1, "seed": 42,
         "sampler": "er_sde", "scheduler": "beta", "references": 0,
         "prompt": PROMPT, "negative_prompt": "", "lora": str(lora),
