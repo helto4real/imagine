@@ -39,3 +39,9 @@
 /.imagine/
 
 /.venv-privacy/
+
+# Verified local Qwen reference-cache executable.
+/native/reference-cache/bin/
+
+# Local acceptance inputs, result evidence and optimization controls.
+/test-generations/

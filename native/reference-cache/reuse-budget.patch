@@ -1,0 +1,284 @@
+--- a/src/core/ggml_runner.cpp
++++ b/src/core/ggml_runner.cpp
+@@ -642,6 +642,10 @@
+     }
+ }
+ 
++static size_t add_bytes(size_t a, size_t b) {
++    return b > SIZE_MAX - a ? SIZE_MAX : a + b;
++}
++
+ std::optional<sd::Tensor<float>> GGMLRunner::compute(get_graph_cb_t get_graph,
+                                                      int n_threads,
+                                                      bool auto_runner_end,
+@@ -700,6 +704,50 @@
+     }
+     std::optional<sd::Tensor<float>> output;
+     try {
++        if (cache_.needs_reuse_budget()) {
++            cache_.mark_reuse_checked();
++            const size_t host_bytes = cache_.host_gpu_bytes();
++            const auto& plan        = resolve_graph_cut_plan(graph);
++            if (host_bytes > 0 && !is_multi_device() && !sd_backend_is_cpu(runtime_backend) &&
++                plan.valid && plan.has_cuts) {
++                // The first store graph has larger activations than steady reuse.
++                // Recheck once all branches exist, before executing or staging inputs.
++                size_t staging = cache_.largest_tensor_bytes();
++                staging        = add_bytes(staging, staging);
++                if (cache_prefetch_enabled_) {
++                    staging = add_bytes(staging, staging);
++                }
++                const size_t peak = hybrid_segment_workspace(graph, plan, staging);
++                const auto params = collect_used_param_tensors(graph);
++                constexpr size_t headroom = 256ULL * 1024ULL * 1024ULL;
++                // Treat the current workspace as reusable capacity for this dry run.
++                // A rejected promotion must not discard its warm allocations.
++                const size_t reservation = add_bytes(peak, add_bytes(host_bytes, headroom));
++                const bool admitted = fits(memory_requests({{runtime_backend, reservation}}, 0, graph), params);
++                LOG_DEBUG("%s hybrid cache reuse budget: %.2f MiB host, %.2f MiB workspace with staging, admitted %d",
++                          get_desc().c_str(), host_bytes / (1024.0 * 1024.0), peak / (1024.0 * 1024.0), admitted);
++                if (admitted) {
++                    workspace_.release();
++                    sync_runtime_residency();
++                    // Recheck real capacity after release before allocating the cache.
++                    auto retired = fits(memory_requests({{runtime_backend, peak}}, add_bytes(host_bytes, headroom), graph), params)
++                                       ? cache_.promote_host_cache()
++                                       : sd::CachedTensors{};
++                    if (!retired.empty()) {
++                        // Rebuild while old graph inputs still have valid host storage.
++                        free_compute_ctx();
++                        graph_cut_plan_cache_.graph_cut_plans.clear();
++                        sync_runtime_residency();
++                        if (!prepare_compute_graph(get_graph, &graph)) {
++                            return std::nullopt;
++                        }
++                        LOG_DEBUG("%s hybrid cache reuse: promoted %.2f MiB to VRAM, %.2f MiB RAM remains",
++                                  get_desc().c_str(), host_bytes / (1024.0 * 1024.0),
++                                  cache_.storage_bytes(true) / (1024.0 * 1024.0));
++                    }
++                }
++            }
++        }
+         output = execute_graph(graph, n_threads, no_return, read_outputs);
+     } catch (const std::bad_alloc&) {
+         last_compute_status_ = GGML_STATUS_ALLOC_FAILED;
+@@ -752,9 +800,6 @@
+     graph_cut_layer_split_primary_notice_logged_ = false;
+ }
+ 
+-static size_t add_bytes(size_t a, size_t b) {
+-    return b > SIZE_MAX - a ? SIZE_MAX : a + b;
+-}
+ 
+ ComputeWorkspace::Measurement GGMLRunner::measure(ggml_cgraph* graph, size_t direct_bytes) {
+     auto external_backend = [&](const ggml_tensor* tensor) -> ggml_backend_t {
+@@ -879,6 +924,42 @@
+     return true;
+ }
+ 
++size_t GGMLRunner::hybrid_segment_workspace(ggml_cgraph* graph, const sd::ggml_graph_cut::Plan& plan, size_t staging_bytes) const {
++    auto buft             = ggml_backend_get_default_buffer_type(runtime_backend);
++    auto allocation_bytes = [&](ggml_tensor* tensor) {
++        return GGML_PAD(ggml_backend_buft_get_alloc_size(buft, tensor),
++                        ggml_backend_buft_get_alignment(buft));
++    };
++    std::map<std::string, size_t> cut_sizes;
++    for (int i = 0; i < ggml_graph_n_nodes(graph); ++i) {
++        auto tensor = ggml_graph_node(graph, i);
++        if (ggml_graph_cut::is_graph_cut_tensor(tensor)) {
++            cut_sizes[tensor->name] = allocation_bytes(ggml_graph_cut::cache_source_tensor(tensor));
++        }
++    }
++    size_t peak = 0;
++    std::unordered_set<std::string> produced;
++    for (const auto& segment : plan.segments) {
++        size_t bytes = add_bytes(segment.compute_buffer_size, staging_bytes);
++        for (const auto& name : produced) {
++            if (segment.live_cut_names.count(name)) {
++                bytes = add_bytes(bytes, cut_sizes.at(name));
++            }
++        }
++        // future_cut_names also names outputs of later segments;
++        // only already produced and current outputs occupy memory.
++        for (int index : segment.output_node_indices) {
++            auto tensor = ggml_graph_node(graph, index);
++            if (ggml_graph_cut::is_graph_cut_tensor(tensor) &&
++                segment.future_cut_names.count(tensor->name) && produced.insert(tensor->name).second) {
++                bytes = add_bytes(bytes, cut_sizes.at(tensor->name));
++            }
++        }
++        peak = std::max(peak, bytes);
++    }
++    return peak;
++}
++
+ std::optional<Tensor<float>> GGMLRunner::execute_graph(ggml_cgraph* graph, int n_threads, bool no_return, const std::function<bool()>& read_outputs) {
+     if (!assign_graph_cut_layer_split_backends(graph)) {
+         return std::nullopt;
+@@ -912,46 +993,12 @@
+             if (capacity(full_measurement.buffers, desired)) {
+                 budget = desired;
+             } else if (!full_measurement.scheduler && cached_plan.valid && cached_plan.has_cuts) {
+-                auto buft             = ggml_backend_get_default_buffer_type(runtime_backend);
+-                auto allocation_bytes = [&](ggml_tensor* tensor) {
+-                    return GGML_PAD(ggml_backend_buft_get_alloc_size(buft, tensor),
+-                                    ggml_backend_buft_get_alignment(buft));
+-                };
+-                std::map<std::string, size_t> cut_sizes;
+-                for (int i = 0; i < ggml_graph_n_nodes(graph); ++i) {
+-                    auto tensor = ggml_graph_node(graph, i);
+-                    if (ggml_graph_cut::is_graph_cut_tensor(tensor)) {
+-                        cut_sizes[tensor->name] = allocation_bytes(ggml_graph_cut::cache_source_tensor(tensor));
+-                    }
+-                }
+-                size_t staging_bytes = 0;
+-                for (const auto& output : cache_.outputs()) {
+-                    staging_bytes = std::max(staging_bytes, allocation_bytes(output.second));
+-                }
++                size_t staging_bytes = cache_.largest_tensor_bytes();
+                 staging_bytes = add_bytes(staging_bytes, staging_bytes);
+                 if (cache_prefetch_enabled_) {
+                     staging_bytes = add_bytes(staging_bytes, staging_bytes);
+                 }
+-                size_t peak   = 0;
+-                std::unordered_set<std::string> produced;
+-                for (const auto& segment : cached_plan.segments) {
+-                    size_t bytes = add_bytes(segment.compute_buffer_size, staging_bytes);
+-                    for (const auto& name : produced) {
+-                        if (segment.live_cut_names.count(name)) {
+-                            bytes = add_bytes(bytes, cut_sizes.at(name));
+-                        }
+-                    }
+-                    // future_cut_names also names outputs of later segments;
+-                    // only already produced and current outputs occupy memory.
+-                    for (int index : segment.output_node_indices) {
+-                        auto tensor = ggml_graph_node(graph, index);
+-                        if (ggml_graph_cut::is_graph_cut_tensor(tensor) &&
+-                            segment.future_cut_names.count(tensor->name) && produced.insert(tensor->name).second) {
+-                            bytes = add_bytes(bytes, cut_sizes.at(tensor->name));
+-                        }
+-                    }
+-                    peak = std::max(peak, bytes);
+-                }
++                const size_t peak = hybrid_segment_workspace(graph, cached_plan, staging_bytes);
+                 const std::vector<BackendBufferSize> buffers{{runtime_backend, peak}};
+                 constexpr size_t quantum = 1024ULL * 1024ULL;
+                 size_t low = 0, high = desired / quantum;
+@@ -967,8 +1014,8 @@
+             }
+         }
+         cache_.set_hybrid_budget(budget);
+-        LOG_DEBUG("%s hybrid cache budget: %.2f MB VRAM total for %zu branches, %.2f MB requested; weights and workspace reserved",
+-                  get_desc().c_str(), budget / (1024.0 * 1024.0), cache_.hybrid_branches(), desired / (1024.0 * 1024.0));
++        LOG_DEBUG("%s hybrid cache budget: %.2f MB VRAM total for %zu branches, %.2f MB requested; weights and workspace reserved; %.2f MiB device free, %.2f MiB graph limit",
++                  get_desc().c_str(), budget / (1024.0 * 1024.0), cache_.hybrid_branches(), desired / (1024.0 * 1024.0), free_bytes / (1024.0 * 1024.0), max_graph_vram_bytes / (1024.0 * 1024.0));
+     }
+     cache_.plan_hybrid_outputs();
+     auto fits_monolithic = [&]() {
+--- a/src/core/ggml_runner.h
++++ b/src/core/ggml_runner.h
+@@ -148,6 +148,7 @@
+                                                      size_t pending_cache_bytes, ggml_cgraph* graph) const;
+     bool fits(const std::vector<DeviceMemoryRequest>& requests,
+               const std::vector<ggml_tensor*>& params) const;
++    size_t hybrid_segment_workspace(ggml_cgraph* graph, const sd::ggml_graph_cut::Plan& plan, size_t staging_bytes) const;
+     bool execute_segment(ggml_cgraph* graph, int n_threads);
+     std::optional<sd::Tensor<float>> execute_graph(ggml_cgraph* graph, int n_threads, bool no_return, const std::function<bool()>& read_outputs);
+ 
+--- a/src/core/runner_cache.cpp
++++ b/src/core/runner_cache.cpp
+@@ -103,6 +103,49 @@
+     static size_t cache_allocation_bytes(ggml_backend_t backend, ggml_tensor* tensor) {
+         auto buft = ggml_backend_get_default_buffer_type(backend);
+         return GGML_PAD(ggml_backend_buft_get_alloc_size(buft, tensor), ggml_backend_buft_get_alignment(buft));
++    }
++
++    size_t RunnerCache::largest_tensor_bytes() const {
++        size_t bytes = 0;
++        for (const auto& output : outputs_) {
++            bytes = std::max(bytes, cache_allocation_bytes(backend_, output.second));
++        }
++        for (const auto& entry : committed_) {
++            bytes = std::max(bytes, cache_allocation_bytes(backend_, entry.second->tensor));
++        }
++        return bytes;
++    }
++
++    size_t RunnerCache::host_gpu_bytes() const {
++        size_t bytes = 0;
++        for (const auto& entry : committed_) {
++            if (ggml_backend_buffer_is_host(entry.second->buffer)) {
++                const size_t size = cache_allocation_bytes(backend_, entry.second->tensor);
++                bytes             = size > SIZE_MAX - bytes ? SIZE_MAX : bytes + size;
++            }
++        }
++        return bytes;
++    }
++
++    CachedTensors RunnerCache::promote_host_cache() {
++        GGML_ASSERT(hybrid_storage() && pending_.empty() && outputs_.empty());
++        CachedTensors replacements, retired;
++        for (const auto& entry : committed_) {
++            if (ggml_backend_buffer_is_host(entry.second->buffer)) {
++                ggml_status status;
++                auto copy = CachedTensor::copy(backend_, entry.first, entry.second->tensor, status);
++                if (copy == nullptr) {
++                    return {};  // Keep every original entry if any allocation/copy fails.
++                }
++                replacements[entry.first] = std::move(copy);
++            }
++        }
++        ggml_backend_synchronize(backend_);
++        for (auto& entry : replacements) {
++            retired[entry.first]    = std::move(committed_.at(entry.first));
++            committed_[entry.first] = std::move(entry.second);
++        }
++        return retired;
+     }
+ 
+     size_t RunnerCache::output_bytes() const {
+@@ -240,6 +283,9 @@
+     void RunnerCache::graph_end(bool success) {
+         // Graph inputs can still reference the previous generation until graph end.
+         if (success) {
++            if (!pending_.empty()) {
++                ++completed_stores_;
++            }
+             for (auto& entry : pending_) {
+                 committed_[entry.first] = std::move(entry.second);
+             }
+@@ -253,6 +299,8 @@
+         graph_end(false);
+         committed_.clear();
+         hybrid_planned_    = false;
++        completed_stores_  = 0;
++        reuse_checked_     = false;
+         branch_gpu_budget_ = 0;
+     }
+ 
+--- a/src/core/runner_cache.h
++++ b/src/core/runner_cache.h
+@@ -34,6 +34,8 @@
+         bool host_storage_ = false;
+         size_t hybrid_branches_   = 0;
+         bool hybrid_planned_      = false;
++        size_t completed_stores_  = 0;
++        bool reuse_checked_       = false;
+         size_t branch_gpu_budget_ = 0;
+         std::unordered_set<std::string> gpu_outputs_;
+ 
+@@ -49,6 +51,14 @@
+         bool needs_hybrid_budget() const { return hybrid_storage() && !hybrid_planned_ && !outputs_.empty(); }
+         size_t hybrid_branches() const { return hybrid_branches_; }
+         void set_hybrid_budget(size_t bytes);
++        bool needs_reuse_budget() const {
++            return hybrid_storage() && !reuse_checked_ && completed_stores_ >= hybrid_branches_ && outputs_.empty();
++        }
++        void mark_reuse_checked() { reuse_checked_ = true; }
++        size_t largest_tensor_bytes() const;
++        size_t host_gpu_bytes() const;
++        // Returned old tensors must outlive any graph built before promotion.
++        CachedTensors promote_host_cache();
+         // Outputs with the same name before the final dot form an indivisible group (e.g. K/V).
+         void plan_hybrid_outputs();
+         size_t output_bytes() const;

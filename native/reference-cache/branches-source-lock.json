@@ -1,0 +1,27 @@
+{
+  "parent_source_lock_sha256": "f2914bacb02d59766b1f55ade6b355880b19160dc5216f2cad363e13992c4f41",
+  "patch_sha256": "36389c629af5d83686f1485fe140a0fc528eff027a7bd97b7628a89ff39adc8b",
+  "files": {
+    "src/model/diffusion/model.hpp": {
+      "before": "8a1f2974e6503edf92e37da7ecca0081aed5e1045680e87048c46a8131dd1dae",
+      "after": "522633c17c7783af6b9f3d45d59a8992bae83ad4c3d420c1aba20080950c2aaf"
+    },
+    "src/model/diffusion/qwen_image_2_1.hpp": {
+      "before": "6873b9d9662a5745c3c24aa89f1f2b59de3c38d33b2c2df88f9f64bbe8b8e78c",
+      "after": "e44577a1b67ad7cff7e322b955606aa727d0860924da42851556bccd9d11e170"
+    },
+    "src/pipeline/diffusion_engine.cpp": {
+      "before": "b604f471d97158821c2e090446533dee4626349f68f776df716c3966aa665ba7",
+      "after": "d102cbbeb623e12c1d250a80ae6b06e4922a4c90e035ace9ab104bae446f9149"
+    },
+    "src/runtime/guidance.cpp": {
+      "before": "f54f3c70aaf8d7e76e6226feb35558e0061243b5c2a8567ab6ab75cc7ac69ed3",
+      "after": "6ddb39e06c84ecdd055e40de66817eb5a8b424f28bdefbf44febee40e3187880"
+    },
+    "src/runtime/guidance.h": {
+      "before": "fce4f432f6b0ba4328aafe79316d157d19b98d729198324a25f9d60dc7ef01f6",
+      "after": "a82dd5f2a7d8dfb52e1fc8e0696f004040dca8ada20e554674fc923b60b82f2b"
+    }
+  },
+  "candidate_binary_sha256": "bb8e32fc8edc8adab6c1b9199d55c84a181a0d06f9b3976fb448729644e305e0"
+}

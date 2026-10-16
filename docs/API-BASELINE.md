@@ -6,6 +6,11 @@ This is the implementation contract for the first Rust service. It supersedes
 older illustrative API examples in `design-document.md`. The native profile was explicitly advanced to `qwen-image21-1600x896-v2` on
 2026-10-15. API revision and request validation remain unchanged. The new profile
 adds dynamic VAE strips while preserving precision and memory policy.
+On 2026-10-16, Qwen Image 2.1 passes with references additionally adopted the
+[hybrid/prefetch baseline](../native/reference-cache/README.md). Frozen v2 remains
+the text-only profile and verified fallback; other models retain their own
+selection. The [character-sheet operation](CHARACTER-SHEETS.md) composes two
+inference passes within one job.
 
 ## Scope and architecture
 
@@ -36,7 +41,9 @@ Module responsibilities:
 | `config` | Local credentials, single-server lock, project/model paths |
 
 The backend trait is a small testable boundary, not a plugin framework.
-The native binary and environment are pinned by the accepted v2 manifest.
+The v2 environment remains pinned by its accepted manifest. The Qwen reference
+executable is separately pinned by `native/reference-cache/reuse-budget-source-lock.json`;
+changing native profiles stops the previous child before launching another.
 
 ## Start and credentials
 

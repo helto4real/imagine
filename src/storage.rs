@@ -121,6 +121,64 @@ impl Store {
         // Only IDs obtained from our database reach the path, never user paths.
         Ok(tokio::fs::read(self.media.join(id)).await?)
     }
+    /// Publish all roles and job success in one transaction. Files are inaccessible
+    /// through the API until commit, and are removed on any staging/commit failure.
+    pub async fn publish_output(
+        &self,
+        job: &str,
+        owner: &str,
+        artifacts: Vec<crate::generation::Artifact>,
+    ) -> Result<()> {
+        if artifacts.is_empty() {
+            bail!("empty generation result");
+        }
+        let mut paths = Vec::new();
+        let result = async {
+            let mut transaction = self.db.begin().await?;
+            let mut assets = Vec::new();
+            for artifact in artifacts {
+                let info = tokio::task::spawn_blocking(move || inspect_image(artifact.bytes)).await??;
+                let asset_id = id("asset");
+                let tmp = self.media.join(format!("{asset_id}.partial"));
+                let destination = self.media.join(&asset_id);
+                paths.extend([tmp.clone(), destination.clone()]);
+                let mut file = tokio::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&tmp).await?;
+                use tokio::io::AsyncWriteExt;
+                file.write_all(&info.bytes).await?;
+                file.sync_all().await?;
+                drop(file);
+                tokio::fs::rename(&tmp, &destination).await?;
+                let sha256 = hash(&info.bytes);
+                sqlx::query("INSERT INTO assets VALUES (?,?,?,?,?,?,?,?)")
+                    .bind(&asset_id).bind(owner).bind(&info.mime).bind(info.width).bind(info.height)
+                    .bind(info.bytes.len() as i64).bind(&sha256).bind(now()).execute(&mut *transaction).await?;
+                assets.push(json!({"id":asset_id,"role":artifact.role,"mime_type":info.mime,"width":info.width,
+                    "height":info.height,"bytes":info.bytes.len(),"sha256":sha256}));
+            }
+            let output = json!({"assets":assets,"format":"png"});
+            let updated = sqlx::query("UPDATE jobs SET status='succeeded',output=?,finished=? WHERE id=? AND owner=? AND status='running'")
+                .bind(output.to_string()).bind(now()).bind(job).bind(owner).execute(&mut *transaction).await?;
+            if updated.rows_affected() != 1 { bail!("output job is no longer running"); }
+            transaction.commit().await?;
+            Ok(())
+        }.await;
+        if result.is_err() {
+            let mut cleanup_error = None;
+            for path in paths {
+                match tokio::fs::remove_file(path).await {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => {
+                        cleanup_error = Some(e);
+                    }
+                }
+            }
+            if let Some(error) = cleanup_error {
+                return Err(error.into());
+            }
+        }
+        result
+    }
     pub async fn save_asset(&self, owner: &str, bytes: Vec<u8>) -> Result<Value> {
         let info = tokio::task::spawn_blocking(move || inspect_image(bytes)).await??;
         let asset_id = id("asset");

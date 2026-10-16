@@ -6,7 +6,10 @@ The internal strip algorithm is dynamic and has no resolution whitelist.
 native algorithm. v1 remains an immutable comparison control below.
 
 Use `./experiments/qwen-image21-sage/run.sh --dry-run`, `--serve` or `--run`.
-The Rust API also selects v2; its API revision and request validation are unchanged.
+The Rust API selects v2 for Qwen passes without references and as fallback.
+Reference passes select the separately validated
+[hybrid/prefetch profile](../../native/reference-cache/ACCEPTANCE-REUSE.md).
+The API revision and request validation are unchanged.
 All original flags, prompts, precision, auto memory policy and idle-retention
 choice remain; the only added switch is `SD_VAE_DYNAMIC_BLOCK_STRIPS=1`.
 Native engine defaults remain separate from the frozen profile.

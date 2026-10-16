@@ -6,7 +6,7 @@ use axum::{
 use imagine_server::{
     api::{self, App},
     config::Access,
-    contract::{JobRequest, MODEL},
+    contract::MODEL,
     engine::{Backend, EngineFuture, EngineState},
     scheduler::{self, Action, Control},
     storage::Store,
@@ -33,6 +33,9 @@ struct Probe {
     stops: AtomicUsize,
     fail: AtomicUsize,
     release: Notify,
+    sized_output: AtomicUsize,
+    passes: std::sync::Mutex<Vec<imagine_server::generation::ImagePass>>,
+    stages: std::sync::Mutex<Vec<String>>,
 }
 struct Fake(Arc<Probe>);
 fn png() -> Vec<u8> {
@@ -45,18 +48,29 @@ fn png() -> Vec<u8> {
 impl Backend for Fake {
     fn generate<'a>(
         &'a mut self,
-        _: &'a JobRequest,
-        _: &'a str,
-        _: &'a Store,
+        pass: &'a imagine_server::generation::ImagePass,
     ) -> EngineFuture<'a, Vec<u8>> {
         Box::pin(async move {
+            self.0.passes.lock().unwrap().push(pass.clone());
             self.0.calls.fetch_add(1, Ordering::SeqCst);
             self.0.release.notified().await;
             if self.0.fail.swap(0, Ordering::SeqCst) > 0 {
                 anyhow::bail!("simulated crash");
             }
-            Ok(png())
+            if self.0.sized_output.load(Ordering::SeqCst) != 0 {
+                let mut bytes = Cursor::new(Vec::new());
+                image::RgbImage::from_pixel(pass.width, pass.height, image::Rgb([42, 50, 60]))
+                    .write_to(&mut bytes, image::ImageFormat::Png)?;
+                Ok(bytes.into_inner())
+            } else {
+                Ok(png())
+            }
         })
+    }
+    fn stage(&mut self, stage: Option<&str>) {
+        if let Some(stage) = stage {
+            self.0.stages.lock().unwrap().push(stage.into());
+        }
     }
     fn stop(&mut self) -> EngineFuture<'_, ()> {
         Box::pin(async move {
@@ -1046,4 +1060,331 @@ async fn old_session_requests_are_rejected_before_mutation() {
     assert_eq!(response.status(), 409);
     assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
     stop(h).await;
+}
+
+fn sheet_request() -> Value {
+    json!({"profile":"qwen-character-sheet","seed":42,"character_sheet":{
+        "character_description":"SYNTHETIC_SHEET_IDENTITY","clothing_description":"SYNTHETIC_SHEET_CLOTHES",
+        "layout":{"output_width":512,"portrait_fraction":0.45}}})
+}
+#[tokio::test]
+async fn character_sheet_validation_schema_and_sensitive_fields() {
+    let h = setup().await;
+    let (_, profile) = req(
+        &h.router,
+        "GET",
+        "/v1/profiles/qwen-character-sheet",
+        "alice",
+        None,
+        None,
+    )
+    .await;
+    assert!(
+        profile["parameters_schema"]["properties"]
+            .get("prompt")
+            .is_none()
+    );
+    assert!(
+        profile["defaults"]["character_sheet"]
+            .get("character_description")
+            .is_none()
+    );
+    assert_eq!(profile["character_sheet"]["max_identity_references"], 8);
+    let (status, valid) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/validate",
+        "alice",
+        Some(sheet_request()),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{valid}");
+    assert!(!valid.to_string().contains("SYNTHETIC_SHEET"));
+    assert_eq!(
+        valid["effective"]["execution_plan"]["passes"][1]["seed"],
+        43
+    );
+    assert!(valid["effective"].get("width").is_none());
+    let mut cases = Vec::new();
+    for (field, value) in [
+        ("prompt", json!("ambiguous")),
+        ("width", json!(512)),
+        ("max_side", json!(512)),
+        ("execution_plan", json!({})),
+    ] {
+        let mut body = sheet_request();
+        body[field] = value;
+        cases.push(body);
+    }
+    let mut body = sheet_request();
+    body["character_sheet"]["layout"]["output_width"] = json!(513);
+    cases.push(body);
+    let mut body = sheet_request();
+    body["character_sheet"]["layout"]["portrait_fraction"] = json!(0.001);
+    cases.push(body);
+    let mut body = sheet_request();
+    body["character_sheet"]["character_description"] = json!("");
+    cases.push(body);
+    let mut body = sheet_request();
+    body["character_sheet"]["character_description"] =
+        json!(r#"{"encrypted":true,"schema":"unknown","ciphertext":"synthetic"}"#);
+    cases.push(body);
+    let mut body = sheet_request();
+    body["inputs"] = json!({"reference_images":vec!["missing";9]});
+    cases.push(body);
+    let mut body = sheet_request();
+    body["model"] = json!(imagine_server::contract::TURBO);
+    cases.push(body);
+    let mut body = request();
+    body["character_sheet"] = json!({});
+    cases.push(body);
+    let mut body = sheet_request();
+    body["model_options"] = json!({"qwen_image_2_1":{"reference_max_pixels_per_image":1}});
+    cases.push(body);
+    for body in cases {
+        let (status, error) = req(&h.router, "POST", "/v1/jobs", "alice", Some(body), None).await;
+        assert_eq!(status, 422, "{error}");
+        assert!(!error.to_string().contains("SYNTHETIC_SHEET"));
+    }
+    let guide = imagine_server::character_sheet::pose_guide(64, 64).unwrap();
+    let asset = h.store.save_asset("a", guide).await.unwrap();
+    let mut body = sheet_request();
+    body["inputs"] = json!({"pose_guide":asset["id"]});
+    assert_eq!(
+        req(
+            &h.router,
+            "POST",
+            "/v1/jobs/validate",
+            "bob",
+            Some(body.clone()),
+            None
+        )
+        .await
+        .0,
+        404
+    );
+    assert_eq!(
+        req(
+            &h.router,
+            "POST",
+            "/v1/jobs/validate",
+            "alice",
+            Some(body),
+            None
+        )
+        .await
+        .0,
+        200
+    );
+    let tiny = h.store.save_asset("a", png()).await.unwrap();
+    let mut body = sheet_request();
+    body["inputs"] = json!({"pose_guide":tiny["id"]});
+    assert_eq!(
+        req(
+            &h.router,
+            "POST",
+            "/v1/jobs/validate",
+            "alice",
+            Some(body),
+            None
+        )
+        .await
+        .0,
+        422
+    );
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn character_sheet_is_one_job_with_ordered_in_memory_passes_and_three_results() {
+    let h = setup().await;
+    h.probe.sized_output.store(1, Ordering::SeqCst);
+    let guide = imagine_server::character_sheet::pose_guide(64, 64).unwrap();
+    let reference = h.store.save_asset("a", guide.clone()).await.unwrap();
+    let mut body = sheet_request();
+    body["seed"] = json!(imagine_server::contract::MAX_SEED);
+    body["inputs"] = json!({"reference_images":[reference["id"]],"pose_guide":reference["id"]});
+    let (status, job) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs",
+        "alice",
+        Some(body.clone()),
+        Some("sheet-once"),
+    )
+    .await;
+    assert_eq!(status, 202, "{job}");
+    let id = job["id"].as_str().unwrap();
+    wait_calls(&h.probe, 1).await;
+    let (_, same) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs",
+        "alice",
+        Some(body),
+        Some("sheet-once"),
+    )
+    .await;
+    assert_eq!(same["id"], id);
+    h.probe.release.notify_one();
+    wait_calls(&h.probe, 2).await;
+    // Only the uploaded guide exists: portrait has not been published mid-job.
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM assets")
+            .fetch_one(&h.store.db)
+            .await
+            .unwrap(),
+        1
+    );
+    {
+        let passes = h.probe.passes.lock().unwrap();
+        assert_eq!(passes.len(), 2);
+        assert_eq!(passes[0].seed, imagine_server::contract::MAX_SEED);
+        assert_eq!(passes[1].seed, 0);
+        assert_eq!((passes[0].width, passes[0].height), (224, 288));
+        assert_eq!((passes[1].width, passes[1].height), (288, 288));
+        assert_eq!(passes[0].references.len(), 1);
+        assert_eq!(passes[1].references.len(), 3);
+        assert_eq!(&*passes[0].references[0], guide.as_slice());
+        assert_eq!(&*passes[1].references[0], guide.as_slice());
+        assert_eq!(&*passes[1].references[2], guide.as_slice());
+        assert_eq!(
+            image::load_from_memory(&passes[1].references[1])
+                .unwrap()
+                .width(),
+            224
+        );
+        assert!(!passes[0].prompt.contains("SYNTHETIC_SHEET_CLOTHES"));
+        assert!(passes[1].prompt.contains("SYNTHETIC_SHEET_CLOTHES"));
+    }
+    h.probe.release.notify_one();
+    let result = wait_status(&h.store, id, "a", "succeeded").await;
+    let assets = result["output"]["assets"].as_array().unwrap();
+    assert_eq!(assets.len(), 3);
+    for (asset, role) in assets
+        .iter()
+        .zip(["character_sheet", "portrait", "turnaround"])
+    {
+        assert_eq!(asset["role"], role);
+        assert!(
+            h.store
+                .read_asset(asset["id"].as_str().unwrap(), "b")
+                .await
+                .is_err()
+        );
+    }
+    assert_eq!(assets[0]["width"], 512);
+    assert_eq!(assets[0]["height"], 288);
+    assert_eq!(
+        result["effective"]["execution_plan"]["passes"][1]["seed"],
+        0
+    );
+    assert_eq!(
+        *h.probe.stages.lock().unwrap(),
+        ["portrait", "turnaround", "compose"]
+    );
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn character_sheet_cancel_or_second_pass_failure_never_publishes_partial_results() {
+    for cancel in [true, false] {
+        let h = setup().await;
+        h.probe.sized_output.store(1, Ordering::SeqCst);
+        let (_, job) = req(
+            &h.router,
+            "POST",
+            "/v1/jobs",
+            "alice",
+            Some(sheet_request()),
+            None,
+        )
+        .await;
+        let id = job["id"].as_str().unwrap();
+        wait_calls(&h.probe, 1).await;
+        h.probe.release.notify_one();
+        wait_calls(&h.probe, 2).await;
+        if cancel {
+            h.control
+                .call(Action::Cancel {
+                    id: id.into(),
+                    owner: "a".into(),
+                })
+                .await
+                .unwrap();
+        } else {
+            h.probe.fail.store(1, Ordering::SeqCst);
+            h.probe.release.notify_one();
+        }
+        wait_status(
+            &h.store,
+            id,
+            "a",
+            if cancel { "cancelled" } else { "failed" },
+        )
+        .await;
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT count(*) FROM assets")
+                .fetch_one(&h.store.db)
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(std::fs::read_dir(&h.store.media).unwrap().count(), 0);
+        assert_eq!(h.probe.stops.load(Ordering::SeqCst), 1);
+        stop(h).await;
+    }
+}
+
+#[tokio::test]
+async fn output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::open(dir.path()).await.unwrap();
+    sqlx::query("INSERT INTO jobs(id,owner,status,request,request_hash,created) VALUES ('job_test','a','running','{}','test',0)").execute(&store.db).await.unwrap();
+    let artifacts = vec![
+        imagine_server::generation::Artifact {
+            role: "character_sheet",
+            bytes: png(),
+        },
+        imagine_server::generation::Artifact {
+            role: "portrait",
+            bytes: vec![0, 1, 2],
+        },
+    ];
+    assert!(
+        store
+            .publish_output("job_test", "a", artifacts)
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM assets")
+            .fetch_one(&store.db)
+            .await
+            .unwrap(),
+        0
+    );
+    assert_eq!(std::fs::read_dir(&store.media).unwrap().count(), 0);
+    assert_eq!(
+        store.job("job_test", "a").await.unwrap().unwrap()["status"],
+        "running"
+    );
+    // A valid output cannot be published to another owner's job either.
+    assert!(
+        store
+            .publish_output(
+                "job_test",
+                "b",
+                vec![imagine_server::generation::Artifact {
+                    role: "image",
+                    bytes: png()
+                }]
+            )
+            .await
+            .is_err()
+    );
+    assert_eq!(std::fs::read_dir(&store.media).unwrap().count(), 0);
+    store.close().await.unwrap();
 }

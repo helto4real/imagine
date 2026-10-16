@@ -1,0 +1,298 @@
+--- a/src/core/runner_cache.h
++++ b/src/core/runner_cache.h
+@@ -32,6 +32,10 @@
+         CachedTensors pending_;
+         std::map<std::string, ggml_tensor*> outputs_;
+         bool host_storage_ = false;
++        size_t hybrid_branches_   = 0;
++        bool hybrid_planned_      = false;
++        size_t branch_gpu_budget_ = 0;
++        std::unordered_set<std::string> gpu_outputs_;
+ 
+     public:
+         explicit RunnerCache(ggml_backend_t backend)
+@@ -40,7 +44,16 @@
+         RunnerCache& operator=(const RunnerCache&) = delete;
+ 
+         void set_host_storage(bool enabled);
+-        bool host_storage() const { return host_storage_; }
++        void set_hybrid_storage(size_t branches);
++        bool hybrid_storage() const { return hybrid_branches_ != 0; }
++        bool needs_hybrid_budget() const { return hybrid_storage() && !hybrid_planned_ && !outputs_.empty(); }
++        size_t hybrid_branches() const { return hybrid_branches_; }
++        void set_hybrid_budget(size_t bytes);
++        // Outputs with the same name before the final dot form an indivisible group (e.g. K/V).
++        void plan_hybrid_outputs();
++        size_t output_bytes() const;
++        bool host_storage() const;
++        size_t storage_bytes(bool host) const;
+ 
+         ggml_tensor* get(const std::string& name) const;
+         void stage(const std::string& name, ggml_tensor* tensor);
+--- a/src/core/runner_cache.cpp
++++ b/src/core/runner_cache.cpp
+@@ -85,6 +85,91 @@
+     void RunnerCache::set_host_storage(bool enabled) {
+         GGML_ASSERT(committed_.empty() && pending_.empty() && outputs_.empty());
+         host_storage_ = enabled;
++        hybrid_branches_ = 0;
++    }
++
++    void RunnerCache::set_hybrid_storage(size_t branches) {
++        set_host_storage(false);
++        GGML_ASSERT(branches > 0);
++        hybrid_branches_ = branches;
++    }
++
++    void RunnerCache::set_hybrid_budget(size_t bytes) {
++        GGML_ASSERT(needs_hybrid_budget() && committed_.empty() && pending_.empty());
++        branch_gpu_budget_ = bytes / hybrid_branches_;
++        hybrid_planned_    = true;
++    }
++
++    static size_t cache_allocation_bytes(ggml_backend_t backend, ggml_tensor* tensor) {
++        auto buft = ggml_backend_get_default_buffer_type(backend);
++        return GGML_PAD(ggml_backend_buft_get_alloc_size(buft, tensor), ggml_backend_buft_get_alignment(buft));
++    }
++
++    size_t RunnerCache::output_bytes() const {
++        size_t bytes = 0;
++        for (const auto& output : outputs_) {
++            const size_t size = cache_allocation_bytes(backend_, output.second);
++            bytes             = size > SIZE_MAX - bytes ? SIZE_MAX : bytes + size;
++        }
++        return bytes;
++    }
++
++    void RunnerCache::plan_hybrid_outputs() {
++        if (!hybrid_storage() || outputs_.empty()) {
++            return;
++        }
++        GGML_ASSERT(hybrid_planned_);
++        std::map<std::string, size_t> groups;
++        for (const auto& output : outputs_) {
++            auto& bytes       = groups[output.first.substr(0, output.first.rfind('.'))];
++            const size_t size = cache_allocation_bytes(backend_, output.second);
++            bytes             = size > SIZE_MAX - bytes ? SIZE_MAX : bytes + size;
++        }
++        size_t remaining = branch_gpu_budget_;
++        std::unordered_set<std::string> gpu_groups;
++        for (const auto& group : groups) {
++            if (group.second <= remaining) {
++                gpu_groups.insert(group.first);
++                remaining -= group.second;
++            }
++        }
++        gpu_outputs_.clear();
++        for (const auto& output : outputs_) {
++            if (gpu_groups.count(output.first.substr(0, output.first.rfind('.')))) {
++                gpu_outputs_.insert(output.first);
++            }
++        }
++    }
++
++    bool RunnerCache::host_storage() const {
++        if (host_storage_) {
++            return true;
++        }
++        if (!hybrid_storage()) {
++            return false;
++        }
++        if (gpu_outputs_.size() < outputs_.size()) {
++            return true;
++        }
++        for (const auto* tensors : {&committed_, &pending_}) {
++            for (const auto& entry : *tensors) {
++                if (ggml_backend_buffer_is_host(entry.second->buffer)) {
++                    return true;
++                }
++            }
++        }
++        return false;
++    }
++
++    size_t RunnerCache::storage_bytes(bool host) const {
++        size_t bytes = 0;
++        for (const auto& entry : committed_) {
++            if (ggml_backend_buffer_is_host(entry.second->buffer) == host) {
++                const size_t size = ggml_backend_buffer_get_size(entry.second->buffer);
++                bytes             = size > SIZE_MAX - bytes ? SIZE_MAX : bytes + size;
++            }
++        }
++        return bytes;
+     }
+ 
+     void RunnerCache::stage(const std::string& name, ggml_tensor* tensor) {
+@@ -102,7 +187,8 @@
+         auto buft    = ggml_backend_get_default_buffer_type(backend_);
+         size_t bytes = 0;
+         for (const auto& output : outputs_) {
+-            if (pending_.count(output.first) || !tensors.count(output.second)) {
++            if (pending_.count(output.first) || !tensors.count(output.second) ||
++                (hybrid_storage() && !gpu_outputs_.count(output.first))) {
+                 continue;
+             }
+             const size_t size = GGML_PAD(ggml_backend_buft_get_alloc_size(buft, output.second),
+@@ -124,7 +210,7 @@
+         }
+         const auto tensors = cache_graph_tensors(graph);
+         ggml_backend_buffer_type_t storage_type = nullptr;
+-        if (host_storage_) {
++        if (host_storage()) {
+             storage_type = ggml_backend_dev_host_buffer_type(ggml_backend_get_device(backend_));
+             if (storage_type == nullptr) {
+                 auto cpu = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+@@ -140,7 +226,8 @@
+             }
+             GGML_ASSERT(ggml_is_contiguous(output.second));
+             ggml_status status;
+-            auto entry = CachedTensor::copy(backend_, output.first, output.second, status, storage_type);
++            auto output_storage = hybrid_storage() && gpu_outputs_.count(output.first) ? nullptr : storage_type;
++            auto entry          = CachedTensor::copy(backend_, output.first, output.second, status, output_storage);
+             if (entry == nullptr) {
+                 return status;
+             }
+@@ -159,11 +246,14 @@
+         }
+         pending_.clear();
+         outputs_.clear();
++        gpu_outputs_.clear();
+     }
+ 
+     void RunnerCache::clear() {
+         graph_end(false);
+         committed_.clear();
++        hybrid_planned_    = false;
++        branch_gpu_budget_ = 0;
+     }
+ 
+     ggml_tensor* GraphCutTensorCache::get(const std::string& name) const {
+--- a/src/core/ggml_runner.cpp
++++ b/src/core/ggml_runner.cpp
+@@ -566,7 +566,9 @@
+     runner_ctx.debug_tensors         = &debug_tensors;
+     runner_ctx.get_cache_tensor      = [this](const std::string& name) {
+         auto tensor = this->get_cache_tensor_by_name(name);
+-        return cache_.host_storage() ? to_backend(tensor) : tensor;
++        return tensor != nullptr && tensor->buffer != nullptr && ggml_backend_buffer_is_host(tensor->buffer)
++                   ? to_backend(tensor)
++                   : tensor;
+     };
+     runner_ctx.cache_tensor = [this, graph](const std::string& name, ggml_tensor* tensor) {
+         this->cache(name, tensor, graph);
+@@ -873,6 +875,84 @@
+         last_compute_status_ = GGML_STATUS_ALLOC_FAILED;
+         return std::nullopt;
+     }
++    if (cache_.needs_hybrid_budget()) {
++        if (is_multi_device()) {
++            LOG_ERROR("%s hybrid prefix cache requires a single compute device", get_desc().c_str());
++            return std::nullopt;
++        }
++        // Reserve every CFG branch before the first allocation. Protect all model
++        // weights, including those not used by the current graph-cut segment.
++        constexpr size_t placement_headroom = 256ULL * 1024ULL * 1024ULL;
++        size_t desired                      = 0;
++        for (size_t i = 0; i < cache_.hybrid_branches(); ++i) {
++            desired = add_bytes(desired, cache_.output_bytes());
++        }
++        auto capacity = [&](const std::vector<BackendBufferSize>& buffers, size_t bytes) {
++            return fits(memory_requests(buffers, add_bytes(bytes, placement_headroom), graph), params);
++        };
++        size_t budget     = 0;
++        size_t free_bytes = 0, total_bytes = 0;
++        ggml_backend_dev_memory(ggml_backend_get_device(runtime_backend), &free_bytes, &total_bytes);
++        if (total_bytes > 0 && free_bytes <= total_bytes && !sd_backend_is_cpu(runtime_backend)) {
++            if (capacity(full_measurement.buffers, desired)) {
++                budget = desired;
++            } else if (!full_measurement.scheduler && cached_plan.valid && cached_plan.has_cuts) {
++                auto buft             = ggml_backend_get_default_buffer_type(runtime_backend);
++                auto allocation_bytes = [&](ggml_tensor* tensor) {
++                    return GGML_PAD(ggml_backend_buft_get_alloc_size(buft, tensor),
++                                    ggml_backend_buft_get_alignment(buft));
++                };
++                std::map<std::string, size_t> cut_sizes;
++                for (int i = 0; i < ggml_graph_n_nodes(graph); ++i) {
++                    auto tensor = ggml_graph_node(graph, i);
++                    if (ggml_graph_cut::is_graph_cut_tensor(tensor)) {
++                        cut_sizes[tensor->name] = allocation_bytes(ggml_graph_cut::cache_source_tensor(tensor));
++                    }
++                }
++                size_t staging_bytes = 0;
++                for (const auto& output : cache_.outputs()) {
++                    staging_bytes = std::max(staging_bytes, allocation_bytes(output.second));
++                }
++                staging_bytes = add_bytes(staging_bytes, staging_bytes);
++                size_t peak   = 0;
++                std::unordered_set<std::string> produced;
++                for (const auto& segment : cached_plan.segments) {
++                    size_t bytes = add_bytes(segment.compute_buffer_size, staging_bytes);
++                    for (const auto& name : produced) {
++                        if (segment.live_cut_names.count(name)) {
++                            bytes = add_bytes(bytes, cut_sizes.at(name));
++                        }
++                    }
++                    // future_cut_names also names outputs of later segments;
++                    // only already produced and current outputs occupy memory.
++                    for (int index : segment.output_node_indices) {
++                        auto tensor = ggml_graph_node(graph, index);
++                        if (ggml_graph_cut::is_graph_cut_tensor(tensor) &&
++                            segment.future_cut_names.count(tensor->name) && produced.insert(tensor->name).second) {
++                            bytes = add_bytes(bytes, cut_sizes.at(tensor->name));
++                        }
++                    }
++                    peak = std::max(peak, bytes);
++                }
++                const std::vector<BackendBufferSize> buffers{{runtime_backend, peak}};
++                constexpr size_t quantum = 1024ULL * 1024ULL;
++                size_t low = 0, high = desired / quantum;
++                while (low < high) {
++                    const size_t mid = low + (high - low + 1) / 2;
++                    if (capacity(buffers, mid * quantum)) {
++                        low = mid;
++                    } else {
++                        high = mid - 1;
++                    }
++                }
++                budget = low * quantum;
++            }
++        }
++        cache_.set_hybrid_budget(budget);
++        LOG_DEBUG("%s hybrid cache budget: %.2f MB VRAM total for %zu branches, %.2f MB requested; weights and workspace reserved",
++                  get_desc().c_str(), budget / (1024.0 * 1024.0), cache_.hybrid_branches(), desired / (1024.0 * 1024.0));
++    }
++    cache_.plan_hybrid_outputs();
+     auto fits_monolithic = [&]() {
+         // Planning headroom absorbs allocation estimate drift; execution keeps the normal limits.
+         constexpr size_t planning_headroom = 128ULL * 1024ULL * 1024ULL;
+--- a/src/model/diffusion/qwen_image_2_1.hpp
++++ b/src/model/diffusion/qwen_image_2_1.hpp
+@@ -566,10 +566,12 @@
+               model(config) {
+             for (const auto& [key, value] : parse_key_value_args(model_args, "model arg")) {
+                 if (key == "qwen_image_2_1_prefix_cache_device") {
+-                    if (value == "cpu" || value == "gpu") {
++                    if (value == "hybrid" && !sd_backend_is_cpu(backend)) {
++                        cache_.set_hybrid_storage(2);
++                    } else if (value == "cpu" || value == "gpu" || value == "hybrid") {
+                         cache_.set_host_storage(value == "cpu" && !sd_backend_is_cpu(backend));
+                     } else {
+-                        LOG_WARN("ignoring Qwen Image 2.1 cache device '%s': expected cpu or gpu", value.c_str());
++                        LOG_WARN("ignoring Qwen Image 2.1 cache device '%s': expected cpu, gpu or hybrid", value.c_str());
+                     }
+                 } else if (key == "qwen_image_2_1_prefix_cache" && !parse_strict_bool(value, prefix_cache_enabled)) {
+                     LOG_WARN("ignoring invalid Qwen Image 2.1 model arg '%s=%s'", key.c_str(), value.c_str());
+@@ -751,7 +753,12 @@
+                 } else {
+                     LOG_DEBUG("Qwen Image 2.1: cached prefix %" PRIu64 " (%" PRId64 " tokens, %s, %s)",
+                               extra->prefix_id, layout.prefix_length, ggml_type_name(cache.type),
+-                              cache_.host_storage() ? "RAM" : "VRAM");
++                              cache_.host_storage() ? (cache_.storage_bytes(false) > 0 ? "VRAM+RAM" : "RAM") : "VRAM");
++                    if (cache_.hybrid_storage()) {
++                        LOG_DEBUG("Qwen Image 2.1: hybrid cache resident %.2f MB VRAM, %.2f MB RAM",
++                                  cache_.storage_bytes(false) / (1024.0 * 1024.0),
++                                  cache_.storage_bytes(true) / (1024.0 * 1024.0));
++                    }
+                 }
+             }
+             return result;

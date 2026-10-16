@@ -16,7 +16,10 @@ pub struct JobRequest {
     pub resolved_profile: Option<ResolvedProfile>,
     pub model: String,
     pub operation: Operation,
+    #[serde(default)]
     pub prompt: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub character_sheet: Option<crate::character_sheet::CharacterSheet>,
     #[serde(default)]
     pub negative_prompt: String,
     #[serde(default = "width")]
@@ -54,6 +57,7 @@ fn height() -> u32 {
 pub enum Operation {
     TextToImage,
     ImageEdit,
+    CharacterSheet,
     TextToVideo,
     ImageToVideo,
     ReferenceToVideo,
@@ -86,6 +90,8 @@ pub struct Inputs {
     pub start_image: Option<String>,
     pub end_image: Option<String>,
     pub mask: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pose_guide: Option<String>,
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
@@ -173,22 +179,63 @@ impl JobRequest {
         }
         if !matches!(
             self.operation,
-            Operation::TextToImage | Operation::ImageEdit
+            Operation::TextToImage | Operation::ImageEdit | Operation::CharacterSheet
         ) || self.video.is_some()
         {
             return Err("unsupported_operation");
         }
+        if self.operation == Operation::CharacterSheet {
+            crate::model_adapter::sheet_strategy(&self.model)?;
+            let sheet = self
+                .character_sheet
+                .as_ref()
+                .ok_or("character_sheet_required")?;
+            sheet.validate(self.inputs.reference_images.len())?;
+            if !self.prompt.is_empty() {
+                return Err("unexpected_prompt");
+            }
+            if self.inputs.reference_images.len() > 8 {
+                return Err("invalid_reference_count");
+            }
+            // This strategy has its own canvas and no scene colour transfer.
+            if self
+                .model_options
+                .qwen_image_2_1
+                .workflow
+                .as_ref()
+                .is_some_and(|w| {
+                    w.color_match_strength > 0.
+                        || w.brightness_strength > 0.
+                        || w.contrast_strength > 0.
+                })
+            {
+                return Err("unsupported_character_sheet_color_matching");
+            }
+            let cap = self
+                .model_options
+                .qwen_image_2_1
+                .reference_max_pixels_per_image;
+            for (w, h) in sheet.layout.pass_sizes()? {
+                let (_, _, w, h) = crate::workflow_image::dimensions(w, h, cap);
+                if w == 0 || h == 0 {
+                    return Err("unsupported_reference_geometry");
+                }
+            }
+        } else if self.character_sheet.is_some() || self.inputs.pose_guide.is_some() {
+            return Err("unexpected_character_sheet_input");
+        }
         let workflow = self.model_options.qwen_image_2_1.workflow.as_ref();
         let minimum = if workflow.is_some() { 32 } else { 128 };
-        if !(minimum..=4096).contains(&self.width)
-            || !(minimum..=4096).contains(&self.height)
-            || self.width.max(self.height) < 256
-            || !self.width.is_multiple_of(32)
-            || !self.height.is_multiple_of(32)
+        if self.operation != Operation::CharacterSheet
+            && (!(minimum..=4096).contains(&self.width)
+                || !(minimum..=4096).contains(&self.height)
+                || self.width.max(self.height) < 256
+                || !self.width.is_multiple_of(32)
+                || !self.height.is_multiple_of(32))
         {
             return Err("unsupported_resolution");
         }
-        if self.prompt.trim().is_empty()
+        if (self.operation != Operation::CharacterSheet && self.prompt.trim().is_empty())
             || self.prompt.len() > 32768
             || self.negative_prompt.len() > 32768
         {
@@ -309,6 +356,12 @@ impl JobRequest {
         }
         Ok(())
     }
+    pub fn asset_ids(&self) -> impl Iterator<Item = &String> {
+        self.inputs
+            .reference_images
+            .iter()
+            .chain(self.inputs.pose_guide.iter())
+    }
     pub fn effective(&self) -> Value {
         let mut v = serde_json::to_value(self).expect("serializable request");
         v["profile_revision"] = json!(if self.model_options.qwen_image_2_1.workflow.is_some() {
@@ -317,6 +370,11 @@ impl JobRequest {
             PROFILE
         });
         v["api_revision"] = json!(API_REVISION);
+        if let Some(sheet) = &self.character_sheet {
+            v.as_object_mut().unwrap().remove("width");
+            v.as_object_mut().unwrap().remove("height");
+            v["execution_plan"] = crate::model_adapter::sheet_plan(self, sheet);
+        }
         v
     }
 }
@@ -332,7 +390,8 @@ pub fn model(id: &str) -> Option<Value> {
         MODEL => Some(json!({
             "id": MODEL, "available": true, "availability": "requires_local_frozen_binary_and_weights",
             "engine":"stable-diffusion.cpp", "profile_revision":PROFILE,
-            "operations":["text_to_image","image_edit"],
+            "operations":["text_to_image","image_edit","character_sheet"],
+            "character_sheet":crate::model_adapter::sheet_capabilities(),
             "constraints": {
                 "dimensions":{"min":128,"max":4096,"multiple":32,"min_max_side":256},
                 "validated_resolutions":[{"width":1600,"height":896}],

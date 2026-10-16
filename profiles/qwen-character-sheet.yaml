@@ -1,0 +1,47 @@
+schema_version: 1
+id: qwen-character-sheet
+version: 1
+name: Qwen Character Sheet
+description: Portrait and three body views composed into a 16:9 character sheet.
+references:
+  min: 0
+  max: 8
+defaults:
+  operation: character_sheet
+  character_sheet:
+    character_description: ""
+    clothing_description: ""
+    layout:
+      output_width: 1536
+      portrait_fraction: 0.45
+  model: qwen-image-2.1-int8
+  negative_prompt: ""
+  seed: null                    # Ny slumpad seed per jobb.
+  sampling:
+    steps: 40
+    cfg_scale: 2.5
+    sampler: er_sde
+    scheduler: beta
+    custom_sigmas: []
+  inputs:
+    reference_images: []
+    start_image: null
+    end_image: null
+    mask: null
+  model_options:
+    qwen_image_2_1:
+      reference_max_pixels_per_image: 1000000
+      generation:
+        diffusion_model: diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors
+        text_encoder: text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors
+        vae: vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors
+        loras: []                # Klientens lista ersätter denna lista helt.
+        zero_negative_conditioning: false
+        color_match_strength: 0.0
+        brightness_strength: 0.0
+        contrast_strength: 0.0
+  output:
+    format: png
+    count: 1
+  video: null
+  client_metadata: {}

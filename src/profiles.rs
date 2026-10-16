@@ -122,6 +122,13 @@ impl Catalog {
         for key in ["prompt", "negative_prompt"] {
             value["defaults"].as_object_mut().unwrap().remove(key);
         }
+        if let Some(sheet) = value["defaults"]
+            .get_mut("character_sheet")
+            .and_then(Value::as_object_mut)
+        {
+            sheet.remove("character_description");
+            sheet.remove("clothing_description");
+        }
         value["references"] = json!(p.references);
         value["sizing"] = json!(p.sizing);
         value["nsfw_available"] = json!(!p.nsfw_loras.is_empty());
@@ -162,8 +169,15 @@ impl Catalog {
         partial(&mut schema);
         // Arrays replace as a whole: each LoRA still needs both fields.
         schema["$defs"]["Lora"]["required"] = json!(["path", "strength"]);
-        if p.defaults.get("prompt").is_none() {
+        if p.defaults.get("prompt").is_none() && p.defaults["operation"] != "character_sheet" {
             schema["required"] = json!(["prompt"]);
+        }
+        if p.defaults["operation"] == "character_sheet" {
+            let properties = schema["properties"].as_object_mut().unwrap();
+            for key in ["prompt", "width", "height", "max_side", "aspect_ratio"] {
+                properties.remove(key);
+            }
+            value["character_sheet"] = crate::model_adapter::sheet_capabilities();
         }
         value["parameters_schema"] = schema;
         Ok(value)
@@ -175,7 +189,7 @@ impl Catalog {
         owner: &str,
     ) -> Result<JobRequest, Fault> {
         let object = value.as_object_mut().ok_or(invalid("invalid_request"))?;
-        if object.contains_key("resolved_profile") {
+        if object.contains_key("resolved_profile") || object.contains_key("execution_plan") {
             return Err(invalid("read_only_profile_metadata"));
         }
         let selected = object.remove("profile");
@@ -184,8 +198,10 @@ impl Catalog {
             if version.is_some() {
                 return Err(invalid("profile_required"));
             }
-            let request: JobRequest =
+            check_sheet_canvas(&value)?;
+            let mut request: JobRequest =
                 serde_json::from_value(value).map_err(|_| invalid("invalid_request"))?;
+            decrypt_sheet(&mut request)?;
             request.validate().map_err(invalid)?;
             return Ok(request);
         };
@@ -212,6 +228,12 @@ impl Catalog {
         }
         let mut merged = profile.defaults.clone();
         merge(&mut merged, value);
+        check_sheet_canvas(&merged)?;
+        if merged["operation"] == "character_sheet"
+            && (max_side.is_some() || aspect.is_some() || profile.sizing.is_some())
+        {
+            return Err(invalid("conflicting_dimensions"));
+        }
         let refs = merged["inputs"]["reference_images"]
             .as_array()
             .cloned()
@@ -302,6 +324,7 @@ impl Catalog {
             .map_err(|_| invalid("private_prompt_unavailable"))?;
         request.negative_prompt = crate::privacy::decrypt(&request.negative_prompt)
             .map_err(|_| invalid("private_prompt_unavailable"))?;
+        decrypt_sheet(&mut request)?;
         request.validate().map_err(invalid)?;
         request.resolved_profile = Some(ResolvedProfile {
             id: profile.id.clone(),
@@ -336,14 +359,32 @@ impl Profile {
         if object.contains_key("resolved_profile") {
             bail!("defaults cannot set resolved_profile");
         }
-        object
-            .entry("prompt")
-            .or_insert(json!("profile validation"));
+        let sheet_profile = object.get("operation") == Some(&json!("character_sheet"));
+        if !sheet_profile {
+            object
+                .entry("prompt")
+                .or_insert(json!("profile validation"));
+        }
+        if sheet_profile
+            && (object.contains_key("width")
+                || object.contains_key("height")
+                || self.sizing.is_some()
+                || self.references.max > 8)
+        {
+            bail!("invalid character sheet profile");
+        }
         object.entry("operation").or_insert(json!("text_to_image"));
         let mut request: JobRequest = serde_json::from_value(value).context("invalid defaults")?;
         // Validate reference-dependent defaults without reading assets or private prompts.
+        if let Some(sheet) = &mut request.character_sheet
+            && sheet.character_description.is_empty()
+        {
+            sheet.character_description = "profile validation".into();
+        }
         if self.references.min > 0 {
-            request.operation = crate::contract::Operation::ImageEdit;
+            if !sheet_profile {
+                request.operation = crate::contract::Operation::ImageEdit;
+            }
             request.inputs.reference_images = vec!["validation".into(); self.references.min];
         }
         request.validate().map_err(anyhow::Error::msg)?;
@@ -367,6 +408,39 @@ impl Profile {
         }
         Ok(())
     }
+}
+
+fn check_sheet_canvas(value: &Value) -> Result<(), Fault> {
+    if value["operation"] == "character_sheet"
+        && (value.get("width").is_some() || value.get("height").is_some())
+    {
+        return Err(invalid("conflicting_dimensions"));
+    }
+    Ok(())
+}
+fn decrypt_sheet(request: &mut JobRequest) -> Result<(), Fault> {
+    if let Some(sheet) = &mut request.character_sheet {
+        sheet.character_description = decrypt_description(&sheet.character_description)
+            .map_err(|_| invalid("private_prompt_unavailable"))?;
+        sheet.clothing_description = decrypt_description(&sheet.clothing_description)
+            .map_err(|_| invalid("private_prompt_unavailable"))?;
+    }
+    Ok(())
+}
+
+fn decrypt_description(text: &str) -> anyhow::Result<String> {
+    if let Ok(value) = serde_json::from_str::<Value>(text)
+        && value.is_object()
+        && (value.get("encrypted").is_some()
+            || value.get("ciphertext").is_some()
+            || value.get("keyId").is_some())
+        && (value["schema"] != "helto.aio-image-generate.v2"
+            || value["algorithm"] != "AES-256-GCM"
+            || value["encrypted"] != true)
+    {
+        bail!("unsupported private description");
+    }
+    crate::privacy::decrypt(text)
 }
 
 #[cfg(test)]

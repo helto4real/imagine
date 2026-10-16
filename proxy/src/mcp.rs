@@ -925,6 +925,10 @@ impl Mcp {
                     for key in ["prompt", "negative_prompt", "client_metadata"] {
                         effective.as_object_mut().unwrap().remove(key);
                     }
+                    if let Some(sheet) = effective.get_mut("character_sheet").and_then(Value::as_object_mut) {
+                        sheet.remove("character_description");
+                        sheet.remove("clothing_description");
+                    }
                     tx.send_modify(|v| {
                         let item = if batch { &mut v["items"][index] } else { v };
                         item["parameters"] = effective;

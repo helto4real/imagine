@@ -1,0 +1,23 @@
+{
+  "parent_source_lock_sha256": "b8fe6de89cc13c92df5471fe274ebe2ac854692bd13345f177b2578646dcba10",
+  "patch_sha256": "fee639b419d88f3551618442d9d2f3244731b6ac9bb9ccaedc4279cbc5b0daa3",
+  "files": {
+    "src/core/ggml_runner.cpp": {
+      "before": "037434a10829567a65c1ceb8b2d7506cc16b5b66a28ac46199f6f188731b17c8",
+      "after": "f0f3a8d78ac97077fd01f900f8ccbb553647e24ddb57b4f4b4073388be8b27fe"
+    },
+    "src/core/ggml_runner.h": {
+      "before": "d392fc66fc445ef0d4cd8b7d0d4b34dc2554ed2d1f57b780c5e201636a69a302",
+      "after": "a4ab068528995764b2a78afea9c3e762a964f663932147978b45a937e527d2b9"
+    },
+    "src/core/runner_cache.cpp": {
+      "before": "f23fc0d9e5c9c5567b610201d37ed340c52ad94b0456b54d903a6a85180b019d",
+      "after": "4efafbe986f415414906ee7ad6af17a50177f84f330004d3d104faf1c02391f7"
+    },
+    "src/core/runner_cache.h": {
+      "before": "44990122eea4a38045d5af08e2d7727c2e67b451b1b3dc8e5d7460ab2d99ec80",
+      "after": "e81c30887ece00cac055add7371397e874bd68f0b146e1795e859e6de395a248"
+    }
+  },
+  "candidate_binary_sha256": "b3188ab2dee7297f4a9060dea2155dcdc7206c0a7e1031c5fdf25e21e810615c"
+}

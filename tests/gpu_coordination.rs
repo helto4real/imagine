@@ -5,7 +5,7 @@ use axum::{
 use imagine_server::{
     api::{self, App},
     config::Access,
-    contract::{JobRequest, MODEL},
+    contract::MODEL,
     engine::{Backend, EngineFuture, EngineState},
     scheduler::{self, Action},
     storage::Store,
@@ -35,9 +35,7 @@ struct Engine(Arc<Probe>);
 impl Backend for Engine {
     fn generate<'a>(
         &'a mut self,
-        _: &'a JobRequest,
-        _: &'a str,
-        _: &'a Store,
+        _: &'a imagine_server::generation::ImagePass,
     ) -> EngineFuture<'a, Vec<u8>> {
         Box::pin(async move {
             assert!(!self.0.llm.load(Ordering::SeqCst), "LLM overlapped Imagine");

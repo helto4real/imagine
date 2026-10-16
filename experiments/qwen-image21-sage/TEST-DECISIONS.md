@@ -207,3 +207,45 @@ improved 4096 residency. Same-grid exactness supports outer tiling as the cause
 of the earlier auto-grid pixel difference for this workload. Do not repeat
 this as an untested hypothesis. No fixed outer tile setting is adopted into
 v2 defaults. See [VAE-FIXED-TILES-4096](profiling/VAE-FIXED-TILES-4096.md).
+
+## Reference-cache acceptance (2026-10-16)
+
+The separate RAM/hybrid/prefetch candidate passed image equality and live API
+cancellation/recovery. An ordinary three-reference image improved from 205.457
+to 57.331 s with identical PNG bytes. However, the reference sheet at CFG 1
+regressed from 41.271 to 46.025 s: hybrid reserved two branches and streamed
+cache unnecessarily for a single computed branch. **Do not promote yet; v2
+remains the default.** See [acceptance report](../../native/reference-cache/ACCEPTANCE.md)
+for scope, preserved controls and the proposed branch-aware follow-up. That
+proposal is not authorization to implement or run it.
+
+
+## 2026-10-16 — corrected reference-cache budget accepted
+
+Supersedes the CFG 1 promotion block above. Counting the actual guidance
+branches was insufficient (43.667 vs 39.888 s); the runner now also rechecks
+cache capacity once against the smaller steady reuse graph. It promotes the
+remaining host cache only when the entire cache fits, preserving model,
+workspace, staging and safety reserves. Rejected promotion retains the warm
+workspace and existing hybrid placement.
+
+Final CFG 1: 39.620 s vs v2 39.888 s, identical PNGs. CFG 2.5: 80.843 s with
+all pinned PNG hashes matching; zero steady weight loads and 78 turnaround
+prefetch forwards. Three-reference ordinary-image sampling: 45.836 s vs prior
+prefetch 45.394 s, identical PNG. Cancellation while prefetch was active and
+immediate recovery passed; recovery completed in 81.393 s.
+
+Intermittent low automatic startup limits produced all-RAM/synchronous fallback
+in separate trials. Waiting for process exit alone did not eliminate that
+variation. Final cancellation/multi-reference benchmarks also stabilized free
+GPU memory before native launch; that test-only wait is included in their raw
+totals and is not a production memory requirement. Native auto limits remain
+unchanged; individual measurements do not establish guarantees under competing
+GPU allocations. See the full evidence and limitations in
+[native/reference-cache/ACCEPTANCE-REUSE.md](../../native/reference-cache/ACCEPTANCE-REUSE.md).
+
+Enable the verified reference executable for all actual Qwen Image 2.1
+reference passes, independent of public operation. Keep v2 for text-only,
+explicit `IMAGINE_QWEN_REFERENCE_CACHE=off`, and missing/hash-mismatched candidate
+fallback. Other model families and Turbo keep their existing selection.
+Frozen v1/v2, base publication patches and workflow compatibility remain intact.

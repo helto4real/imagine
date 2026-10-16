@@ -1,8 +1,8 @@
 use imagine_server::{
     api::{self, App},
     config::Access,
-    contract::JobRequest,
     engine::{Backend, EngineFuture, EngineState},
+    generation::ImagePass,
     scheduler::{self, Action},
     storage::Store,
 };
@@ -25,7 +25,7 @@ use tokio::sync::{Semaphore, watch};
 struct Fake {
     state: watch::Sender<EngineState>,
     calls: Arc<AtomicUsize>,
-    requests: Arc<Mutex<Vec<JobRequest>>>,
+    requests: Arc<Mutex<Vec<ImagePass>>>,
     block_folder: Arc<Mutex<Option<PathBuf>>>,
 }
 fn png() -> Vec<u8> {
@@ -43,12 +43,7 @@ impl Backend for Fake {
             ..Default::default()
         });
     }
-    fn generate<'a>(
-        &'a mut self,
-        req: &'a JobRequest,
-        _: &'a str,
-        _: &'a Store,
-    ) -> EngineFuture<'a, Vec<u8>> {
+    fn generate<'a>(&'a mut self, req: &'a ImagePass) -> EngineFuture<'a, Vec<u8>> {
         Box::pin(async move {
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.requests.lock().unwrap().push(req.clone());

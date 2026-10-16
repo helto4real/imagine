@@ -1,0 +1,27 @@
+{
+  "parent_source_lock_sha256": "7486c03a1cc12a4149cdc30a4abca76bdcdbe1db91faae0089e791bcdd7ed8a8",
+  "patch_sha256": "198b9b5a731b344f55fd8de0e752ceb058a0f6f7985772d6cefe044ad7849803",
+  "files": {
+    "src/core/cache_prefetch.h": {
+      "before": null,
+      "after": "5ccf76f39ae6d2e605345a81231f0989bb2ffd27fd4642cc4c3f75293bc69adc"
+    },
+    "src/core/cache_prefetch.cpp": {
+      "before": null,
+      "after": "3e0b4200b611bfe1d85daef7d85b8b6d2a5648c5d7cb82fbe44d8bb212aaf3eb"
+    },
+    "src/core/ggml_runner.h": {
+      "before": "6cc3f0665cfc295d50079a56e16dc2dcc07dc6c7a1d2aa45d5d45bc023adb900",
+      "after": "d392fc66fc445ef0d4cd8b7d0d4b34dc2554ed2d1f57b780c5e201636a69a302"
+    },
+    "src/core/ggml_runner.cpp": {
+      "before": "ef0aaa41c455103ac7ecd3b6e5917976452ec6d1a9c1cc50f3c77a6b99c6ba0d",
+      "after": "037434a10829567a65c1ceb8b2d7506cc16b5b66a28ac46199f6f188731b17c8"
+    },
+    "src/model/diffusion/qwen_image_2_1.hpp": {
+      "before": "cba35efe1d06ddddf48a4ab707dd786567ce31428412d61e9f7bef2e3a013d79",
+      "after": "6873b9d9662a5745c3c24aa89f1f2b59de3c38d33b2c2df88f9f64bbe8b8e78c"
+    }
+  },
+  "candidate_binary_sha256": "19545cb052e9248d8d0076874a06acc45308b4253ba1f6f274388721f72032bd"
+}

@@ -124,3 +124,11 @@ use the selected profile. MCP asks Imagine to validate every request before
 starting the batch; Imagine repeats authoritative validation at admission.
 MCP keeps its process-owned jobs, retry handling, private reference storage,
 FIFO coordination and local result files.
+
+## Character sheets
+
+`qwen-character-sheet` selects the two-pass Qwen character-sheet operation.
+It accepts structured identity/clothing descriptions and up to eight identity
+references, and returns a composed sheet, portrait and turnaround. See
+[the character-sheet API](../docs/CHARACTER-SHEETS.md) for layout, pose-guide,
+result and live-validation boundaries.

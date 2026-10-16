@@ -1,8 +1,8 @@
 use crate::{
     config::{Config, baseline_dir},
-    contract::JobRequest,
+    generation::ImagePass,
     progress::{SamplingProgress, read_steps},
-    storage::{Store, hash},
+    storage::hash,
 };
 use anyhow::{Context, Result, bail};
 use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -25,12 +25,8 @@ impl std::error::Error for EngineError {}
 
 pub type EngineFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T>> + Send + 'a>>;
 pub trait Backend: Send {
-    fn generate<'a>(
-        &'a mut self,
-        request: &'a JobRequest,
-        owner: &'a str,
-        store: &'a Store,
-    ) -> EngineFuture<'a, Vec<u8>>;
+    fn generate<'a>(&'a mut self, request: &'a ImagePass) -> EngineFuture<'a, Vec<u8>>;
+    fn stage(&mut self, _stage: Option<&str>) {}
     fn mark_idle(&mut self) {}
     fn begin_job(&mut self, _id: &str) {}
     fn stop(&mut self) -> EngineFuture<'_, ()>;
@@ -38,6 +34,8 @@ pub trait Backend: Send {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EngineState {
     pub phase: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stage: Option<String>,
     pub pid: Option<u32>,
     pub job_id: Option<String>,
     pub progress: Option<SamplingProgress>,
@@ -52,6 +50,52 @@ pub struct Native {
     state: watch::Sender<EngineState>,
     output_reader: Option<tokio::task::JoinHandle<()>>,
     loaded_weights: Option<String>,
+    loaded_profile: Option<NativeProfile>,
+}
+// Selection belongs to inference passes, independent of the public operation.
+// Other model families keep their own native profile until separately validated.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NativeProfile {
+    Frozen,
+    ReferenceCache,
+    Workflow,
+}
+impl NativeProfile {
+    fn for_pass(request: &ImagePass, cache_enabled: bool) -> Self {
+        match request.model.as_str() {
+            crate::contract::TURBO => Self::Workflow,
+            crate::contract::MODEL if cache_enabled && !request.references.is_empty() => {
+                Self::ReferenceCache
+            }
+            _ => Self::Frozen,
+        }
+    }
+}
+fn reference_cache_enabled(value: Option<&str>) -> Result<bool> {
+    match value {
+        None | Some("auto") => Ok(true),
+        Some("off") => Ok(false),
+        _ => bail!(EngineError("invalid_reference_cache_mode")),
+    }
+}
+async fn reference_cache_binary(project: &std::path::Path) -> Option<std::path::PathBuf> {
+    let lock: Value = serde_json::from_str(include_str!(
+        "../native/reference-cache/reuse-budget-source-lock.json"
+    ))
+    .expect("reference cache source lock");
+    let expected = lock["candidate_binary_sha256"]
+        .as_str()
+        .expect("reference cache binary hash");
+    let binary = project.join("native/reference-cache/bin/sd-server");
+    match tokio::fs::read(&binary).await {
+        Ok(bytes) if hash(&bytes) == expected => Some(binary),
+        _ => {
+            // Never launch an absent or unverified cache executable. The frozen
+            // binary is verified independently before reaching this selection.
+            eprintln!("Qwen reference cache unavailable or hash mismatch; using frozen v2");
+            None
+        }
+    }
 }
 impl Native {
     pub fn new(config: Config, state: watch::Sender<EngineState>) -> Result<Self> {
@@ -66,6 +110,7 @@ impl Native {
             state,
             output_reader: None,
             loaded_weights: None,
+            loaded_profile: None,
         })
     }
     fn phase(&self, phase: &str) {
@@ -75,15 +120,24 @@ impl Native {
             state.progress = None;
         });
     }
-    async fn ready(&mut self, request: &JobRequest) -> Result<()> {
+    async fn ready(&mut self, request: &ImagePass) -> Result<()> {
+        let cache_enabled = reference_cache_enabled(
+            std::env::var("IMAGINE_QWEN_REFERENCE_CACHE")
+                .ok()
+                .as_deref(),
+        )?;
+        let profile = NativeProfile::for_pass(request, cache_enabled);
         let workflow = request.model_options.qwen_image_2_1.workflow.as_ref();
         let weights = workflow
             .map(|w| serde_json::json!([w.diffusion_model, w.text_encoder, w.vae]).to_string())
             .unwrap_or_default();
         if self
-            .loaded_weights
-            .as_ref()
-            .is_some_and(|current| current != &weights)
+            .loaded_profile
+            .is_some_and(|current| current != profile)
+            || self
+                .loaded_weights
+                .as_ref()
+                .is_some_and(|current| current != &weights)
         {
             self.stop().await?;
         }
@@ -116,7 +170,15 @@ impl Native {
         {
             bail!(EngineError("frozen_binary_hash_mismatch"));
         }
-        if request.model == crate::contract::TURBO {
+        let reference_cache = if profile == NativeProfile::ReferenceCache {
+            reference_cache_binary(&self.config.project).await
+        } else {
+            None
+        };
+        if let Some(path) = &reference_cache {
+            binary = path.clone();
+        }
+        if profile == NativeProfile::Workflow {
             let compatibility: Value = serde_json::from_slice(
                 &tokio::fs::read(
                     self.config
@@ -175,6 +237,12 @@ impl Native {
                 bail!(EngineError("model_weights_missing"));
             }
             command.arg(key).arg(path);
+        }
+        if reference_cache.is_some() {
+            command.args([
+                "--model-args",
+                "qwen_image_2_1_prefix_cache_device=hybrid,qwen_image_2_1_prefix_cache_prefetch=true",
+            ]);
         }
         if workflow.is_some() {
             command
@@ -264,6 +332,7 @@ impl Native {
             .await;
         }));
         self.loaded_weights = Some(weights);
+        self.loaded_profile = Some(profile);
         self.base = format!("http://127.0.0.1:{port}");
         self.phase("loading_model");
         let deadline = tokio::time::Instant::now() + Duration::from_secs(300);
@@ -286,41 +355,12 @@ impl Native {
             tokio::time::sleep(Duration::from_millis(200)).await;
         }
     }
-    async fn run(&mut self, req: &JobRequest, owner: &str, store: &Store) -> Result<Vec<u8>> {
+    async fn run(&mut self, req: &ImagePass) -> Result<Vec<u8>> {
         self.state
             .send_modify(|state| state.requested_steps = req.sampling.steps);
         self.ready(req).await?;
         self.phase("preparing_inputs");
-        let mut refs = Vec::new();
-        for id in &req.inputs.reference_images {
-            let bytes = store.read_asset(id, owner).await?;
-            let bytes = crate::workflow_image::prepare(
-                &bytes,
-                req.model_options
-                    .qwen_image_2_1
-                    .reference_max_pixels_per_image,
-            )?;
-            refs.push(STANDARD.encode(bytes));
-        }
-        let mut body = json!({"prompt":req.prompt,"negative_prompt":req.negative_prompt,"width":req.width,"height":req.height,
-            "seed":req.seed.context("resolved seed")?,"batch_count":1,"sample_params":{"sample_method":req.sampling.sampler,
-            "scheduler":req.sampling.scheduler,"sample_steps":req.sampling.steps,"guidance":{"txt_cfg":req.sampling.cfg_scale}},
-            "preview":"none","output_format":"png","embed_image_metadata":false});
-        if !req.sampling.custom_sigmas.is_empty() {
-            body["sample_params"]["custom_sigmas"] = json!(req.sampling.custom_sigmas);
-        }
-        if let Some(w) = &req.model_options.qwen_image_2_1.workflow {
-            body["lora"] = json!(
-                w.loras
-                    .iter()
-                    .map(|l| json!({"path":l.path,"multiplier":l.strength}))
-                    .collect::<Vec<_>>()
-            );
-        }
-        if !refs.is_empty() {
-            body["ref_images"] = json!(refs);
-            body["ref_image_args"] = json!("resize_before_vae=false");
-        }
+        let body = native_body(req)?;
         self.phase("inference");
         let response: Value = self
             .http
@@ -363,9 +403,7 @@ impl Native {
                             || w.brightness_strength > 0.
                             || w.contrast_strength > 0.)
                     {
-                        let reference = store
-                            .read_asset(&req.inputs.reference_images[0], owner)
-                            .await?;
+                        let reference = req.references.first().context("colour reference")?.clone();
                         let (chroma, brightness, contrast) = (
                             w.color_match_strength,
                             w.brightness_strength,
@@ -389,30 +427,38 @@ impl Native {
     }
 }
 impl Backend for Native {
+    fn stage(&mut self, stage: Option<&str>) {
+        self.state.send_modify(|state| {
+            state.stage = stage.map(str::to_owned);
+            state.progress = None;
+        });
+        if stage == Some("compose") {
+            self.phase("composing");
+        }
+    }
     fn begin_job(&mut self, id: &str) {
         self.state.send_modify(|state| {
             state.job_id = Some(id.into());
+            state.stage = None;
             state.phase = "preparing".into();
             state.progress = None;
             state.requested_steps = 0;
         });
     }
     fn mark_idle(&mut self) {
-        self.state.send_modify(|state| state.job_id = None);
+        self.state.send_modify(|state| {
+            state.job_id = None;
+            state.stage = None;
+        });
         self.phase(if self.child.is_some() {
             "ready"
         } else {
             "unloaded"
         });
     }
-    fn generate<'a>(
-        &'a mut self,
-        r: &'a JobRequest,
-        o: &'a str,
-        s: &'a Store,
-    ) -> EngineFuture<'a, Vec<u8>> {
+    fn generate<'a>(&'a mut self, r: &'a ImagePass) -> EngineFuture<'a, Vec<u8>> {
         Box::pin(async move {
-            tokio::time::timeout(Duration::from_secs(3600), self.run(r, o, s))
+            tokio::time::timeout(Duration::from_secs(3600), self.run(r))
                 .await
                 .context(EngineError("generation_timeout"))?
         })
@@ -432,6 +478,39 @@ impl Backend for Native {
             Ok(())
         })
     }
+}
+
+fn native_body(req: &ImagePass) -> Result<Value> {
+    let mut refs = Vec::new();
+    for bytes in &req.references {
+        let bytes = crate::workflow_image::prepare(
+            bytes,
+            req.model_options
+                .qwen_image_2_1
+                .reference_max_pixels_per_image,
+        )?;
+        refs.push(STANDARD.encode(bytes));
+    }
+    let mut body = json!({"prompt":req.prompt,"negative_prompt":req.negative_prompt,"width":req.width,"height":req.height,
+            "seed":req.seed,"batch_count":1,"sample_params":{"sample_method":req.sampling.sampler,
+            "scheduler":req.sampling.scheduler,"sample_steps":req.sampling.steps,"guidance":{"txt_cfg":req.sampling.cfg_scale}},
+            "preview":"none","output_format":"png","embed_image_metadata":false});
+    if !req.sampling.custom_sigmas.is_empty() {
+        body["sample_params"]["custom_sigmas"] = json!(req.sampling.custom_sigmas);
+    }
+    if let Some(w) = &req.model_options.qwen_image_2_1.workflow {
+        body["lora"] = json!(
+            w.loras
+                .iter()
+                .map(|l| json!({"path":l.path,"multiplier":l.strength}))
+                .collect::<Vec<_>>()
+        );
+    }
+    if !refs.is_empty() {
+        body["ref_images"] = json!(refs);
+        body["ref_image_args"] = json!("resize_before_vae=false");
+    }
+    Ok(body)
 }
 
 fn update_progress(state: &mut EngineState, step: u32, total: u32, seconds: f64) -> bool {
@@ -471,6 +550,147 @@ fn update_progress(state: &mut EngineState, step: u32, total: u32, seconds: f64)
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn synthetic_pass(reference_count: usize) -> ImagePass {
+        ImagePass {
+            model: crate::contract::MODEL.into(),
+            model_options: Default::default(),
+            sampling: Default::default(),
+            prompt: "synthetic".into(),
+            negative_prompt: String::new(),
+            width: 1600,
+            height: 896,
+            seed: 42,
+            references: (0..reference_count).map(|_| vec![0u8].into()).collect(),
+        }
+    }
+    #[test]
+    fn reference_cache_selection_uses_model_and_actual_pass_inputs() {
+        assert!(reference_cache_enabled(None).unwrap());
+        assert!(reference_cache_enabled(Some("auto")).unwrap());
+        assert!(!reference_cache_enabled(Some("off")).unwrap());
+        assert!(reference_cache_enabled(Some("typo")).is_err());
+        assert_eq!(
+            NativeProfile::for_pass(&synthetic_pass(0), true),
+            NativeProfile::Frozen
+        );
+        for count in [1, 3, 10] {
+            let mut pass = synthetic_pass(count);
+            assert_eq!(
+                NativeProfile::for_pass(&pass, true),
+                NativeProfile::ReferenceCache
+            );
+            assert_eq!(NativeProfile::for_pass(&pass, false), NativeProfile::Frozen);
+            pass.model = crate::contract::TURBO.into();
+            assert_eq!(
+                NativeProfile::for_pass(&pass, true),
+                NativeProfile::Workflow
+            );
+            pass.model = "future-model".into();
+            assert_eq!(NativeProfile::for_pass(&pass, true), NativeProfile::Frozen);
+        }
+    }
+    #[tokio::test]
+    async fn absent_or_unverified_reference_executable_falls_back() {
+        let root = tempfile::tempdir().unwrap();
+        assert!(reference_cache_binary(root.path()).await.is_none());
+        let binary = root.path().join("native/reference-cache/bin/sd-server");
+        std::fs::create_dir_all(binary.parent().unwrap()).unwrap();
+        std::fs::write(binary, b"not the accepted binary").unwrap();
+        assert!(reference_cache_binary(root.path()).await.is_none());
+    }
+    #[tokio::test]
+    async fn changing_reference_profile_stops_the_previous_native_process() {
+        // A harmless child exercises the actual reuse/stop path without a GPU.
+        for (loaded, count) in [
+            (NativeProfile::Frozen, 1),
+            (NativeProfile::ReferenceCache, 0),
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let (config, _lock) = Config::load(
+                root.path().into(),
+                root.path().join("data"),
+                "127.0.0.1:0".parse().unwrap(),
+            )
+            .unwrap();
+            let (state, _) = watch::channel(EngineState::default());
+            let mut native = Native::new(config, state).unwrap();
+            native.child = Some(
+                Command::new("sleep")
+                    .arg("60")
+                    .kill_on_drop(true)
+                    .spawn()
+                    .unwrap(),
+            );
+            native.loaded_profile = Some(loaded);
+            native.loaded_weights = Some(String::new());
+            // Same profile keeps the running process, even without model files.
+            let current_count = if loaded == NativeProfile::Frozen {
+                0
+            } else {
+                1
+            };
+            native.ready(&synthetic_pass(current_count)).await.unwrap();
+            assert!(native.child.is_some());
+            // Switching must kill/wait before trying to verify the new profile.
+            assert!(native.ready(&synthetic_pass(count)).await.is_err());
+            assert!(native.child.is_none());
+        }
+    }
+    #[test]
+    fn native_pass_prepares_every_reference_in_order_without_touching_output_size() {
+        use crate::contract::{ModelOptions, Sampling};
+        let references = [
+            ([255, 0, 0], (96, 64)),
+            ([0, 255, 0], (224, 288)),
+            ([0, 0, 255], (288, 288)),
+        ]
+        .into_iter()
+        .map(|(color, (w, h))| {
+            crate::workflow_image::encode(&image::DynamicImage::ImageRgb8(
+                image::RgbImage::from_pixel(w, h, image::Rgb(color)),
+            ))
+            .unwrap()
+            .into()
+        })
+        .collect();
+        let mut options = ModelOptions::default();
+        options.qwen_image_2_1.reference_max_pixels_per_image = 4096;
+        let pass = ImagePass {
+            model: crate::contract::MODEL.into(),
+            model_options: options,
+            sampling: Sampling::default(),
+            prompt: "synthetic".into(),
+            negative_prompt: "synthetic negative".into(),
+            width: 288,
+            height: 288,
+            seed: 43,
+            references,
+        };
+        let body = native_body(&pass).unwrap();
+        assert_eq!(body["width"], 288);
+        assert_eq!(body["seed"], 43);
+        assert_eq!(body["ref_image_args"], "resize_before_vae=false");
+        assert_eq!(body["embed_image_metadata"], false);
+        for (encoded, color) in body["ref_images"].as_array().unwrap().iter().zip([
+            [255, 0, 0],
+            [0, 255, 0],
+            [0, 0, 255],
+        ]) {
+            let bytes = STANDARD.decode(encoded.as_str().unwrap()).unwrap();
+            let image = image::load_from_memory(&bytes).unwrap().to_rgb8();
+            assert_eq!(image.width() % 32, 0);
+            assert_eq!(image.height() % 32, 0);
+            assert!(image.width() * image.height() <= 4096);
+            assert_eq!(image.get_pixel(0, 0).0, color);
+        }
+        // The original portrait remains full resolution for the compositor.
+        assert_eq!(
+            image::load_from_memory(&pass.references[1])
+                .unwrap()
+                .width(),
+            224
+        );
+    }
     #[test]
     fn counts_real_steps_and_estimates_only_sampling() {
         let mut state = EngineState {

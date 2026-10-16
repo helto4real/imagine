@@ -253,6 +253,7 @@ async fn job_snapshot(app: &App, id: &str, owner: &str) -> Result<Value, Fault> 
         && state.job_id.as_deref() == Some(id)
     {
         value["phase"] = json!(state.phase);
+        value["stage"] = json!(state.stage);
         value["progress"] = json!(state.progress);
     }
     Ok(value)
@@ -376,15 +377,18 @@ async fn validate_job(
 ) -> Result<Json<Value>, Fault> {
     let Json(value) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
     let request = app.profiles.resolve(value, &app.store, &p.owner).await?;
-    for id in &request.inputs.reference_images {
-        if app.store.asset(id, &p.owner).await?.is_none() {
-            return Err(Fault::new(404, "asset_not_found"));
-        }
-    }
+    crate::generation::reference_metadata(&request, &p.owner, &app.store).await?;
     let mut effective = request.effective();
     // Validation is safe to expose in MCP results; prompt text stays private.
     for key in ["prompt", "negative_prompt", "client_metadata"] {
         effective.as_object_mut().unwrap().remove(key);
+    }
+    if let Some(sheet) = effective
+        .get_mut("character_sheet")
+        .and_then(Value::as_object_mut)
+    {
+        sheet.remove("character_description");
+        sheet.remove("clothing_description");
     }
     Ok(Json(json!({"valid":true,"effective":effective})))
 }

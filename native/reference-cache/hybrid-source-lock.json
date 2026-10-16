@@ -1,0 +1,23 @@
+{
+  "parent_source_lock_sha256": "e1ced7de6b2de47fe3b6d906f3073b2149fd5f2c05b032f17bfc044468c9bc8c",
+  "patch_sha256": "e8398c591c9cbf649f0062a1f040ad2754402f0ca1dd8d60fe5179a53a5131a0",
+  "files": {
+    "src/core/runner_cache.h": {
+      "before": "d26489964ccfc7399e4c7b91e3470df3395e0f003216c924b3513aa2f3f26a71",
+      "after": "44990122eea4a38045d5af08e2d7727c2e67b451b1b3dc8e5d7460ab2d99ec80"
+    },
+    "src/core/runner_cache.cpp": {
+      "before": "8d95e3650eb0faeb5132f5366668573bbfe98de1d8094b75b3c11aef77dd9c18",
+      "after": "f23fc0d9e5c9c5567b610201d37ed340c52ad94b0456b54d903a6a85180b019d"
+    },
+    "src/core/ggml_runner.cpp": {
+      "before": "cb4dce23e9fb84c4162c338258ca525db0dd3bd6eb01c05f8a0b1ca6ac479c71",
+      "after": "ef0aaa41c455103ac7ecd3b6e5917976452ec6d1a9c1cc50f3c77a6b99c6ba0d"
+    },
+    "src/model/diffusion/qwen_image_2_1.hpp": {
+      "before": "2d9ab626c5a9ab25c72e62e947a16c6aac50e317cb8d559a69184e2776aa86d0",
+      "after": "cba35efe1d06ddddf48a4ab707dd786567ce31428412d61e9f7bef2e3a013d79"
+    }
+  },
+  "candidate_binary_sha256": "c5ebf39f7d1a9f68f1621e157ac43f03d0e92f1d5816a41a6592c4c1b60a10eb"
+}

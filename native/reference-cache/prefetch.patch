@@ -1,0 +1,439 @@
+--- /dev/null
++++ b/src/core/cache_prefetch.h
+@@ -0,0 +1,62 @@
++#ifndef __SD_CORE_CACHE_PREFETCH_H__
++#define __SD_CORE_CACHE_PREFETCH_H__
++
++#include <array>
++#include <functional>
++#include <map>
++#include <vector>
++
++#include "ggml-backend.h"
++
++namespace sd::ggml_graph_cut {
++    struct Plan;
++}
++
++namespace sd {
++    class CachePrefetch {
++        struct Slot {
++            ggml_backend_buffer_t buffer  = nullptr;
++            ggml_backend_event_t ready    = nullptr;
++            ggml_backend_event_t consumed = nullptr;
++            bool used                     = false;
++        };
++        struct Input {
++            ggml_tensor* target;
++            ggml_tensor* source;
++            size_t offset;
++        };
++        struct Group {
++            std::vector<Input> inputs;
++            size_t slot = 0;
++            bool queued = false;
++        };
++        ggml_backend_t compute_;
++        ggml_backend_t transfer_ = nullptr;
++        std::array<Slot, 2> slots_;
++        std::map<ggml_tensor*, ggml_tensor*> inputs_;
++        std::vector<Group> groups_;
++        bool active_              = false;
++        size_t transferred_bytes_ = 0;
++        size_t queued_groups_     = 0;
++
++        void enqueue(size_t index);
++
++    public:
++        explicit CachePrefetch(ggml_backend_t compute) : compute_(compute) {}
++        ~CachePrefetch();
++        CachePrefetch(const CachePrefetch&)            = delete;
++        CachePrefetch& operator=(const CachePrefetch&) = delete;
++
++        void add_input(ggml_tensor* target, ggml_tensor* source);
++        bool empty() const { return inputs_.empty(); }
++        bool contains(ggml_tensor* tensor) const { return active_ && inputs_.count(tensor); }
++        size_t bytes() const;
++        bool prepare(ggml_cgraph* graph, const ggml_graph_cut::Plan& plan, const std::function<bool(size_t)>& admit);
++        void before_segment(size_t index);
++        void after_segment(size_t index);
++        void graph_end();
++        void clear();
++    };
++}
++
++#endif  // __SD_CORE_CACHE_PREFETCH_H__
+--- /dev/null
++++ b/src/core/cache_prefetch.cpp
+@@ -0,0 +1,206 @@
++#include "core/cache_prefetch.h"
++
++#include <algorithm>
++#include <unordered_set>
++
++#include "core/ggml_extend_backend.h"
++#include "core/ggml_graph_cut.h"
++#include "core/util.h"
++
++namespace sd {
++    CachePrefetch::~CachePrefetch() {
++        clear();
++    }
++
++    void CachePrefetch::add_input(ggml_tensor* target, ggml_tensor* source) {
++        GGML_ASSERT(!active_ && source != nullptr && ggml_is_contiguous(source));
++        inputs_[target] = source;
++    }
++
++    size_t CachePrefetch::bytes() const {
++        size_t size = 0;
++        for (const auto& slot : slots_) {
++            if (slot.buffer != nullptr) {
++                size += ggml_backend_buffer_get_size(slot.buffer);
++            }
++        }
++        return size;
++    }
++
++    bool CachePrefetch::prepare(ggml_cgraph* graph, const ggml_graph_cut::Plan& plan, const std::function<bool(size_t)>& admit) {
++        GGML_ASSERT(!active_);
++        if (inputs_.empty() || !sd_backend_is(compute_, "CUDA")) {
++            return false;
++        }
++        auto device = ggml_backend_get_device(compute_);
++        ggml_backend_dev_props props{};
++        ggml_backend_dev_get_props(device, &props);
++        if (!props.caps.async || !props.caps.events) {
++            return false;
++        }
++        auto buft              = ggml_backend_get_default_buffer_type(compute_);
++        const size_t alignment = ggml_backend_buft_get_alignment(buft);
++        size_t peak = 0, group_count = 0;
++        std::unordered_set<ggml_tensor*> seen;
++        groups_.resize(plan.segments.size());
++        for (size_t i = 0; i < plan.segments.size(); ++i) {
++            auto& group   = groups_[i];
++            size_t offset = 0;
++            for (const auto& ref : plan.segments[i].input_refs) {
++                auto target = ggml_graph_cut::input_tensor(graph, ref);
++                auto input  = inputs_.find(target);
++                if (input == inputs_.end()) {
++                    continue;
++                }
++                // A staging alias may only live within one segment.
++                if (!seen.insert(target).second) {
++                    return false;
++                }
++                group.inputs.push_back({target, input->second, offset});
++                const size_t size = GGML_PAD(ggml_backend_buft_get_alloc_size(buft, target), alignment);
++                if (size > SIZE_MAX - offset) {
++                    return false;
++                }
++                offset += size;
++            }
++            if (!group.inputs.empty()) {
++                group.slot = group_count++ % slots_.size();
++                peak       = std::max(peak, offset);
++            }
++        }
++        if (seen.size() != inputs_.size() || peak == 0 || peak > SIZE_MAX / slots_.size()) {
++            return false;
++        }
++        if (transfer_ == nullptr) {
++            transfer_ = ggml_backend_dev_init(device, nullptr);
++            if (transfer_ == nullptr) {
++                return false;
++            }
++            for (auto& slot : slots_) {
++                slot.ready    = ggml_backend_event_new(device);
++                slot.consumed = ggml_backend_event_new(device);
++                if (slot.ready == nullptr || slot.consumed == nullptr) {
++                    clear();
++                    return false;
++                }
++            }
++        }
++        const bool grows = std::any_of(slots_.begin(), slots_.end(), [&](const Slot& slot) {
++            return slot.buffer == nullptr || ggml_backend_buffer_get_size(slot.buffer) < peak;
++        });
++        if (grows) {
++            // No graph is active at resize; finish both streams before releasing aliases.
++            ggml_backend_synchronize(compute_);
++            ggml_backend_synchronize(transfer_);
++            for (auto& slot : slots_) {
++                ggml_backend_buffer_free(slot.buffer);
++                slot.buffer = nullptr;
++            }
++            if (!admit(peak * slots_.size())) {
++                return false;
++            }
++            for (auto& slot : slots_) {
++                slot.buffer = ggml_backend_alloc_buffer(compute_, peak);
++                if (slot.buffer == nullptr) {
++                    clear();
++                    return false;
++                }
++            }
++        }
++        for (auto& group : groups_) {
++            auto& slot = slots_[group.slot];
++            for (auto& input : group.inputs) {
++                const auto address = static_cast<char*>(ggml_backend_buffer_get_base(slot.buffer)) + input.offset;
++                if (ggml_backend_tensor_alloc(slot.buffer, input.target, address) != GGML_STATUS_SUCCESS) {
++                    clear();
++                    return false;
++                }
++            }
++        }
++        active_ = true;
++        return true;
++    }
++
++    void CachePrefetch::enqueue(size_t index) {
++        auto& group = groups_[index];
++        if (group.inputs.empty() || group.queued) {
++            return;
++        }
++        auto& slot = slots_[group.slot];
++        if (slot.used) {
++            ggml_backend_event_wait(transfer_, slot.consumed);
++        }
++        for (const auto& input : group.inputs) {
++            ggml_backend_tensor_set_async(transfer_, input.target, input.source->data, 0, ggml_nbytes(input.source));
++            transferred_bytes_ += ggml_nbytes(input.source);
++        }
++        ggml_backend_event_record(slot.ready, transfer_);
++        group.queued = true;
++        ++queued_groups_;
++    }
++
++    void CachePrefetch::before_segment(size_t index) {
++        if (!active_) {
++            return;
++        }
++        auto& group = groups_[index];
++        if (!group.inputs.empty()) {
++            enqueue(index);
++            ggml_backend_event_wait(compute_, slots_[group.slot].ready);
++        }
++        for (size_t next = index + 1; next < groups_.size(); ++next) {
++            if (!groups_[next].inputs.empty()) {
++                enqueue(next);
++                break;
++            }
++        }
++    }
++
++    void CachePrefetch::after_segment(size_t index) {
++        if (active_ && !groups_[index].inputs.empty()) {
++            auto& slot = slots_[groups_[index].slot];
++            ggml_backend_event_record(slot.consumed, compute_);
++            slot.used = true;
++        }
++    }
++
++    void CachePrefetch::graph_end() {
++        if (transfer_ != nullptr) {
++            // A failed/cancelled forward may leave the next host copy in flight.
++            ggml_backend_synchronize(compute_);
++            ggml_backend_synchronize(transfer_);
++        }
++        if (active_) {
++            LOG_DEBUG("reference cache prefetch: %zu groups, %.2f MiB copied, %.2f MiB staging",
++                      queued_groups_, transferred_bytes_ / (1024.0 * 1024.0), bytes() / (1024.0 * 1024.0));
++        }
++        for (const auto& input : inputs_) {
++            for (const auto& slot : slots_) {
++                if (slot.buffer != nullptr && input.first->buffer == slot.buffer) {
++                    input.first->buffer = nullptr;
++                    input.first->data   = nullptr;
++                    input.first->extra  = nullptr;
++                }
++            }
++        }
++        for (auto& slot : slots_) {
++            slot.used = false;
++        }
++        inputs_.clear();
++        groups_.clear();
++        active_            = false;
++        transferred_bytes_ = queued_groups_ = 0;
++    }
++
++    void CachePrefetch::clear() {
++        graph_end();
++        for (auto& slot : slots_) {
++            ggml_backend_buffer_free(slot.buffer);
++            ggml_backend_event_free(slot.ready);
++            ggml_backend_event_free(slot.consumed);
++            slot = {};
++        }
++        ggml_backend_free(transfer_);
++        transfer_ = nullptr;
++    }
++}
+--- a/src/core/ggml_runner.h
++++ b/src/core/ggml_runner.h
+@@ -12,6 +12,7 @@
+ #include <utility>
+ #include <vector>
+ 
++#include "core/cache_prefetch.h"
+ #include "core/compute_workspace.h"
+ #include "core/ggml_graph_cut.h"
+ #include "core/runner_cache.h"
+@@ -159,6 +160,8 @@
+     ggml_context* params_ctx = nullptr;
+ 
+     sd::RunnerCache cache_;
++    sd::CachePrefetch cache_prefetch_;
++    bool cache_prefetch_enabled_ = false;
+     sd::GraphCutTensorCache cut_cache_;
+     sd::ComputeWorkspace workspace_;
+     ggml_context* compute_ctx = nullptr;
+--- a/src/core/ggml_runner.cpp
++++ b/src/core/ggml_runner.cpp
+@@ -62,6 +62,7 @@
+ }
+ 
+ void GGMLRunner::free_compute_ctx() {
++    cache_prefetch_.graph_end();
+     debug_tensors.clear();
+     if (compute_ctx != nullptr) {
+         ggml_free(compute_ctx);
+@@ -241,6 +242,7 @@
+     backend      = backend == nullptr ? runtime_backend : backend;
+     size_t bytes = workspace_.bytes(backend);
+     if (backend == runtime_backend) {
++        bytes += cache_prefetch_.bytes();
+         const size_t cache_bytes = cache_.resident_bytes(ggml_backend_get_device(backend));
+         bytes                    = cache_bytes > SIZE_MAX - bytes ? SIZE_MAX : bytes + cache_bytes;
+         const size_t cut_bytes   = cut_cache_.resident_bytes(ggml_backend_get_device(backend));
+@@ -305,6 +307,9 @@
+     for (auto& kv : backend_tensor_data_map) {
+         auto tensor = kv.first;
+         auto data   = kv.second;
++        if (cache_prefetch_.contains(tensor)) {
++            continue;
++        }
+         if (tensor == nullptr || data == nullptr) {
+             continue;
+         }
+@@ -462,6 +467,7 @@
+     if (runner_started_) {
+         return true;
+     }
++    cache_prefetch_.clear();
+     cache_.clear();
+     workspace_.set_extra_backends(extra_runtime_backends);
+     if (auto manager = residency_manager.lock()) {
+@@ -490,6 +496,7 @@
+         return;
+     }
+     // Prefix tensors depend on this request's conditioning; only allocations and weights survive.
++    cache_prefetch_.clear();
+     cache_.clear();
+     if (auto manager = residency_manager.lock()) {
+         manager->clear_prefetched_params(reinterpret_cast<uintptr_t>(this));
+@@ -514,6 +521,7 @@
+         return;
+     }
+     workspace_.release();
++    cache_prefetch_.clear();
+     cache_.clear();
+     logged_compute_bytes_.clear();
+     logged_segment_count_ = 0;
+@@ -536,6 +544,7 @@
+                        std::shared_ptr<DeviceResidencyManager> manager)
+     : runtime_backend(backend),
+       cache_(backend),
++      cache_prefetch_(backend),
+       cut_cache_(backend),
+       workspace_(backend),
+       residency_manager(manager) {
+@@ -566,9 +575,14 @@
+     runner_ctx.debug_tensors         = &debug_tensors;
+     runner_ctx.get_cache_tensor      = [this](const std::string& name) {
+         auto tensor = this->get_cache_tensor_by_name(name);
+-        return tensor != nullptr && tensor->buffer != nullptr && ggml_backend_buffer_is_host(tensor->buffer)
+-                   ? to_backend(tensor)
+-                   : tensor;
++        if (tensor != nullptr && tensor->buffer != nullptr && ggml_backend_buffer_is_host(tensor->buffer)) {
++            auto input = to_backend(tensor);
++            if (cache_prefetch_enabled_ && input != tensor) {
++                cache_prefetch_.add_input(input, tensor);
++            }
++            return input;
++        }
++        return tensor;
+     };
+     runner_ctx.cache_tensor = [this, graph](const std::string& name, ggml_tensor* tensor) {
+         this->cache(name, tensor, graph);
+@@ -585,6 +599,7 @@
+ }
+ 
+ void GGMLRunner::free_cache_ctx_and_buffer() {
++    cache_prefetch_.clear();
+     cache_.clear();
+     sync_runtime_residency();
+ }
+@@ -914,6 +929,9 @@
+                     staging_bytes = std::max(staging_bytes, allocation_bytes(output.second));
+                 }
+                 staging_bytes = add_bytes(staging_bytes, staging_bytes);
++                if (cache_prefetch_enabled_) {
++                    staging_bytes = add_bytes(staging_bytes, staging_bytes);
++                }
+                 size_t peak   = 0;
+                 std::unordered_set<std::string> produced;
+                 for (const auto& segment : cached_plan.segments) {
+@@ -996,6 +1014,20 @@
+         LOG_VERBOSE("%s using %zu segment%s", get_desc().c_str(),
+                     plan.segments.size(), plan.segments.size() == 1 ? "" : "s");
+     }
++    if (cache_prefetch_enabled_ && !cache_prefetch_.empty()) {
++        size_t peak = 0;
++        for (const auto& segment : plan.segments) {
++            peak = std::max(peak, segment.compute_buffer_size);
++        }
++        auto admit = [&](size_t additional) {
++            sync_runtime_residency();
++            return fits(memory_requests({{runtime_backend, peak}}, additional, graph), params);
++        };
++        if (!segmented || full_measurement.scheduler || !cache_prefetch_.prepare(graph, plan, admit)) {
++            LOG_DEBUG("reference cache prefetch: synchronous fallback");
++        }
++        sync_runtime_residency();
++    }
+     SegmentGraphBindings bindings(cut_cache_, plan, graph);
+     SegmentWeightPipeline weights(manager, runtime_backend, reinterpret_cast<uintptr_t>(this),
+                                   graph, plan, params_tensor_set_,
+@@ -1095,6 +1127,7 @@
+             return fail_segment("allocated capacity check");
+         }
+         copy_data_to_backend_tensor(segment_graph, false);
++        cache_prefetch_.before_segment(index);
+         auto prefetch_requests = memory_requests(measurement.buffers, new_cache_bytes, segment_graph);
+         if (!prefetch_requests.empty()) {
+             weights.enqueue_next(index, prefetch_requests.front());
+@@ -1112,6 +1145,7 @@
+         if (!execute_segment(segment_graph, n_threads)) {
+             return fail_segment("execution");
+         }
++        cache_prefetch_.after_segment(index);
+         auto cache_status = cache_.capture(segment_graph);
+         if (cache_status == GGML_STATUS_SUCCESS) {
+             cache_status = cut_cache_.capture(graph, segment, get_desc().c_str());
+--- a/src/model/diffusion/qwen_image_2_1.hpp
++++ b/src/model/diffusion/qwen_image_2_1.hpp
+@@ -573,6 +573,10 @@
+                     } else {
+                         LOG_WARN("ignoring Qwen Image 2.1 cache device '%s': expected cpu, gpu or hybrid", value.c_str());
+                     }
++                } else if (key == "qwen_image_2_1_prefix_cache_prefetch") {
++                    if (!parse_strict_bool(value, cache_prefetch_enabled_)) {
++                        LOG_WARN("ignoring invalid Qwen Image 2.1 model arg '%s=%s'", key.c_str(), value.c_str());
++                    }
+                 } else if (key == "qwen_image_2_1_prefix_cache" && !parse_strict_bool(value, prefix_cache_enabled)) {
+                     LOG_WARN("ignoring invalid Qwen Image 2.1 model arg '%s=%s'", key.c_str(), value.c_str());
+                 } else if (key == "qwen_image_2_1_prefix_cache_type") {

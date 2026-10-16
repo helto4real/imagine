@@ -1,0 +1,154 @@
+--- a/src/core/runner_cache.h
++++ b/src/core/runner_cache.h
+@@ -21,7 +21,8 @@
+         static std::unique_ptr<CachedTensor> copy(ggml_backend_t backend,
+                                                   const std::string& name,
+                                                   ggml_tensor* source,
+-                                                  ggml_status& status);
++                                                  ggml_status& status,
++                                                  ggml_backend_buffer_type_t storage_type = nullptr);
+     };
+     using CachedTensors = std::map<std::string, std::unique_ptr<CachedTensor>>;
+ 
+@@ -30,12 +31,16 @@
+         CachedTensors committed_;
+         CachedTensors pending_;
+         std::map<std::string, ggml_tensor*> outputs_;
++        bool host_storage_ = false;
+ 
+     public:
+         explicit RunnerCache(ggml_backend_t backend)
+             : backend_(backend) {}
+         RunnerCache(const RunnerCache&)            = delete;
+         RunnerCache& operator=(const RunnerCache&) = delete;
++
++        void set_host_storage(bool enabled);
++        bool host_storage() const { return host_storage_; }
+ 
+         ggml_tensor* get(const std::string& name) const;
+         void stage(const std::string& name, ggml_tensor* tensor);
+--- a/src/core/runner_cache.cpp
++++ b/src/core/runner_cache.cpp
+@@ -27,7 +27,8 @@
+     std::unique_ptr<CachedTensor> CachedTensor::copy(ggml_backend_t backend,
+                                                      const std::string& name,
+                                                      ggml_tensor* source,
+-                                                     ggml_status& status) {
++                                                     ggml_status& status,
++                                                     ggml_backend_buffer_type_t storage_type) {
+         status = GGML_STATUS_FAILED;
+         if (ggml_graph_cut::tensor_buffer(source) == nullptr) {
+             return nullptr;
+@@ -42,7 +43,9 @@
+         // Cut views are rebound with their original strides and offsets.
+         std::copy(std::begin(source->nb), std::end(source->nb), std::begin(entry->tensor->nb));
+         ggml_set_name(entry->tensor, name.c_str());
+-        entry->buffer = ggml_backend_alloc_ctx_tensors(entry->context, backend);
++        entry->buffer = storage_type != nullptr
++                            ? ggml_backend_alloc_ctx_tensors_from_buft(entry->context, storage_type)
++                            : ggml_backend_alloc_ctx_tensors(entry->context, backend);
+         if (entry->buffer == nullptr) {
+             return nullptr;
+         }
+@@ -79,6 +82,11 @@
+         return cached_tensor(committed_, name);
+     }
+ 
++    void RunnerCache::set_host_storage(bool enabled) {
++        GGML_ASSERT(committed_.empty() && pending_.empty() && outputs_.empty());
++        host_storage_ = enabled;
++    }
++
+     void RunnerCache::stage(const std::string& name, ggml_tensor* tensor) {
+         if (tensor != nullptr) {
+             ggml_set_output(tensor);
+@@ -87,7 +95,7 @@
+     }
+ 
+     size_t RunnerCache::pending_bytes(ggml_cgraph* graph) const {
+-        if (outputs_.empty()) {
++        if (host_storage_ || outputs_.empty()) {
+             return 0;
+         }
+         auto tensors = cache_graph_tensors(graph);
+@@ -115,13 +123,24 @@
+             return GGML_STATUS_SUCCESS;
+         }
+         const auto tensors = cache_graph_tensors(graph);
++        ggml_backend_buffer_type_t storage_type = nullptr;
++        if (host_storage_) {
++            storage_type = ggml_backend_dev_host_buffer_type(ggml_backend_get_device(backend_));
++            if (storage_type == nullptr) {
++                auto cpu = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
++                if (cpu == nullptr) {
++                    return GGML_STATUS_ALLOC_FAILED;
++                }
++                storage_type = ggml_backend_dev_buffer_type(cpu);
++            }
++        }
+         for (const auto& output : outputs_) {
+             if (pending_.count(output.first) || !tensors.count(output.second)) {
+                 continue;
+             }
+             GGML_ASSERT(ggml_is_contiguous(output.second));
+             ggml_status status;
+-            auto entry = CachedTensor::copy(backend_, output.first, output.second, status);
++            auto entry = CachedTensor::copy(backend_, output.first, output.second, status, storage_type);
+             if (entry == nullptr) {
+                 return status;
+             }
+--- a/src/core/ggml_runner.cpp
++++ b/src/core/ggml_runner.cpp
+@@ -565,7 +565,8 @@
+     runner_ctx.weight_adapter        = weight_adapter;
+     runner_ctx.debug_tensors         = &debug_tensors;
+     runner_ctx.get_cache_tensor      = [this](const std::string& name) {
+-        return this->get_cache_tensor_by_name(name);
++        auto tensor = this->get_cache_tensor_by_name(name);
++        return cache_.host_storage() ? to_backend(tensor) : tensor;
+     };
+     runner_ctx.cache_tensor = [this, graph](const std::string& name, ggml_tensor* tensor) {
+         this->cache(name, tensor, graph);
+@@ -882,10 +883,12 @@
+         return fits(requests, params);
+     };
+     auto manager         = residency_manager.lock();
++    // Host cache inputs must enter GPU memory one layer at a time, even when
++    // the full model fits. Each segment reuses the bounded workspace buffers.
+     const bool segmented = !is_multi_device() && !sd_backend_is_cpu(runtime_backend) &&
+-                           manager != nullptr && manager->segmented_compute_enabled() &&
+                            cached_plan.valid && cached_plan.has_cuts && cached_plan.segments.size() > 1 &&
+-                           !fits_monolithic();
++                           (cache_.host_storage() ||
++                            (manager != nullptr && manager->segmented_compute_enabled() && !fits_monolithic()));
+     ggml_graph_cut::Plan monolithic_plan;
+     if (!segmented) {
+         monolithic_plan.segments.emplace_back();
+--- a/src/model/diffusion/qwen_image_2_1.hpp
++++ b/src/model/diffusion/qwen_image_2_1.hpp
+@@ -565,7 +565,13 @@
+               config(QwenImage21Config::detect_from_weights(weights, prefix)),
+               model(config) {
+             for (const auto& [key, value] : parse_key_value_args(model_args, "model arg")) {
+-                if (key == "qwen_image_2_1_prefix_cache" && !parse_strict_bool(value, prefix_cache_enabled)) {
++                if (key == "qwen_image_2_1_prefix_cache_device") {
++                    if (value == "cpu" || value == "gpu") {
++                        cache_.set_host_storage(value == "cpu" && !sd_backend_is_cpu(backend));
++                    } else {
++                        LOG_WARN("ignoring Qwen Image 2.1 cache device '%s': expected cpu or gpu", value.c_str());
++                    }
++                } else if (key == "qwen_image_2_1_prefix_cache" && !parse_strict_bool(value, prefix_cache_enabled)) {
+                     LOG_WARN("ignoring invalid Qwen Image 2.1 model arg '%s=%s'", key.c_str(), value.c_str());
+                 } else if (key == "qwen_image_2_1_prefix_cache_type") {
+                     if (value == "auto") {
+@@ -743,7 +749,9 @@
+                     prefix_cache_disabled = true;
+                     LOG_WARN("Qwen Image 2.1: incomplete prefix cache; disabling it for this sampling run");
+                 } else {
+-                    LOG_DEBUG("Qwen Image 2.1: cached prefix %" PRIu64 " (%" PRId64 " tokens, %s)", extra->prefix_id, layout.prefix_length, ggml_type_name(cache.type));
++                    LOG_DEBUG("Qwen Image 2.1: cached prefix %" PRIu64 " (%" PRId64 " tokens, %s, %s)",
++                              extra->prefix_id, layout.prefix_length, ggml_type_name(cache.type),
++                              cache_.host_storage() ? "RAM" : "VRAM");
+                 }
+             }
+             return result;

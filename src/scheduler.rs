@@ -83,7 +83,7 @@ struct Active {
 struct Finished {
     ticket: Option<crate::coordination::Ticket>,
     engine: Box<dyn Backend>,
-    result: Result<Vec<u8>>,
+    result: Result<Vec<crate::generation::Artifact>>,
     stopped: Result<()>,
 }
 struct Prepared {
@@ -381,29 +381,8 @@ impl Scheduler {
     ) -> std::result::Result<Prepared, Fault> {
         request.validate().map_err(|e| Fault::new(422, e))?;
         let fingerprint = hash(&serde_json::to_vec(&request).expect("serializable request"));
-        let mut reference_preprocessing = Vec::new();
-        for a in &request.inputs.reference_images {
-            let asset = self
-                .store
-                .asset(a, owner)
-                .await?
-                .ok_or(Fault::new(404, "asset_not_found"))?;
-            let w = asset["width"].as_u64().unwrap();
-            let h = asset["height"].as_u64().unwrap();
-            let (_, _, width, height) = crate::workflow_image::dimensions(
-                w as u32,
-                h as u32,
-                request
-                    .model_options
-                    .qwen_image_2_1
-                    .reference_max_pixels_per_image,
-            );
-            if width == 0 || height == 0 || width > 8192 || height > 8192 {
-                return Err(Fault::new(422, "unsupported_reference_geometry"));
-            }
-            reference_preprocessing.push(json!({"asset_id":a,"source_width":w,"source_height":h,"vae_width":width,"vae_height":height,
-                        "pixels":width*height,"source":"aio_shrink_center_crop_v1"}));
-        }
+        let reference_preprocessing =
+            crate::generation::reference_metadata(&request, owner, &self.store).await?;
         if request.seed.is_none() {
             // Use only random UUID bytes (exclude version/variant bits), then
             // mask to the API's complete, exactly representable 53-bit range.
@@ -473,7 +452,16 @@ impl Scheduler {
                 .as_object_mut()
                 .unwrap()
                 .remove("reference_preprocessing");
+            let plan = value.as_object_mut().unwrap().remove("execution_plan");
             let request: JobRequest = serde_json::from_value(value)?;
+            if plan.as_ref() != request.effective().get("execution_plan") {
+                sqlx::query("UPDATE jobs SET status='failed',error='execution_plan_mismatch',finished=? WHERE id=?")
+                    .bind(now()).bind(&job_id).execute(&self.store.db).await?;
+                if let Some(ticket) = self.granted.take() {
+                    let _ = ticket.finish().await;
+                }
+                return Ok(());
+            }
             sqlx::query("UPDATE jobs SET status='running',started=? WHERE id=?")
                 .bind(now())
                 .bind(&job_id)
@@ -491,7 +479,7 @@ impl Scheduler {
                     biased;
                     _=token.cancelled()=>Err(anyhow::anyhow!("cancelled")),
                     _=async {ticket.as_mut().unwrap().lost().await}, if ticket.is_some()=>Err(anyhow::anyhow!(EngineError("coordinator_unavailable"))),
-                    result=engine.generate(&request,&worker_owner,&store)=>result
+                    result=crate::generation::generate(engine.as_mut(),&request,&worker_owner,&store)=>result
                 };
                 let stopped = if result.is_err() {
                     engine.stop().await
@@ -531,25 +519,15 @@ impl Scheduler {
                 .await?;
         } else {
             let result = match finished.result {
-                Ok(bytes) => self
+                Ok(artifacts) => self
                     .store
-                    .save_asset(&active.owner, bytes)
+                    .publish_output(&active.id, &active.owner, artifacts)
                     .await
                     .context(EngineError("output_save_failed")),
                 Err(error) => Err(error),
             };
             match result {
-                Ok(asset) => {
-                    let output = json!({"assets":[asset],"format":"png"});
-                    sqlx::query(
-                        "UPDATE jobs SET status='succeeded',output=?,finished=? WHERE id=?",
-                    )
-                    .bind(output.to_string())
-                    .bind(now())
-                    .bind(&active.id)
-                    .execute(&self.store.db)
-                    .await?;
-                }
+                Ok(()) => {}
                 Err(error) => {
                     let code = error
                         .downcast_ref::<EngineError>()
