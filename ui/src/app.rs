@@ -48,6 +48,7 @@ enum Workspace {
 }
 
 struct ResultView {
+    asset_id: String,
     role: OutputRole,
     texture: egui::TextureHandle,
     file: PathBuf,
@@ -63,7 +64,6 @@ struct GenerationDesk {
     references: Vec<ReferenceView>,
     reference_directory: Option<PathBuf>,
     pending: Option<Submission>,
-    last_generation: Option<Value>,
     working: bool,
     uploading: bool,
     cancelling: bool,
@@ -87,7 +87,6 @@ impl Default for GenerationDesk {
             references: Vec::new(),
             reference_directory: None,
             pending: None,
-            last_generation: None,
             working: false,
             uploading: false,
             cancelling: false,
@@ -348,21 +347,42 @@ impl ImagineApp {
                             } else {
                                 OutputRole::Image
                             };
-                            state.result = Some(Results {
-                                assets: done
-                                    .assets
-                                    .into_iter()
-                                    .map(|asset| ResultView {
-                                        role: asset.role,
-                                        texture: texture(ctx, &asset.preview, asset.role.name()),
-                                        file: asset.file,
-                                    })
-                                    .collect(),
-                                seed: done.seed,
-                            });
+                            let upscale = state
+                                .pending
+                                .as_ref()
+                                .is_some_and(|p| p.request["profile"] == "image_upscale");
+                            let assets: Vec<_> = done
+                                .assets
+                                .into_iter()
+                                .map(|asset| ResultView {
+                                    asset_id: asset.asset_id,
+                                    role: if upscale {
+                                        state.selected_role
+                                    } else {
+                                        asset.role
+                                    },
+                                    texture: texture(ctx, &asset.preview, asset.role.name()),
+                                    file: asset.file,
+                                })
+                                .collect();
+                            if upscale && let Some(previous) = &mut state.result {
+                                for asset in assets {
+                                    if let Some(slot) =
+                                        previous.assets.iter_mut().find(|a| a.role == asset.role)
+                                    {
+                                        *slot = asset;
+                                    }
+                                }
+                                previous.seed = done.seed;
+                            } else {
+                                state.result = Some(Results {
+                                    assets,
+                                    seed: done.seed,
+                                });
+                            }
                             state.actual_pixels = false;
                             state.image_pan = egui::Vec2::ZERO;
-                            state.last_generation = state.pending.take().map(|job| job.request);
+                            state.pending = None;
                             state.status = "Saved".into();
                             state.error = None;
                         }
@@ -454,16 +474,53 @@ impl ImagineApp {
             send(&tx, &ctx, Message::Finished(workspace, result));
         });
     }
-    fn regeneration(&self) -> Option<Submission> {
-        if self.busy() || self.desk().pending.is_some() {
-            return None;
+    fn upscale_ratio(&self) -> &str {
+        if self.workspace == Workspace::CharacterSheet {
+            "16:9"
+        } else {
+            &self.prefs.generation.aspect_ratio
         }
-        Some(Submission {
-            request: self.desk().last_generation.clone()?,
+    }
+    fn upscale_source(&self) -> Option<&ResultView> {
+        let role = match self.workspace {
+            Workspace::Image => OutputRole::Image,
+            Workspace::CharacterSheet => OutputRole::Sheet,
+            Workspace::Video => return None,
+        };
+        self.desk()
+            .result
+            .as_ref()?
+            .assets
+            .iter()
+            .find(|a| a.role == role && !a.asset_id.is_empty())
+    }
+    fn upscale_submission(&self) -> anyhow::Result<Submission> {
+        if self.busy() || self.desk().pending.is_some() {
+            anyhow::bail!("Wait for the current job before upscaling.");
+        }
+        let source = self
+            .upscale_source()
+            .ok_or_else(|| anyhow::anyhow!("Generate an image before upscaling."))?;
+        Ok(Submission {
+            request: client::make_upscale_request(
+                &source.asset_id,
+                self.prefs.upscale_target,
+                self.upscale_ratio(),
+                &self.prefs.generation,
+            )?,
             key: uuid::Uuid::new_v4().to_string(),
             folder: self.prefs.output_folder.clone(),
             job: None,
         })
+    }
+    fn upscale(&mut self, ctx: &egui::Context) {
+        match self.upscale_submission() {
+            Ok(submission) => {
+                self.desk_mut().pending = Some(submission);
+                self.generate(ctx);
+            }
+            Err(error) => self.desk_mut().error = Some(error.to_string()),
+        }
     }
     fn choose_references(&mut self, ctx: &egui::Context) {
         self.desk_mut().uploading = true;

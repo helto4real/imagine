@@ -182,7 +182,7 @@ fn reference_order_and_pending_request_controls_are_preserved() {
             .iter()
             .any(|(_, node)| node.label() == Some("Retry"))
     );
-    assert!(desk.control("Generate again").is_disabled());
+    assert!(desk.control("Upscale").is_disabled());
     assert!(!desk.control("Cancel generation").is_disabled());
     desk.app.image.cancelling = true;
     desk.frame(Vec::new());
@@ -190,91 +190,81 @@ fn reference_order_and_pending_request_controls_are_preserved() {
 }
 
 #[test]
-fn regenerate_reuses_successful_inputs_with_a_new_job_identity() {
-    for seed in [Value::Null, serde_json::json!(42)] {
+fn upscale_uses_result_id_and_captures_target_ratio_for_retry() {
+    for random in [true, false] {
         let mut desk = Desk::new();
-        assert!(desk.control("Generate again").is_disabled());
-        assert!(desk.app.regeneration().is_none());
-        let request = serde_json::json!({
-            "prompt": "Original synthetic prompt",
-            "negative_prompt": "Original negative prompt",
-            "inputs": {"reference_images": ["ref-2", "ref-1"]},
-            "sampling": {"steps": 40, "cfg_scale": 2.5},
-            "width": 1600, "height": 896, "seed": seed
-        });
-        desk.app.image.pending = Some(Submission {
-            request: request.clone(),
-            key: "completed-key".into(),
-            job: Some("completed-job".into()),
-            folder: desk._root.path().into(),
-        });
-        desk.app
-            .tx
-            .send(Message::Finished(
-                Workspace::Image,
-                Ok(Completed {
-                    assets: vec![client::CompletedAsset {
-                        role: OutputRole::Image,
-                        file: desk._root.path().join("synthetic.png"),
-                        preview: Preview {
-                            width: 1,
-                            height: 1,
-                            pixels: vec![0, 0, 0, 255],
-                        },
-                    }],
-                    seed: Some(42),
-                }),
-            ))
-            .unwrap();
-        desk.frame(Vec::new());
-        assert!(!desk.control("Generate again").is_disabled());
+        assert!(!desk.control("Upscale").is_disabled());
         assert!(
             !desk
                 .nodes
                 .iter()
-                .any(|(_, node)| node.label() == Some("Retry"))
+                .any(|(_, n)| n.label() == Some("Generate again"))
         );
-        desk.app.image.prompt = "Changed draft".into();
-        desk.app.image.references.clear();
-        desk.app.prefs.generation.steps = 12;
-        desk.app.prefs.output_folder = desk._root.path().join("new-output");
-        let again = desk.app.regeneration().unwrap();
-        assert_eq!(again.request, request);
-        assert_eq!(again.request["seed"], seed);
-        assert_ne!(again.key, "completed-key");
-        assert_ne!(again.key, desk.app.regeneration().unwrap().key);
-        assert!(again.job.is_none());
-        assert_eq!(again.folder, desk.app.prefs.output_folder);
-        let retry_key = again.key.clone();
-        desk.app.image.pending = Some(again);
+        desk.app.prefs.generation.random_seed = random;
+        desk.app.prefs.generation.seed = 42;
+        desk.app.prefs.generation.aspect_ratio = "3:4".into();
+        desk.app.prefs.upscale_target = crate::settings::UpscaleTarget::K3;
+        desk.app.image.prompt = "Unrelated draft".into();
+        let submission = desk.app.upscale_submission().unwrap();
+        assert_eq!(submission.request["profile"], "image_upscale");
+        assert_eq!(
+            submission.request["inputs"]["reference_images"],
+            serde_json::json!(["asset_synthetic"])
+        );
+        assert_eq!(submission.request["max_side"], 3072);
+        assert_eq!(submission.request["aspect_ratio"], "3:4");
+        assert_eq!(
+            submission.request["seed"],
+            if random {
+                Value::Null
+            } else {
+                serde_json::json!(42)
+            }
+        );
+        assert!(submission.request.get("prompt").is_none());
+        assert!(submission.request.get("sampling").is_none());
+        assert_ne!(submission.key, desk.app.upscale_submission().unwrap().key);
+        let captured = submission.request.clone();
+        let key = submission.key.clone();
+        desk.app.image.pending = Some(Submission {
+            job: Some("job_upscale".into()),
+            ..submission
+        });
+        desk.app.prefs.upscale_target = crate::settings::UpscaleTarget::K4;
+        desk.app.prefs.generation.aspect_ratio = "1:1".into();
         desk.app
             .tx
             .send(Message::Finished(
                 Workspace::Image,
                 Err(Failure {
-                    message: "Synthetic recoverable error".into(),
+                    message: "Save failed".into(),
                     retryable: true,
                 }),
             ))
             .unwrap();
-        desk.frame(Vec::new());
-        assert!(desk.app.regeneration().is_none());
-        assert!(desk.control("Generate again").is_disabled());
+        desk.frame(vec![]);
+        assert!(desk.control("Upscale").is_disabled());
         assert!(!desk.control("Retry").is_disabled());
-        assert_eq!(desk.app.image.pending.as_ref().unwrap().key, retry_key);
-        assert_eq!(desk.app.image.pending.as_ref().unwrap().request, request);
+        let pending = desk.app.image.pending.as_ref().unwrap();
+        assert_eq!(pending.request, captured);
+        assert_eq!(pending.key, key);
+        assert_eq!(pending.job.as_deref(), Some("job_upscale"));
         desk.app
             .tx
             .send(Message::Finished(
                 Workspace::Image,
                 Err(Failure {
-                    message: "Synthetic terminal error".into(),
+                    message: "Cancelled".into(),
                     retryable: false,
                 }),
             ))
             .unwrap();
-        desk.frame(Vec::new());
-        assert_eq!(desk.app.regeneration().unwrap().request, request);
+        desk.frame(vec![]);
+        assert!(!desk.control("Upscale").is_disabled());
+        desk.app.image.result = None;
+        desk.frame(vec![]);
+        assert!(desk.control("Upscale").is_disabled());
+        assert!(desk.app.upscale_submission().is_err());
     }
 }
 
@@ -326,7 +316,7 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
         assert!(!desk.control(name).is_disabled(), "{name}");
     }
     assert!(desk.control("Generate").is_disabled());
-    assert!(desk.control("Generate again").is_disabled());
+    assert!(desk.control("Upscale").is_disabled());
     let prompt = desk.control("Prompt").bounds().unwrap();
     replace(&mut desk, prompt, "Next prompt");
     assert_eq!(desk.app.image.prompt, "Next prompt");
@@ -394,6 +384,7 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
             Workspace::Image,
             Ok(Completed {
                 assets: vec![client::CompletedAsset {
+                    asset_id: "asset_synthetic".into(),
                     role: OutputRole::Image,
                     file: original_folder.join("synthetic.png"),
                     preview: Preview {
@@ -411,7 +402,7 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
     assert_eq!(desk.app.prefs.negative_prompt, "Next negative prompt");
     assert_eq!(desk.app.prefs.generation.steps, 24);
     assert_eq!(desk.app.prefs.output_folder, new_folder);
-    assert_eq!(desk.app.image.last_generation.as_ref(), Some(&request));
+    assert!(desk.app.image.pending.is_none());
     assert_eq!(
         desk.app.prefs.generation.reference_max_pixels_per_image,
         2_500_000
@@ -793,6 +784,7 @@ fn headless_layout_and_recoverable_job_state() {
         });
         app.image.result = Some(Results {
             assets: vec![ResultView {
+                asset_id: "asset_synthetic".into(),
                 role: OutputRole::Image,
                 texture: texture(&ctx, &sample, "synthetic-result"),
                 file: PathBuf::from("/Pictures/Imagine/imagine-example.png"),
@@ -995,6 +987,7 @@ fn sheet_result(folder: &std::path::Path) -> Completed {
         .into_iter()
         .enumerate()
         .map(|(i, (role, width, height))| client::CompletedAsset {
+            asset_id: format!("asset_{}", role.name()),
             role,
             file: folder.join(format!("{}.png", role.name())),
             preview: Preview {
@@ -1112,8 +1105,8 @@ fn sheet_tab_preserves_image_draft_and_routes_async_results_to_origin() {
         desk.app.sheet.selected_result().unwrap().role,
         OutputRole::Views
     );
-    let again = desk.app.regeneration().unwrap();
-    assert_eq!(again.request["operation"], "character_sheet");
+    let again = desk.app.upscale_submission().unwrap();
+    assert_eq!(again.request["profile"], "image_upscale");
     assert_ne!(again.key, "sheet-key");
     assert!(again.job.is_none());
     desk.click("Image");
@@ -1338,4 +1331,106 @@ fn headless_character_sheet_layout_and_privacy() {
             output.textures_delta.clear();
         }
     }
+}
+
+#[test]
+fn upscale_target_settings_persist_without_changing_generation_size() {
+    let mut desk = Desk::new();
+    let generation = desk.app.prefs.generation.clone();
+    desk.click("Settings");
+    desk.click("Upscale target");
+    desk.click("3K");
+    assert_eq!(
+        desk.app.prefs.upscale_target,
+        crate::settings::UpscaleTarget::K3
+    );
+    assert_eq!(
+        Preferences::load(desk._root.path()).unwrap().upscale_target,
+        crate::settings::UpscaleTarget::K3
+    );
+    assert_eq!(desk.app.prefs.generation, generation);
+    desk.click("Upscale target");
+    desk.click("4K");
+    assert_eq!(
+        Preferences::load(desk._root.path()).unwrap().upscale_target,
+        crate::settings::UpscaleTarget::K4
+    );
+}
+
+#[test]
+fn sheet_upscale_replaces_only_whole_sheet_even_when_viewing_portrait() {
+    let mut desk = Desk::new();
+    desk.app
+        .tx
+        .send(Message::Finished(
+            Workspace::CharacterSheet,
+            Ok(sheet_result(desk._root.path())),
+        ))
+        .unwrap();
+    desk.app.receive(&desk.ctx);
+    desk.click("Character sheets");
+    desk.click("Portrait");
+    desk.app.prefs.generation.aspect_ratio = "3:4".into();
+    desk.app.prefs.upscale_target = crate::settings::UpscaleTarget::K4;
+    let submission = desk.app.upscale_submission().unwrap();
+    assert_eq!(
+        submission.request["inputs"]["reference_images"],
+        serde_json::json!(["asset_character_sheet"])
+    );
+    assert_eq!(submission.request["aspect_ratio"], "16:9");
+    assert_eq!(submission.request["max_side"], 4096);
+    let original: Vec<_> = desk
+        .app
+        .sheet
+        .result
+        .as_ref()
+        .unwrap()
+        .assets
+        .iter()
+        .map(|a| (a.role, a.asset_id.clone(), a.file.clone()))
+        .collect();
+    let image_id = desk.app.image.selected_result().unwrap().asset_id.clone();
+    desk.app.sheet.pending = Some(submission);
+    desk.app.sheet.working = true;
+    desk.click("Image");
+    desk.app
+        .tx
+        .send(Message::Finished(
+            Workspace::CharacterSheet,
+            Ok(Completed {
+                assets: vec![client::CompletedAsset {
+                    role: OutputRole::Image,
+                    asset_id: "asset_upscaled_sheet".into(),
+                    file: desk._root.path().join("upscaled.png"),
+                    preview: Preview {
+                        width: 2,
+                        height: 1,
+                        pixels: [0, 0, 0, 255].repeat(2),
+                    },
+                }],
+                seed: Some(99),
+            }),
+        ))
+        .unwrap();
+    desk.app.receive(&desk.ctx);
+    let result = desk.app.sheet.result.as_ref().unwrap();
+    assert_eq!(result.assets.len(), 3);
+    for (role, id, path) in original {
+        let asset = result.assets.iter().find(|a| a.role == role).unwrap();
+        if role == OutputRole::Sheet {
+            assert_eq!(asset.asset_id, "asset_upscaled_sheet");
+            assert_ne!(asset.file, path);
+        } else {
+            assert_eq!(asset.asset_id, id);
+            assert_eq!(asset.file, path);
+        }
+    }
+    assert_eq!(desk.app.image.selected_result().unwrap().asset_id, image_id);
+    assert_eq!(desk.app.sheet.selected_role, OutputRole::Sheet);
+    assert!(desk.app.sheet.pending.is_none());
+    desk.click("Character sheets");
+    assert_eq!(
+        desk.app.upscale_submission().unwrap().request["inputs"]["reference_images"],
+        serde_json::json!(["asset_upscaled_sheet"])
+    );
 }

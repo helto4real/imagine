@@ -690,17 +690,26 @@ impl ImagineApp {
                 }
                 if ui
                     .add_enabled_ui(
-                        ready
-                            && self.desk().pending.is_none()
-                            && self.desk().last_generation.is_some(),
-                        |ui| helto::icon_button(ui, Icon::Retry, "Generate again", false),
+                        ready && self.desk().pending.is_none() && self.upscale_source().is_some(),
+                        |ui| {
+                            helto::icon_button(ui, Icon::Upscale, "Upscale", false).on_hover_text(
+                                self.prefs
+                                    .upscale_target
+                                    .dimensions(self.upscale_ratio())
+                                    .map(|(w, h)| {
+                                        format!(
+                                            "{} · {w} × {h} px",
+                                            if sheet { "Character sheet" } else { "Image" }
+                                        )
+                                    })
+                                    .unwrap_or_else(|e| e.to_string()),
+                            )
+                        },
                     )
                     .inner
                     .clicked()
-                    && let Some(submission) = self.regeneration()
                 {
-                    self.desk_mut().pending = Some(submission);
-                    self.generate(ui.ctx());
+                    self.upscale(ui.ctx());
                 }
                 if ui
                     .add_enabled_ui(
@@ -894,6 +903,7 @@ impl ImagineApp {
                     );
                     ui.add_space(14.);
                     let before = self.prefs.generation.clone();
+                    let before_upscale = self.prefs.upscale_target;
                     ui.scope(|ui| {
                         egui::Grid::new("generation-settings")
                             .num_columns(2)
@@ -940,9 +950,27 @@ impl ImagineApp {
                                         (megapixels * 1_000_000.).round() as u32;
                                 }
                                 ui.end_row();
+                                let label = ui.label("Upscale target");
+                                egui::ComboBox::from_id_salt("upscale-target")
+                                    .width(ui.available_width().max(120.))
+                                    .selected_text(self.prefs.upscale_target.label())
+                                    .show_ui(ui, |ui| {
+                                        for target in crate::settings::UpscaleTarget::ALL {
+                                            ui.selectable_value(
+                                                &mut self.prefs.upscale_target,
+                                                target,
+                                                target.label(),
+                                            );
+                                        }
+                                    })
+                                    .response
+                                    .labelled_by(label.id);
+                                ui.end_row();
                             });
                     });
-                    if self.prefs.generation != before {
+                    if self.prefs.generation != before
+                        || self.prefs.upscale_target != before_upscale
+                    {
                         self.save_preferences();
                     }
                     ui.add_space(24.);

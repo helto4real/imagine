@@ -7,8 +7,11 @@ use imagine_server::{
     storage::Store,
 };
 use imagine_ui::{
-    client::{Client, OutputRole, Progress, Submission, make_request, make_sheet_request},
-    settings::{Connection, GenerationSettings},
+    client::{
+        Client, OutputRole, Progress, Submission, make_request, make_sheet_request,
+        make_upscale_request,
+    },
+    settings::{Connection, GenerationSettings, UpscaleTarget},
 };
 use serde_json::json;
 use std::{
@@ -71,7 +74,7 @@ impl Backend for Fake {
                 std::fs::remove_dir(&folder)?;
                 std::fs::write(folder, b"blocked")?;
             }
-            if self.state.borrow().stage.is_some() {
+            if self.state.borrow().stage.is_some() || req.model == "qwen-image-2.1-turbo" {
                 let mut buf = Cursor::new(Vec::new());
                 image::RgbImage::from_pixel(req.width, req.height, image::Rgb([122, 94, 70]))
                     .write_to(&mut buf, image::ImageFormat::Png)?;
@@ -115,14 +118,25 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     };
     let access_path = dir.path().join("access.json");
     std::fs::write(&access_path, serde_json::to_vec(&access).unwrap()).unwrap();
+    // Keep the shipped upscale settings, with only synthetic plaintext prompts.
+    let profiles = dir.path().join("profiles");
+    std::fs::create_dir(&profiles).unwrap();
+    let profile = include_str!("../../profiles/image_upscale.yaml")
+        .lines()
+        .map(|line| {
+            if line.starts_with("  prompt:") {
+                "  prompt: Synthetic upscale fixture"
+            } else if line.starts_with("  negative_prompt:") {
+                "  negative_prompt: ''"
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write(profiles.join("image_upscale.yaml"), profile).unwrap();
     let app = App {
-        profiles: Arc::new(
-            imagine_server::profiles::Catalog::load(std::path::Path::new(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../profiles"
-            )))
-            .unwrap(),
-        ),
+        profiles: Arc::new(imagine_server::profiles::Catalog::load(&profiles).unwrap()),
         store,
         control: control.clone(),
         engine,
@@ -416,6 +430,60 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     assert!(!error.retryable);
     assert_eq!(error.message, "Generation cancelled.");
     assert_eq!(std::fs::read_dir(&submission.folder).unwrap().count(), 0);
+    // Both UI workspaces use registered output assets and the same upscale profile.
+    for (source, target, ratio, dimensions) in [
+        (&first.assets[0], UpscaleTarget::K3, "3:4", (2304, 3072)),
+        (
+            &completed.assets[0],
+            UpscaleTarget::K2,
+            "16:9",
+            (2048, 1152),
+        ),
+    ] {
+        let source_bytes = std::fs::read(&source.file).unwrap();
+        let before = calls.load(Ordering::SeqCst);
+        let blocked = dir.path().join(format!("blocked-upscale-{ratio}"));
+        *blocker.lock().unwrap() = Some(blocked.clone());
+        let mut submission = Submission {
+            request: make_upscale_request(&source.asset_id, target, ratio, &settings).unwrap(),
+            key: format!("upscale-{ratio}"),
+            folder: blocked,
+            job: None,
+        };
+        let mut job = None;
+        let error = client
+            .generate(submission.clone(), |p| {
+                if let Progress::Submitted(id) = p {
+                    job = Some(id);
+                }
+            })
+            .await
+            .err()
+            .unwrap();
+        assert!(error.retryable);
+        assert_eq!(calls.load(Ordering::SeqCst), before + 1);
+        submission.job = job;
+        submission.folder = source.file.parent().unwrap().into();
+        let upscaled = client.generate(submission, |_| {}).await.unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), before + 1);
+        assert_eq!(upscaled.assets.len(), 1);
+        let output = &upscaled.assets[0];
+        assert_ne!(output.asset_id, source.asset_id);
+        assert_ne!(output.file, source.file);
+        assert_eq!(std::fs::read(&source.file).unwrap(), source_bytes);
+        let saved = image::load_from_memory(&std::fs::read(&output.file).unwrap()).unwrap();
+        assert_eq!((saved.width(), saved.height()), dimensions);
+        let requests = requests.lock().unwrap();
+        let request = requests.last().unwrap();
+        assert_eq!((request.width, request.height), dimensions);
+        assert_eq!(request.model, "qwen-image-2.1-turbo");
+        assert_eq!(request.sampling.steps, 8);
+        assert_eq!(request.sampling.cfg_scale, 1.);
+        assert_eq!(request.sampling.sampler, "euler");
+        assert_eq!(request.sampling.scheduler, "simple");
+        assert_eq!(request.references.len(), 1);
+        assert_eq!(request.references[0].as_ref(), source_bytes);
+    }
     control.call(Action::Shutdown).await.unwrap();
     scheduler.await.unwrap().unwrap();
     proxy.close().await;

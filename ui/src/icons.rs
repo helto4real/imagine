@@ -17,6 +17,7 @@ pub enum Icon {
     Actual,
     Hand,
     Generate,
+    Upscale,
     Retry,
     Stop,
     Folder,
@@ -56,6 +57,11 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
             for y in [8., 12., 16.] {
                 line(&[[14., y], [19., y]]);
             }
+        }
+        Icon::Upscale => {
+            box_at(3., 12., 9., 9., 1);
+            line(&[[13., 3.], [21., 3.], [21., 11.]]);
+            line(&[[10., 14.], [21., 3.]]);
         }
         Icon::Video => {
             box_at(3., 3., 18., 18., 2);

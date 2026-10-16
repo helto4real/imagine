@@ -1,5 +1,5 @@
 use crate::settings::{
-    Connection, GenerationSettings, check_output_folder, save_image, save_sheet,
+    Connection, GenerationSettings, UpscaleTarget, check_output_folder, save_image, save_sheet,
 };
 use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
@@ -60,6 +60,7 @@ impl OutputRole {
     }
 }
 pub struct CompletedAsset {
+    pub asset_id: String,
     pub role: OutputRole,
     pub file: PathBuf,
     pub preview: Preview,
@@ -295,7 +296,7 @@ impl Client {
             let preview = decode(&bytes, false).map_err(|_| {
                 Failure::retry("Could not decode the image from the server. Retry.")
             })?;
-            downloads.push((role, bytes, preview));
+            downloads.push((role, bytes, preview, asset));
         }
         let files = if roles == [OutputRole::Image] {
             save_image(&submission.folder, &downloads[0].1).map(|file| vec![file])
@@ -304,7 +305,7 @@ impl Client {
                 &submission.folder,
                 &downloads
                     .iter()
-                    .map(|(role, bytes, _)| (role.name(), bytes.as_ref()))
+                    .map(|(role, bytes, _, _)| (role.name(), bytes.as_ref()))
                     .collect::<Vec<_>>(),
             )
         }
@@ -313,7 +314,8 @@ impl Client {
             assets: downloads
                 .into_iter()
                 .zip(files)
-                .map(|((role, _, preview), file)| CompletedAsset {
+                .map(|((role, _, preview, asset_id), file)| CompletedAsset {
+                    asset_id,
                     role,
                     file,
                     preview,
@@ -352,6 +354,23 @@ fn result_assets(
             Ok((role, identifier(&matches[0]["id"])?))
         })
         .collect()
+}
+
+pub fn make_upscale_request(
+    asset: &str,
+    target: UpscaleTarget,
+    ratio: &str,
+    settings: &GenerationSettings,
+) -> Result<Value> {
+    target.dimensions(ratio)?;
+    if identifier(&json!(asset)).is_err() {
+        bail!("Generate an image before upscaling.");
+    }
+    Ok(json!({
+        "profile":"image_upscale", "max_side":target.max_side(), "aspect_ratio":ratio,
+        "inputs":{"reference_images":[asset]},
+        "seed":if settings.random_seed { Value::Null } else { json!(settings.seed) },
+    }))
 }
 
 pub fn supports_character_sheets(metadata: &Value) -> bool {
@@ -512,6 +531,8 @@ pub fn error_message(code: &str) -> String {
         "character_description_or_reference_required"=>"Describe the character or add a reference image.",
         "invalid_character_sheet_layout"|"conflicting_dimensions"=>"Choose a sheet width of 512–4096 px in steps of 512.",
         "invalid_reference_count"=>"Use at most eight identity references for a character sheet, or ten for an image.",
+        "private_prompt_unavailable"=>"Unlock the Helto session used by the upscale profile, then try again.",
+        "unknown_profile"=>"The requested generation profile is unavailable. Check the server profiles and reconnect.",
         "unsupported_character_sheet_model"=>"This model does not support character sheets.",
         "generation_failed"|"native_generation_failed"=>"Generation failed. Check available GPU memory and try a smaller image or fewer references.",
         "job_not_found"=>"The job is missing on the server. Start a new generation.",
@@ -522,6 +543,27 @@ pub fn error_message(code: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn upscale_request_uses_profile_and_one_output_asset_without_generation_overrides() {
+        let settings = GenerationSettings {
+            steps: 17,
+            cfg_scale: 4.,
+            aspect_ratio: "1:1".into(),
+            max_side: 512,
+            random_seed: false,
+            seed: 7,
+            ..Default::default()
+        };
+        for target in UpscaleTarget::ALL {
+            let request = make_upscale_request("asset_output", target, "3:4", &settings).unwrap();
+            assert_eq!(
+                request,
+                json!({"profile":"image_upscale","max_side":target.max_side(),"aspect_ratio":"3:4","seed":7,"inputs":{"reference_images":["asset_output"]}})
+            );
+        }
+        assert!(make_upscale_request("", UpscaleTarget::K2, "16:9", &settings).is_err());
+        assert!(make_upscale_request("asset", UpscaleTarget::K2, "invalid", &settings).is_err());
+    }
     #[test]
     fn sheet_request_preserves_descriptions_and_validates_against_server_contract() {
         let meta = imagine_server::contract::model(MODEL).unwrap();

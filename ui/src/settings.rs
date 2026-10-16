@@ -59,6 +59,43 @@ pub struct Preferences {
     pub generation: GenerationSettings,
     #[serde(default = "sheet_width")]
     pub sheet_width: u32,
+    #[serde(default)]
+    pub upscale_target: UpscaleTarget,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UpscaleTarget {
+    #[default]
+    #[serde(rename = "2k")]
+    K2,
+    #[serde(rename = "3k")]
+    K3,
+    #[serde(rename = "4k")]
+    K4,
+}
+impl UpscaleTarget {
+    pub const ALL: [Self; 3] = [Self::K2, Self::K3, Self::K4];
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::K2 => "2K",
+            Self::K3 => "3K",
+            Self::K4 => "4K",
+        }
+    }
+    pub fn max_side(self) -> u32 {
+        match self {
+            Self::K2 => 2048,
+            Self::K3 => 3072,
+            Self::K4 => 4096,
+        }
+    }
+    pub fn dimensions(self, ratio: &str) -> Result<(u32, u32)> {
+        GenerationSettings {
+            max_side: self.max_side(),
+            aspect_ratio: ratio.into(),
+            ..Default::default()
+        }
+        .dimensions()
+    }
 }
 // AIO services/dimensions.py, preset ratio mode with multiple value 32.
 pub const ASPECT_RATIOS: [&str; 9] = [
@@ -141,6 +178,7 @@ impl Preferences {
                 negative_prompt: String::new(),
                 generation: GenerationSettings::default(),
                 sheet_width: sheet_width(),
+                upscale_target: UpscaleTarget::default(),
             });
         }
         serde_json::from_slice(&std::fs::read(path)?).context("Could not read ui-settings.json.")
@@ -252,6 +290,28 @@ pub fn save_sheet(folder: &Path, images: &[(&str, &[u8])]) -> Result<Vec<PathBuf
 mod tests {
     use super::*;
     #[test]
+    fn upscale_targets_follow_selected_ratio_with_aligned_short_edge() {
+        for (target, long, wide, two_thirds) in [
+            (UpscaleTarget::K2, 2048, 1152, 1376),
+            (UpscaleTarget::K3, 3072, 1728, 2048),
+            (UpscaleTarget::K4, 4096, 2304, 2720),
+        ] {
+            assert_eq!(target.dimensions("16:9").unwrap(), (long, wide));
+            assert_eq!(target.dimensions("9:16").unwrap(), (wide, long));
+            assert_eq!(target.dimensions("1:1").unwrap(), (long, long));
+            assert_eq!(target.dimensions("2:3").unwrap(), (two_thirds, long));
+            for ratio in ASPECT_RATIOS {
+                let (w, h) = target.dimensions(ratio).unwrap();
+                assert_eq!(w.max(h), long);
+                assert!(w.is_multiple_of(32) && h.is_multiple_of(32));
+            }
+        }
+        let root = tempfile::tempdir().unwrap();
+        let old: Preferences =
+            serde_json::from_value(serde_json::json!({"output_folder":root.path()})).unwrap();
+        assert_eq!(old.upscale_target, UpscaleTarget::K2);
+    }
+    #[test]
     fn sheet_files_share_a_unique_prefix_and_keep_private_permissions() {
         let root = tempfile::tempdir().unwrap();
         let images = [
@@ -335,6 +395,7 @@ mod tests {
             privacy_mode: false,
             negative_prompt: "  artifacts, suddig\nextra fingrar  ".into(),
             sheet_width: 1536,
+            upscale_target: UpscaleTarget::K3,
             generation: GenerationSettings {
                 steps: 24,
                 cfg_scale: 3.,

@@ -95,7 +95,7 @@ each workspace's drafts, references, results and pending job intact. Video curre
 or editing tools.
 
 The gear opens a separate native **Settings** window with **Generation** (Steps,
-CFG, Reference size), **Storage** (output folder), and **Privacy** (Hide previews). Changes save
+CFG, Reference size, Upscale target), **Storage** (output folder), and **Privacy** (Hide previews). Changes save
 automatically. The close icon or Escape closes only Settings. A failed preference
 write shows **Not saved** and the error; it is never reported as saved. On backends
 without native child windows the same settings content uses egui's embedded window.
@@ -172,6 +172,28 @@ been synced. Handled write failures remove files created by that save attempt;
 if cleanup itself fails the UI reports partial files. A process/system crash
 can leave partial files. Retry retrieves the existing job and uses the currently
 selected output folder, without rerunning inference.
+
+## Upscale
+
+**Upscale** replaces Generate again in both desks. It uses the displayed image
+result's server asset, or the whole composed character sheet even when Portrait
+or Views is selected. The original files and the sheet's separate Portrait/Views
+results are retained; the new image replaces the main result after saving.
+
+Choose **Upscale target** in Settings: **2K** (default), **3K** or **4K** means
+2048, 3072 or 4096 pixels on the longest side. The image desk uses its selected
+Ratio; character sheets use 16:9. The short edge rounds to the nearest multiple
+of 32, matching generation sizing. For example, 3K at 3:4 gives 2304 × 3072;
+a 4K character sheet is 4096 × 2304. The button tooltip shows the target size.
+This setting saves independently of the normal generation size.
+
+The request uses the server's existing `image_upscale` profile and one registered
+output asset, with the selected seed mode/value and explicit target ratio/size.
+Prompt, reference uploads and normal Steps/CFG controls do not override that
+profile. Its stored private prompt requires the server's Helto session to be
+unlocked. Upscale shares Cancel/Retry and save recovery with generation; changing
+settings while it runs does not alter its captured request. It requires a saved
+result in the current UI session and an asset still available on the server.
 
 ## Output folder and recovery
 
@@ -369,3 +391,17 @@ UI were inspected for desktop, compact, progress and privacy states. These are
 procedural fixtures, not runtime images or native compositor captures. Local
 socket tests required sandbox escalation; native window/file-dialog acceptance
 and live GPU generation were not run. Existing services were not restarted.
+
+### Upscale — 2026-10-16
+
+All 94 workspace tests passed, including 36 UI unit tests. The real proxy/API
+test uses synthetic prompts and fake inference with the shipped upscale profile
+settings: image 3:4 at 3K and sheet 16:9 at 2K, registered output references,
+profile sampling defaults, new files and save retries without repeated inference.
+Headless tests cover persisted targets, every supported ratio, captured retry
+settings and replacing only the composed sheet while retaining Portrait/Views.
+
+Formatting, all-targets/all-features Clippy with warnings denied, the release UI
+build and launcher help passed. Synthetic CPU-rendered settings and image/sheet
+layouts were inspected. Local socket tests used sandbox escalation; no live GPU
+generation, native window interaction or service restart was performed.

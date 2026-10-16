@@ -26,6 +26,7 @@ impl ImagineApp {
                 negative_prompt: String::new(),
                 generation: Default::default(),
                 sheet_width: 1536,
+                upscale_target: Default::default(),
             },
         );
         app.client = Some(Client::connect(&app.connection).unwrap());
@@ -40,6 +41,7 @@ impl ImagineApp {
         }
         app.image.result = Some(Results {
             assets: vec![ResultView {
+                asset_id: "asset_synthetic".into(),
                 role: OutputRole::Image,
                 texture: texture(ctx, &sample, "synthetic-result"),
                 file: project.join("Pictures/Imagine/imagine-example.png"),
