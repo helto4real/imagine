@@ -67,12 +67,15 @@ def main():
     parser.add_argument("--model-root", required=True, type=Path)
     parser.add_argument("--lora", required=True, type=Path)
     parser.add_argument("--run", action="store_true")
+    parser.add_argument("--trace-memory", action="store_true", help="Opt-in allocation sizes/timestamps only; requires --trace-library and permission")
     parser.add_argument("--trace-library", type=Path,
                         help="Opt-in kernel/copy timings only; requires permission to read diagnostic runtime data")
     parser.add_argument("--candidate-manifest", type=Path,
                         help="Verified separate native candidate; frozen baseline is still checked")
     parser.add_argument("--lora-output", choices=("0", "1"),
                         help="Only with --candidate-manifest: toggle the LoRA output fusion")
+    parser.add_argument("--lora-merge", choices=("0", "1"),
+                        help="Separate INT8/ConvRot merge candidate; requires --candidate-manifest")
     args = parser.parse_args()
     manifest = json.loads((BASELINE / "manifest.json").read_text())
     for name, expected in manifest["files_sha256"].items():
@@ -82,11 +85,11 @@ def main():
     if hashlib.sha256(binary.read_bytes()).hexdigest() != manifest["binary_sha256"]:
         raise RuntimeError("Frozen binary hash mismatch")
     binary_hash = manifest["binary_sha256"]
-    if (args.lora_output is not None) != (args.candidate_manifest is not None):
-        parser.error("--candidate-manifest and --lora-output must be supplied together")
+    if (args.lora_output is not None or args.lora_merge is not None) != (args.candidate_manifest is not None):
+        parser.error("--candidate-manifest requires --lora-output or --lora-merge")
     if args.candidate_manifest:
         candidate = json.loads(args.candidate_manifest.read_text())
-        source_lock = PROJECT / "native/lora-output/source-lock.json"
+        source_lock = PROJECT / ("native/lora-merge/source-lock.json" if args.lora_merge is not None else "native/lora-output/source-lock.json")
         if (hashlib.sha256(source_lock.read_bytes()).hexdigest() != candidate["source_lock_sha256"]
                 or candidate["base_binary_sha256"] != manifest["binary_sha256"]):
             raise RuntimeError("Candidate provenance does not match the source lock and frozen baseline")
@@ -106,22 +109,27 @@ def main():
         command[command.index(option) + 1] = str(path)
     command[command.index("--cfg-scale") + 1] = "1"
     command[command.index("--log-level") + 1] = "error"
-    if any(os.environ.get(k) for k in ("LD_PRELOAD", "QWEN_ACTIVITY_TRACE", "QWEN_COPY_STACKS", "QWEN_ACTIVITY_FLUSH")):
+    if any(os.environ.get(k) for k in ("LD_PRELOAD", "QWEN_ACTIVITY_TRACE", "QWEN_COPY_STACKS", "QWEN_ACTIVITY_FLUSH", "QWEN_MEMORY_TRACE")):
         raise RuntimeError("Profiling injection must be disabled")
     env = {k: v for k, v in os.environ.items() if not k.startswith(("SD_", "GGML_"))}
     env.update(json.loads((BASELINE / "baseline-environment.json").read_text()))
     if args.lora_output is not None:
         env["GGML_CUDA_FUSED_LORA_OUTPUT"] = args.lora_output
+    if args.lora_merge is not None:
+        env["SD_QWEN21_MERGE_LORA_INT8"] = args.lora_merge
     library = args.trace_library.resolve(strict=True) if args.trace_library else None
+    if args.trace_memory and not library:
+        parser.error("--trace-memory requires --trace-library")
     plan = {
         "baseline": manifest["id"], "binary_sha256": binary_hash,
-        "lora_output_fusion": args.lora_output,
+        "lora_output_fusion": args.lora_output, "lora_int8_merge": args.lora_merge,
         "width": 1600, "height": 896, "steps": 40, "cfg": 1, "seed": 42,
         "sampler": "er_sde", "scheduler": "beta", "references": 0,
         "prompt": PROMPT, "negative_prompt": "", "lora": str(lora),
         "lora_bytes": lora.stat().st_size, "strength": 1.0,
         "measurement": "client wall time through synchronous HTTP response discarded to /dev/null",
         "trace_library": str(library) if library else None,
+        "trace_memory": args.trace_memory,
         "sequence": ["without_first", "without_warm_1", "without_warm_2",
                      "with_first", "with_warm_1", "with_warm_2",
                      "without_return_first", "without_return_warm"],
@@ -148,6 +156,8 @@ def main():
     if library:
         env.update(LD_PRELOAD=str(library), QWEN_ACTIVITY_TRACE=str(out / "activity.tsv"),
                    QWEN_ACTIVITY_FLUSH=str(out / "flush.request"))
+    if args.trace_memory:
+        env["QWEN_MEMORY_TRACE"] = str(out / "memory.tsv")
     (out / "plan.json").write_text(json.dumps(plan, indent=2) + "\n")
     print(f"RESULTS {out}", flush=True)
     results = []

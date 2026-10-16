@@ -1,0 +1,920 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -339,7 +339,12 @@
+ if (SD_CUDA)
+     find_package(CUDAToolkit REQUIRED)
+     # Keep the driver stub on downstream link lines when no driver is installed.
+-    target_link_libraries(${SD_LIB} PUBLIC CUDA::cuda_driver)
++    enable_language(CUDA)
++    target_sources(${SD_LIB} PRIVATE src/model/adapter/lora_int8_merge.cu)
++    set_property(SOURCE src/model_manager.cpp APPEND PROPERTY COMPILE_DEFINITIONS SD_USE_CUDA)
++    # Match Kitchen/PyTorch staged arithmetic; do not inherit CUDA fast-math here.
++    set_source_files_properties(src/model/adapter/lora_int8_merge.cu PROPERTIES COMPILE_OPTIONS "--fmad=false")
++    target_link_libraries(${SD_LIB} PUBLIC CUDA::cuda_driver CUDA::cudart CUDA::cublas)
+     set_property(SOURCE src/core/ggml_extend_backend.cpp APPEND PROPERTY COMPILE_DEFINITIONS SD_USE_CUDA)
+ endif()
+ target_include_directories(${SD_LIB} PUBLIC . src include)
+--- a/src/model_loader.cpp
++++ b/src/model_loader.cpp
+@@ -1344,7 +1344,8 @@
+             });
+         }
+ 
+-        while (true) {
++        // Silent loads wait directly in join(); polling is only for progress display.
++        while (log_progress) {
+             size_t current_idx = tensor_idx.load();
+             if (current_idx >= tensors_to_process.size() || failed) {
+                 break;
+--- a/src/model_manager.cpp
++++ b/src/model_manager.cpp
+@@ -10,6 +10,7 @@
+ #include "core/ggml_extend_backend.h"
+ #include "core/util.h"
+ #include "model/adapter/lora.hpp"
++#include "model/adapter/lora_int8_merge.h"
+ 
+ static size_t aligned_offset(const void* buffer, size_t offset, size_t alignment) {
+     GGML_ASSERT(alignment != 0 && (alignment & (alignment - 1)) == 0);
+@@ -154,6 +155,7 @@
+         LOG_ERROR("cannot change LoRA configuration during execution");
+         return false;
+     }
++    merged_int8_scales_.clear();
+     loras_        = std::move(loras);
+     lora_version_ = version;
+     current_lora_epoch_++;
+@@ -634,6 +636,11 @@
+         bool& active;
+         ~ApplyGuard() { active = false; }
+     } guard{applying_loras_};
++
++    const char* merge_flag = std::getenv("SD_QWEN21_MERGE_LORA_INT8");
++    if (merge_flag && std::strcmp(merge_flag, "1") == 0 && lora_version_ == VERSION_QWEN_IMAGE_2_1) {
++        return apply_merged_int8_loras(states);
++    }
+ 
+     struct LoraApplyGroup {
+         std::map<std::string, ggml_tensor*> model_tensors;
+@@ -1964,3 +1971,195 @@
+              available_budget.c_str());
+     return false;
+ }
++
++bool ModelManager::apply_merged_int8_loras(const std::vector<TensorState*>& states) {
++#ifndef SD_USE_CUDA
++    LOG_ERROR("INT8 LoRA merge requires CUDA");
++    return false;
++#else
++    std::vector<TensorState*> pending;
++    std::vector<ggml_tensor*> protected_tensors;
++    for (TensorState* state : states) {
++        if (!state || state->component == ModelComponent::LoRA || should_ignore(*state))
++            continue;
++        protected_tensors.push_back(state->tensor);
++        if (state->applied_lora_epoch != current_lora_epoch_)
++            pending.push_back(state);
++    }
++    if (pending.empty())
++        return true;
++    auto backend = pending.front()->compute_backend;
++    if (!sd_backend_is(backend, "CUDA"))
++        return false;
++    DeviceMemoryRequest request;
++    request.compute_backend = backend;
++    request.owner_id        = reinterpret_cast<uintptr_t>(this);
++
++    const auto names = tensor_names();
++    std::map<std::string, TensorState*> by_name;
++    for (const auto& state : tensor_states_)
++        by_name[state->name] = state.get();
++    auto borrowed = std::shared_ptr<ModelManager>(this, [](ModelManager*) {});
++    std::vector<std::shared_ptr<LoraModel>> adapters;
++    for (const auto& spec : loras_) {
++        auto adapter               = std::make_shared<LoraModel>(lora_id(spec), backend, pending.front()->params_backend,
++                                                                 borrowed, spec.file_id, lora_version_, pending.front()->residency_mode);
++        LoraModel::filter_t filter = nullptr;
++        if (!spec.tensor_name_prefix_filter.empty())
++            filter = [&](const std::string& n) { return starts_with(n, spec.tensor_name_prefix_filter); };
++        if (!adapter->init_params(n_threads_, filter))
++            return false;
++        adapter->multiplier = spec.multiplier;
++        adapter->preprocess_lora_tensors(names);
++        // This candidate deliberately rejects adapters outside its tested contract.
++        // Never disable the runtime branch and silently drop an unsupported patch.
++        for (const auto& entry : adapter->lora_tensors) {
++            std::string key              = entry.first;
++            const std::string suffixes[] = {".lora_up", ".lora_down", ".alpha", ".scale"};
++            bool recognized              = false;
++            for (const auto& suffix : suffixes) {
++                if (ends_with(key, suffix)) {
++                    key.resize(key.size() - suffix.size());
++                    recognized = true;
++                    break;
++                }
++            }
++            if (!recognized || !starts_with(key, "lora."))
++                return false;
++            key = key.substr(5);
++            if (ends_with(key, ".weight.1"))
++                key.resize(key.size() - 2);
++            auto found = by_name.find(key);
++            if (found == by_name.end() || found->second->tensor->type != GGML_TYPE_I8 ||
++                found->second->sources.empty() || !found->second->sources.front().is_int8_tensorwise ||
++                !found->second->sources.front().int8_convrot) {
++                LOG_ERROR("INT8 LoRA merge supports ordinary ConvRot linear adapters only");
++                return false;
++            }
++        }
++        adapters.push_back(std::move(adapter));
++    }
++
++    // Scale and weight residency can change independently. Restore the prepared
++    // scale when only that tensor was evicted, without patching a weight twice.
++    for (TensorState* state : pending) {
++        if (!ends_with(state->name, ".weight_scale"))
++            continue;
++        std::string weight_name = state->name.substr(0, state->name.size() - 6);
++        auto cached = merged_int8_scales_.find(weight_name), unused = merged_int8_scales_.end();
++        auto weight = by_name.find(weight_name);
++        if (cached != unused && weight != by_name.end() && weight->second->applied_lora_epoch == current_lora_epoch_) {
++            ggml_backend_tensor_set(state->tensor, cached->second.data(), 0, cached->second.size() * sizeof(float));
++        }
++    }
++    struct OwnedPatch {
++        SdInt8LoraPatch patch;
++        std::vector<float> up, down;
++    };
++    for (TensorState* state : pending) {
++        if (state->tensor->type != GGML_TYPE_I8 || !ends_with(state->name, ".weight"))
++            continue;
++        const int width = int(state->tensor->ne[0]), rows = int(state->tensor->ne[1]);
++        const bool gate_up = ends_with(state->name, ".img_mlp.gate_up.weight");
++        std::vector<OwnedPatch> owned;
++        for (const auto& adapter : adapters) {
++            for (int part = 0; part < (gate_up ? 2 : 1); ++part) {
++                const std::string prefix = "lora." + state->name + (part ? ".1" : "");
++                auto up = adapter->lora_tensors.find(prefix + ".lora_up"), down = adapter->lora_tensors.find(prefix + ".lora_down");
++                if (up == adapter->lora_tensors.end() && down == adapter->lora_tensors.end())
++                    continue;
++                if (up == adapter->lora_tensors.end() || down == adapter->lora_tensors.end())
++                    return false;
++                int rank = int(down->second->ne[1]), out = int(up->second->ne[1]);
++                const bool full_weight = part == 0 && out == rows;
++                const bool half_weight = gate_up && rows % 2 == 0 && out == rows / 2;
++                if (ggml_n_dims(up->second) > 2 || ggml_n_dims(down->second) > 2 || rank < 1 || rank > 256 ||
++                    down->second->ne[0] != width || up->second->ne[0] != rank || (!full_weight && !half_weight))
++                    return false;
++                double strength = adapter->multiplier;
++                auto scale = adapter->lora_tensors.find(prefix + ".scale"), alpha = adapter->lora_tensors.find(prefix + ".alpha");
++                if (scale != adapter->lora_tensors.end())
++                    strength *= adapter->scalar_value(scale->second);
++                else if (alpha != adapter->lora_tensors.end())
++                    strength *= double(adapter->scalar_value(alpha->second)) / rank;
++                OwnedPatch item;
++                item.patch = {part * out, out, rank, float(strength), nullptr, nullptr};
++                if (!adapter->load_merge_operand(up->second, item.up) || !adapter->load_merge_operand(down->second, item.down))
++                    return false;
++                owned.push_back(std::move(item));
++            }
++        }
++        if (owned.empty())
++            continue;
++        if (state->sources.empty())
++            return false;
++        const int group  = state->sources.front().int8_convrot_group_size;
++        auto scale_state = by_name.find(state->name + "_scale");
++        if (scale_state == by_name.end())
++            return false;
++        ggml_tensor* scale = scale_state->second->tensor;
++        if (scale->type != GGML_TYPE_F32 || ggml_nelements(scale) != rows || !scale->data || !state->tensor->data ||
++            std::find(states.begin(), states.end(), scale_state->second) == states.end())
++            return false;
++        std::vector<SdInt8LoraPatch> patches;
++        for (auto& item : owned) {
++            item.patch.up   = item.up.data();
++            item.patch.down = item.down.data();
++            patches.push_back(item.patch);
++        }
++        const bool device_quantized = state->tensor->buffer && !ggml_backend_buffer_is_host(state->tensor->buffer);
++        const size_t workspace = sd_lora_int8_merge_workspace_bytes(width, rows, int(patches.size()), patches.data(), device_quantized);
++        if (!workspace)
++            return false;
++        // Reserve full-matrix scratch plus headroom for the cuBLAS handle. The
++        // existing capacity check adds its own safety margin and can evict other weights.
++        request.pending_allocation_bytes = workspace + 32ULL * 1024 * 1024;
++        if (!ensure_compute_backend_capacity(request, protected_tensors, {}, protected_tensors))
++            return false;
++        std::vector<float> scales(rows);
++        ggml_backend_synchronize(backend);
++        // Always pair reloaded original INT8 bytes with original scales, even
++        // when a previously merged scale tensor is still resident.
++        auto cpu_ctx = std::unique_ptr<ggml_context, decltype(&ggml_free)>(
++            ggml_init({(scale_state->second->sources.size() + 1) * ggml_tensor_overhead(), nullptr, true}), ggml_free);
++        if (!cpu_ctx)
++            return false;
++        std::map<std::string, ggml_tensor*> parts;
++        std::set<std::string> selected;
++        size_t offset = 0;
++        for (const auto& source : scale_state->second->sources) {
++            auto* part = ggml_new_tensor(cpu_ctx.get(), GGML_TYPE_F32, source.n_dims, source.ne);
++            if (offset + ggml_nelements(part) > scales.size())
++                return false;
++            part->data = scales.data() + offset;
++            offset += ggml_nelements(part);
++            parts[source.name] = part;
++            selected.insert(source.name);
++        }
++        if (offset != scales.size())
++            return false;
++        auto load_scale = [&](const TensorStorage& source, ggml_tensor** dst) {
++            auto found = parts.find(source.name);
++            *dst       = found == parts.end() ? nullptr : found->second;
++            return true;
++        };
++        if (!model_loader_.load_tensors(load_scale, enable_mmap_, &selected, false))
++            return false;
++        // Comfy's ordinary ModelPatcher seeds the quantizer from the full key.
++        const std::string key = starts_with(state->name, "model.") ? state->name.substr(6) : state->name;
++        uint32_t crc          = 0xffffffffu;
++        for (unsigned char ch : key) {
++            crc ^= ch;
++            for (int bit = 0; bit < 8; ++bit)
++                crc = (crc >> 1) ^ ((crc & 1) ? 0xedb88320u : 0u);
++        }
++        if (!sd_lora_int8_merge_cuda(width, rows, group, crc ^ 0xffffffffu, int(patches.size()), patches.data(), static_cast<int8_t*>(state->tensor->data), scales.data(), device_quantized))
++            return false;
++        ggml_backend_tensor_set(scale, scales.data(), 0, scales.size() * sizeof(float));
++        merged_int8_scales_[state->name] = std::move(scales);
++    }
++    for (TensorState* state : pending)
++        state->applied_lora_epoch = current_lora_epoch_;
++    return true;
++#endif
++}
+--- a/src/model_manager.h
++++ b/src/model_manager.h
+@@ -104,6 +104,7 @@
+     bool warned_split_lora_skip_ = false;
+     std::set<std::string> common_ignore_tensors_;
+     std::vector<LoraSpec> loras_;
++    std::map<std::string, std::vector<float>> merged_int8_scales_;
+     std::set<ModelLoader::FileId> lora_sources_;
+     bool applying_loras_             = false;
+     SDVersion lora_version_          = VERSION_COUNT;
+@@ -135,6 +136,7 @@
+ 
+     bool load_tensors_to_params_backend(const std::vector<TensorState*>& states);
+     bool apply_loras_to_params(const std::vector<TensorState*>& states);
++    bool apply_merged_int8_loras(const std::vector<TensorState*>& states);
+     bool mmap_params(const std::vector<TensorState*>& states,
+                      std::vector<ParamsStorageBlock*>& created_storage_blocks);
+     static std::vector<TensorStorage> find_tensor_sources(const TensorState& state, const String2TensorStorage& sources);
+--- a/src/model_manager_files.cpp
++++ b/src/model_manager_files.cpp
+@@ -37,8 +37,17 @@
+ 
+ void ModelManager::invalidate_sources(const std::unordered_set<TensorState*>& states) {
+     auto affected = states;
++    // Prepared INT8 bytes and their scales form one logical source revision.
++    for (const auto* state : states) {
++        std::string key = ends_with(state->name, ".weight_scale") ? state->name.substr(0,state->name.size()-6) : state->name;
++        if (merged_int8_scales_.erase(key)) {
++            for (const auto& partner : tensor_states_) {
++                if (partner->name == key || partner->name == key + "_scale") affected.insert(partner.get());
++            }
++        }
++    }
+     for (const auto& block : params_storage_blocks_) {
+-        if (std::any_of(block->states.begin(), block->states.end(), [&](TensorState* state) { return states.count(state) != 0; })) {
++        if (std::any_of(block->states.begin(), block->states.end(), [&](TensorState* state) { return affected.count(state) != 0; })) {
+             affected.insert(block->states.begin(), block->states.end());
+         }
+     }
+--- a/src/pipeline/diffusion_engine.cpp
++++ b/src/pipeline/diffusion_engine.cpp
+@@ -1083,6 +1083,14 @@
+         }
+     } else {
+         apply_lora_immediately = false;
++    }
++
++    const char* merge_flag = std::getenv("SD_QWEN21_MERGE_LORA_INT8");
++    if (merge_flag && std::strcmp(merge_flag, "1") == 0 && have_int8_tensorwise && version == VERSION_QWEN_IMAGE_2_1) {
++        if (!sd_backend_is(backend_for(SDBackendModule::DIFFUSION), "CUDA") || row_split_active()) {
++            throw std::runtime_error("INT8 LoRA merge requires a single CUDA device without row splitting");
++        }
++        apply_lora_immediately = true;
+     }
+ 
+     bool needs_writable_mmap = enable_mmap && apply_lora_immediately;
+--- a/src/model/adapter/lora.hpp
++++ b/src/model/adapter/lora.hpp
+@@ -33,6 +33,7 @@
+     bool params_follow_compute                 = false;
+     std::vector<ggml_tensor*> registered_params;
+     std::map<ggml_tensor*, float> scalar_values;
++    std::map<ggml_tensor*, std::string> source_names;
+ 
+     typedef std::function<bool(const std::string&)> filter_t;
+ 
+@@ -72,6 +73,7 @@
+             const bool scalar  = source.nelements() == 1 && (ends_with(name, ".alpha") || ends_with(name, ".scale"));
+             auto* tensor       = ggml_new_tensor(params_ctx, scalar ? GGML_TYPE_F32 : source.type, source.n_dims, source.ne);
+             lora_tensors[name] = tensor;
++            source_names[tensor] = name;
+             if (scalar) {
+                 tensor->data  = &scalar_values[tensor];
+                 scalars[name] = tensor;
+@@ -99,6 +101,25 @@
+         return model_manager->validate_registered_tensors();
+     }
+ 
++    bool load_merge_operand(ggml_tensor* tensor, std::vector<float>& values) const {
++        auto manager = std::dynamic_pointer_cast<ModelManager>(residency_manager.lock());
++        if (!manager || !source_names.count(tensor)) return false;
++        values.resize(ggml_nelements(tensor));
++        ggml_init_params init{ggml_tensor_overhead() * 2, nullptr, true};
++        ggml_context* ctx = ggml_init(init);
++        if (!ctx) return false;
++        ggml_tensor* output = ggml_new_tensor(ctx, GGML_TYPE_F32, ggml_n_dims(tensor), tensor->ne);
++        output->data = values.data();
++        const std::string& name = source_names.at(tensor);
++        auto callback = [&](const TensorStorage& source, ggml_tensor** dst) {
++            *dst = source.name == name ? output : nullptr;
++            return true;
++        };
++        bool ok = manager->loader().load_file_tensors(source_file, source_version, callback, {name});
++        ggml_free(ctx);
++        return ok;
++    }
++
+     float scalar_value(ggml_tensor* tensor) const {
+         auto found = scalar_values.find(tensor);
+         return found != scalar_values.end() ? found->second : ggml_ext_backend_tensor_get_f32(tensor);
+@@ -114,6 +135,7 @@
+         alloc_params_ctx();
+         lora_tensors.clear();
+         scalar_values.clear();
++        source_names.clear();
+         original_tensor_to_final_tensor.clear();
+         applied_lora_tensors.clear();
+         skipped_incompatible_lora_tensors.clear();
+--- /dev/null
++++ b/src/model/adapter/lora_int8_merge.h
+@@ -0,0 +1,22 @@
++#ifndef SD_LORA_INT8_MERGE_H
++#define SD_LORA_INT8_MERGE_H
++#include <cstddef>
++#include <cstdint>
++
++// Host-resident, row-major matrices. Applies ordered patches before one requantization.
++struct SdInt8LoraPatch {
++    int row_offset;
++    int rows;
++    int rank;
++    float strength;
++    const float* up;
++    const float* down;
++};
++
++// Full-matrix CUDA scratch size, excluding the cuBLAS handle workspace.
++extern "C" size_t sd_lora_int8_merge_workspace_bytes(int input, int rows, int patch_count, const SdInt8LoraPatch* patches, bool device_quantized);
++
++// Scales/patches reside on the host; quantized may already reside on the CUDA device.
++// Caller owns reservation, original-weight restoration and configuration lifetime.
++extern "C" bool sd_lora_int8_merge_cuda(int input, int rows, int group_size, uint64_t seed, int patch_count, const SdInt8LoraPatch* patches, int8_t* quantized, float* scales, bool device_quantized = false);
++#endif
+--- /dev/null
++++ b/src/model/adapter/lora_int8_merge.cu
+@@ -0,0 +1,214 @@
++// ConvRot butterfly, scale rounding and PCG stochastic quantization adapted from
++// Comfy Kitchen 0.2.37 int8.cu. Copyright (c) 2025 Comfy Org. Apache-2.0.
++// The whole-matrix integration and patch application are native Imagine code.
++#include <cublas_v2.h>
++#include <cuda_fp16.h>
++#include <cuda_runtime.h>
++#include <algorithm>
++#include <cmath>
++#include <vector>
++#include "lora_int8_merge.h"
++
++static __device__ float half_round(float x) {
++    return __half2float(__float2half_rn(x));
++}
++static __device__ uint32_t pcg(uint32_t x) {
++    uint32_t state = x * 747796405u + 2891336453u;
++    uint32_t word  = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
++    return (word >> 22u) ^ word;
++}
++static __device__ float noise(uint64_t index, uint64_t seed) {
++    uint64_t key = index + seed;
++    return half_round(float(pcg(uint32_t(key) ^ uint32_t(key >> 32)) >> 8) * 0x1.0p-24f);
++}
++
++// Group-local rotation has the same staged arithmetic and final rounding as
++// Kitchen's groups64 kernels; applying the normalized butterfly twice is identity.
++static __global__ void lora_merge_unrotate(const int8_t* q, const float* scales, half* output, int width, int group) {
++    __shared__ float a[256], b[256];
++    const int lane = threadIdx.x;
++    const int row  = blockIdx.x;
++    const int base = blockIdx.y * group;
++    a[lane]        = float(q[row * width + base + lane]) * scales[row];
++    __syncthreads();
++    float* src = a;
++    float* dst = b;
++    for (int stride = 1; stride < group; stride *= 4) {
++        const int quad  = (lane / (4 * stride)) * (4 * stride) + lane % stride;
++        const int which = (lane / stride) % 4;
++        float x0 = src[quad], x1 = src[quad + stride], x2 = src[quad + 2 * stride], x3 = src[quad + 3 * stride];
++        float y   = which == 0 ? .5f * (x0 + x1 + x2 - x3) : which == 1 ? .5f * (x0 + x1 - x2 + x3)
++                                                         : which == 2   ? .5f * (x0 - x1 + x2 + x3)
++                                                                        : .5f * (-x0 + x1 + x2 + x3);
++        dst[lane] = y;
++        __syncthreads();
++        float* swap = src;
++        src         = dst;
++        dst         = swap;
++    }
++    output[row * width + base + lane] = __float2half_rn(src[lane]);
++}
++
++static __global__ void lora_merge_add(half* base, const float* diff, float strength, int64_t count) {
++    int64_t i = int64_t(blockIdx.x) * blockDim.x + threadIdx.x;
++    if (i < count) {
++        // torch: FP32 product -> FP32 strength -> FP16 delta -> FP16 addition.
++        half delta = __float2half_rn(__fmul_rn(diff[i], strength));
++        base[i]    = __hadd(base[i], delta);
++    }
++}
++
++// Kitchen-style row-local ConvRot + quantization: no full FP32 rotated copy.
++// FP32 rotation/scale calculation, followed by the original FP16 rounding stages.
++static __global__ void lora_merge_quantize(const half* input, int8_t* q, float* scales, int width, uint64_t seed) {
++    extern __shared__ float storage[];
++    float* row_data = storage;
++    float* scratch  = storage + width;
++    __shared__ float maxima[256];
++    const int tid = threadIdx.x, row = blockIdx.x;
++    const int64_t offset = int64_t(row) * width;
++    for (int col = tid; col < width; col += 256)
++        row_data[col] = __half2float(input[offset + col]);
++    __syncthreads();
++    for (int group = 0; group < width; group += 256) {
++        float* src = row_data + group;
++        float* dst = scratch;
++        for (int stride = 1; stride < 256; stride *= 4) {
++            const int quad  = (tid / (4 * stride)) * (4 * stride) + tid % stride;
++            const int which = (tid / stride) % 4;
++            float x0 = src[quad], x1 = src[quad + stride], x2 = src[quad + 2 * stride], x3 = src[quad + 3 * stride];
++            dst[tid] = which == 0 ? .5f * (x0 + x1 + x2 - x3) : which == 1 ? .5f * (x0 + x1 - x2 + x3)
++                                                            : which == 2   ? .5f * (x0 - x1 + x2 + x3)
++                                                                           : .5f * (-x0 + x1 + x2 + x3);
++            __syncthreads();
++            float* swap = src;
++            src         = dst;
++            dst         = swap;
++        }
++    }
++    float maximum = 0;
++    for (int col = tid; col < width; col += 256)
++        maximum = fmaxf(maximum, fabsf(row_data[col]));
++    maxima[tid] = maximum;
++    __syncthreads();
++    for (int stride = 128; stride; stride /= 2) {
++        if (tid < stride)
++            maxima[tid] = fmaxf(maxima[tid], maxima[tid + stride]);
++        __syncthreads();
++    }
++    float scale = fmaxf(fminf(maxima[0], 65504.f) * (1.f / 127.f), 1.e-30f);
++    if (tid == 0)
++        scales[row] = scale;
++    for (int col = tid; col < width; col += 256) {
++        const int64_t i = offset + col;
++        float value     = half_round(half_round(row_data[col]) / half_round(scale));
++        float v         = seed ? floorf(half_round(value + noise(i, seed))) : nearbyintf(value);
++        q[i]            = int8_t(fminf(127.f, fmaxf(-128.f, v)));
++    }
++}
++
++struct MergeCudaWorkspace {
++    void* memory          = nullptr;
++    cublasHandle_t handle = nullptr;
++    cudaStream_t stream   = nullptr;
++    ~MergeCudaWorkspace() {
++        if (stream)
++            cudaStreamSynchronize(stream);
++        if (handle)
++            cublasDestroy(handle);
++        if (memory)
++            cudaFree(memory);
++        if (stream)
++            cudaStreamDestroy(stream);
++    }
++};
++#define SD_MERGE_CUDA(call)        \
++    do {                           \
++        if ((call) != cudaSuccess) \
++            return false;          \
++    } while (0)
++#define SD_MERGE_BLAS(call)                  \
++    do {                                     \
++        if ((call) != CUBLAS_STATUS_SUCCESS) \
++            return false;                    \
++    } while (0)
++
++struct MergeLayout {
++    size_t q = 0, scales = 0, base = 0, diff = 0, up = 0, down = 0, bytes = 0;
++};
++static MergeLayout merge_layout(int width, int rows, int count, const SdInt8LoraPatch* patches, bool device_q) {
++    MergeLayout layout;
++    if (width < 256 || width > 24576 || width % 256 || rows <= 0 || count <= 0 || !patches)
++        return layout;
++    const auto aligned = [](size_t n) { return (n + 255) & ~size_t(255); };
++    for (int j = 0; j < count; ++j) {
++        const auto& p = patches[j];
++        if (p.rank <= 0 || p.rank > 256 || p.rows <= 0 || p.row_offset < 0 ||
++            int64_t(p.row_offset) + p.rows > rows || !std::isfinite(p.strength) || !p.up || !p.down)
++            return {};
++        layout.diff = std::max(layout.diff, aligned(size_t(p.rows) * width * sizeof(float)));
++        layout.up   = std::max(layout.up, aligned(size_t(p.rows) * p.rank * sizeof(float)));
++        layout.down = std::max(layout.down, aligned(size_t(p.rank) * width * sizeof(float)));
++    }
++    const size_t elements = size_t(rows) * width;
++    layout.q              = device_q ? 0 : aligned(elements);
++    layout.scales         = aligned(size_t(rows) * sizeof(float));
++    layout.base           = aligned(elements * sizeof(half));
++    layout.bytes          = layout.q + layout.scales + layout.base + layout.diff + layout.up + layout.down;
++    return layout;
++}
++
++extern "C" size_t sd_lora_int8_merge_workspace_bytes(int width, int rows, int count, const SdInt8LoraPatch* patches, bool device_q) {
++    return merge_layout(width, rows, count, patches, device_q).bytes;
++}
++
++extern "C" bool sd_lora_int8_merge_cuda(int width, int rows, int group, uint64_t seed, int count, const SdInt8LoraPatch* patches, int8_t* q, float* scales, bool device_q) {
++    const auto layout = merge_layout(width, rows, count, patches, device_q);
++    if (group != 256 || !layout.bytes || !q || !scales)
++        return false;
++    int devices = 0;
++    SD_MERGE_CUDA(cudaGetDeviceCount(&devices));
++    if (devices != 1)
++        return false;
++    SD_MERGE_CUDA(cudaSetDevice(0));
++    MergeCudaWorkspace ws;
++    SD_MERGE_CUDA(cudaStreamCreateWithFlags(&ws.stream, cudaStreamNonBlocking));
++    SD_MERGE_CUDA(cudaMalloc(&ws.memory, layout.bytes));
++    SD_MERGE_BLAS(cublasCreate(&ws.handle));
++    SD_MERGE_BLAS(cublasSetStream(ws.handle, ws.stream));
++    SD_MERGE_BLAS(cublasSetMathMode(ws.handle, CUBLAS_PEDANTIC_MATH));
++    char* mem  = static_cast<char*>(ws.memory);
++    int8_t* dq = device_q ? q : reinterpret_cast<int8_t*>(mem);
++    mem += layout.q;
++    float* ds = reinterpret_cast<float*>(mem);
++    mem += layout.scales;
++    half* base = reinterpret_cast<half*>(mem);
++    mem += layout.base;
++    float* diff = reinterpret_cast<float*>(mem);
++    mem += layout.diff;
++    float* up = reinterpret_cast<float*>(mem);
++    mem += layout.up;
++    float* down           = reinterpret_cast<float*>(mem);
++    const size_t elements = size_t(rows) * width;
++    if (!device_q)
++        SD_MERGE_CUDA(cudaMemcpyAsync(dq, q, elements, cudaMemcpyHostToDevice, ws.stream));
++    SD_MERGE_CUDA(cudaMemcpyAsync(ds, scales, size_t(rows) * sizeof(float), cudaMemcpyHostToDevice, ws.stream));
++    lora_merge_unrotate<<<dim3(rows, width / group), group, 0, ws.stream>>>(dq, ds, base, width, group);
++    for (int j = 0; j < count; ++j) {
++        const auto& p = patches[j];
++        SD_MERGE_CUDA(cudaMemcpyAsync(up, p.up, size_t(p.rows) * p.rank * sizeof(float), cudaMemcpyHostToDevice, ws.stream));
++        SD_MERGE_CUDA(cudaMemcpyAsync(down, p.down, size_t(p.rank) * width * sizeof(float), cudaMemcpyHostToDevice, ws.stream));
++        const float alpha = 1.f, beta = 0.f;
++        SD_MERGE_BLAS(cublasSgemm(ws.handle, CUBLAS_OP_N, CUBLAS_OP_N, width, p.rows, p.rank, &alpha, down, width, up, p.rank, &beta, diff, width));
++        lora_merge_add<<<(size_t(p.rows) * width + 255) / 256, 256, 0, ws.stream>>>(base + size_t(p.row_offset) * width, diff, p.strength, size_t(p.rows) * width);
++    }
++    const size_t shared_bytes = size_t(width + 256) * sizeof(float);
++    SD_MERGE_CUDA(cudaFuncSetAttribute(lora_merge_quantize, cudaFuncAttributeMaxDynamicSharedMemorySize, int(shared_bytes)));
++    lora_merge_quantize<<<rows, 256, shared_bytes, ws.stream>>>(base, dq, ds, width, seed);
++    SD_MERGE_CUDA(cudaGetLastError());
++    if (!device_q)
++        SD_MERGE_CUDA(cudaMemcpyAsync(q, dq, elements, cudaMemcpyDeviceToHost, ws.stream));
++    SD_MERGE_CUDA(cudaMemcpyAsync(scales, ds, size_t(rows) * sizeof(float), cudaMemcpyDeviceToHost, ws.stream));
++    SD_MERGE_CUDA(cudaStreamSynchronize(ws.stream));
++    return true;
++}
+--- /dev/null
++++ b/src/model/adapter/lora_int8_merge.LICENSE
+@@ -0,0 +1,202 @@
++
++                                 Apache License
++                           Version 2.0, January 2004
++                        http://www.apache.org/licenses/
++
++   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
++
++   1. Definitions.
++
++      "License" shall mean the terms and conditions for use, reproduction,
++      and distribution as defined by Sections 1 through 9 of this document.
++
++      "Licensor" shall mean the copyright owner or entity authorized by
++      the copyright owner that is granting the License.
++
++      "Legal Entity" shall mean the union of the acting entity and all
++      other entities that control, are controlled by, or are under common
++      control with that entity. For the purposes of this definition,
++      "control" means (i) the power, direct or indirect, to cause the
++      direction or management of such entity, whether by contract or
++      otherwise, or (ii) ownership of fifty percent (50%) or more of the
++      outstanding shares, or (iii) beneficial ownership of such entity.
++
++      "You" (or "Your") shall mean an individual or Legal Entity
++      exercising permissions granted by this License.
++
++      "Source" form shall mean the preferred form for making modifications,
++      including but not limited to software source code, documentation
++      source, and configuration files.
++
++      "Object" form shall mean any form resulting from mechanical
++      transformation or translation of a Source form, including but
++      not limited to compiled object code, generated documentation,
++      and conversions to other media types.
++
++      "Work" shall mean the work of authorship, whether in Source or
++      Object form, made available under the License, as indicated by a
++      copyright notice that is included in or attached to the work
++      (an example is provided in the Appendix below).
++
++      "Derivative Works" shall mean any work, whether in Source or Object
++      form, that is based on (or derived from) the Work and for which the
++      editorial revisions, annotations, elaborations, or other modifications
++      represent, as a whole, an original work of authorship. For the purposes
++      of this License, Derivative Works shall not include works that remain
++      separable from, or merely link (or bind by name) to the interfaces of,
++      the Work and Derivative Works thereof.
++
++      "Contribution" shall mean any work of authorship, including
++      the original version of the Work and any modifications or additions
++      to that Work or Derivative Works thereof, that is intentionally
++      submitted to Licensor for inclusion in the Work by the copyright owner
++      or by an individual or Legal Entity authorized to submit on behalf of
++      the copyright owner. For the purposes of this definition, "submitted"
++      means any form of electronic, verbal, or written communication sent
++      to the Licensor or its representatives, including but not limited to
++      communication on electronic mailing lists, source code control systems,
++      and issue tracking systems that are managed by, or on behalf of, the
++      Licensor for the purpose of discussing and improving the Work, but
++      excluding communication that is conspicuously marked or otherwise
++      designated in writing by the copyright owner as "Not a Contribution."
++
++      "Contributor" shall mean Licensor and any individual or Legal Entity
++      on behalf of whom a Contribution has been received by Licensor and
++      subsequently incorporated within the Work.
++
++   2. Grant of Copyright License. Subject to the terms and conditions of
++      this License, each Contributor hereby grants to You a perpetual,
++      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
++      copyright license to reproduce, prepare Derivative Works of,
++      publicly display, publicly perform, sublicense, and distribute the
++      Work and such Derivative Works in Source or Object form.
++
++   3. Grant of Patent License. Subject to the terms and conditions of
++      this License, each Contributor hereby grants to You a perpetual,
++      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
++      (except as stated in this section) patent license to make, have made,
++      use, offer to sell, sell, import, and otherwise transfer the Work,
++      where such license applies only to those patent claims licensable
++      by such Contributor that are necessarily infringed by their
++      Contribution(s) alone or by combination of their Contribution(s)
++      with the Work to which such Contribution(s) was submitted. If You
++      institute patent litigation against any entity (including a
++      cross-claim or counterclaim in a lawsuit) alleging that the Work
++      or a Contribution incorporated within the Work constitutes direct
++      or contributory patent infringement, then any patent licenses
++      granted to You under this License for that Work shall terminate
++      as of the date such litigation is filed.
++
++   4. Redistribution. You may reproduce and distribute copies of the
++      Work or Derivative Works thereof in any medium, with or without
++      modifications, and in Source or Object form, provided that You
++      meet the following conditions:
++
++      (a) You must give any other recipients of the Work or
++          Derivative Works a copy of this License; and
++
++      (b) You must cause any modified files to carry prominent notices
++          stating that You changed the files; and
++
++      (c) You must retain, in the Source form of any Derivative Works
++          that You distribute, all copyright, patent, trademark, and
++          attribution notices from the Source form of the Work,
++          excluding those notices that do not pertain to any part of
++          the Derivative Works; and
++
++      (d) If the Work includes a "NOTICE" text file as part of its
++          distribution, then any Derivative Works that You distribute must
++          include a readable copy of the attribution notices contained
++          within such NOTICE file, excluding those notices that do not
++          pertain to any part of the Derivative Works, in at least one
++          of the following places: within a NOTICE text file distributed
++          as part of the Derivative Works; within the Source form or
++          documentation, if provided along with the Derivative Works; or,
++          within a display generated by the Derivative Works, if and
++          wherever such third-party notices normally appear. The contents
++          of the NOTICE file are for informational purposes only and
++          do not modify the License. You may add Your own attribution
++          notices within Derivative Works that You distribute, alongside
++          or as an addendum to the NOTICE text from the Work, provided
++          that such additional attribution notices cannot be construed
++          as modifying the License.
++
++      You may add Your own copyright statement to Your modifications and
++      may provide additional or different license terms and conditions
++      for use, reproduction, or distribution of Your modifications, or
++      for any such Derivative Works as a whole, provided Your use,
++      reproduction, and distribution of the Work otherwise complies with
++      the conditions stated in this License.
++
++   5. Submission of Contributions. Unless You explicitly state otherwise,
++      any Contribution intentionally submitted for inclusion in the Work
++      by You to the Licensor shall be under the terms and conditions of
++      this License, without any additional terms or conditions.
++      Notwithstanding the above, nothing herein shall supersede or modify
++      the terms of any separate license agreement you may have executed
++      with Licensor regarding such Contributions.
++
++   6. Trademarks. This License does not grant permission to use the trade
++      names, trademarks, service marks, or product names of the Licensor,
++      except as required for reasonable and customary use in describing the
++      origin of the Work and reproducing the content of the NOTICE file.
++
++   7. Disclaimer of Warranty. Unless required by applicable law or
++      agreed to in writing, Licensor provides the Work (and each
++      Contributor provides its Contributions) on an "AS IS" BASIS,
++      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
++      implied, including, without limitation, any warranties or conditions
++      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
++      PARTICULAR PURPOSE. You are solely responsible for determining the
++      appropriateness of using or redistributing the Work and assume any
++      risks associated with Your exercise of permissions under this License.
++
++   8. Limitation of Liability. In no event and under no legal theory,
++      whether in tort (including negligence), contract, or otherwise,
++      unless required by applicable law (such as deliberate and grossly
++      negligent acts) or agreed to in writing, shall any Contributor be
++      liable to You for damages, including any direct, indirect, special,
++      incidental, or consequential damages of any character arising as a
++      result of this License or out of the use or inability to use the
++      Work (including but not limited to damages for loss of goodwill,
++      work stoppage, computer failure or malfunction, or any and all
++      other commercial damages or losses), even if such Contributor
++      has been advised of the possibility of such damages.
++
++   9. Accepting Warranty or Additional Support. While redistributing
++      the Work or Derivative Works thereof, You may choose to offer,
++      and charge a fee for, acceptance of support, warranty, indemnity,
++      or other liability obligations and/or rights consistent with this
++      License. However, in accepting such obligations, You may act only
++      on Your own behalf and on Your sole responsibility, not on behalf
++      of any other Contributor, and only if You agree to indemnify,
++      defend, and hold each Contributor harmless for any liability
++      incurred by, or claims asserted against, such Contributor by reason
++      of your accepting any such warranty or additional liability.
++
++   END OF TERMS AND CONDITIONS
++
++   APPENDIX: How to apply the Apache License to your work.
++
++      To apply the Apache License to your work, attach the following
++      boilerplate notice, with the fields enclosed by brackets "[]"
++      replaced with your own identifying information. (Don't include
++      the brackets!)  The text should be enclosed in the appropriate
++      comment syntax for the file format. We also recommend that a
++      file or class name and description of purpose be included on the
++      same "printed page" as the copyright notice for easier
++      identification within third-party archives.
++
++   Copyright (c) 2025 Comfy Org. All rights reserved.
++
++   Licensed under the Apache License, Version 2.0 (the "License");
++   you may not use this file except in compliance with the License.
++   You may obtain a copy of the License at
++
++       http://www.apache.org/licenses/LICENSE-2.0
++
++   Unless required by applicable law or agreed to in writing, software
++   distributed under the License is distributed on an "AS IS" BASIS,
++   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++   See the License for the specific language governing permissions and
++   limitations under the License.
+--- /dev/null
++++ b/src/model/adapter/lora_int8_merge.NOTICE
+@@ -0,0 +1,108 @@
++ComfyKitchen
++
++Copyright (c) 2025 Comfy Org. All rights reserved.
++
++This product includes software developed at NVIDIA CORPORATION.
++
++================================================================================
++
++This software uses the following third-party libraries:
++
++--------------------------------------------------------------------------------
++NVIDIA CUDA Runtime (cudart)
++--------------------------------------------------------------------------------
++Copyright (c) 1993-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++License: NVIDIA CUDA Toolkit End User License Agreement (EULA)
++Website: https://developer.nvidia.com/cuda-toolkit
++
++This software statically links and redistributes the NVIDIA CUDA Runtime library
++(cudart_static) in accordance with the NVIDIA CUDA Toolkit EULA. The full license
++is available at: https://docs.nvidia.com/cuda/eula/index.html
++
++NVIDIA permits redistribution of the CUDA runtime libraries as part of applications
++that use the CUDA toolkit, provided that proper attribution is included.
++
++--------------------------------------------------------------------------------
++PyTorch
++--------------------------------------------------------------------------------
++Copyright (c) 2016-present, Meta Platforms, Inc. and PyTorch contributors
++License: BSD-3-Clause
++Website: https://pytorch.org/
++
++PyTorch is used as a runtime dependency for tensor operations.
++
++--------------------------------------------------------------------------------
++nanobind
++--------------------------------------------------------------------------------
++Copyright (c) 2022 Wenzel Jakob <wenzel.jakob@epfl.ch>
++License: BSD-3-Clause
++Website: https://github.com/wjakob/nanobind
++
++nanobind is used at build time to create Python bindings for C++/CUDA code.
++
++--------------------------------------------------------------------------------
++FlashAttention
++--------------------------------------------------------------------------------
++Copyright (c) 2022, the respective contributors, as shown by the AUTHORS file.
++License: BSD-3-Clause
++Website: https://github.com/Dao-AILab/flash-attention
++
++The fixed-cache decode kernel uses FlashAttention 2.7.4.
++
++--------------------------------------------------------------------------------
++PyTorch AO (torchao)
++--------------------------------------------------------------------------------
++Copyright (c) Meta Platforms, Inc. and affiliates.
++License: BSD-3-Clause
++Website: https://github.com/pytorch/ao
++
++Portions of the following files are derived from PyTorch AO:
++
++- comfy_kitchen/backends/eager/quantization.py
++  Source: https://github.com/pytorch/ao/blob/main/torchao/prototype/mx_formats/nvfp4_tensor.py
++
++- comfy_kitchen/float_utils.py (_f32_to_floatx_unpacked, _floatx_unpacked_to_f32)
++  Source: https://github.com/pytorch/ao/blob/main/torchao/prototype/mx_formats/custom_cast.py
++
++BSD 3-Clause License:
++
++Redistribution and use in source and binary forms, with or without modification,
++are permitted provided that the following conditions are met:
++
++1. Redistributions of source code must retain the above copyright notice, this
++   list of conditions and the following disclaimer.
++
++2. Redistributions in binary form must reproduce the above copyright notice,
++   this list of conditions and the following disclaimer in the documentation
++   and/or other materials provided with the distribution.
++
++3. Neither the name of the copyright holder nor the names of its contributors
++   may be used to endorse or promote products derived from this software without
++   specific prior written permission.
++
++THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
++ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
++DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
++ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
++(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
++ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
++SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++
++--------------------------------------------------------------------------------
++SageAttention
++--------------------------------------------------------------------------------
++Copyright (c) 2024 by SageAttention team.
++License: Apache-2.0
++Website: https://github.com/thu-ml/SageAttention
++
++Portions of the CUDA attention and quantization kernels under
++comfy_kitchen/backends/cuda/sage_attention/ are derived from SageAttention
++commit d1a57a546c3d395b1ffcbeecc66d81db76f3b4b5.
++
++================================================================================
++
++For full license texts of these dependencies, please refer to their respective
++project repositories or installation directories.

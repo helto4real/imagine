@@ -1,0 +1,52 @@
+{
+  "base_lock_sha256": "dff1196594bfc9a454ea0e8c3d69b0b2815feb91c6beafd86221d0d68a4303ea",
+  "parent_lock_sha256": "70d81ba06ea813a643c5f28d00cf1e636ee95a45b3377077febc0935122b9bb9",
+  "base_profile": "qwen-image21-1600x896-v2",
+  "files": {
+    "CMakeLists.txt": {
+      "before": "bdde0ef35b749196b7401f5eddd0245f097d0f14cd3442e0ed6d95b74e24606c",
+      "after": "b0829f4f65c03e2795cdaf2efd5a542ed60dc8a9da7649da1d6afe5c2a505593"
+    },
+    "src/model_loader.cpp": {
+      "before": "31eede334981bafd782e06ba46d0fdb5e0d5575bb729ad89b50248a089e19cd6",
+      "after": "3de86334a4fc9b7148c0b98a3558dbe6f3811dcf7e894f49b6330ae775d9d1da"
+    },
+    "src/model_manager.cpp": {
+      "before": "77626253494203eb848a19eb118afd4cf3587bb65ade702caf8d59d899af509e",
+      "after": "1402359537a253a9b10c1450cdbef443e0e547864cfbf2ff2d0f1778dd5fed24"
+    },
+    "src/model_manager.h": {
+      "before": "1bed6a0413181be9274c99dea5e62d3d89a71f8dcba4d8258f7af79b68d55da0",
+      "after": "e943d8acc9783aa3c8f6cc3e256c32b25e9d69b046f326054fe1943976d5d949"
+    },
+    "src/model_manager_files.cpp": {
+      "before": "dad5f1dbc4dc6bc9759254658447a2cb738c9724fd73219dc23547b1efda9b86",
+      "after": "ddcea6542eaa63f40989ea3fd33cee02f385f8c67e8744873719b4f1d9664cbc"
+    },
+    "src/pipeline/diffusion_engine.cpp": {
+      "before": "b604f471d97158821c2e090446533dee4626349f68f776df716c3966aa665ba7",
+      "after": "bfc3148819cf9c16fca41ad30c15481c3b6ec8c95ce3e67c46908f556eced470"
+    },
+    "src/model/adapter/lora.hpp": {
+      "before": "dd6e15aabcb3e856118abc413ce07058417e4d8fcd6b4d792e217fb9968b7429",
+      "after": "8156948bc700d3b672168fa06e6fd12de3cd8baaa39e7c93192ffe82b1ba59d7"
+    },
+    "src/model/adapter/lora_int8_merge.h": {
+      "before": null,
+      "after": "939d2b71cc1e4c9d738b8e3999c15944cea6896c9808fe1924317900cc7b120a"
+    },
+    "src/model/adapter/lora_int8_merge.cu": {
+      "before": null,
+      "after": "5eb7fb51850d4bbe6833eaab16c444de305b72aad4d1b9c8c77aa7c00a98a783"
+    },
+    "src/model/adapter/lora_int8_merge.LICENSE": {
+      "before": null,
+      "after": "cd1c9ea1573c9047e9b5a3676ecc1c8f755e56f249ac1ebd8b5ceda7899037da"
+    },
+    "src/model/adapter/lora_int8_merge.NOTICE": {
+      "before": null,
+      "after": "35c43127ad3acbd6bc94ff63c56684a7c26eedf07795e596c8105a0476dae2ea"
+    }
+  },
+  "patch_sha256": "0ba2c0d63b7fed32ce908256b0410dc305c8173f87e998af4bd9ab0b987ff0e4"
+}

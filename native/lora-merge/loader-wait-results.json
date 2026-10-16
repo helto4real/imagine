@@ -1,0 +1,1121 @@
+{
+  "complete": true,
+  "change": "Skip progress polling for silent loads; join workers directly.",
+  "candidate": {
+    "binary_path": ".imagine/lora-merge/build/bin/sd-server",
+    "binary_sha256": "f5ab9ed7e583d2d85fad917efa0338ade07da3629b249b12ebf7b95f2ec2d116",
+    "source_lock_sha256": "990b8e4c4e4a4dbe9f9dfe35dd61d662814ecbe686e6baff0b89503208ef3de7",
+    "base_binary_sha256": "9fd49b0e5cb3426043ebd85271ad167555551ac65252590cde5ac25bed44bbb0"
+  },
+  "workload": {
+    "width": 1600,
+    "height": 896,
+    "steps": 40,
+    "cfg": 1,
+    "seed": 42,
+    "sampler": "er_sde",
+    "scheduler": "beta",
+    "lora": "lenovo_qwen21.safetensors",
+    "strength": 1.0,
+    "batch": 1,
+    "references": 0
+  },
+  "previous_candidate": {
+    "binary_path": ".imagine/lora-merge/build/bin/sd-server",
+    "binary_sha256": "2a9adef375ab60b01a82c6e28b9af1835b1f94d66dac2c877df0173facdc12de",
+    "source_lock_sha256": "6eb42bb40e8ca691d46ac73842bfe8eb6c9da105f59287d9862fb3a9846d43fd",
+    "base_binary_sha256": "9fd49b0e5cb3426043ebd85271ad167555551ac65252590cde5ac25bed44bbb0"
+  },
+  "previous_control_directory": ".imagine/lora-merge/whole-matrix-control",
+  "native_before": {
+    "run_directory": "lora-cfg1-0wth3yd2",
+    "reused": true,
+    "first_lora_seconds": 27.48827119800262,
+    "warm_lora_mean_seconds": 21.018666798539925,
+    "warm_without_mean_seconds": 19.90497948398115,
+    "first_minus_warm_seconds": 6.469604399462696
+  },
+  "native_after": {
+    "run_directory": "lora-cfg1-pr448kaa",
+    "first_lora_seconds": 21.829082733020186,
+    "warm_lora_mean_seconds": 20.189731942955405,
+    "warm_without_mean_seconds": 19.891883424541447,
+    "first_minus_warm_seconds": 1.639350790064782,
+    "without_warm_mean_seconds": 19.891883424541447,
+    "with_warm_mean_seconds": 20.189731942955405,
+    "ratio": 1.0149733693917837,
+    "runs": [
+      {
+        "case": "without_first",
+        "seconds": 22.997858249000274,
+        "http_status": 200,
+        "gpu_before": {
+          "free_mib": 14236.0,
+          "utilization_percent": 0.0
+        },
+        "start_ns": 899013843200092,
+        "end_ns": 899036841084312
+      },
+      {
+        "case": "without_warm_1",
+        "seconds": 19.873260991997086,
+        "http_status": 200,
+        "gpu_before": {
+          "free_mib": 8216.0,
+          "utilization_percent": 100.0
+        },
+        "start_ns": 899036865653513,
+        "end_ns": 899056738941950
+      },
+      {
+        "case": "without_warm_2",
+        "seconds": 19.91050585708581,
+        "http_status": 200,
+        "gpu_before": {
+          "free_mib": 8216.0,
+          "utilization_percent": 100.0
+        },
+        "start_ns": 899056764902231,
+        "end_ns": 899076675435661
+      },
+      {
+        "case": "with_first",
+        "seconds": 21.829082733020186,
+        "http_status": 200,
+        "gpu_before": {
+          "free_mib": 8216.0,
+          "utilization_percent": 100.0
+        },
+        "start_ns": 899076697350449,
+        "end_ns": 899098526501674
+      },
+      {
+        "case": "with_warm_1",
+        "seconds": 20.18955777795054,
+        "http_status": 200,
+        "gpu_before": {
+          "free_mib": 8212.0,
+          "utilization_percent": 96.0
+        },
+        "start_ns": 899098552691929,
+        "end_ns": 899118742275915
+      },
+      {
+        "case": "with_warm_2",
+        "seconds": 20.18990610796027,
+        "http_status": 200,
+        "gpu_before": {
+          "free_mib": 8208.0,
+          "utilization_percent": 100.0
+        },
+        "start_ns": 899118767819469,
+        "end_ns": 899138957756077
+      },
+      {
+        "case": "without_return_first",
+        "seconds": 21.185846235021017,
+        "http_status": 200,
+        "gpu_before": {
+          "free_mib": 8204.0,
+          "utilization_percent": 92.0
+        },
+        "start_ns": 899138986511005,
+        "end_ns": 899160172384741
+      },
+      {
+        "case": "without_return_warm",
+        "seconds": 19.877627987065352,
+        "http_status": 200,
+        "gpu_before": {
+          "free_mib": 8200.0,
+          "utilization_percent": 100.0
+        },
+        "start_ns": 899160191253558,
+        "end_ns": 899180068915997
+      }
+    ],
+    "startup_seconds": 0.43050320202019066,
+    "trace_checkpoints": [
+      "# checkpoint_dropped_records=0"
+    ],
+    "fusion_counts_per_request": {
+      "int8_gate_up_swiglu": 1280,
+      "int8_attention_residual": 1248,
+      "int8_down_residual": 1248,
+      "int8_bf16_output": 3840,
+      "norm_modulation_convrot": 2496
+    },
+    "gpu_activity_union_seconds": {
+      "without_first": 19.849190972,
+      "without_warm_1": 18.965750215,
+      "without_warm_2": 18.971184825,
+      "with_first": 19.702785579,
+      "with_warm_1": 19.051491715,
+      "with_warm_2": 19.05449442,
+      "without_return_first": 19.908081006,
+      "without_return_warm": 19.002412231
+    }
+  },
+  "comfy_latest_control": {
+    "run_directory": "comfy-lora-cfg1-mvdjgtgn",
+    "reused": true,
+    "timing_only_diagnostic": true,
+    "first_lora_seconds": 20.45978087000549,
+    "warm_lora_mean_seconds": 20.194621776987333,
+    "warm_without_mean_seconds": 20.28150550049031,
+    "first_minus_warm_seconds": 0.26515909301815554
+  },
+  "comfy_earlier_control": {
+    "run_directory": "comfy-lora-cfg1-veb6za2v",
+    "reused": true,
+    "first_lora_seconds": 21.28249495907221,
+    "warm_lora_mean_seconds": 20.82047632546164,
+    "warm_without_mean_seconds": 21.063428954978008,
+    "first_minus_warm_seconds": 0.46201863361056894
+  },
+  "differences": {
+    "first_request_saved_seconds": 5.659188464982435,
+    "first_request_reduction_percent": 20.587647816111655,
+    "warm_request_saved_seconds": 0.8289348555845208,
+    "first_request_gap_vs_latest_comfy_seconds": 1.369301863014698,
+    "extra_activation_gap_vs_latest_comfy_seconds": 1.3741916970466264
+  },
+  "diagnostic": {
+    "run_directory": "lora-cfg1-hhh6_7o9",
+    "manifest": {
+      "binary_path": ".imagine/lora-merge/activation-waits-diagnostic/sd-server",
+      "binary_sha256": "ab8e8ca9f9ce4a3d725a1543685988e0aae5d18ed912a44d64416e93f82e2ab1",
+      "source_lock_sha256": "990b8e4c4e4a4dbe9f9dfe35dd61d662814ecbe686e6baff0b89503208ef3de7",
+      "base_binary_sha256": "9fd49b0e5cb3426043ebd85271ad167555551ac65252590cde5ac25bed44bbb0",
+      "parent_binary_sha256": "f5ab9ed7e583d2d85fad917efa0338ade07da3629b249b12ebf7b95f2ec2d116",
+      "diagnostic_only": true,
+      "timer_header_sha256": "0bd15899560dffc4b2e7ecbf422c9820b974a523ad28b63133c2d59d6964958e",
+      "diagnostic_sources": {
+        "src/model_manager.cpp": {
+          "original_sha256": "1402359537a253a9b10c1450cdbef443e0e547864cfbf2ff2d0f1778dd5fed24",
+          "diagnostic_sha256": "7ac92367df0fb23594b8ef36391064e94d83bba4f7fac082ee37709ece6f6df0"
+        },
+        "src/pipeline/diffusion_engine.cpp": {
+          "original_sha256": "bfc3148819cf9c16fca41ad30c15481c3b6ec8c95ce3e67c46908f556eced470",
+          "diagnostic_sha256": "c3fe559bc4a76bb5c31b1a26061d3a9f2e7f12426d2c0b142cfd805218044d52"
+        },
+        "src/model_loader.cpp": {
+          "original_sha256": "3de86334a4fc9b7148c0b98a3558dbe6f3811dcf7e894f49b6330ae775d9d1da",
+          "diagnostic_sha256": "4019c61d005310d39e23ddbecac33f1163a799f76a21201f9702a5d1f2b10daa"
+        },
+        "src/model_loader_files.cpp": {
+          "original_sha256": "88a8bda8a43052d7158da9468c7d50eaa5e6b723891ae6602076c86b60b54133",
+          "diagnostic_sha256": "b20db8fa605702ac731ab92438f25842a2f881131524e309470abf56e68d2331"
+        }
+      }
+    },
+    "trace_checkpoints": [
+      "# checkpoint_dropped_records=0"
+    ],
+    "first_lora_seconds": 21.842223951010965,
+    "warm_lora_mean_seconds": 20.165775928995572,
+    "warm_without_mean_seconds": 19.89075287198648,
+    "first_minus_warm_seconds": 1.6764480220153928,
+    "runs": [
+      {
+        "case": "without_first",
+        "seconds": 22.998219783999957,
+        "phases": {
+          "engine.apply_loras": {
+            "count": 1,
+            "sum_seconds": 0.005415389,
+            "union_seconds": 0.005415389
+          },
+          "engine.conditioning": {
+            "count": 1,
+            "sum_seconds": 1.911132044,
+            "union_seconds": 1.911132044
+          },
+          "loader.join": {
+            "count": 33,
+            "sum_seconds": 0.001184973,
+            "union_seconds": 0.001184973
+          },
+          "loader.poll_sleep": {
+            "count": 8,
+            "sum_seconds": 1.601106413,
+            "union_seconds": 1.601106413
+          },
+          "loader.process_files": {
+            "count": 3,
+            "sum_seconds": 7.36e-07,
+            "union_seconds": 7.36e-07
+          },
+          "loader.total": {
+            "count": 3,
+            "sum_seconds": 1.606156916,
+            "union_seconds": 1.606156916
+          },
+          "loader.validate": {
+            "count": 6,
+            "sum_seconds": 0.00049966,
+            "union_seconds": 0.00049966
+          },
+          "loader.worker": {
+            "count": 33,
+            "sum_seconds": 13.294518566,
+            "union_seconds": 1.346963686
+          },
+          "lora.catalog": {
+            "count": 1,
+            "sum_seconds": 0.005374983,
+            "union_seconds": 0.005374983
+          },
+          "weights.load": {
+            "count": 3,
+            "sum_seconds": 1.607127958,
+            "union_seconds": 1.607127958
+          }
+        },
+        "merge_outside_conditioning_seconds": 0.0,
+        "loader_wait_breakdown": {
+          "merge.operand_up": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.operand_down": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.original_scales": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          }
+        }
+      },
+      {
+        "case": "without_warm_1",
+        "seconds": 19.889500207966194,
+        "phases": {
+          "engine.apply_loras": {
+            "count": 1,
+            "sum_seconds": 0.003277654,
+            "union_seconds": 0.003277654
+          },
+          "engine.conditioning": {
+            "count": 1,
+            "sum_seconds": 6.2493e-05,
+            "union_seconds": 6.2493e-05
+          },
+          "loader.join": {
+            "count": 11,
+            "sum_seconds": 0.000294065,
+            "union_seconds": 0.000294065
+          },
+          "loader.poll_sleep": {
+            "count": 1,
+            "sum_seconds": 0.200150587,
+            "union_seconds": 0.200150587
+          },
+          "loader.process_files": {
+            "count": 1,
+            "sum_seconds": 3.2e-07,
+            "union_seconds": 3.2e-07
+          },
+          "loader.total": {
+            "count": 1,
+            "sum_seconds": 0.201315644,
+            "union_seconds": 0.201315644
+          },
+          "loader.validate": {
+            "count": 2,
+            "sum_seconds": 8.274e-05,
+            "union_seconds": 8.274e-05
+          },
+          "loader.worker": {
+            "count": 11,
+            "sum_seconds": 1.189387495,
+            "union_seconds": 0.132133653
+          },
+          "lora.catalog": {
+            "count": 1,
+            "sum_seconds": 0.003266669,
+            "union_seconds": 0.003266669
+          },
+          "weights.load": {
+            "count": 1,
+            "sum_seconds": 0.201395763,
+            "union_seconds": 0.201395763
+          }
+        },
+        "merge_outside_conditioning_seconds": 0.0,
+        "loader_wait_breakdown": {
+          "merge.operand_up": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.operand_down": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.original_scales": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          }
+        }
+      },
+      {
+        "case": "without_warm_2",
+        "seconds": 19.892005536006764,
+        "phases": {
+          "engine.apply_loras": {
+            "count": 1,
+            "sum_seconds": 0.003289921,
+            "union_seconds": 0.003289921
+          },
+          "engine.conditioning": {
+            "count": 1,
+            "sum_seconds": 5.4507e-05,
+            "union_seconds": 5.4507e-05
+          },
+          "loader.join": {
+            "count": 11,
+            "sum_seconds": 0.000432514,
+            "union_seconds": 0.000432514
+          },
+          "loader.poll_sleep": {
+            "count": 1,
+            "sum_seconds": 0.200081299,
+            "union_seconds": 0.200081299
+          },
+          "loader.process_files": {
+            "count": 1,
+            "sum_seconds": 2.19e-07,
+            "union_seconds": 2.19e-07
+          },
+          "loader.total": {
+            "count": 1,
+            "sum_seconds": 0.201527624,
+            "union_seconds": 0.201527624
+          },
+          "loader.validate": {
+            "count": 2,
+            "sum_seconds": 0.000137405,
+            "union_seconds": 0.000137405
+          },
+          "loader.worker": {
+            "count": 11,
+            "sum_seconds": 1.190912191,
+            "union_seconds": 0.131936885
+          },
+          "lora.catalog": {
+            "count": 1,
+            "sum_seconds": 0.003279659,
+            "union_seconds": 0.003279659
+          },
+          "weights.load": {
+            "count": 1,
+            "sum_seconds": 0.201642811,
+            "union_seconds": 0.201642811
+          }
+        },
+        "merge_outside_conditioning_seconds": 0.0,
+        "loader_wait_breakdown": {
+          "merge.operand_up": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.operand_down": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.original_scales": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          }
+        }
+      },
+      {
+        "case": "with_first",
+        "seconds": 21.842223951010965,
+        "phases": {
+          "engine.apply_loras": {
+            "count": 1,
+            "sum_seconds": 0.011020139,
+            "union_seconds": 0.011020139
+          },
+          "engine.conditioning": {
+            "count": 1,
+            "sum_seconds": 0.310427609,
+            "union_seconds": 0.310427609
+          },
+          "loader.file_reader": {
+            "count": 390,
+            "sum_seconds": 0.673055604,
+            "union_seconds": 0.673055604
+          },
+          "loader.join": {
+            "count": 587,
+            "sum_seconds": 0.226157879,
+            "union_seconds": 0.226157879
+          },
+          "loader.poll_sleep": {
+            "count": 1,
+            "sum_seconds": 0.200175741,
+            "union_seconds": 0.200175741
+          },
+          "loader.process_files": {
+            "count": 577,
+            "sum_seconds": 0.011578434,
+            "union_seconds": 0.011578434
+          },
+          "loader.total": {
+            "count": 577,
+            "sum_seconds": 0.488454996,
+            "union_seconds": 0.488454996
+          },
+          "loader.validate": {
+            "count": 1154,
+            "sum_seconds": 0.005406225,
+            "union_seconds": 0.005406225
+          },
+          "loader.worker": {
+            "count": 587,
+            "sum_seconds": 2.007442513,
+            "union_seconds": 0.360154123
+          },
+          "lora.catalog": {
+            "count": 1,
+            "sum_seconds": 0.010985446,
+            "union_seconds": 0.010985446
+          },
+          "merge.adapter_init": {
+            "count": 3,
+            "sum_seconds": 0.013668276,
+            "union_seconds": 0.013668276
+          },
+          "merge.adapter_mapping": {
+            "count": 3,
+            "sum_seconds": 0.000193588,
+            "union_seconds": 0.000193588
+          },
+          "merge.backend_sync": {
+            "count": 192,
+            "sum_seconds": 0.000480157,
+            "union_seconds": 0.000480157
+          },
+          "merge.capacity": {
+            "count": 192,
+            "sum_seconds": 0.00964091,
+            "union_seconds": 0.00964091
+          },
+          "merge.cuda_total": {
+            "count": 192,
+            "sum_seconds": 0.565435242,
+            "union_seconds": 0.565435242
+          },
+          "merge.operand_down": {
+            "count": 192,
+            "sum_seconds": 0.442770651,
+            "union_seconds": 0.442770651
+          },
+          "merge.operand_up": {
+            "count": 192,
+            "sum_seconds": 0.474435783,
+            "union_seconds": 0.474435783
+          },
+          "merge.original_scales": {
+            "count": 192,
+            "sum_seconds": 0.061442563,
+            "union_seconds": 0.061442563
+          },
+          "merge.scale_store": {
+            "count": 192,
+            "sum_seconds": 0.035383122,
+            "union_seconds": 0.035383122
+          },
+          "merge.total": {
+            "count": 42,
+            "sum_seconds": 1.609016988,
+            "union_seconds": 1.609016988
+          },
+          "weights.load": {
+            "count": 1,
+            "sum_seconds": 0.201712288,
+            "union_seconds": 0.201712288
+          }
+        },
+        "merge_outside_conditioning_seconds": 1.604114354,
+        "loader_wait_breakdown": {
+          "merge.operand_up": {
+            "parent_seconds": 0.474435783,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.093689286,
+            "join_seconds": 0.113614666,
+            "catalog_reader_seconds": 0.332175244,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.operand_down": {
+            "parent_seconds": 0.442770651,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.067340745,
+            "join_seconds": 0.086433002,
+            "catalog_reader_seconds": 0.328654632,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.original_scales": {
+            "parent_seconds": 0.061442563,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.006402822,
+            "join_seconds": 0.025907609,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          }
+        }
+      },
+      {
+        "case": "with_warm_1",
+        "seconds": 20.165719063952565,
+        "phases": {
+          "engine.apply_loras": {
+            "count": 1,
+            "sum_seconds": 0.00553397,
+            "union_seconds": 0.00553397
+          },
+          "engine.conditioning": {
+            "count": 1,
+            "sum_seconds": 6.0698e-05,
+            "union_seconds": 6.0698e-05
+          },
+          "loader.file_reader": {
+            "count": 60,
+            "sum_seconds": 0.111052557,
+            "union_seconds": 0.111052557
+          },
+          "loader.join": {
+            "count": 95,
+            "sum_seconds": 0.024065521,
+            "union_seconds": 0.024065521
+          },
+          "loader.poll_sleep": {
+            "count": 1,
+            "sum_seconds": 0.200140211,
+            "union_seconds": 0.200140211
+          },
+          "loader.process_files": {
+            "count": 85,
+            "sum_seconds": 0.001730811,
+            "union_seconds": 0.001730811
+          },
+          "loader.total": {
+            "count": 85,
+            "sum_seconds": 0.234397026,
+            "union_seconds": 0.234397026
+          },
+          "loader.validate": {
+            "count": 170,
+            "sum_seconds": 0.000868522,
+            "union_seconds": 0.000868522
+          },
+          "loader.worker": {
+            "count": 95,
+            "sum_seconds": 1.223439208,
+            "union_seconds": 0.145714809
+          },
+          "lora.catalog": {
+            "count": 1,
+            "sum_seconds": 0.005518387,
+            "union_seconds": 0.005518387
+          },
+          "merge.adapter_init": {
+            "count": 2,
+            "sum_seconds": 0.008091525,
+            "union_seconds": 0.008091525
+          },
+          "merge.adapter_mapping": {
+            "count": 2,
+            "sum_seconds": 0.000142679,
+            "union_seconds": 0.000142679
+          },
+          "merge.backend_sync": {
+            "count": 28,
+            "sum_seconds": 7.7615e-05,
+            "union_seconds": 7.7615e-05
+          },
+          "merge.capacity": {
+            "count": 28,
+            "sum_seconds": 0.001728837,
+            "union_seconds": 0.001728837
+          },
+          "merge.cuda_total": {
+            "count": 28,
+            "sum_seconds": 0.084551047,
+            "union_seconds": 0.084551047
+          },
+          "merge.operand_down": {
+            "count": 28,
+            "sum_seconds": 0.06749166,
+            "union_seconds": 0.06749166
+          },
+          "merge.operand_up": {
+            "count": 28,
+            "sum_seconds": 0.06484289,
+            "union_seconds": 0.06484289
+          },
+          "merge.original_scales": {
+            "count": 28,
+            "sum_seconds": 0.010027248,
+            "union_seconds": 0.010027248
+          },
+          "merge.scale_store": {
+            "count": 28,
+            "sum_seconds": 0.005514828,
+            "union_seconds": 0.005514828
+          },
+          "merge.total": {
+            "count": 41,
+            "sum_seconds": 0.245106192,
+            "union_seconds": 0.245106192
+          },
+          "weights.load": {
+            "count": 1,
+            "sum_seconds": 0.201141593,
+            "union_seconds": 0.201141593
+          }
+        },
+        "merge_outside_conditioning_seconds": 0.245106192,
+        "loader_wait_breakdown": {
+          "merge.operand_up": {
+            "parent_seconds": 0.06484289,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.007180806,
+            "join_seconds": 0.010698964,
+            "catalog_reader_seconds": 0.049431393,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.operand_down": {
+            "parent_seconds": 0.06749166,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.005402701,
+            "join_seconds": 0.008768827,
+            "catalog_reader_seconds": 0.054565022,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.original_scales": {
+            "parent_seconds": 0.010027248,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.000667218,
+            "join_seconds": 0.004424523,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          }
+        }
+      },
+      {
+        "case": "with_warm_2",
+        "seconds": 20.16583279403858,
+        "phases": {
+          "engine.apply_loras": {
+            "count": 1,
+            "sum_seconds": 0.005599402,
+            "union_seconds": 0.005599402
+          },
+          "engine.conditioning": {
+            "count": 1,
+            "sum_seconds": 6.7962e-05,
+            "union_seconds": 6.7962e-05
+          },
+          "loader.file_reader": {
+            "count": 60,
+            "sum_seconds": 0.111250749,
+            "union_seconds": 0.111250749
+          },
+          "loader.join": {
+            "count": 95,
+            "sum_seconds": 0.029226715,
+            "union_seconds": 0.029226715
+          },
+          "loader.poll_sleep": {
+            "count": 1,
+            "sum_seconds": 0.20006038,
+            "union_seconds": 0.20006038
+          },
+          "loader.process_files": {
+            "count": 85,
+            "sum_seconds": 0.001800474,
+            "union_seconds": 0.001800474
+          },
+          "loader.total": {
+            "count": 85,
+            "sum_seconds": 0.239719948,
+            "union_seconds": 0.239719948
+          },
+          "loader.validate": {
+            "count": 170,
+            "sum_seconds": 0.000909241,
+            "union_seconds": 0.000909241
+          },
+          "loader.worker": {
+            "count": 95,
+            "sum_seconds": 1.291545381,
+            "union_seconds": 0.15322009
+          },
+          "lora.catalog": {
+            "count": 1,
+            "sum_seconds": 0.005583518,
+            "union_seconds": 0.005583518
+          },
+          "merge.adapter_init": {
+            "count": 2,
+            "sum_seconds": 0.008077227,
+            "union_seconds": 0.008077227
+          },
+          "merge.adapter_mapping": {
+            "count": 2,
+            "sum_seconds": 0.0001489,
+            "union_seconds": 0.0001489
+          },
+          "merge.backend_sync": {
+            "count": 28,
+            "sum_seconds": 7.1021e-05,
+            "union_seconds": 7.1021e-05
+          },
+          "merge.capacity": {
+            "count": 28,
+            "sum_seconds": 0.001716853,
+            "union_seconds": 0.001716853
+          },
+          "merge.cuda_total": {
+            "count": 28,
+            "sum_seconds": 0.08442892,
+            "union_seconds": 0.08442892
+          },
+          "merge.operand_down": {
+            "count": 28,
+            "sum_seconds": 0.070252684,
+            "union_seconds": 0.070252684
+          },
+          "merge.operand_up": {
+            "count": 28,
+            "sum_seconds": 0.067513345,
+            "union_seconds": 0.067513345
+          },
+          "merge.original_scales": {
+            "count": 28,
+            "sum_seconds": 0.010157983,
+            "union_seconds": 0.010157983
+          },
+          "merge.scale_store": {
+            "count": 28,
+            "sum_seconds": 0.005533479,
+            "union_seconds": 0.005533479
+          },
+          "merge.total": {
+            "count": 41,
+            "sum_seconds": 0.250738122,
+            "union_seconds": 0.250738122
+          },
+          "weights.load": {
+            "count": 1,
+            "sum_seconds": 0.201032198,
+            "union_seconds": 0.201032198
+          }
+        },
+        "merge_outside_conditioning_seconds": 0.250738122,
+        "loader_wait_breakdown": {
+          "merge.operand_up": {
+            "parent_seconds": 0.067513345,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.010089281,
+            "join_seconds": 0.013461442,
+            "catalog_reader_seconds": 0.049261889,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.operand_down": {
+            "parent_seconds": 0.070252684,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.008071891,
+            "join_seconds": 0.011236227,
+            "catalog_reader_seconds": 0.054925641,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.original_scales": {
+            "parent_seconds": 0.010157983,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.000908174,
+            "join_seconds": 0.004415062,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          }
+        }
+      },
+      {
+        "case": "without_return_first",
+        "seconds": 21.228587781079113,
+        "phases": {
+          "engine.apply_loras": {
+            "count": 1,
+            "sum_seconds": 0.061399215,
+            "union_seconds": 0.061399215
+          },
+          "engine.conditioning": {
+            "count": 1,
+            "sum_seconds": 0.594936786,
+            "union_seconds": 0.594936786
+          },
+          "loader.join": {
+            "count": 13,
+            "sum_seconds": 0.296173814,
+            "union_seconds": 0.296173814
+          },
+          "loader.poll_sleep": {
+            "count": 5,
+            "sum_seconds": 0.810598677,
+            "union_seconds": 0.810598677
+          },
+          "loader.process_files": {
+            "count": 2,
+            "sum_seconds": 0.000134142,
+            "union_seconds": 0.000134142
+          },
+          "loader.total": {
+            "count": 2,
+            "sum_seconds": 1.108240424,
+            "union_seconds": 1.108240424
+          },
+          "loader.validate": {
+            "count": 4,
+            "sum_seconds": 0.000177728,
+            "union_seconds": 0.000177728
+          },
+          "loader.worker": {
+            "count": 13,
+            "sum_seconds": 9.146860702,
+            "union_seconds": 1.106801525
+          },
+          "lora.catalog": {
+            "count": 1,
+            "sum_seconds": 0.061288796,
+            "union_seconds": 0.061288796
+          },
+          "weights.load": {
+            "count": 2,
+            "sum_seconds": 1.108477201,
+            "union_seconds": 1.108477201
+          }
+        },
+        "merge_outside_conditioning_seconds": 0.0,
+        "loader_wait_breakdown": {
+          "merge.operand_up": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.operand_down": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.original_scales": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          }
+        }
+      },
+      {
+        "case": "without_return_warm",
+        "seconds": 19.917237763060257,
+        "phases": {
+          "engine.apply_loras": {
+            "count": 1,
+            "sum_seconds": 0.003099569,
+            "union_seconds": 0.003099569
+          },
+          "engine.conditioning": {
+            "count": 1,
+            "sum_seconds": 5.2e-05,
+            "union_seconds": 5.2e-05
+          },
+          "loader.join": {
+            "count": 11,
+            "sum_seconds": 0.000410187,
+            "union_seconds": 0.000410187
+          },
+          "loader.poll_sleep": {
+            "count": 1,
+            "sum_seconds": 0.200181818,
+            "union_seconds": 0.200181818
+          },
+          "loader.process_files": {
+            "count": 1,
+            "sum_seconds": 3.78e-07,
+            "union_seconds": 3.78e-07
+          },
+          "loader.total": {
+            "count": 1,
+            "sum_seconds": 0.201504676,
+            "union_seconds": 0.201504676
+          },
+          "loader.validate": {
+            "count": 2,
+            "sum_seconds": 8.7389e-05,
+            "union_seconds": 8.7389e-05
+          },
+          "loader.worker": {
+            "count": 11,
+            "sum_seconds": 1.172412953,
+            "union_seconds": 0.132577503
+          },
+          "lora.catalog": {
+            "count": 1,
+            "sum_seconds": 0.003090408,
+            "union_seconds": 0.003090408
+          },
+          "weights.load": {
+            "count": 1,
+            "sum_seconds": 0.201606779,
+            "union_seconds": 0.201606779
+          }
+        },
+        "merge_outside_conditioning_seconds": 0.0,
+        "loader_wait_breakdown": {
+          "merge.operand_up": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.operand_down": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          },
+          "merge.original_scales": {
+            "parent_seconds": 0.0,
+            "sleep_count": 0,
+            "sleep_seconds": 0.0,
+            "worker_seconds": 0.0,
+            "join_seconds": 0.0,
+            "catalog_reader_seconds": 0.0,
+            "sleep_after_workers_done_seconds": 0.0,
+            "sleep_after_workers_done_without_gpu_seconds": 0.0
+          }
+        }
+      }
+    ]
+  },
+  "verification": {
+    "lifecycle_cases_passed": 15,
+    "all_16_requests_http_200": true,
+    "patch_replay_and_source_hashes": true,
+    "previous_source_files_unchanged": true,
+    "only_changed_native_source_file": "src/model_loader.cpp",
+    "frozen_v2_unchanged": true,
+    "precision_suite_reused_unchanged_math": true,
+    "image_quality_not_inspected": true,
+    "production_engine_unchanged": true,
+    "commit_created": false,
+    "gpu_sandbox_escalation_approved": true,
+    "auto_review_rejections": false
+  },
+  "scripts_sha256": {
+    "compare-lora-cfg1.py": "6cf24d2e2c5de3166802046741d3e20933fc51d88f466e1a039ca838fc0c9c2d",
+    "build-lora-activation-diagnostic.py": "8a68417da1c33b13ffdb46436dd53f0a773c50d74fd747228c31500716ff77c9",
+    "summarize-lora-activation.py": "a41487e154df26f5b1c6b5a463839605a9cc76c6a771e55c94624a077a8b5efd",
+    "summarize-lora-fusions.py": "3cb15da6d586d72553e48a8cc5c2da684a42293f62d649440d76027f567bc8d6",
+    "test-lora-int8-lifecycle.py": "cb92444346f4f9ba88a0cc5b517d6da83d7b383c8538e87aec6bcc48e02ae866",
+    "test-lora-int8-lifecycle.cpp": "2d34a626e910aabff96ac6710f702fe6523d2f2de8f146117987d3996554fdcc"
+  }
+}

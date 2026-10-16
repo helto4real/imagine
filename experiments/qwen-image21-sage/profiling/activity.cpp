@@ -16,6 +16,7 @@
 struct Trace { FILE* file; std::mutex mutex; size_t dropped = 0; };
 static Trace* trace;
 static FILE* stacks;
+static FILE* memory_trace;
 static CUpti_SubscriberHandle subscriber;
 static std::set<size_t>* sampled_sizes;
 static std::atomic<bool> stop_flush{false};
@@ -87,6 +88,13 @@ static void CUPTIAPI complete(CUcontext context, uint32_t stream, uint8_t* buffe
             std::fprintf(trace->file, "memcpy\t%llu\t%llu\t%u\t%u\t%llu\t-\t-\tcopy_kind_%u\n",
                 (unsigned long long)m->start, (unsigned long long)m->end,
                 m->streamId, m->correlationId, (unsigned long long)m->bytes, m->copyKind);
+        } else if (record->kind == CUPTI_ACTIVITY_KIND_MEMORY2 && memory_trace) {
+            const auto* m = reinterpret_cast<const CUpti_ActivityMemory4*>(record);
+            // Explicitly opt-in size/timestamp counters only. No addresses,
+            // allocation names, stacks, tensor contents or ordinary runtime logs.
+            std::fprintf(memory_trace, "%llu\t%u\t%u\t%llu\n",
+                (unsigned long long)m->timestamp, unsigned(m->memoryOperationType),
+                unsigned(m->memoryKind), (unsigned long long)m->bytes);
         } else if (record->kind == CUPTI_ACTIVITY_KIND_MEMSET) {
             auto* m = reinterpret_cast<CUpti_ActivityMemset5*>(record);
             std::fprintf(trace->file, "memset\t%llu\t%llu\t%u\t%u\t%llu\t-\t-\tmemset\n",
@@ -97,6 +105,7 @@ static void CUPTIAPI complete(CUcontext context, uint32_t stream, uint8_t* buffe
     size_t dropped = 0;
     check(cuptiActivityGetNumDroppedRecords(context, stream, &dropped));
     trace->dropped += dropped;
+    if (memory_trace) std::fflush(memory_trace);
     std::free(buffer);
 }
 __attribute__((constructor)) static void start() {
@@ -111,6 +120,12 @@ __attribute__((constructor)) static void start() {
     check(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
     check(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_MEMCPY));
     check(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_MEMSET));
+    if (const char* path = std::getenv("QWEN_MEMORY_TRACE")) {
+        memory_trace = std::fopen(path, "w");
+        if (!memory_trace) std::_Exit(2);
+        std::fprintf(memory_trace, "timestamp_ns\toperation\tmemory_kind\tbytes\n");
+        check(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_MEMORY2));
+    }
     // Optional explicit checkpoint for servers stopped by SIGTERM. No GPU
     // synchronization; the client requests this only after its last response.
     if (const char* path = std::getenv("QWEN_ACTIVITY_FLUSH")) {
@@ -145,6 +160,7 @@ __attribute__((destructor)) static void finish() {
     check(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
     std::fprintf(trace->file, "# dropped_records=%zu\n", trace->dropped);
     std::fclose(trace->file);
+    if (memory_trace) std::fclose(memory_trace);
     if (stacks) {
         check(cuptiUnsubscribe(subscriber));
         std::fclose(stacks);

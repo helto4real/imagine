@@ -24,6 +24,8 @@ p.add_argument('--comfy-root', type=Path, required=True)
 p.add_argument('--aio-root', type=Path, required=True)
 p.add_argument('--model-root', type=Path, required=True)
 p.add_argument('--run', action='store_true')
+p.add_argument('--trace-library', type=Path, help='Authorized CUDA kernel/copy measurements only')
+p.add_argument('--verify-merge', action='store_true', help='Assert the ordinary FP16-weight / FP32-delta merge contract')
 p.add_argument('--verify-lora', action='store_true', help='One additional LoRA run with application assertions')
 a = p.parse_args()
 # Reuse the source-defined fixture, never a previous request or runtime plan.
@@ -66,6 +68,12 @@ sys.path.insert(0,str(a.comfy_root.resolve()))
 sys.argv = [sys.argv[0]]
 stage = 'imports'
 try:
+    trace_library = None
+    if a.trace_library:
+        import ctypes
+        os.environ['QWEN_ACTIVITY_TRACE'] = str(OUT/'activity.tsv')
+        os.environ['QWEN_ACTIVITY_FLUSH'] = str(OUT/'flush.request')
+        trace_library = ctypes.CDLL(str(a.trace_library.resolve()), mode=ctypes.RTLD_GLOBAL)
     import torch
     import numpy as np
     from PIL import Image
@@ -103,7 +111,7 @@ try:
         aio_revision=subprocess.check_output(['git','-C',str(a.aio_root),'rev-parse','HEAD'],text=True).strip(),
         torch=torch.__version__,cuda=torch.version.cuda,kitchen=importlib.metadata.version('comfy-kitchen'),
         cpu_threads=torch.get_num_threads(),width=1600,height=896,steps=40,cfg=1,seed=42,
-        sampler='er_sde',scheduler='beta',attention='comfy_kitchen_int8',profiled=False,
+        sampler='er_sde',scheduler='beta',attention='comfy_kitchen_int8',profiled=bool(a.trace_library),
         sequence=sequence,measurement='adapter.generate through PNG encoded in memory, discarded')
     (OUT/'environment.json').write_text(json.dumps(metadata,indent=2)+'\n')
     # Fail closed if the selected adapter was silently ignored. These checks
@@ -125,6 +133,32 @@ try:
             assert prepared[0].patches
             return prepared
         qwen.prepare_models = checked_prepare
+    merge_calls = [0, 0]
+    if a.verify_merge:
+        import comfy.model_patcher
+        from comfy.weight_adapter.lora import LoRAAdapter
+        from comfy_kitchen.tensor import QuantizedTensor
+        assert comfy.model_patcher.CoreModelPatcher is comfy.model_patcher.ModelPatcher
+        assert not torch.backends.cuda.matmul.allow_tf32
+        original_calculate = LoRAAdapter.calculate_weight
+        @functools.wraps(original_calculate)
+        def checked_calculate(self, weight, key, strength, strength_model, offset, function,
+                              intermediate_dtype=torch.float32, original_weight=None):
+            assert weight.dtype == torch.float16
+            assert intermediate_dtype == torch.float32
+            merge_calls[0] += 1
+            return original_calculate(self, weight, key, strength, strength_model, offset, function,
+                                      intermediate_dtype, original_weight)
+        LoRAAdapter.calculate_weight = checked_calculate
+        original_requantize = QuantizedTensor.requantize_from_float
+        @functools.wraps(original_requantize)
+        def checked_requantize(self, tensor, **kwargs):
+            assert tensor.dtype == torch.float16
+            assert self._params.convrot and self._params.convrot_groupsize == 256
+            assert kwargs['scale'] == 'recalculate' and kwargs['stochastic_rounding'] > 0
+            merge_calls[1] += 1
+            return original_requantize(self, tensor, **kwargs)
+        QuantizedTensor.requantize_from_float = checked_requantize
     active=None
     def instrument(obj,attr,name):
         old=getattr(obj,attr)
@@ -159,7 +193,7 @@ try:
     with torch.inference_mode():
         for name in sequence:
             stage=name
-            active=dict(name=name,phases={},steps_executed=0)
+            active=dict(name=name,phases={},steps_executed=0,start_ns=time.monotonic_ns())
             torch.cuda.synchronize(); start=time.perf_counter()
             result=adapter.generate(**models,positive_prompt=PROMPT,negative_prompt='',width=1600,height=896,
                 seed=42,sampler='er_sde',scheduler='beta',settings=settings,batch_count=1,
@@ -172,12 +206,22 @@ try:
                 image.save(sink,format='PNG')
                 del image
             active['total_seconds']=time.perf_counter()-start
+            active['end_ns']=time.monotonic_ns()
             assert active['steps_executed']==40
             assert settings.get('resolved_attention_mode')=='comfy_kitchen_int8'
             results.append(active)
             (OUT/'timings.json').write_text(json.dumps(results,indent=2)+'\n')
             report(active)
             del result
+    if a.verify_merge:
+        assert all(merge_calls)
+    if trace_library:
+        checkpoint=OUT/'flush.request'
+        checkpoint.touch()
+        deadline=time.monotonic()+15
+        while checkpoint.exists() and time.monotonic()<deadline:
+            time.sleep(.1)
+        assert not checkpoint.exists()
     report(dict(complete=True))
 except BaseException as exc:
     # Only type and source locations; exception messages may contain runtime data.

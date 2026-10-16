@@ -295,3 +295,104 @@ reference passes, independent of public operation. Keep v2 for text-only,
 explicit `IMAGINE_QWEN_REFERENCE_CACHE=off`, and missing/hash-mismatched candidate
 fallback. Other model families and Turbo keep their existing selection.
 Frozen v1/v2, base publication patches and workflow compatibility remain intact.
+
+## Opt-in INT8/ConvRot LoRA merge — completed 2026-10-16 (historical tiled candidate)
+
+For the explicitly requested CFG 1 portrait workload with only
+`lenovo_qwen21.safetensors` at strength 1, the separate
+`SD_QWEN21_MERGE_LORA_INT8=1` candidate restores the inference fusions lost by
+runtime LoRA. Same final binary, two warm samples per mode: **38.041 → 21.672 s
+(43.0% shorter)**. No-LoRA means are 19.916 / 19.886 s; matched headless Comfy
+LoRA is 20.820 s. First-use native LoRA still takes 32.381 s versus Comfy 21.282 s.
+
+The tested ordinary Comfy ModelPatcher path is verified as FP16 base/addition,
+FP32 LoRA product and stochastic FP16-aware INT8/ConvRot requantization. Eight
+synthetic numerical cases match exactly, and fifteen native lifecycle cases
+pass. A full gate/up adapter shape bug was reproduced synthetically and fixed.
+Group 64 failed an exploratory numerical comparison and is rejected; the
+validated scope is group 256, one CUDA GPU and ordinary rank <=256 linear LoRAs.
+
+All requests in both final eight-request native series succeed. Fusion counts
+return to the no-LoRA values. No generated-image quality or pixel identity was
+checked; native pipeline/RNG differences remain. The flag is off by default,
+the production engine selection and frozen v2 are unchanged, and no additional
+memory-policy or tile-size optimization was made. Read
+[native/lora-merge/RESULTS.md](../../native/lora-merge/RESULTS.md) for provenance,
+kernel/copy measurements, replay commands and remaining scope limitations.
+
+## Whole-matrix INT8/ConvRot LoRA preparation — completed 2026-10-16
+
+Explicitly authorized follow-up to replace 64-row tiling with Comfy-style
+whole-matrix preparation, retaining its FP16/FP32/INT8 precision contract.
+Same CFG 1 Lenovo-LoRA workload: first activation **32.381 → 27.488 s** and
+warm mean **21.672 → 21.019 s**. Previously measured Comfy is 21.282 s first /
+20.820 s warm, so the first-activation gap remains; do not call this complete
+loading-path parity. Current no-LoRA warm mean is 19.905 s.
+
+First preparation drops from 22,528 tiles to 192 matrices; warm from 3,392 tiles
+to 28 matrices. Inference fusions remain restored. The largest observed temporary
+scratch allocation is 577.844 MiB, reserved as 609.844 MiB including cuBLAS
+headroom through existing auto-fit accounting. This is not a physical peak-VRAM
+measurement. Whole matrices fit without a tile fallback.
+
+Eight exact synthetic Comfy/Kitchen cases pass for CPU- and GPU-resident input,
+and all fifteen lifecycle cases pass. All eight final requests succeed, with
+zero dropped CUPTI records. The old controls are preserved and reused. New final
+timing excludes the extra allocation tracing used in a separate diagnostic.
+Flag remains default-off, production engine/frozen v2 unchanged, no new commit.
+See [whole-matrix results](../../native/lora-merge/RESULTS.md). Host loading,
+conditioning-cache policies, image quality and full pixel parity are not newly
+optimized or validated by this slice.
+
+## First LoRA activation diagnosis — completed 2026-10-16, no optimization changes
+
+Same CFG 1 Lenovo-LoRA workload, separate timing-only diagnostic executables.
+The dominant cause is the general tensor loader's unconditional progress polling
+at `model_loader.cpp:1360`, even with progress logging disabled. First merge
+loads 192 up, 192 down and 192 scale tensors separately: **576 sleeps total
+5.836 s**, including **5.617 s after workers finish with no recorded GPU work**.
+Actual worker work totals 0.188 s and overlaps the sleeps. Rebuilding operand
+readers/catalogs costs 0.732 s; the full CUDA merge helper costs 0.500 s.
+Native first-use conditioning is only 0.310 s in this probe.
+
+Warm preparation has 84 small loads and about 0.85 s polling sleep. Whole merge
+is 7.254 s first / about 1.080 s warm. Comfy uses the loaded tensor dictionary;
+its first request spends 0.805 s in all weight-patching method calls, including
+192 LoRA calculations. Its AIO encoding cache survives unchanged CLIP patches.
+
+New first/warm times are native 27.466/20.982 s and Comfy 20.460/20.195 s.
+The total first-request gap is now 7.006 s; after subtracting each warm baseline,
+extra activation differs by 6.219 s. Do not confuse this with the historical
+6.206 s total gap. All 24 probe requests succeeded and CUPTI dropped no records.
+Candidate executable/source, precision, memory policy, flags and frozen controls
+are unchanged. No wait was removed and no projected speedup is validated.
+Read [activation investigation](../../native/lora-merge/ACTIVATION-INVESTIGATION.md)
+before repeating this diagnosis or implementing its proposed next step.
+
+## Silent tensor loader wait fix — completed 2026-10-16
+
+Explicitly authorized follow-up to the first-activation diagnosis. In the
+separate LoRA-merge candidate, progress polling now runs only with progress
+display enabled. Silent loads join workers directly. Failure handling and
+before/after source validation remain unchanged; no precision, reader/cache,
+CUDA or VRAM-policy change is included.
+
+Same CFG 1 Lenovo-LoRA test: first request **27.488 → 21.829 s**, warm mean
+**21.019 → 20.190 s**, no-LoRA warm mean 19.892 s. Separate post-fix diagnostic
+confirms **zero sleeps** across 576 first-use / 84 warm operand-and-scale loads.
+Merge scope improves 7.254 → 1.609 s first and about 1.080 → 0.248 s warm.
+
+Latest reused Comfy timing-only control is 20.460 s first / 20.195 s warm;
+remaining first-request gap is 1.369 s (extra activation above warm: 1.374 s).
+Earlier kernel/copy-only Comfy control was 21.282 / 20.820 s. Neither is rerun
+here; preserve the distinction and run-to-run variability. Remaining first-use
+reader/catalog work is 0.661 s, complete CUDA helper 0.565 s and conditioning
+0.310 s in nested/non-additive scopes. Do not claim these policies were changed.
+
+All 16 real requests and all 15 synthetic lifecycle cases pass; fusion counts
+are unchanged and CUPTI drops zero records. Full build, patch restoration,
+source hashes and frozen v2 verification pass. Previous whole-matrix control
+is preserved. All prior candidate native source hashes are unchanged; only the
+loader is added to the overlay. Merge remains default-off and production engine
+selection is unchanged. No new commit. See
+[loader wait results](../../native/lora-merge/LOADER-WAIT-RESULTS.md).

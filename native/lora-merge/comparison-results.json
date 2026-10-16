@@ -1,0 +1,4527 @@
+{
+  "complete": true,
+  "candidate": {
+    "binary_path": ".imagine/lora-merge/build/bin/sd-server",
+    "binary_sha256": "2a9adef375ab60b01a82c6e28b9af1835b1f94d66dac2c877df0173facdc12de",
+    "source_lock_sha256": "6eb42bb40e8ca691d46ac73842bfe8eb6c9da105f59287d9862fb3a9846d43fd",
+    "base_binary_sha256": "9fd49b0e5cb3426043ebd85271ad167555551ac65252590cde5ac25bed44bbb0"
+  },
+  "workload": {
+    "width": 1600,
+    "height": 896,
+    "steps": 40,
+    "cfg": 1,
+    "seed": 42,
+    "sampler": "er_sde",
+    "scheduler": "beta",
+    "lora": "lenovo_qwen21.safetensors",
+    "strength": 1.0,
+    "batch": 1,
+    "references": 0
+  },
+  "comfy": {
+    "run_directory": "comfy-lora-cfg1-veb6za2v",
+    "precision_assertions_passed": true,
+    "trace_checkpoints": [
+      "# checkpoint_dropped_records=0",
+      "# dropped_records=0"
+    ],
+    "without_warm_mean_seconds": 21.063428954978008,
+    "with_warm_mean_seconds": 20.82047632546164,
+    "runs": [
+      {
+        "case": "without_first",
+        "seconds": 27.82318288006354,
+        "phases": {
+          "prepare_models": [
+            0.8165461529279128
+          ],
+          "conditioning": [
+            4.108797202934511
+          ],
+          "sampling": [
+            20.832989644026384
+          ],
+          "vae": [
+            1.1951832320773974
+          ]
+        },
+        "selected_kernels": {
+          "fp32_gemm": {
+            "count": 578,
+            "seconds": 0.11757669800000002
+          }
+        }
+      },
+      {
+        "case": "without_warm_1",
+        "seconds": 20.987844098941423,
+        "phases": {
+          "prepare_models": [
+            0.6911439889809117
+          ],
+          "conditioning": [
+            0.001384714967571199
+          ],
+          "sampling": [
+            19.14629248296842
+          ],
+          "vae": [
+            0.672976884059608
+          ]
+        },
+        "selected_kernels": {}
+      },
+      {
+        "case": "without_warm_2",
+        "seconds": 21.139013811014593,
+        "phases": {
+          "prepare_models": [
+            0.9046478590462357
+          ],
+          "conditioning": [
+            0.0009206309914588928
+          ],
+          "sampling": [
+            19.089031317969784
+          ],
+          "vae": [
+            0.6770398849621415
+          ]
+        },
+        "selected_kernels": {}
+      },
+      {
+        "case": "with_first",
+        "seconds": 21.28249495907221,
+        "phases": {
+          "prepare_models": [
+            0.33263088401872665
+          ],
+          "conditioning": [
+            0.0004445540253072977
+          ],
+          "sampling": [
+            19.799299809033982
+          ],
+          "vae": [
+            0.657628113985993
+          ]
+        },
+        "selected_kernels": {
+          "convrot_dequantize_fp16": {
+            "count": 192,
+            "seconds": 0.03246498299999999
+          },
+          "fp32_gemm": {
+            "count": 192,
+            "seconds": 0.046762906000000035
+          },
+          "convrot_requantize_fp16_stochastic": {
+            "count": 192,
+            "seconds": 0.04906522400000001
+          }
+        }
+      },
+      {
+        "case": "with_warm_1",
+        "seconds": 20.827331807930022,
+        "phases": {
+          "prepare_models": [
+            0.3044833510648459
+          ],
+          "conditioning": [
+            0.0003972670529037714
+          ],
+          "sampling": [
+            19.3774949060753
+          ],
+          "vae": [
+            0.650125170010142
+          ]
+        },
+        "selected_kernels": {
+          "convrot_dequantize_fp16": {
+            "count": 192,
+            "seconds": 0.03368386899999999
+          },
+          "fp32_gemm": {
+            "count": 192,
+            "seconds": 0.04884401800000001
+          },
+          "convrot_requantize_fp16_stochastic": {
+            "count": 192,
+            "seconds": 0.05088315400000002
+          }
+        }
+      },
+      {
+        "case": "with_warm_2",
+        "seconds": 20.81362084299326,
+        "phases": {
+          "prepare_models": [
+            0.2702364129945636
+          ],
+          "conditioning": [
+            0.014291631989181042
+          ],
+          "sampling": [
+            19.393199861049652
+          ],
+          "vae": [
+            0.6519198910100386
+          ]
+        },
+        "selected_kernels": {
+          "convrot_dequantize_fp16": {
+            "count": 192,
+            "seconds": 0.03313116000000003
+          },
+          "fp32_gemm": {
+            "count": 192,
+            "seconds": 0.049210053000000004
+          },
+          "convrot_requantize_fp16_stochastic": {
+            "count": 192,
+            "seconds": 0.049277258000000004
+          }
+        }
+      },
+      {
+        "case": "without_return_first",
+        "seconds": 20.953898857929744,
+        "phases": {
+          "prepare_models": [
+            0.6061723169405013
+          ],
+          "conditioning": [
+            0.0013237609528005123
+          ],
+          "sampling": [
+            19.221816326957196
+          ],
+          "vae": [
+            0.6565160090103745
+          ]
+        },
+        "selected_kernels": {}
+      },
+      {
+        "case": "without_return_warm",
+        "seconds": 20.59848683408927,
+        "phases": {
+          "prepare_models": [
+            0.36169311800040305
+          ],
+          "conditioning": [
+            0.0007012470159679651
+          ],
+          "sampling": [
+            19.104024806059897
+          ],
+          "vae": [
+            0.6628909009741619
+          ]
+        },
+        "selected_kernels": {}
+      }
+    ]
+  },
+  "native_merge_off": {
+    "run_directory": "lora-cfg1-c0a1lgld",
+    "trace_checkpoints": [
+      "# checkpoint_dropped_records=0"
+    ],
+    "runs": [
+      {
+        "case": "without_first",
+        "seconds": 22.97112276800908,
+        "gpu_activity_union_seconds": 19.863951312,
+        "kernel_seconds": 18.66735336299999,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008734566,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008510564,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25717491599999986,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1488,
+            "seconds": 0.8327599270000006,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 1441,
+            "seconds": 1.032646885,
+            "bytes": 15005566512
+          },
+          "copy_kind_2": {
+            "count": 42,
+            "seconds": 0.003952567000000001,
+            "bytes": 81281024
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15971142100000424,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.10366758800000012,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3392,
+            "seconds": 0.10580543599999943,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022511438000000005,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009495856000000004,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3877224270000003,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8257114139999993,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.389060725,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2703739509999945,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07796044299999998,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.685468592999999,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 272,
+            "seconds": 0.00028707600000000037,
+            "bytes": 3440640
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8058842670000004,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 714,
+            "seconds": 0.3090560850000002,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 56438,
+            "seconds": 2.2830108709995347,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5101670499999998,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.774277245999998,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_warm_1",
+        "seconds": 19.913099964964204,
+        "gpu_activity_union_seconds": 18.989204612,
+        "kernel_seconds": 18.679380564999995,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008743911999999998,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008513673000000003,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25734746299999994,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8314252570000008,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.14614892699999957,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.003709010000000001,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15980658900000314,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.103310098,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10574128899999961,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022533790000000015,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009479755000000001,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3868786989999997,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8268765460000002,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3932363700000026,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2734193759999983,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07834561399999998,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.6956205289999975,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015952100000000006,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8072519999999986,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.29601053599999977,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.2825741069994776,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5118362929999997,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7802352579999976,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_warm_2",
+        "seconds": 19.919837387045845,
+        "gpu_activity_union_seconds": 19.000561063,
+        "kernel_seconds": 18.688672450000016,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008744936,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008554541,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.257407619,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8316825030000005,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.14784104899999956,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.003991792,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15989659900000344,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10373483299999998,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10597497999999944,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022550675000000017,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009504997000000001,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.38688881699999944,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8275098459999992,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.394841537000003,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.274548664000006,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07834029999999996,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.697972958000001,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015917300000000006,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.807815793000001,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.29609892700000007,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.2831396599994886,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5120039589999998,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.781356905000004,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "with_first",
+        "seconds": 38.5789066569414,
+        "gpu_activity_union_seconds": 37.328490235,
+        "kernel_seconds": 36.707805372000024,
+        "groups": {
+          "attention_input_scale": {
+            "count": 1280,
+            "seconds": 0.3824713860000001,
+            "bytes": 0
+          },
+          "attention_output_scale": {
+            "count": 1280,
+            "seconds": 0.34591400499999986,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 1415,
+            "seconds": 0.298292767,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 5264,
+            "seconds": 1.6071770499999989,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 1432,
+            "seconds": 0.4559637750000019,
+            "bytes": 8886375984
+          },
+          "copy_kind_2": {
+            "count": 42,
+            "seconds": 0.003433709,
+            "bytes": 81281024
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.16005228800000182,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.10450441900000007,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 7232,
+            "seconds": 0.49009684000000037,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 7985,
+            "seconds": 0.03254643799999963,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 3911,
+            "seconds": 0.8584760469999985,
+            "bytes": 0
+          },
+          "f32_to_f16": {
+            "count": 15360,
+            "seconds": 2.252230683000166,
+            "bytes": 0
+          },
+          "fused_lora_output": {
+            "count": 7680,
+            "seconds": 9.492281006000027,
+            "bytes": 0
+          },
+          "gated_residual": {
+            "count": 2496,
+            "seconds": 0.7651134600000002,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 7680,
+            "seconds": 10.459123266000018,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 1520,
+            "seconds": 0.0012350910000000117,
+            "bytes": 3660288
+          },
+          "norm_modulation": {
+            "count": 2496,
+            "seconds": 0.5158492820000017,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 16074,
+            "seconds": 2.0349482560000025,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 56438,
+            "seconds": 2.255116079999479,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.49427601299999985,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.628742666000004,
+            "bytes": 0
+          },
+          "standalone_swiglu": {
+            "count": 1280,
+            "seconds": 1.690645707999999,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "with_warm_1",
+        "seconds": 38.033597244066186,
+        "gpu_activity_union_seconds": 37.009541998,
+        "kernel_seconds": 36.701531225000004,
+        "groups": {
+          "attention_input_scale": {
+            "count": 1280,
+            "seconds": 0.382466831,
+            "bytes": 0
+          },
+          "attention_output_scale": {
+            "count": 1280,
+            "seconds": 0.34592792699999975,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 1415,
+            "seconds": 0.2982919799999998,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 5120,
+            "seconds": 1.6060684949999957,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.14308794599999985,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.003547241999999999,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.16027286600000196,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10409471799999999,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 7196,
+            "seconds": 0.4897279250000051,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 7985,
+            "seconds": 0.0325935289999997,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 3911,
+            "seconds": 0.8585282470000019,
+            "bytes": 0
+          },
+          "f32_to_f16": {
+            "count": 15360,
+            "seconds": 2.2520467770001567,
+            "bytes": 0
+          },
+          "fused_lora_output": {
+            "count": 7680,
+            "seconds": 9.505800641999997,
+            "bytes": 0
+          },
+          "gated_residual": {
+            "count": 2496,
+            "seconds": 0.765113453999998,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 7680,
+            "seconds": 10.459277352000024,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 1376,
+            "seconds": 0.0011027190000000003,
+            "bytes": 1006080
+          },
+          "norm_modulation": {
+            "count": 2496,
+            "seconds": 0.5157669949999993,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 15750,
+            "seconds": 2.021629961000005,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.2520425329994325,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.49435159499999914,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.6269888539999986,
+            "bytes": 0
+          },
+          "standalone_swiglu": {
+            "count": 1280,
+            "seconds": 1.6908134100000003,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "with_warm_2",
+        "seconds": 38.047655607922934,
+        "gpu_activity_union_seconds": 37.017471613,
+        "kernel_seconds": 36.70044790400002,
+        "groups": {
+          "attention_input_scale": {
+            "count": 1280,
+            "seconds": 0.38244865400000017,
+            "bytes": 0
+          },
+          "attention_output_scale": {
+            "count": 1280,
+            "seconds": 0.34587668400000005,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 1415,
+            "seconds": 0.29831589099999967,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 5120,
+            "seconds": 1.606299794999997,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.15226911999999906,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.0034430859999999997,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.1602070350000016,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10363468800000003,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 7196,
+            "seconds": 0.49005613199999964,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 7985,
+            "seconds": 0.032694979999999624,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 3911,
+            "seconds": 0.8584811809999988,
+            "bytes": 0
+          },
+          "f32_to_f16": {
+            "count": 15360,
+            "seconds": 2.252072476000153,
+            "bytes": 0
+          },
+          "fused_lora_output": {
+            "count": 7680,
+            "seconds": 9.505558014999988,
+            "bytes": 0
+          },
+          "gated_residual": {
+            "count": 2496,
+            "seconds": 0.7651130099999996,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 7680,
+            "seconds": 10.460831630000003,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 1376,
+            "seconds": 0.0011044679999999989,
+            "bytes": 1006080
+          },
+          "norm_modulation": {
+            "count": 2496,
+            "seconds": 0.5158266160000001,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 15750,
+            "seconds": 2.0214089220000044,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.2503710699994666,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.4943223460000005,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.6264650420000017,
+            "bytes": 0
+          },
+          "standalone_swiglu": {
+            "count": 1280,
+            "seconds": 1.6906707720000012,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_return_first",
+        "seconds": 20.257082515978254,
+        "gpu_activity_union_seconds": 19.334343131,
+        "kernel_seconds": 18.715887747,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008746628,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008537989999999999,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2575263709999995,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1488,
+            "seconds": 0.8325160949999995,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 1048,
+            "seconds": 0.45443017600000213,
+            "bytes": 8806684208
+          },
+          "copy_kind_2": {
+            "count": 42,
+            "seconds": 0.0036680140000000007,
+            "bytes": 81281024
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.16006874500000293,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.10409877599999995,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3392,
+            "seconds": 0.10615907899999952,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022561105999999987,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009479659,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.38688422600000033,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8276997120000006,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.396369747999991,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2760103380000047,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07842127199999997,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.7005587390000025,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 272,
+            "seconds": 0.00028844900000000073,
+            "bytes": 3440640
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8081720219999979,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 714,
+            "seconds": 0.3097212080000001,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 56438,
+            "seconds": 2.286872143999459,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5121247649999999,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7834278690000045,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_return_warm",
+        "seconds": 19.903813875978813,
+        "gpu_activity_union_seconds": 19.015726811,
+        "kernel_seconds": 18.702998746999995,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008747334999999998,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008552387,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.257571015,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8322196239999986,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.14839957799999942,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.00400642,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.16016263700000333,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10340881999999992,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.1060548979999994,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022479165000000002,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009483909,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.386896532,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8279341480000001,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.397292015999997,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.276505472999997,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07845447100000001,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.703091652999997,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015942900000000008,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8086707959999994,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.2961094639999998,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.282709991999503,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5123211249999998,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.784495923999999,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      }
+    ],
+    "without_warm_mean_seconds": 19.916468676005024,
+    "with_warm_mean_seconds": 38.04062642599456
+  },
+  "native_merge_on": {
+    "run_directory": "lora-cfg1-0wth3yd2",
+    "trace_checkpoints": [
+      "# checkpoint_dropped_records=0"
+    ],
+    "runs": [
+      {
+        "case": "without_first",
+        "seconds": 23.05953088705428,
+        "gpu_activity_union_seconds": 19.868269308,
+        "kernel_seconds": 18.663158777000003,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008731117000000002,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008550699999999998,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2570895309999996,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1488,
+            "seconds": 0.8328141919999998,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 1441,
+            "seconds": 1.0410987040000006,
+            "bytes": 15005566512
+          },
+          "copy_kind_2": {
+            "count": 42,
+            "seconds": 0.004023504000000001,
+            "bytes": 81281024
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.1597010940000041,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.10364707400000006,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3392,
+            "seconds": 0.10575366199999946,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022514983999999995,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009505996,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3876999510000002,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8256667779999995,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3886263579999967,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2695197440000014,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07796980400000003,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.684645445000005,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 272,
+            "seconds": 0.0002872290000000005,
+            "bytes": 3440640
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8057577379999998,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 714,
+            "seconds": 0.3093060169999998,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 56438,
+            "seconds": 2.2815087759994817,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.510235254,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.773615655999999,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_warm_1",
+        "seconds": 19.903046328923665,
+        "gpu_activity_union_seconds": 18.978880922,
+        "kernel_seconds": 18.672186685,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008741801,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008563406,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25734473199999963,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8312682490000005,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.14321916799999962,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.00342152,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15989367000000307,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10370114399999991,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10587436499999953,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.02253996200000001,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009472076,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.38686214599999963,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8269057590000004,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.392144022999991,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2726857519999992,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.078267291,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.693591929000004,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015987900000000006,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.807047802000001,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.2959079539999998,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.2805903389994793,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5118754749999997,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.778802480000004,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_warm_2",
+        "seconds": 19.906912639038637,
+        "gpu_activity_union_seconds": 18.982651488,
+        "kernel_seconds": 18.679208314000014,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.00874603,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008594468,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25735584900000036,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8315230100000024,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.13963815799999954,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.0038403099999999996,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15980499400000342,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10330093600000004,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10570250299999948,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022518959999999994,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009485093999999996,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3868874710000001,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8271467850000015,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3935239780000055,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.273685754000002,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.078345878,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.694948663000006,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015971200000000014,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.807453233000001,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.29599119300000004,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.2823376759994805,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5120184950000004,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7796423379999995,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "with_first",
+        "seconds": 27.48827119800262,
+        "gpu_activity_union_seconds": 19.71409754,
+        "kernel_seconds": 19.08304132200001,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008748456,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008576613000000002,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25572856499999996,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1488,
+            "seconds": 0.8298499360000003,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 1816,
+            "seconds": 0.46730918799999965,
+            "bytes": 8977602096
+          },
+          "copy_kind_2": {
+            "count": 234,
+            "seconds": 0.003918827,
+            "bytes": 87048192
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.1595393300000044,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.10370278900000005,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3392,
+            "seconds": 0.10574429399999948,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.02252103200000001,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009482251999999998,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3865539989999999,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8274029310000003,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.392262718000011,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2724710599999978,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.078321709,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.694730281999999,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 272,
+            "seconds": 0.0002888730000000008,
+            "bytes": 3440640
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8065693650000002,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 906,
+            "seconds": 0.35318382300000045,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 57014,
+            "seconds": 2.63713499399954,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5121763879999994,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7778801160000044,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {
+          "lora_merge_add": {
+            "count": 192,
+            "seconds": 0.09061975
+          },
+          "lora_merge_quantize": {
+            "count": 192,
+            "seconds": 0.10121013499999996
+          },
+          "lora_merge_unrotate": {
+            "count": 192,
+            "seconds": 0.160733841
+          }
+        }
+      },
+      {
+        "case": "with_warm_1",
+        "seconds": 21.006598910083994,
+        "gpu_activity_union_seconds": 19.046593577,
+        "kernel_seconds": 18.733895610999994,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008745574999999998,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008582019,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2557142059999998,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8295428629999994,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 509,
+            "seconds": 0.14900839499999957,
+            "bytes": 1878673468
+          },
+          "copy_kind_2": {
+            "count": 69,
+            "seconds": 0.003981429,
+            "bytes": 81149952
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15954916400000427,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10348555200000004,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.1057130849999996,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.02253291099999999,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009480592999999999,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3865500320000003,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8275964999999996,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3921829349999935,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2734476839999993,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07836731600000005,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.696420256999994,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015897800000000002,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8067236350000007,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 418,
+            "seconds": 0.3025041569999999,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55730,
+            "seconds": 2.3362739269994743,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5119351569999999,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7780972069999987,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {
+          "lora_merge_add": {
+            "count": 28,
+            "seconds": 0.01372576
+          },
+          "lora_merge_quantize": {
+            "count": 28,
+            "seconds": 0.01492852
+          },
+          "lora_merge_unrotate": {
+            "count": 28,
+            "seconds": 0.023525419
+          }
+        }
+      },
+      {
+        "case": "with_warm_2",
+        "seconds": 21.030734686995856,
+        "gpu_activity_union_seconds": 19.045148755,
+        "kernel_seconds": 18.735137951999988,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008752745999999999,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.00857108,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2557288260000001,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8296131720000004,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 509,
+            "seconds": 0.14624260099999942,
+            "bytes": 1878673468
+          },
+          "copy_kind_2": {
+            "count": 69,
+            "seconds": 0.004075345000000001,
+            "bytes": 81149952
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15953326900000467,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10344379300000002,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10568087299999974,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022543904999999993,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009456171000000001,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3866290540000001,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8277981239999992,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3925174909999942,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.273587908999996,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07839322999999998,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.697334625999998,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015958800000000014,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8068172899999991,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 418,
+            "seconds": 0.30261979299999986,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55730,
+            "seconds": 2.3348462549994937,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5119520600000006,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7788515540000005,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {
+          "lora_merge_add": {
+            "count": 28,
+            "seconds": 0.013720221999999997
+          },
+          "lora_merge_quantize": {
+            "count": 28,
+            "seconds": 0.014938565999999999
+          },
+          "lora_merge_unrotate": {
+            "count": 28,
+            "seconds": 0.023548523999999998
+          }
+        }
+      },
+      {
+        "case": "without_return_first",
+        "seconds": 21.218937449972145,
+        "gpu_activity_union_seconds": 19.916908546,
+        "kernel_seconds": 18.694557326000016,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008727716,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008604196,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25844781,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1488,
+            "seconds": 0.8324426389999993,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 1441,
+            "seconds": 1.0589813160000106,
+            "bytes": 15005566512
+          },
+          "copy_kind_2": {
+            "count": 42,
+            "seconds": 0.003537966,
+            "bytes": 81281024
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15954307400000456,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.10380500000000004,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3392,
+            "seconds": 0.10611207399999954,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.02257176899999999,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009503409999999999,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3891204930000002,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8280710359999995,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.391768079000004,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.272937154000003,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07824665899999997,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.695636790000007,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 272,
+            "seconds": 0.0002888640000000006,
+            "bytes": 3440640
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8074124040000017,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 714,
+            "seconds": 0.3092297899999996,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 56438,
+            "seconds": 2.2805193909995167,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5125732440000005,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7788276720000002,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_return_warm",
+        "seconds": 19.928888548049144,
+        "gpu_activity_union_seconds": 19.001726807,
+        "kernel_seconds": 18.693573043,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008725796999999999,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008573859,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2586433369999999,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8322665190000003,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.14488195899999992,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.0035783509999999996,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15953415400000426,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10351046899999992,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.1060550009999997,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022578121000000007,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009489156,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.38912635999999917,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8290041619999997,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3947812140000004,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.274788162000001,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07835298899999997,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.700999787,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015930000000000008,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8082364249999999,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.29566291899999997,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.278018796999492,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5128959810000007,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.781863987999999,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      }
+    ],
+    "without_warm_mean_seconds": 19.90497948398115,
+    "with_warm_mean_seconds": 21.018666798539925
+  },
+  "synthetic_lifecycle": {
+    "passed": true,
+    "cases": 15,
+    "residency_modes": [
+      "cpu_parameters",
+      "disk_weights_and_scales",
+      "gpu_parameters",
+      "disk_weights_gpu_scales",
+      "gpu_weights_disk_scales"
+    ],
+    "target_layouts": [
+      "linear",
+      "separate_gate_up_halves",
+      "full_gate_up"
+    ]
+  },
+  "native_lora_wall_reduction_percent": 44.74679106709689,
+  "native_vs_comfy_lora_wall_percent": 0.9519017239577598,
+  "previous_tiled_candidate": {
+    "binary_path": ".imagine/lora-merge/build/bin/sd-server",
+    "binary_sha256": "c48eb730ffd8f5be2ea73c41ffca18de836e669b19a57649d91236e42eef3aa5",
+    "source_lock_sha256": "a666846e13e179beee1af43a265ec5020f37ce8f41e97b45eea71ab4de2d9d6b",
+    "base_binary_sha256": "9fd49b0e5cb3426043ebd85271ad167555551ac65252590cde5ac25bed44bbb0"
+  },
+  "native_merge_tiled": {
+    "run_directory": "lora-cfg1-4llj23t2",
+    "trace_checkpoints": [
+      "# checkpoint_dropped_records=0"
+    ],
+    "runs": [
+      {
+        "case": "without_first",
+        "seconds": 22.958067553001456,
+        "gpu_activity_union_seconds": 19.841103612,
+        "kernel_seconds": 18.630029309999994,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008733775,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008474173000000002,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.256771886,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1488,
+            "seconds": 0.8317104419999992,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 1441,
+            "seconds": 1.0476981259999996,
+            "bytes": 15005566512
+          },
+          "copy_kind_2": {
+            "count": 42,
+            "seconds": 0.003432586,
+            "bytes": 81281024
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15965651500000394,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.10362304900000002,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3392,
+            "seconds": 0.10572275399999943,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022534999000000007,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009499201,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3877084610000008,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8242550450000009,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3833950019999888,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2655041520000005,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07779236399999996,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.675438311000001,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 272,
+            "seconds": 0.0002870750000000004,
+            "bytes": 3440640
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8038334580000003,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 714,
+            "seconds": 0.30864009100000034,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 56438,
+            "seconds": 2.279169829999527,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5096402989999994,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.767582018000002,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_warm_1",
+        "seconds": 19.859556667972356,
+        "gpu_activity_union_seconds": 18.954171809,
+        "kernel_seconds": 18.647522286,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008740777000000002,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008515463000000001,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2570704940000001,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8304155170000002,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.14330331399999952,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.003420175,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15976661200000325,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10330434800000003,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10569429799999953,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022528008000000013,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009499473999999999,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.38685987300000046,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8255357050000008,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3887733990000015,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.269714589999999,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07816026399999998,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.686373867999996,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015942200000000007,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8057516600000014,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.2956501139999999,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.2793409299995098,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5114384860000001,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7741550179999983,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_warm_2",
+        "seconds": 19.913286162074655,
+        "gpu_activity_union_seconds": 18.968460279,
+        "kernel_seconds": 18.666316293,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008742086999999999,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008514797000000003,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25722066900000035,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8308665120000019,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.1383471679999998,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.0038541339999999995,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15978387300000324,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10329469899999993,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10572860899999961,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022515537999999998,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009478317000000002,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3869283920000001,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8263490040000004,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.392652822000002,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.272088637999999,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07823566399999998,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.6911265439999985,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015881100000000008,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8064396440000006,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.295878277,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.280643893999503,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5118166299999994,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.777795555999998,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "with_first",
+        "seconds": 32.38075986504555,
+        "gpu_activity_union_seconds": 21.384646775,
+        "kernel_seconds": 19.242460174,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008742536,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008514887999999998,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2569033080000004,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1488,
+            "seconds": 0.8308354399999986,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 69208,
+            "seconds": 1.1834489270001176,
+            "bytes": 22936245808
+          },
+          "copy_kind_2": {
+            "count": 45290,
+            "seconds": 0.7987690340000843,
+            "bytes": 14045691904
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15968006300000326,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.10365727000000001,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3392,
+            "seconds": 0.10583198699999938,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022599730000000005,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009479532000000002,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.38686960100000006,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8250677279999964,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.387727765000003,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2683902270000034,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07815927899999997,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.6825447770000075,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 272,
+            "seconds": 0.0002889570000000007,
+            "bytes": 3440640
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8050336709999991,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 23242,
+            "seconds": 0.38534258100002966,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 146550,
+            "seconds": 2.7924319050005626,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5113376370000001,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7729903120000023,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {
+          "lora_merge_add": {
+            "count": 22528,
+            "seconds": 0.0481541919999887
+          },
+          "lora_merge_rotate": {
+            "count": 22528,
+            "seconds": 0.1894322580000008
+          },
+          "lora_merge_quantize": {
+            "count": 22528,
+            "seconds": 0.08197223199998335
+          },
+          "lora_merge_unrotate": {
+            "count": 22528,
+            "seconds": 0.19103091200000893
+          }
+        }
+      },
+      {
+        "case": "with_warm_1",
+        "seconds": 21.67293379106559,
+        "gpu_activity_union_seconds": 19.286535011,
+        "kernel_seconds": 18.751383944000008,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008744266,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008522574000000002,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25722831700000043,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8311178510000011,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 10657,
+            "seconds": 0.2513426319999729,
+            "bytes": 3992602684
+          },
+          "copy_kind_2": {
+            "count": 6853,
+            "seconds": 0.12382788400000713,
+            "bytes": 2195079168
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.1598209020000031,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10315795000000011,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10598356399999945,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022539383000000017,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009465843,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3868795580000002,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8262082410000003,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3915255660000034,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2717966510000007,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.078296032,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.691464002000002,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.0001596490000000001,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8066697530000005,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 3782,
+            "seconds": 0.3068477459999999,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 69214,
+            "seconds": 2.3560618839994647,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5117486349999999,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.777126128000001,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {
+          "lora_merge_add": {
+            "count": 3392,
+            "seconds": 0.007058528999999994
+          },
+          "lora_merge_rotate": {
+            "count": 3392,
+            "seconds": 0.02776451299999972
+          },
+          "lora_merge_quantize": {
+            "count": 3392,
+            "seconds": 0.012028531999999833
+          },
+          "lora_merge_unrotate": {
+            "count": 3392,
+            "seconds": 0.028030113000000044
+          }
+        }
+      },
+      {
+        "case": "with_warm_2",
+        "seconds": 21.67118757602293,
+        "gpu_activity_union_seconds": 19.287222355,
+        "kernel_seconds": 18.75468994500001,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008743019000000001,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008518626,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25722902200000003,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.831197344000002,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 10657,
+            "seconds": 0.25224418999997295,
+            "bytes": 3992602684
+          },
+          "copy_kind_2": {
+            "count": 6853,
+            "seconds": 0.1201179200000074,
+            "bytes": 2195079168
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.16001017100000303,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10364326200000001,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10613616799999952,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022590002999999994,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009475466000000004,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3868860620000002,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8260362790000002,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.392106314999997,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.272257897,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07833875100000001,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.692081438000002,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.0001601290000000001,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8066491539999995,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 3782,
+            "seconds": 0.3068899899999997,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 69214,
+            "seconds": 2.3565238489994953,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5117682600000001,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.777619040000004,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {
+          "lora_merge_add": {
+            "count": 3392,
+            "seconds": 0.007017077
+          },
+          "lora_merge_rotate": {
+            "count": 3392,
+            "seconds": 0.027674238999999632
+          },
+          "lora_merge_quantize": {
+            "count": 3392,
+            "seconds": 0.0119986739999998
+          },
+          "lora_merge_unrotate": {
+            "count": 3392,
+            "seconds": 0.0279388380000001
+          }
+        }
+      },
+      {
+        "case": "without_return_first",
+        "seconds": 21.220144013990648,
+        "gpu_activity_union_seconds": 19.904572489,
+        "kernel_seconds": 18.690796084,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008742254000000001,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008525065999999998,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2587440949999998,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1488,
+            "seconds": 0.8249529499999989,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 1441,
+            "seconds": 1.0506175080000077,
+            "bytes": 15005566512
+          },
+          "copy_kind_2": {
+            "count": 42,
+            "seconds": 0.003459279000000001,
+            "bytes": 81281024
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15941113800000353,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.103929254,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3392,
+            "seconds": 0.1059475069999994,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.02252437,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009514092000000004,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.38710289700000033,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8276393479999986,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3942211579999992,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.273059463000004,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07821432999999997,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.696376239999994,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 272,
+            "seconds": 0.0002884800000000006,
+            "bytes": 3440640
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8074088090000009,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 714,
+            "seconds": 0.30931145699999996,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 56438,
+            "seconds": 2.2835755219994796,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5114415750000002,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7795656969999984,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_return_warm",
+        "seconds": 19.92005660093855,
+        "gpu_activity_union_seconds": 18.998349921,
+        "kernel_seconds": 18.686306241,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008742894,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008531952,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2588753000000001,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8248552459999989,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.14834622999999925,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.004028846,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15950937600000353,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.103573629,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10647590899999942,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.02250704200000002,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009520076,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3870808660000002,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.82852157,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.395573574000006,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2743529260000006,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07841686000000002,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.700971517999997,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.0001592280000000001,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8082663780000033,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.29586082499999977,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.280984907999477,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5116270420000003,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.781567725999994,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      }
+    ],
+    "without_warm_mean_seconds": 19.886421415023506,
+    "with_warm_mean_seconds": 21.67206068354426
+  },
+  "memory_diagnostic": {
+    "run_directory": "lora-cfg1-bpxoba7l",
+    "trace_checkpoints": [
+      "# checkpoint_dropped_records=0"
+    ],
+    "runs": [
+      {
+        "case": "without_first",
+        "seconds": 22.938496661023237,
+        "gpu_activity_union_seconds": 19.814956127,
+        "kernel_seconds": 18.603783935,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008733126,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008503950999999997,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25649003400000014,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1488,
+            "seconds": 0.8307112490000004,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 1441,
+            "seconds": 1.0477640849999998,
+            "bytes": 15005566512
+          },
+          "copy_kind_2": {
+            "count": 42,
+            "seconds": 0.003432653,
+            "bytes": 81281024
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.1596889920000043,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.10365393900000001,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3392,
+            "seconds": 0.1057258619999993,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022517397999999987,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009495388,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3877363009999999,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8233850829999994,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.379704289000005,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.262604392999998,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07753947799999998,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.666302963999996,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 272,
+            "seconds": 0.0002864620000000003,
+            "bytes": 3440640
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8028063509999996,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 714,
+            "seconds": 0.3085168079999997,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 56438,
+            "seconds": 2.277418247999489,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.509285817,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7626532560000037,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_warm_1",
+        "seconds": 19.861559830023907,
+        "gpu_activity_union_seconds": 18.935131987,
+        "kernel_seconds": 18.628033258000006,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008740870999999997,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008510890000000004,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.256842763,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8297024729999999,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.14318766399999994,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.003932242,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15981990800000348,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10330500099999997,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10569461799999942,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022510044000000003,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009474858,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.386824321,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8247613219999995,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3860331650000046,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2668505620000015,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07805546899999997,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.679698265000001,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015891500000000006,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.804348257000001,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.2960471109999998,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.278790677999492,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5112518240000007,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.770590765999994,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_warm_2",
+        "seconds": 19.881265767966397,
+        "gpu_activity_union_seconds": 18.94944564,
+        "kernel_seconds": 18.645313238,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008745776000000002,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008533230000000001,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25704827300000016,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8303437649999998,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.1403872879999994,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.003790583,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15979520400000316,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10328360499999997,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.1057031029999994,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022525181999999998,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009471666,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3868568350000003,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8255730819999982,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3883758849999985,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2695319230000006,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.078200059,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.685613598000006,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.0001593270000000001,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8054018360000007,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.2957955559999999,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.2788551309994736,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.511369131,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7740856019999995,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "with_first",
+        "seconds": 27.440464230021462,
+        "gpu_activity_union_seconds": 19.67976142,
+        "kernel_seconds": 19.047839431999996,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008752270000000001,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008525805000000001,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2552660329999999,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1488,
+            "seconds": 0.8286903290000007,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 1816,
+            "seconds": 0.4681933160000007,
+            "bytes": 8977602096
+          },
+          "copy_kind_2": {
+            "count": 234,
+            "seconds": 0.0038928809999999995,
+            "bytes": 87048192
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.159546857000004,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.1037346210000001,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3392,
+            "seconds": 0.10578529099999957,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022524756,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009459759,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.38661142499999945,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8256039919999999,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3861557529999997,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.268446244999997,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07822650499999999,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.684174262000002,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 272,
+            "seconds": 0.0002889340000000008,
+            "bytes": 3440640
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8047162009999994,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 906,
+            "seconds": 0.3531416410000002,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 57014,
+            "seconds": 2.6357844239994814,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5112704050000005,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.770969715000001,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {
+          "lora_merge_add": {
+            "count": 192,
+            "seconds": 0.09061413700000003
+          },
+          "lora_merge_quantize": {
+            "count": 192,
+            "seconds": 0.10144852099999999
+          },
+          "lora_merge_unrotate": {
+            "count": 192,
+            "seconds": 0.16122665500000002
+          }
+        }
+      },
+      {
+        "case": "with_warm_1",
+        "seconds": 20.944836333044805,
+        "gpu_activity_union_seconds": 19.029160883,
+        "kernel_seconds": 18.721845859000002,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008749236999999998,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008537580000000001,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2556087779999998,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8291356600000003,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 509,
+            "seconds": 0.14375778099999995,
+            "bytes": 1878673468
+          },
+          "copy_kind_2": {
+            "count": 69,
+            "seconds": 0.0038110920000000003,
+            "bytes": 81149952
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.1595872070000044,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.103471444,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10575633399999958,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022518708999999994,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009468371,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.38678300600000015,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8269405449999985,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3907712269999997,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.271916733000002,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07820668799999997,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.692092269,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015894400000000008,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8062968660000002,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 418,
+            "seconds": 0.3025859280000002,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55730,
+            "seconds": 2.334879222999491,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.511742751999999,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.776384508999999,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {
+          "lora_merge_add": {
+            "count": 28,
+            "seconds": 0.013726343
+          },
+          "lora_merge_quantize": {
+            "count": 28,
+            "seconds": 0.014921357000000001
+          },
+          "lora_merge_unrotate": {
+            "count": 28,
+            "seconds": 0.023524056999999998
+          }
+        }
+      },
+      {
+        "case": "with_warm_2",
+        "seconds": 20.981535463011824,
+        "gpu_activity_union_seconds": 19.033000408,
+        "kernel_seconds": 18.721508905999997,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008749103,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008526638000000001,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.2555489129999996,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.8289638279999997,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 509,
+            "seconds": 0.14792896899999952,
+            "bytes": 1878673468
+          },
+          "copy_kind_2": {
+            "count": 69,
+            "seconds": 0.0038253939999999998,
+            "bytes": 81149952
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15957844900000437,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.10345880999999994,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10571938799999957,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022528872000000005,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009465517,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3865802110000001,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8269974810000003,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.390733605999998,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2721047689999985,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07827762600000002,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.692016012000002,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.0001586900000000001,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8063547209999997,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 418,
+            "seconds": 0.30263846999999977,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55730,
+            "seconds": 2.33483218299949,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5117394810000003,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.776273276999999,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {
+          "lora_merge_add": {
+            "count": 28,
+            "seconds": 0.013723751999999999
+          },
+          "lora_merge_quantize": {
+            "count": 28,
+            "seconds": 0.014915466
+          },
+          "lora_merge_unrotate": {
+            "count": 28,
+            "seconds": 0.023508443
+          }
+        }
+      },
+      {
+        "case": "without_return_first",
+        "seconds": 21.216448806109838,
+        "gpu_activity_union_seconds": 19.890366525,
+        "kernel_seconds": 18.67772626799999,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008742344999999999,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008545514999999998,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25857703099999985,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1488,
+            "seconds": 0.8247183789999994,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 1441,
+            "seconds": 1.0492509890000086,
+            "bytes": 15005566512
+          },
+          "copy_kind_2": {
+            "count": 42,
+            "seconds": 0.0034596660000000006,
+            "bytes": 81281024
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.15964118600000296,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 585,
+            "seconds": 0.10380966700000008,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3392,
+            "seconds": 0.1061342589999994,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.02255796799999999,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009515829999999998,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.3870969389999997,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8273982000000006,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.391794012000003,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.2717102539999967,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07820359599999999,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.692816926999993,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 272,
+            "seconds": 0.00028841600000000065,
+            "bytes": 3440640
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8067198980000007,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 714,
+            "seconds": 0.30930048999999993,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 56438,
+            "seconds": 2.281540123999464,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5114272099999989,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.777117623999999,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      },
+      {
+        "case": "without_return_warm",
+        "seconds": 19.904244933044538,
+        "gpu_activity_union_seconds": 18.991983755,
+        "kernel_seconds": 18.678974958999998,
+        "groups": {
+          "attention_output_scale": {
+            "count": 32,
+            "seconds": 0.008744716,
+            "bytes": 0
+          },
+          "bf16_to_f32": {
+            "count": 135,
+            "seconds": 0.008550379,
+            "bytes": 0
+          },
+          "convrot_bf16": {
+            "count": 1280,
+            "seconds": 0.25879428800000026,
+            "bytes": 0
+          },
+          "convrot_f32": {
+            "count": 1344,
+            "seconds": 0.824818039,
+            "bytes": 0
+          },
+          "copy_kind_1": {
+            "count": 397,
+            "seconds": 0.1495287349999998,
+            "bytes": 1853081660
+          },
+          "copy_kind_2": {
+            "count": 41,
+            "seconds": 0.003681047,
+            "bytes": 80281600
+          },
+          "copy_kind_8": {
+            "count": 6770,
+            "seconds": 0.1596397550000035,
+            "bytes": 48878170112
+          },
+          "elementwise_add": {
+            "count": 477,
+            "seconds": 0.103521046,
+            "bytes": 0
+          },
+          "elementwise_scale": {
+            "count": 3356,
+            "seconds": 0.10607052899999941,
+            "bytes": 0
+          },
+          "f16_to_f32": {
+            "count": 305,
+            "seconds": 0.022567660999999985,
+            "bytes": 0
+          },
+          "f32_to_bf16": {
+            "count": 71,
+            "seconds": 0.009509072,
+            "bytes": 0
+          },
+          "gate_up_pack": {
+            "count": 1280,
+            "seconds": 0.38706616200000016,
+            "bytes": 0
+          },
+          "int8_attention_residual": {
+            "count": 1248,
+            "seconds": 0.8281001680000006,
+            "bytes": 0
+          },
+          "int8_bf16_output": {
+            "count": 3840,
+            "seconds": 2.3946568149999967,
+            "bytes": 0
+          },
+          "int8_down_residual": {
+            "count": 1248,
+            "seconds": 2.274061105000003,
+            "bytes": 0
+          },
+          "int8_f32_output": {
+            "count": 64,
+            "seconds": 0.07836176100000002,
+            "bytes": 0
+          },
+          "int8_gate_up_swiglu": {
+            "count": 1280,
+            "seconds": 4.698163438999997,
+            "bytes": 0
+          },
+          "memset": {
+            "count": 128,
+            "seconds": 0.00015925900000000006,
+            "bytes": 786432
+          },
+          "norm_modulation_convrot": {
+            "count": 2496,
+            "seconds": 0.8076721570000001,
+            "bytes": 0
+          },
+          "other_gemm": {
+            "count": 390,
+            "seconds": 0.2955945860000001,
+            "bytes": 0
+          },
+          "other_kernel": {
+            "count": 55646,
+            "seconds": 2.281268668999446,
+            "bytes": 0
+          },
+          "paired_qk_rms_rope": {
+            "count": 1280,
+            "seconds": 0.5114852569999992,
+            "bytes": 0
+          },
+          "sage_attention_core": {
+            "count": 1280,
+            "seconds": 2.7799691100000006,
+            "bytes": 0
+          }
+        },
+        "merge_kernels": {}
+      }
+    ],
+    "without_warm_mean_seconds": 19.871412798995152,
+    "with_warm_mean_seconds": 20.963185898028314,
+    "binary_sha256": "a998aad64733d6deae25ad3288e7027fd669703b56da3c33552ed3b1aa32278d",
+    "source_lock_sha256": "0f9f03b837025d5deb84f32ba3b63a5812ec53f902d29f5335c078f0375f7f22",
+    "note": "Before final source formatting; same algorithm. A build overlapped part of this diagnostic; use final run for timing.",
+    "allocation_counters": {
+      "scope": "CUPTI DEVICE allocation event sizes; not physical peak or live VRAM",
+      "runs": {
+        "without_first": {
+          "allocated_device_bytes": 22563184512,
+          "allocation_count": 89,
+          "allocation_sizes": {
+            "1073741824": 2,
+            "1044381696": 2,
+            "1072030720": 1,
+            "1072389120": 1,
+            "571920384": 1,
+            "8277632": 1,
+            "2097152": 2,
+            "1024": 1,
+            "131072": 1,
+            "8388608": 1,
+            "4194304": 1,
+            "1026658304": 1,
+            "1041093632": 2,
+            "1057854464": 1,
+            "1057837056": 1,
+            "990630912": 1,
+            "1041551360": 1,
+            "1072808064": 1,
+            "41943040": 1,
+            "385024": 64,
+            "506264448": 1,
+            "6683033856": 1
+          }
+        },
+        "without_warm_1": {
+          "allocated_device_bytes": 9344584960,
+          "allocation_count": 68,
+          "allocation_sizes": {
+            "1057837056": 1,
+            "1072808064": 1,
+            "385024": 64,
+            "506264448": 1,
+            "6683033856": 1
+          }
+        },
+        "without_warm_2": {
+          "allocated_device_bytes": 9344584960,
+          "allocation_count": 68,
+          "allocation_sizes": {
+            "1057837056": 1,
+            "1072808064": 1,
+            "385024": 64,
+            "506264448": 1,
+            "6683033856": 1
+          }
+        },
+        "with_first": {
+          "allocated_device_bytes": 59982506880,
+          "allocation_count": 844,
+          "allocation_sizes": {
+            "1073741824": 2,
+            "1044381696": 2,
+            "1072030720": 1,
+            "1072389120": 1,
+            "571920384": 1,
+            "8277632": 1,
+            "1057837056": 1,
+            "101203968": 128,
+            "1024": 192,
+            "131072": 192,
+            "8388608": 192,
+            "303054848": 32,
+            "605913088": 32,
+            "1072808064": 1,
+            "385024": 64,
+            "506264448": 1,
+            "6683033856": 1
+          }
+        },
+        "with_warm_1": {
+          "allocated_device_bytes": 15949675776,
+          "allocation_count": 180,
+          "allocation_sizes": {
+            "1057837056": 1,
+            "101203968": 18,
+            "1024": 28,
+            "131072": 28,
+            "8388608": 28,
+            "303054848": 5,
+            "605913088": 5,
+            "1072808064": 1,
+            "385024": 64,
+            "506264448": 1,
+            "6683033856": 1
+          }
+        },
+        "with_warm_2": {
+          "allocated_device_bytes": 15949675776,
+          "allocation_count": 180,
+          "allocation_sizes": {
+            "1057837056": 1,
+            "101203968": 18,
+            "1024": 28,
+            "131072": 28,
+            "8388608": 28,
+            "303054848": 5,
+            "605913088": 5,
+            "1072808064": 1,
+            "385024": 64,
+            "506264448": 1,
+            "6683033856": 1
+          }
+        },
+        "without_return_first": {
+          "allocated_device_bytes": 22504332160,
+          "allocation_count": 82,
+          "allocation_sizes": {
+            "1073741824": 2,
+            "1044381696": 2,
+            "1072030720": 1,
+            "1072389120": 1,
+            "571920384": 1,
+            "8277632": 1,
+            "1057837056": 1,
+            "1026658304": 1,
+            "1041093632": 2,
+            "1057854464": 1,
+            "990630912": 1,
+            "1041551360": 1,
+            "1072808064": 1,
+            "385024": 64,
+            "506264448": 1,
+            "6683033856": 1
+          }
+        },
+        "without_return_warm": {
+          "allocated_device_bytes": 9344584960,
+          "allocation_count": 68,
+          "allocation_sizes": {
+            "1057837056": 1,
+            "1072808064": 1,
+            "385024": 64,
+            "506264448": 1,
+            "6683033856": 1
+          }
+        }
+      }
+    },
+    "max_merge_workspace_bytes": 605913088,
+    "max_merge_reservation_bytes": 639467520,
+    "physical_peak_vram_measured": false
+  }
+}
