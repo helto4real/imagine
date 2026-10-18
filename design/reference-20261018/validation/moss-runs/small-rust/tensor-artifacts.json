@@ -1,0 +1,65 @@
+{
+  "source_own_run": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/runtime/moss-first-trained-fused-rust/first-image",
+  "boundaries": [
+    {
+      "file": "context-f32.bin",
+      "bytes": 425984,
+      "sha256": "37450c784e7a4e35566b1290220551a66629bf6a39827097eaaf862d7ae391ed"
+    },
+    {
+      "file": "image-rgb-f32.bin",
+      "bytes": 860160,
+      "sha256": "3a8148b9eeab6eb46c37d73d960c65da3ddcaf0f5c6e7e5837d5575d78339db0"
+    },
+    {
+      "file": "latent-f32.bin",
+      "bytes": 143360,
+      "sha256": "6cc1ad69eec02a199f423377b7f2a7442a025802b80a75ed47d4ca90f35c0dfe"
+    },
+    {
+      "file": "negative-context-f32.bin",
+      "bytes": 163840,
+      "sha256": "6643d2e88ce835bc69c236a07549c3559bc52e846045d0e5012eef227633a35d"
+    },
+    {
+      "file": "noise-f32.bin",
+      "bytes": 143360,
+      "sha256": "940d924795a00dc8f8ae9371d521da56e28f2dfb2823eb90ad8c621ecaf0c87e"
+    },
+    {
+      "file": "sigmas-f32.bin",
+      "bytes": 20,
+      "sha256": "3e2079cf69100492d126f771451ab84cc24809e8dea59588be19393e76185397"
+    },
+    {
+      "file": "step-000-denoised-f32.bin",
+      "bytes": 143360,
+      "sha256": "24a017fee564d56cc727c568d3b61f5ce4a8c9a71cf96c069e9163496e2273aa"
+    },
+    {
+      "file": "step-001-denoised-f32.bin",
+      "bytes": 143360,
+      "sha256": "fda917e9cee5fd7b50f4d94e96abc531811925bc1dcc004e3facec5d88e6998f"
+    },
+    {
+      "file": "step-002-denoised-f32.bin",
+      "bytes": 143360,
+      "sha256": "65b3d538b0461d4746cc403986b760986dc768566e7d31f231e3d6cf2ffdf0b6"
+    },
+    {
+      "file": "step-003-denoised-f32.bin",
+      "bytes": 143360,
+      "sha256": "b33cb5b20ab447854a992d107a851a857c89240c3a9ec2f852245eae24b98213"
+    },
+    {
+      "file": "text-mask-0-f32.bin",
+      "bytes": 104,
+      "sha256": "bed151e7dc389be7606626ec31ec6fd4dd42c9c29369a971056a0e87c29d188c"
+    },
+    {
+      "file": "text-mask-1-f32.bin",
+      "bytes": 40,
+      "sha256": "00e1a993efd5074e1fc9c7ff6fc46a151ee4ed93935d05ee2ab229ded34975c1"
+    }
+  ]
+}

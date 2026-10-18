@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Frozen RoPE callables, own initialized storage and metadata only."""
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import itertools
@@ -118,7 +119,7 @@ def capture(torch,devices,bits):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--site',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);a=parser.parse_args()
-    manifest=json.loads((Path(__file__).resolve().parents[2]/'design/reference-local/source-manifest.json').read_text());hashes={}
+    manifest=json.loads((reference_dir(Path(__file__).resolve().parents[2])/'source-manifest.json').read_text());hashes={}
     for x in manifest:
         if x['root']=='site'and x['path'].startswith('comfy_kitchen/')and Path(x['path']).suffix in ['.py','.cpp','.cu','.h','.hpp','.cuh']:
             h=hashlib.sha256((a.site/x['path']).read_bytes()).hexdigest();assert h==x['sha256'];hashes[x['path']]=h

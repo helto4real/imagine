@@ -96,12 +96,14 @@ fn apply_input(
         ""
     };
     match name {
-        "gelu_tanh" | "swiglu" => {
+        "gelu_tanh" | "swiglu" | "situ" => {
             let x = unsafe { rt.dequantize_args(x)? }.as_tensor()?;
             Ok(Value::tensor(int8_linear::apply_input(
                 &x,
                 &if name == "gelu_tanh" {
                     InputActivation::GeluTanh
+                } else if name == "situ" {
+                    InputActivation::Situ
                 } else {
                     InputActivation::SwiGlu
                 },
@@ -135,7 +137,7 @@ fn apply_input(
         _ => Err(error(
             "ValueError",
             format!(
-                "unsupported input_act: {} (expected one of ['gelu_tanh', 'none', 'rms_norm', 'swiglu'])",
+                "unsupported input_act: {} (expected one of ['gelu_tanh', 'none', 'rms_norm', 'situ', 'swiglu'])",
                 crate::python_value::repr_with_native(mode, &rt.native)?
             ),
         )),

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Pinned original definitions, real Torch/Kitchen and initialized own operands only."""
+from reference_paths import reference_dir
 import argparse
 import ast
 import hashlib
@@ -15,7 +16,7 @@ p.add_argument('--comfy',type=Path,required=True)
 p.add_argument('--output',type=Path,required=True)
 a=p.parse_args()
 project=Path(__file__).resolve().parents[2]
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 source_names=['comfy/ldm/qwen_image21/model.py','comfy/model_management.py','comfy/rmsnorm.py',
               'comfy/latent_formats.py','comfy/model_detection.py','comfy/ldm/flux/math.py','comfy/ldm/flux/layers.py']
 sources={}

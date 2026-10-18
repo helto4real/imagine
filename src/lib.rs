@@ -1,4 +1,5 @@
 pub mod api;
+pub mod comfy_engine;
 pub mod config;
 pub mod contract;
 pub mod engine;
@@ -23,3 +24,5 @@ pub mod generation;
 pub mod model_adapter;
 
 pub mod model_library;
+
+pub mod rust_runtime;

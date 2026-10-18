@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Frozen RMS-RoPE wrappers on initialized owned tensors; no model inputs."""
+from reference_paths import reference_dir
 import argparse,hashlib,itertools,json,math,sys
 from pathlib import Path
 # This development draft is copied into inference/tools before capture.
@@ -79,7 +80,7 @@ def capture(torch,devices,bits):
     return dict(triton_rms_rope_bindings=cases,triton_rms_rope_large=large)
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-    manifest=json.loads((Path(__file__).resolve().parents[2]/'design/reference-local/source-manifest.json').read_text());hashes={}
+    manifest=json.loads((reference_dir(Path(__file__).resolve().parents[2])/'source-manifest.json').read_text());hashes={}
     for name in ['comfy_kitchen/backends/triton/rms_rope.py','comfy_kitchen/_rope_utils.py']:
         h=hashlib.sha256((a.site/name).read_bytes()).hexdigest();assert h==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name);hashes[name]=h
     sys.path.insert(0,str(a.site));import torch

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Development-only source transcription of locked integer matmul and grouped-unpack kernels."""
+from reference_paths import reference_dir
 import argparse,ast,hashlib,json,struct,re
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--family',choices=['int8','w4a8'],default='int8');p.add_argument('--source',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());expected=next(e['sha256']for e in manifest if e['root']=='site'and e['path']==('comfy_kitchen/backends/triton/quantization.py'if a.family=='int8'else'comfy_kitchen/backends/triton/w4a8_int8.py'));assert hashlib.sha256(a.source.read_bytes()).hexdigest()==expected
+project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());expected=next(e['sha256']for e in manifest if e['root']=='site'and e['path']==('comfy_kitchen/backends/triton/quantization.py'if a.family=='int8'else'comfy_kitchen/backends/triton/w4a8_int8.py'));assert hashlib.sha256(a.source.read_bytes()).hexdigest()==expected
 module=ast.parse(a.source.read_text());out=['// Generated from the locked INT8 matmul source; no saved IR.'if a.family=='int8'else'// Generated from locked integer-kernel source; no saved IR.',f'// Source SHA256: {expected}'];next_id=0;last_position=None;origins={}
 functions=[next(n for n in module.body if isinstance(n,ast.FunctionDef)and n.name==name)for name in (['_int8_matmul_dequant_kernel','_int8_matmul_dequant_per_row_kernel']if a.family=='int8'else['_dequant_int4_grouped_to_int8_kernel'])]
 pointer_count=6 if a.family=='int8'else 4

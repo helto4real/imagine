@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Original Qwen21 tokenizer and Unicode behavior on source-owned test strings."""
+from reference_paths import reference_dir
 import argparse
 import ast
 import hashlib
@@ -20,7 +21,7 @@ p.add_argument('--comfy',type=Path,required=True)
 p.add_argument('--output',type=Path,required=True)
 a=p.parse_args()
 project=Path(__file__).resolve().parents[2]
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 sources={}
 for root,names in [('comfy',['comfy/sd1_clip.py','comfy/text_encoders/qwen3vl.py','comfy/text_encoders/qwen_image21.py']),('site',['transformers/models/qwen2/tokenization_qwen2.py','transformers/tokenization_utils.py','transformers/tokenization_utils_base.py'])]:
  for name in names:

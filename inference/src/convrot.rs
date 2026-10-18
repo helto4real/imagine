@@ -25,12 +25,13 @@ fn empty(device: Device, kind: Kind) -> Result<Tensor, Error> {
     Ok(cache[&(device, kind)].shallow_clone())
 }
 
-/// Typed internal operands for Kitchen's four fused activation codes.
+/// Typed internal operands for Kitchen's fused activation codes.
 #[derive(Clone, Copy)]
 pub enum InputActivation<'a> {
     None,
     GeluTanh,
     SwiGlu,
+    Situ,
     RmsNormDefault {
         weight: Option<&'a Tensor>,
     },
@@ -173,7 +174,7 @@ pub(crate) unsafe fn rowwise64_with_seed(
     activation: InputActivation<'_>,
 ) -> Result<(Tensor, Tensor), Error> {
     use KernelArg::{Bool, Float, Int, Tensor as T};
-    let width_factor = if matches!(activation, InputActivation::SwiGlu) {
+    let width_factor = if matches!(activation, InputActivation::SwiGlu | InputActivation::Situ) {
         2
     } else {
         1
@@ -184,31 +185,7 @@ pub(crate) unsafe fn rowwise64_with_seed(
     )?;
     let scales = Tensor::f_empty([x.size()[0], 1], (Kind::Float, x.device()))?;
     let stream = stream(native, x)?;
-    let weight = match &activation {
-        InputActivation::RmsNorm {
-            weight: Some(weight),
-            ..
-        }
-        | InputActivation::RmsNormDefault {
-            weight: Some(weight),
-        } => weight
-            .f_to_device_(x.device(), x.kind(), false, false)?
-            .f_contiguous()?,
-        _ => empty(x.device(), x.kind())?,
-    };
-    let (code, epsilon) = match activation {
-        InputActivation::None => (0, 0.),
-        InputActivation::GeluTanh => (1, 0.),
-        InputActivation::SwiGlu => (2, 0.),
-        InputActivation::RmsNorm { epsilon, .. } => (3, epsilon),
-        InputActivation::RmsNormDefault { .. } => {
-            return Err(Error::ReferenceException {
-                class: "TypeError",
-                message: "float() argument must be a string or a real number, not 'NoneType'"
-                    .into(),
-            });
-        }
-    };
+    let (weight, code, epsilon) = activation_args(x, activation)?;
     let seed = seed()?;
     unsafe {
         native.call_unchecked(
@@ -228,6 +205,40 @@ pub(crate) unsafe fn rowwise64_with_seed(
         )?;
     }
     Ok((output, scales))
+}
+
+/// Original activation operands shared by the rowwise and M=1 quantizers.
+pub(crate) fn activation_args(
+    x: &Tensor,
+    activation: InputActivation<'_>,
+) -> Result<(Tensor, i64, f64), Error> {
+    let weight = match &activation {
+        InputActivation::RmsNorm {
+            weight: Some(weight),
+            ..
+        }
+        | InputActivation::RmsNormDefault {
+            weight: Some(weight),
+        } => weight
+            .f_to_device_(x.device(), x.kind(), false, false)?
+            .f_contiguous()?,
+        _ => empty(x.device(), x.kind())?,
+    };
+    let (code, epsilon) = match activation {
+        InputActivation::None => (0, 0.),
+        InputActivation::GeluTanh => (1, 0.),
+        InputActivation::SwiGlu => (2, 0.),
+        InputActivation::Situ => (4, 0.),
+        InputActivation::RmsNorm { epsilon, .. } => (3, epsilon),
+        InputActivation::RmsNormDefault { .. } => {
+            return Err(Error::ReferenceException {
+                class: "TypeError",
+                message: "float() argument must be a string or a real number, not 'NoneType'"
+                    .into(),
+            });
+        }
+    };
+    Ok((weight, code, epsilon))
 }
 
 /// CUDA backend dequantize_int8_simple_dtype, including its original eager

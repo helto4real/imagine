@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Approved 3456-case matrix; guard all formerly unwritten consumers, metadata only."""
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import itertools
@@ -136,7 +137,7 @@ def capture(torch, native, bits):
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--site',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args();project=Path(__file__).resolve().parents[2]
-    manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={}
+    manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={}
     for name in ['comfy_kitchen/backends/cuda/__init__.py','comfy_kitchen/backends/_activations.py']:
         actual=hashlib.sha256((args.site/name).read_bytes()).hexdigest()
         assert actual==next(x['sha256'] for x in manifest if x['root']=='site' and x['path']==name);hashes[name]=actual

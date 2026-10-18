@@ -51,6 +51,28 @@ pub fn apply_input(x: &Tensor, activation: &InputActivation<'_>) -> Result<Tenso
             }
             parts[0].f_silu()?.f_mul_(&parts[1])?
         }
+        InputActivation::Situ => {
+            let parts = x.f_chunk(2, -1)?;
+            if parts.len() != 2 {
+                return Err(exception(
+                    "ValueError",
+                    format!(
+                        "not enough values to unpack (expected 2, got {})",
+                        parts.len()
+                    ),
+                ));
+            }
+            let gated = parts[1]
+                .f_div_scalar(4.)?
+                .f_tanh_()?
+                .f_mul_scalar_(4.)?
+                .f_mul_(&parts[1].f_sigmoid()?)?;
+            parts[0]
+                .f_div_scalar(25.)?
+                .f_tanh_()?
+                .f_mul_scalar_(25.)?
+                .f_mul_(&gated)?
+        }
         InputActivation::RmsNormDefault { weight } => {
             let weight = weight.ok_or_else(|| {
                 exception("ValueError", "input_act 'rms_norm' requires act_weight")

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Source-faithful SM89 INT4 routes, guarded K0 outputs and exact defined controls."""
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import itertools
@@ -103,7 +104,7 @@ def capture(torch,native,bits):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--site',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);args=parser.parse_args()
-    manifest=json.loads((Path(__file__).resolve().parents[2]/'design/reference-local/source-manifest.json').read_text());name='comfy_kitchen/backends/cuda/__init__.py';h=hashlib.sha256((args.site/name).read_bytes()).hexdigest();assert h==next(x['sha256'] for x in manifest if x['root']=='site' and x['path']==name)
+    manifest=json.loads((reference_dir(Path(__file__).resolve().parents[2])/'source-manifest.json').read_text());name='comfy_kitchen/backends/cuda/__init__.py';h=hashlib.sha256((args.site/name).read_bytes()).hexdigest();assert h==next(x['sha256'] for x in manifest if x['root']=='site' and x['path']==name)
     sys.path.insert(0,str(args.site));import torch
     from comfy_kitchen.backends import cuda as native
     assert torch.cuda.get_device_capability()==(8,9)

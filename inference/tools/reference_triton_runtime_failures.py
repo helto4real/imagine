@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Original lazy CompiledKernel failure states, owned synthetic metadata only."""
+from reference_paths import reference_dir
 import argparse,hashlib,json,sys,tempfile
 from pathlib import Path
 def capture(torch,profile_path,cubin_path,workspace):
@@ -37,7 +38,7 @@ def capture(torch,profile_path,cubin_path,workspace):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--profile',type=Path,required=True);p.add_argument('--cubin',type=Path,required=True);p.add_argument('--workspace',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-    project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={}
+    project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={}
     for name in ['triton/compiler/compiler.py','triton/backends/nvidia/driver.c']:
         h=hashlib.sha256((a.site/name).read_bytes()).hexdigest();assert h==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name);hashes[name]=h
     sys.path.insert(0,str(a.site));import torch

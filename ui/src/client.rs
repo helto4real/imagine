@@ -471,6 +471,9 @@ pub fn make_request(
     if prompt.trim().is_empty() {
         bail!("Enter a prompt.");
     }
+    if metadata["model"] == "moss-image-sft-int8" && !refs.is_empty() {
+        bail!("MOSS currently supports text-to-image only. Remove reference images.");
+    }
     if refs.len() > 10 {
         bail!("Up to ten reference images.");
     }
@@ -511,6 +514,28 @@ pub fn make_request(
     request["height"] = json!(height);
     request["sampling"]["steps"] = json!(settings.steps);
     request["sampling"]["cfg_scale"] = json!(settings.cfg_scale);
+    for (field, constraint, selected) in [
+        ("sampler", "samplers", &settings.sampler),
+        ("scheduler", "schedulers", &settings.scheduler),
+    ] {
+        // Manual sigmas replace the scheduler; retain the model's nominal default.
+        if field == "scheduler"
+            && request["sampling"]["custom_sigmas"]
+                .as_array()
+                .is_some_and(|s| !s.is_empty())
+        {
+            continue;
+        }
+        if let Some(selected) = selected {
+            if !metadata["constraints"][constraint]
+                .as_array()
+                .is_some_and(|choices| choices.iter().any(|c| c.as_str() == Some(selected)))
+            {
+                bail!("The selected {field} is unavailable for this model. Update Settings.");
+            }
+            request["sampling"][field] = json!(selected);
+        }
+    }
     request["model_options"]["qwen_image_2_1"]["reference_max_pixels_per_image"] =
         json!(settings.reference_max_pixels_per_image);
     request["seed"] = if settings.random_seed {
@@ -656,11 +681,27 @@ pub fn error_message(code: &str) -> String {
         "imagine_proxy_not_configured" => "Restart the proxy with ./start-proxy.sh to enable Imagine coordination.",
         "imagine_upstream_unavailable" => "The proxy cannot reach Imagine. Start ./start-server.sh and retry.",
         "unsupported_resolution"=>"This server does not accept the selected image size. Restart the updated server or choose a supported size.",
-        "unsupported_sampling"=>"Choose steps between 1 and 100 and CFG between 0 and 20.",
+        "unsupported_sampling"=>"Choose a sampler and scheduler supported by this backend, steps between 1 and 100, and CFG between 0 and 20.",
+        "unsupported_moss_configuration"=>"MOSS currently supports text-to-image with Euler and normal or sgm_uniform, without references or LoRAs.",
         "runtime_suspended"=>"The server is suspended. Resume it through the API before generating.",
         "model_weights_missing"=>"Model files are missing. Check QWEN_MODEL_ROOT on the server.",
         "frozen_binary_unavailable"|"frozen_binary_hash_mismatch"=>"The frozen inference engine is missing or has changed on the server.",
         "native_startup_failed"=>"The inference engine could not start. Check the GPU and model files on the server.",
+        "rust_startup_failed"=>"Rust inference could not start. Check the prepared runtime and available GPU memory.",
+        "rust_startup_timeout"=>"Rust inference startup timed out.",
+        "rust_protocol_error"=>"Rust worker communication failed. Rebuild the Rust runtime and restart Imagine.",
+        "rust_generation_failed"=>"Rust inference failed. Check available RAM/VRAM and the selected model files.",
+        "rust_invalid_output"=>"Rust inference returned invalid image data.",
+        "rust_input_too_large"=>"Reference images exceed the Rust transfer limit. Use fewer or smaller references.",
+        "requires_rust_backend"=>"Start Imagine with --backend rust to use MOSS.",
+        "comfy_startup_failed"=>"Comfy worker could not start (comfy_startup_failed). Check the selected Python environment and Comfy version.",
+        "comfy_startup_timeout"=>"Comfy worker startup timed out (comfy_startup_timeout).",
+        "comfy_kitchen_unavailable"=>"Kitchen CUDA attention is unavailable (comfy_kitchen_unavailable). Check Kitchen support in the selected Comfy Python environment.",
+        "comfy_protocol_error"=>"Comfy worker communication failed (comfy_protocol_error). Restart Imagine with the updated worker files.",
+        "comfy_generation_failed"=>"Comfy inference failed (comfy_generation_failed).",
+        "comfy_invalid_output"=>"Comfy returned an unreadable image (comfy_invalid_output).",
+        "comfy_input_too_large"=>"Comfy input exceeds the transfer limit (comfy_input_too_large). Use fewer or smaller references.",
+        "unexpected_output_dimensions"=>"The inference engine returned the wrong image dimensions (unexpected_output_dimensions).",
         "asset_not_found"=>"A source or reference image is missing on the server. Select a current result or upload the reference again.",
         "invalid_image"=>"The image is unreadable. Choose PNG, JPEG or WebP within the server size limits.",
         "upload_busy"=>"The server is handling other uploads. Retry.",
@@ -906,5 +947,26 @@ mod tests {
         settings.steps = 40;
         settings.cfg_scale = f32::NAN;
         assert!(make_request("test", "", &[], &meta, &settings).is_err());
+    }
+
+    #[test]
+    fn sampling_choices_follow_server_capabilities_and_old_preferences_inherit_defaults() {
+        let meta = imagine_server::contract::model(MODEL).unwrap();
+        let old: GenerationSettings =
+            serde_json::from_str(r#"{"steps":40,"cfg_scale":2.5}"#).unwrap();
+        let request = make_request("Synthetic", "", &[], &meta, &old).unwrap();
+        assert_eq!(request["sampling"], meta["defaults"]["sampling"]);
+        let settings = GenerationSettings {
+            sampler: Some("euler".into()),
+            ..old
+        };
+        assert!(make_request("Synthetic", "", &[], &meta, &settings).is_err());
+        let library_meta = imagine_server::model_library::model_metadata(MODEL);
+        assert!(make_request("Synthetic", "", &[], &library_meta, &settings).is_ok());
+        let settings = GenerationSettings {
+            scheduler: Some("unknown".into()),
+            ..settings
+        };
+        assert!(make_request("Synthetic", "", &[], &library_meta, &settings).is_err());
     }
 }

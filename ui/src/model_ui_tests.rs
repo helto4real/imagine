@@ -98,9 +98,13 @@ fn variants_keep_loras_and_missing_files_do_not_silently_change_selection() {
         .as_str()
         .unwrap()
         .to_owned();
+    desk.app.prefs.generation.sampler = Some("euler".into());
+    desk.app.prefs.generation.scheduler = Some("beta".into());
     desk.app.select_model(turbo.clone());
     assert_eq!(desk.app.prefs.generation.steps, 8);
     assert_eq!(desk.app.prefs.generation.cfg_scale, 1.);
+    assert!(desk.app.prefs.generation.sampler.is_none());
+    assert!(desk.app.prefs.generation.scheduler.is_none());
     assert_eq!(desk.app.model_selection().unwrap().loras[0].id, lora.id);
     desk.app.workspace = Workspace::CharacterSheet;
     desk.app.sheet.character_description = "Synthetic".into();
@@ -122,6 +126,152 @@ fn variants_keep_loras_and_missing_files_do_not_silently_change_selection() {
     desk.app.accept_library(library);
     assert_eq!(desk.app.prefs.model_groups[QWEN_GROUP].variant, turbo);
     assert!(desk.app.model_selection().is_err());
+}
+
+#[test]
+fn model_picker_roundtrip_keeps_cold_and_switched_requests_identical() {
+    fn choose(desk: &mut Desk, name: &str) {
+        let current = desk.app.selected_model_name();
+        let bounds = desk
+            .nodes
+            .iter()
+            .map(|(_, n)| n)
+            .find(|n| {
+                n.role() == egui::accesskit::Role::ComboBox && n.value() == Some(current.as_str())
+            })
+            .unwrap()
+            .bounds()
+            .unwrap();
+        let pos = egui::pos2(
+            (bounds.x0 + bounds.x1) as f32 / 2.,
+            (bounds.y0 + bounds.y1) as f32 / 2.,
+        );
+        for pressed in [true, false] {
+            desk.frame(vec![
+                egui::Event::PointerMoved(pos),
+                egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            ]);
+        }
+        desk.frame(vec![]);
+        desk.click(name);
+    }
+    fn request(desk: &Desk) -> Value {
+        desk.app
+            .apply_model_selection(
+                client::make_request(
+                    "Synthetic model-switch check",
+                    "",
+                    &[],
+                    desk.app.metadata.as_ref().unwrap(),
+                    &desk.app.prefs.generation,
+                )
+                .unwrap(),
+            )
+            .unwrap()
+    }
+    let mut cold = Desk::new();
+    let mut library = catalog(cold._root.path());
+    library
+        .models
+        .retain(|m| m["model"] == "qwen-image-2.1-turbo");
+    cold.app.accept_library(library);
+    cold.app.prefs.generation.random_seed = false;
+    let turbo = request(&cold);
+    assert_eq!(turbo["sampling"]["sampler"], "euler");
+    assert_eq!(turbo["sampling"]["steps"], 8);
+    assert_eq!(turbo["sampling"]["cfg_scale"], 1.);
+
+    let mut desk = Desk::new();
+    install(&mut desk);
+    desk.app.prefs.generation.random_seed = false;
+    desk.frame(vec![]);
+    let normal = request(&desk);
+    for _ in 0..2 {
+        choose(&mut desk, "Qwen Image 2.1 · Turbo");
+        assert_eq!(request(&desk), turbo);
+        choose(&mut desk, "Qwen Image 2.1 · INT8");
+        assert_eq!(request(&desk), normal);
+    }
+}
+
+#[test]
+fn sampling_widgets_persist_and_reach_the_server_without_overriding_turbo_sigmas() {
+    let mut desk = Desk::new();
+    install(&mut desk);
+    desk.click("Settings");
+    desk.click("Sampler");
+    desk.click("euler");
+    desk.click("Scheduler");
+    desk.click("simple");
+    desk.app.prefs = Preferences::load(desk._root.path()).unwrap();
+    assert_eq!(desk.app.prefs.generation.sampler.as_deref(), Some("euler"));
+    assert_eq!(
+        desk.app.prefs.generation.scheduler.as_deref(),
+        Some("simple")
+    );
+    // A catalog refresh preserves saved choices; changing models restores defaults.
+    desk.app.accept_library(catalog(desk._root.path()));
+    let request = desk
+        .app
+        .apply_model_selection(
+            client::make_request(
+                "Synthetic",
+                "",
+                &[],
+                desk.app.metadata.as_ref().unwrap(),
+                &desk.app.prefs.generation,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let library = imagine_server::model_library::Library::load(
+        desk._root.path().join("models"),
+        desk._root.path().join("library.json"),
+    )
+    .unwrap();
+    let (resolved, _) = library.prepare(request).unwrap();
+    let typed: imagine_server::contract::JobRequest = serde_json::from_value(resolved).unwrap();
+    typed.validate().unwrap();
+    assert_eq!(typed.sampling.sampler, "euler");
+    assert_eq!(typed.sampling.scheduler, "simple");
+    assert!(typed.sampling.custom_sigmas.is_empty());
+
+    let turbo = desk
+        .app
+        .models
+        .catalog
+        .as_ref()
+        .unwrap()
+        .models
+        .iter()
+        .find(|m| m["model"] == "qwen-image-2.1-turbo")
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    desk.app.select_model(turbo);
+    desk.frame(vec![]);
+    desk.frame(vec![]);
+    assert!(!desk.control("Sampler").is_disabled());
+    assert!(desk.control("Scheduler").is_disabled());
+    desk.click("Sampler");
+    desk.click("euler");
+    let meta = desk.app.metadata.as_ref().unwrap();
+    let request =
+        client::make_request("Synthetic", "", &[], meta, &desk.app.prefs.generation).unwrap();
+    assert_eq!(request["sampling"]["sampler"], "euler");
+    assert_eq!(request["sampling"]["scheduler"], "simple");
+    assert_eq!(
+        request["sampling"]["custom_sigmas"],
+        meta["defaults"]["sampling"]["custom_sigmas"]
+    );
+    assert_eq!(request["sampling"]["steps"], 8);
+    assert_eq!(request["sampling"]["cfg_scale"], 1.);
 }
 #[test]
 fn lora_button_is_available_in_generation_and_editing_and_pending_requests_are_frozen() {
@@ -435,4 +585,36 @@ fn lora_search_filters_each_keystroke_across_words_and_path_segments() {
         assert_eq!(results(&desk).len(), count, "{query}");
     }
     assert!(desk.app.model_selection().unwrap().loras.is_empty());
+}
+
+#[test]
+fn moss_model_switch_uses_its_group_defaults_and_preserves_qwen_loras() {
+    let mut desk = Desk::new();
+    install(&mut desk);
+    let qwen = desk.app.prefs.model_groups[QWEN_GROUP].variant.clone();
+    let lora = selected_lora(&desk);
+    desk.app
+        .prefs
+        .model_groups
+        .get_mut(QWEN_GROUP)
+        .unwrap()
+        .loras = vec![lora.clone()];
+    let mut moss = imagine_server::model_library::model_metadata(imagine_server::contract::MOSS);
+    moss["id"] = json!("synthetic-moss-id");
+    moss["model"] = json!(imagine_server::contract::MOSS);
+    moss["name"] = json!("MOSS Image · SFT INT8");
+    moss["group"] = json!(crate::model_catalog::MOSS_GROUP);
+    moss["available"] = json!(true);
+    desk.app.models.catalog.as_mut().unwrap().models.push(moss);
+    desk.app.models.open = true;
+    desk.app.select_model("synthetic-moss-id".into());
+    assert_eq!(desk.app.prefs.model_group, crate::model_catalog::MOSS_GROUP);
+    assert_eq!(desk.app.prefs.generation.steps, 50);
+    assert_eq!(desk.app.prefs.generation.cfg_scale, 3.);
+    assert!(!desk.app.models.open);
+    assert!(desk.app.model_selection().unwrap().loras.is_empty());
+
+    desk.app.select_model(qwen);
+    assert_eq!(desk.app.prefs.model_group, QWEN_GROUP);
+    assert_eq!(desk.app.prefs.model_groups[QWEN_GROUP].loras, vec![lora]);
 }

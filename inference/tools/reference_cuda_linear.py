@@ -1,4 +1,5 @@
 """Own synthetic oracle for the original CUDA FP16 linear wrapper."""
+from reference_paths import reference_dir
 from reference_checks import reject_resource_failure
 
 
@@ -83,7 +84,7 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     project = Path(__file__).resolve().parents[2]
-    manifest = json.loads((project / 'design/reference-local/source-manifest.json').read_text())
+    manifest = json.loads((reference_dir(project)/'source-manifest.json').read_text())
     hashes = {}
     for path in ['comfy_kitchen/backends/cuda/__init__.py', 'comfy_kitchen/backends/_activations.py']:
         actual = hashlib.sha256((args.site / path).read_bytes()).hexdigest()

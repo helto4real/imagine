@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "directory": "reference-20261018",
+  "comfy_revision": "446ef4e005fc7134d53ce6869ebd77d2134cd39c",
+  "status": "development_target_upgrade_in_progress",
+  "previous_reference": "reference-local",
+  "preserved_code_baseline": "c0d291c472b9cd0c20226f5dcf0e870be0e98cc2"
+}

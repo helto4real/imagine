@@ -1,0 +1,3 @@
+# These are deliberate synthetic validation artifacts, not ordinary runtime data.
+!*.png
+!*.log

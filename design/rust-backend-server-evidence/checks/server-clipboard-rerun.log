@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.14s
+     Running unittests src/lib.rs (target/debug/deps/imagine_ui-552d9bc2bcd30e89)
+
+running 1 test
+test clipboard::tests::stale_failure_does_not_replace_a_newer_copy ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 61 filtered out; finished in 0.01s
+

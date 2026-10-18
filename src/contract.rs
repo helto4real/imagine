@@ -2,6 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+pub const MOSS: &str = "moss-image-sft-int8";
 pub const MODEL: &str = "qwen-image-2.1-int8";
 pub const TURBO: &str = "qwen-image-2.1-turbo";
 pub const MCP_PROFILE: &str = "qwen-image21-workflow-v1";
@@ -100,6 +101,17 @@ pub struct Inputs {
 #[serde(default, deny_unknown_fields)]
 pub struct ModelOptions {
     pub qwen_image_2_1: QwenOptions,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub moss_image: Option<WorkflowOptions>,
+}
+impl ModelOptions {
+    pub fn generation(&self, model: &str) -> Option<&WorkflowOptions> {
+        if model == MOSS {
+            self.moss_image.as_ref()
+        } else {
+            self.qwen_image_2_1.workflow.as_ref()
+        }
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
@@ -177,7 +189,7 @@ impl JobRequest {
         if self.model == "minimax-h3" {
             return Err("model_not_validated");
         }
-        if self.model != MODEL && self.model != TURBO {
+        if self.model != MODEL && self.model != TURBO && self.model != MOSS {
             return Err("unknown_model");
         }
         if !matches!(
@@ -227,7 +239,12 @@ impl JobRequest {
         } else if self.character_sheet.is_some() || self.inputs.pose_guide.is_some() {
             return Err("unexpected_character_sheet_input");
         }
-        let workflow = self.model_options.qwen_image_2_1.workflow.as_ref();
+        if (self.model == MOSS && self.model_options.qwen_image_2_1.workflow.is_some())
+            || (self.model != MOSS && self.model_options.moss_image.is_some())
+        {
+            return Err("model_settings_mismatch");
+        }
+        let workflow = self.model_options.generation(&self.model);
         let minimum = if workflow.is_some() { 32 } else { 128 };
         if self.operation != Operation::CharacterSheet
             && (!(minimum..=4096).contains(&self.width)
@@ -251,7 +268,10 @@ impl JobRequest {
                 self.sampling.sampler.as_str(),
                 "er_sde" | "euler" | "res_multistep"
             ))
-            || (!matches!(self.sampling.scheduler.as_str(), "beta" | "simple"))
+            || (!matches!(
+                self.sampling.scheduler.as_str(),
+                "beta" | "simple" | "normal" | "sgm_uniform"
+            ))
             || (workflow.is_none()
                 && (self.sampling.sampler != "er_sde"
                     || self.sampling.scheduler != "beta"
@@ -275,6 +295,27 @@ impl JobRequest {
         if self.seed.is_some_and(|seed| seed > MAX_SEED) {
             return Err("invalid_seed");
         }
+        if self.model == MOSS
+            && (self.operation != Operation::TextToImage
+                || !self.inputs.reference_images.is_empty()
+                || workflow.is_none()
+                || self.sampling.sampler != "euler"
+                || !matches!(self.sampling.scheduler.as_str(), "normal" | "sgm_uniform")
+                || workflow.is_some_and(|w| {
+                    !w.loras.is_empty()
+                        || w.zero_negative_conditioning
+                        || w.color_match_strength != 0.
+                        || w.brightness_strength != 0.
+                        || w.contrast_strength != 0.
+                }))
+        {
+            return Err("unsupported_moss_configuration");
+        }
+        if self.model != MOSS
+            && matches!(self.sampling.scheduler.as_str(), "normal" | "sgm_uniform")
+        {
+            return Err("unsupported_sampling");
+        }
         if self.model == TURBO && workflow.is_none() {
             return Err("workflow_settings_required");
         }
@@ -288,7 +329,9 @@ impl JobRequest {
             {
                 return Err("invalid_model_path");
             }
-            let expected = if self.model == TURBO {
+            let expected = if self.model == MOSS {
+                "moss_image_sft_int8_convrot.safetensors"
+            } else if self.model == TURBO {
                 "qwen_image_2.1_turbo_bf16.safetensors"
             } else {
                 "qwen_image_2.1_int8_convrot.safetensors"
@@ -383,10 +426,27 @@ impl JobRequest {
 }
 
 pub fn models() -> Value {
-    json!({"models":[model(MODEL).unwrap(), model(TURBO).unwrap(), model("minimax-h3").unwrap()]})
+    json!({"models":[model(MODEL).unwrap(), model(TURBO).unwrap(), model(MOSS).unwrap(), model("minimax-h3").unwrap()]})
 }
 pub fn model(id: &str) -> Option<Value> {
     match id {
+        MOSS => {
+            let mut v = model(MODEL)?;
+            v["id"] = json!(MOSS);
+            v["engine"] = json!("Imagine Rust");
+            v["availability"] = json!("requires_rust_backend_and_weights");
+            v["operations"] = json!(["text_to_image"]);
+            v.as_object_mut()?.remove("character_sheet");
+            v["constraints"]["samplers"] = json!(["euler"]);
+            v["constraints"]["schedulers"] = json!(["normal", "sgm_uniform"]);
+            v["constraints"]["loras"] = json!(false);
+            v["constraints"]["reference_images"]["max_count"] = json!(0);
+            v["constraints"]["validated_resolutions"] = json!([]);
+            v["defaults"] = serde_yaml::from_str::<Value>(include_str!("../profiles/moss.yaml"))
+                .ok()?["defaults"]
+                .clone();
+            Some(v)
+        }
         TURBO => Some(
             json!({"id":TURBO,"available":true,"availability":"requires_local_workflow_binary_and_weights","engine":"stable-diffusion.cpp","profile_revision":MCP_PROFILE,"operations":["text_to_image","image_edit"],"request_schema":schemars::schema_for!(JobRequest)}),
         ),

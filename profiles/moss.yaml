@@ -1,0 +1,30 @@
+schema_version: 1
+id: moss
+version: 1
+name: MOSS Image
+description: MOSS SFT INT8 ConvRot, lokal Rust-inferens.
+references:
+  min: 0
+  max: 0
+defaults:
+  model: moss-image-sft-int8
+  operation: text_to_image
+  negative_prompt: ""
+  width: 1024
+  height: 1024
+  seed: null
+  sampling:
+    steps: 50
+    cfg_scale: 3.0
+    sampler: euler
+    scheduler: normal
+  inputs:
+    reference_images: []
+  model_options:
+    moss_image:
+      diffusion_model: diffusion_models/moss/moss_image_sft_int8_convrot.safetensors
+      text_encoder: text_encoders/moss/qwen3.5_9b_int8_convrot.safetensors
+      vae: vae/flux.2/flux2-vae.safetensors
+  output:
+    format: png
+    count: 1

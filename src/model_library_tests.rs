@@ -295,7 +295,14 @@ fn discovered_turbo_keeps_shipped_sampling_and_operation_limits() {
     let typed: contract::JobRequest = serde_json::from_value(value).unwrap();
     typed.validate().unwrap();
     assert_eq!(typed.sampling.steps, 8);
-    assert_eq!(typed.sampling.custom_sigmas.len(), 9);
+    assert_eq!(typed.sampling.cfg_scale, 1.);
+    assert_eq!(typed.sampling.sampler, "euler");
+    assert_eq!(
+        typed.sampling.custom_sigmas,
+        vec![
+            1., 0.978453, 0.954180, 0.926626, 0.895080, 0.845148, 0.704534, 0.414568, 0.,
+        ]
+    );
     assert!(metadata.get("character_sheet").is_none());
 }
 
@@ -320,4 +327,62 @@ fn changed_lora_files_require_refresh_before_a_new_selection() {
         .prepare(request(&library, json!([{"id":lora,"strength":1}])))
         .unwrap();
     resolved.unwrap().verify().unwrap();
+}
+
+#[test]
+fn moss_selection_keeps_its_own_encoder_vae_and_rejects_cross_family_components() {
+    let (dir, mut library) = setup();
+    let root = dir.path().join("models");
+    fixture::write(
+        &root,
+        "diffusion_models/moss/moss_image_sft_int8_convrot.safetensors",
+        json!({"video_embedder.weight":fixture::tensor(&[1]),"layers.41.proj.qkv.weight":fixture::tensor(&[1])}),
+    );
+    fixture::write(
+        &root,
+        "text_encoders/moss/qwen3.5_9b_int8_convrot.safetensors",
+        json!({"model.layers.0.linear_attn.in_proj_qkv.weight":fixture::tensor(&[1]),"model.layers.3.self_attn.q_proj.weight":fixture::tensor(&[1])}),
+    );
+    fixture::write(
+        &root,
+        "vae/flux.2/flux2-vae.safetensors",
+        json!({"bn.running_mean":fixture::tensor(&[1]),"decoder.conv_in.weight":fixture::tensor(&[1])}),
+    );
+    library.scan().unwrap();
+    let diffusion = id(&library, "moss_image_sft_int8_convrot.safetensors");
+    let components = library.components(&diffusion).unwrap();
+    assert_eq!(
+        library
+            .file(&components.text_encoder, "text_encoders")
+            .unwrap()
+            .group
+            .as_deref(),
+        Some(MOSS_GROUP)
+    );
+    let meta = library
+        .snapshot()
+        .models
+        .into_iter()
+        .find(|m| m["model"] == contract::MOSS)
+        .unwrap();
+    assert_eq!(meta["group"], MOSS_GROUP);
+    assert_eq!(meta["constraints"]["reference_images"]["max_count"], 0);
+    let (mut value,_)=library.prepare(json!({"model":contract::MOSS,"operation":"text_to_image","prompt":"synthetic","model_selection":{"diffusion":diffusion},"sampling":{"steps":4,"cfg_scale":3.,"sampler":"euler","scheduler":"normal"}})).unwrap();
+    value["width"] = json!(256);
+    value["height"] = json!(256);
+    let mut request: contract::JobRequest = serde_json::from_value(value).unwrap();
+    request.validate().unwrap();
+    request.inputs.reference_images.push("synthetic".into());
+    assert_eq!(request.validate(), Err("unsupported_moss_configuration"));
+    library.settings.components.insert(
+        diffusion.clone(),
+        Components {
+            text_encoder: id(&library, ENCODER),
+            vae: id(&library, VAE),
+        },
+    );
+    assert_eq!(
+        library.components(&diffusion),
+        Err("incompatible_component")
+    );
 }

@@ -42,16 +42,7 @@ impl ResidentExecution {
         let mut blocks = BTreeMap::new();
         for i in 0..layers {
             let key = format!("transformer_blocks.{i}.attn.comfy_attention.config");
-            let config = state
-                .get(&key)
-                .map(|v| -> Result<serde_json::Value, Error> {
-                    let t = v.as_tensor()?.f_contiguous()?.f_view_dtype(Kind::Uint8)?;
-                    let mut data = vec![0; t.numel()];
-                    let len = data.len();
-                    t.f_copy_data_u8(&mut data, len)?;
-                    serde_json::from_slice(&data).map_err(|e| Error::Native(e.to_string()))
-                })
-                .transpose()?;
+            let config = state.attention_config(&key)?;
             let mut bound = attention.clone();
             bound.method = attention.preferred(rt, config.as_ref())?;
             blocks.insert(i, bound);

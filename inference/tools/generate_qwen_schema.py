@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Constructor-only frozen Qwen21 schema; meta tensors, no forward or weights."""
+from reference_paths import reference_dir
 import argparse,hashlib,json,sys
 from pathlib import Path
 p=argparse.ArgumentParser(description=__doc__)
@@ -7,8 +8,10 @@ p.add_argument('--site',type=Path,required=True);p.add_argument('--comfy',type=P
 p.add_argument('--own-root',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
 p.add_argument('--vae-dim',type=int,required=True);p.add_argument('--vae-dec-dim',type=int,required=True)
 p.add_argument('--module-output',type=Path)
+p.add_argument('--family',choices=['qwen_image21','moss_image'],default='qwen_image21')
+p.add_argument('--moss-mtp',action='store_true',help='Selected Qwen3.5 checkpoint contains original MTP auxiliary weights')
 a=p.parse_args();project=Path(__file__).resolve().parents[2]
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 # Check source before importing or constructing anything. In particular, an
 # upgraded constructor must not run before a source mismatch can be reported.
 frozen={str(a.comfy/e['path']):e['sha256']for e in manifest if e['root']=='comfy'}
@@ -43,26 +46,54 @@ def schema(model):
   params.append(dict(name=name,shape=list(t.shape),dtype=str(t.dtype),requires_grad=t.requires_grad,kind='linear'if isinstance(module,torch.nn.Linear)else'embedding'if isinstance(module,torch.nn.Embedding)else'plain'))
  return dict(parameters=params,buffers=[dict(name=n,shape=list(t.shape),dtype=str(t.dtype))for n,t in model.named_buffers()])
 with torch.device('meta'):
- dit=QwenImage21Transformer2DModel(device='meta',dtype=torch.bfloat16,operations=comfy.ops.manual_cast)
- text=Qwen3VL({},torch.bfloat16,'meta',comfy.ops.manual_cast)
- vae=WanVAE(dim=a.vae_dim,dec_dim=a.vae_dec_dim,z_dim=64,dim_mult=[1,2,4,8,8],num_res_blocks=2,attn_scales=[],temperal_downsample=[False,True,True,True],dropout=0.,image_channels=4,patch_size=1,temporal_kernel=1)
+ if a.family=='qwen_image21':
+  dit=QwenImage21Transformer2DModel(device='meta',dtype=torch.bfloat16,operations=comfy.ops.manual_cast)
+  text=Qwen3VL({},torch.bfloat16,'meta',comfy.ops.manual_cast)
+  vae=WanVAE(dim=a.vae_dim,dec_dim=a.vae_dec_dim,z_dim=64,dim_mult=[1,2,4,8,8],num_res_blocks=2,attn_scales=[],temperal_downsample=[False,True,True,True],dropout=0.,image_channels=4,patch_size=1,temporal_kernel=1)
+ else:
+  from comfy.ldm.moss_image.model import MOSSImage
+  from comfy.text_encoders.qwen35 import Qwen35
+  from comfy.ldm.models.autoencoder import AutoencoderKL
+  dit=MOSSImage(fused_qkv=True,device='meta',dtype=torch.bfloat16,operations=comfy.ops.manual_cast)
+  class Qwen35_9B(Qwen35):model_type='qwen35_9b'
+  text=Qwen35_9B(dict(mtp=True)if a.moss_mtp else{},torch.bfloat16,'meta',comfy.ops.manual_cast)
+  config=dict(double_z=True,z_channels=32,resolution=256,in_channels=3,out_ch=3,ch=a.vae_dim,
+      ch_mult=[1,2,4,4],num_res_blocks=2,attn_resolutions=[],dropout=0.,batch_norm_latent=True)
+  decoder_config=dict(config,ch=a.vae_dec_dim)
+  vae=AutoencoderKL(ddconfig=config,decoder_ddconfig=decoder_config,embed_dim=32)
  models={k:schema(m)for k,m in [('dit',dit),('text',text),('vae',vae)]}
  if a.module_output:
   from comfy.model_patcher import ModelPatcher
   from comfy.text_encoders.qwen_image21 import QwenImage21TEModel
   inventories={}
-  wrapped_text=QwenImage21TEModel(device='meta',dtype=torch.bfloat16)
-  for name,model in [('text',wrapped_text),('vae',vae.to(dtype=torch.bfloat16))]:
+  if a.family=='qwen_image21':
+   wrapped_text=QwenImage21TEModel(device='meta',dtype=torch.bfloat16)
+   text_prefix='qwen3vl_8b'
+  else:
+   from comfy.text_encoders.moss_image import MOSSImageTEModel
+   wrapped_text=MOSSImageTEModel(device='meta',dtype=torch.bfloat16,mtp=a.moss_mtp)
+   text_prefix='qwen35_9b'
+  inventory_models=[('text',wrapped_text),('vae',vae.to(dtype=torch.bfloat16))]
+  if a.family=='moss_image':
+   from comfy import supported_models
+   model_config=supported_models.MOSSImage(dict(image_model='moss_image',fused_qkv=True))
+   model_config.set_inference_dtype(torch.bfloat16,None)
+   wrapped_dit=model_config.get_model({},'',device='meta')
+   inventory_models.append(('dit',wrapped_dit))
+  for name,model in inventory_models:
    patcher=ModelPatcher(model,torch.device('cpu'),torch.device('cpu'),size=1)
    if name=='text':
     # CLIP.__init__ installs this object patch before the first load. Only the
     # metadata/injection path runs here; load_weights=False keeps all data meta.
     patcher.set_model_compute_dtype(torch.float32)
     patcher.patch_model(load_weights=False)
-   def normalize(n):return n.removeprefix('qwen3vl_8b.transformer.').removeprefix('qwen3vl_8b.')if name=='text'else n
+   def normalize(n):
+    if name=='text':return n.removeprefix(text_prefix+'.transformer.').removeprefix(text_prefix+'.')
+    if name=='dit':return n.removeprefix('diffusion_model.')
+    return n
    modules=[dict(name=normalize(n),module_bytes=mem,offload_bytes=off,cast_weights=hasattr(m,'comfy_cast_weights'),parameters=[normalize(n+'.'+key)for key in params])for off,mem,n,m,params in patcher._load_list()]
    leaves={key for m in modules for key in m['parameters']}
-   extras=[dict(name=normalize(n),persistent=True,kind='nonleaf_parameter',requires_grad=t.requires_grad,shape=list(t.shape),dtype=str(t.dtype),initial_value=4.6055 if n=='qwen3vl_8b.logit_scale'else None,default_dtype=n=='qwen3vl_8b.logit_scale')for n,t in model.named_parameters()if normalize(n)not in leaves]
+   extras=[dict(name=normalize(n),persistent=True,kind='nonleaf_parameter',requires_grad=t.requires_grad,shape=list(t.shape),dtype=str(t.dtype),initial_value=4.6055 if n==text_prefix+'.logit_scale'else None,default_dtype=n==text_prefix+'.logit_scale')for n,t in model.named_parameters()if normalize(n)not in leaves]
    buffers=[dict(name=normalize(n),persistent=n in model.state_dict(),kind='buffer',shape=list(t.shape),dtype=str(t.dtype))for n,t in model.named_buffers()]
    inventories[name]=dict(modules=modules,force_cast_weights=patcher.force_cast_weights,model_size=comfy.model_management.module_size(model),manual_cast_dtype='missing'if not hasattr(model,'manual_cast_dtype')else str(model.manual_cast_dtype),buffers=buffers+extras)
    del patcher

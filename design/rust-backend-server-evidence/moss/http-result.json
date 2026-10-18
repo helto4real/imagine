@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "backend": "rust",
+  "model": "moss-image-sft-int8",
+  "control_sha256": "724fedc8d8de9003db771dfcfe3d585d52c18767810bced1e72f67e53301fb5d",
+  "server_binary_sha256": "800d99af91e833e75a0f67b1817828fb94f5802cca7507a066cda23d5f263aee",
+  "wall_seconds": 15.358758097980171,
+  "startup_did_not_launch_worker": true,
+  "worker_maps_contain_python": false,
+  "pixel_sha256": "4fb0fc15a4ddb3c69397a4bcd6aaf6b2eac6da3ba8e577d12cb83eff57078250",
+  "width": 320,
+  "height": 224,
+  "library_model_selectable": true,
+  "progress": {
+    "completed": 4,
+    "elapsed_seconds": 12.661666061,
+    "remaining_seconds": 0.0,
+    "total": 4,
+    "updated_at_ms": 1792355672549
+  },
+  "pixels_exact": true
+}

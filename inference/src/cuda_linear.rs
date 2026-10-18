@@ -168,6 +168,28 @@ pub struct Int8M1<'a> {
     pub residual_scale: Option<&'a Tensor>,
 }
 
+fn gemv_residual_args(
+    native: &Kitchen,
+    request: &Int8M1<'_>,
+    n: i64,
+) -> Result<Option<(Tensor, Tensor)>, Error> {
+    let x = request.x;
+    Ok(match (request.residual, request.residual_scale) {
+        (Some(residual), Some(scale))
+            if residual.kind() == request.output_kind
+                && scale.kind() == request.output_kind
+                && residual.numel() as i64 == n
+                && scale.numel() as i64 == n =>
+        {
+            Some((
+                residual.f_reshape([1, n])?.f_contiguous()?,
+                vector(native, scale, x.device(), request.output_kind)?,
+            ))
+        }
+        _ => None,
+    })
+}
+
 /// The same no-activation operands for the later GEMV route.
 pub type Int8Gemv<'a> = Int8M1<'a>;
 
@@ -426,7 +448,7 @@ unsafe fn int8_dispatch(
     let stream = native.current_stream(device)? as i64;
     let m = x_2d.size()[0];
     let k = x_2d.size()[1]
-        / if matches!(activation, InputActivation::SwiGlu) {
+        / if matches!(activation, InputActivation::SwiGlu | InputActivation::Situ) {
             2
         } else {
             1
@@ -475,8 +497,8 @@ unsafe fn int8_dispatch(
     };
     let route = match route {
         LinearRoute::Auto { disable_cutlass } => {
-            if matches!(activation, InputActivation::None)
-                && int8_m1_supported(native, &x_2d, &weight, request.convrot, group)?
+            if ((request.convrot && fused) || matches!(activation, InputActivation::None))
+                && int8_m1_supported_width(native, &x_2d, &weight, request.convrot, group, k)?
             {
                 LinearRoute::M1
             } else if (m == 1 && k % 4 == 0) || (m == 2 && k % 16 == 0) {
@@ -490,8 +512,21 @@ unsafe fn int8_dispatch(
     let mut fused_residual_done = false;
     let mut dequantized_output = false;
     let output = if matches!(route, LinearRoute::M1) {
-        let quantized = Tensor::f_empty([1, k], (Kind::Int8, x.device()))?;
-        let x_scale = Tensor::f_empty([1, 1], (Kind::Float, x.device()))?;
+        let quantized = if request.convrot {
+            empty(x.device(), Kind::Int8)?
+        } else {
+            Tensor::f_empty([1, k], (Kind::Int8, x.device()))?
+        };
+        let x_scale = if request.convrot {
+            empty(x.device(), Kind::Float)?
+        } else {
+            Tensor::f_empty([1, 1], (Kind::Float, x.device()))?
+        };
+        let (act_weight, act_code, act_eps) = if request.convrot {
+            crate::convrot::activation_args(&x_2d, activation)?
+        } else {
+            (empty(x.device(), x.kind())?, 0, 0.)
+        };
         let weight_scale = if request.weight_scale.device() == x.device()
             && request.weight_scale.kind() == Kind::Float
             && request.weight_scale.is_contiguous()
@@ -517,6 +552,8 @@ unsafe fn int8_dispatch(
             Some(bias) => bias.shallow_clone(),
             None => empty(x.device(), request.output_kind)?,
         };
+        let fused_residual = gemv_residual_args(native, request, n)?;
+        fused_residual_done = fused_residual.is_some();
         unsafe {
             native.call_unchecked(
                 "int8_linear_m1",
@@ -531,7 +568,16 @@ unsafe fn int8_dispatch(
                     Int(output_code),
                     Bool(request.convrot),
                     Int(request.convrot_group),
+                    Int(act_code),
+                    T(&act_weight),
+                    KernelArg::Float(act_eps),
                     Int(stream),
+                    fused_residual
+                        .as_ref()
+                        .map_or(KernelArg::None, |(r, _)| T(r)),
+                    fused_residual
+                        .as_ref()
+                        .map_or(KernelArg::None, |(_, s)| T(s)),
                 ],
             )?;
         }
@@ -602,6 +648,12 @@ unsafe fn int8_dispatch(
                     Some(bias) => bias.shallow_clone(),
                     None => empty(x.device(), request.output_kind)?,
                 };
+                let fused_residual = if m == 1 {
+                    gemv_residual_args(native, request, n)?
+                } else {
+                    None
+                };
+                fused_residual_done = fused_residual.is_some();
                 unsafe {
                     native.call_unchecked(
                         "int8_gemv_dequant",
@@ -614,6 +666,12 @@ unsafe fn int8_dispatch(
                             T(&output),
                             Int(output_code),
                             Int(stream),
+                            fused_residual
+                                .as_ref()
+                                .map_or(KernelArg::None, |(r, _)| T(r)),
+                            fused_residual
+                                .as_ref()
+                                .map_or(KernelArg::None, |(_, s)| T(s)),
                         ],
                     )?;
                 }
@@ -765,8 +823,7 @@ unsafe fn int8_dispatch(
     }
 }
 
-/// Original M=1 predicate for an already prepared 2D input, with input_act None.
-/// Other activation and GEMM routes remain separate Stage 1 work.
+/// Original M=1 predicate for a plain prepared 2D input.
 pub fn int8_m1_supported(
     native: &Kitchen,
     x_2d: &Tensor,
@@ -774,7 +831,17 @@ pub fn int8_m1_supported(
     convrot: bool,
     group: i64,
 ) -> Result<bool, Error> {
-    let (m, k, n) = (x_2d.size()[0], x_2d.size()[1], weight.size()[0]);
+    int8_m1_supported_width(native, x_2d, weight, convrot, group, x_2d.size()[1])
+}
+fn int8_m1_supported_width(
+    native: &Kitchen,
+    x_2d: &Tensor,
+    weight: &Tensor,
+    convrot: bool,
+    group: i64,
+    k: i64,
+) -> Result<bool, Error> {
+    let (m, n) = (x_2d.size()[0], weight.size()[0]);
     if m != 1 {
         return Ok(false);
     }
@@ -787,8 +854,9 @@ pub fn int8_m1_supported(
     let Device::Cuda(device) = x_2d.device() else {
         return Ok(true); // Original shared-memory helper accepts non-CUDA metadata.
     };
-    Ok(crate::convrot::fused_shared_memory_bytes(m, k)
-        < crate::convrot::max_dynamic_shared_memory(native, device)?)
+    Ok(aligned16(weight)
+        && crate::convrot::fused_shared_memory_bytes(m, k) + k
+            < crate::convrot::max_dynamic_shared_memory(native, device)?)
 }
 
 /// The original `int8_linear` M=1 branch, not a replacement for other routes.

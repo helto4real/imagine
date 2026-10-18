@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "mode": "run",
+  "binary_sha256": "53d7fc28de9001a36c23236d97af407f7ca976396229f927738b5cb6c279b00c",
+  "host_ram_guard": {
+    "available": 54116691968,
+    "required": 23791210360
+  },
+  "commands": [
+    {
+      "label": "rust",
+      "returncode": 0
+    },
+    {
+      "label": "python",
+      "returncode": 0
+    },
+    {
+      "label": "comparison",
+      "returncode": 1
+    }
+  ]
+}

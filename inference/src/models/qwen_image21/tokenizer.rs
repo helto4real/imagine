@@ -13,6 +13,8 @@ pub struct QwenTokenizer {
     byte_encoder: [char; 256],
     added: Vec<(String, i64)>,
     cache: HashMap<String, Vec<String>>,
+    pad_token: i64,
+    image_token: i64,
 }
 fn gap(operation: &str) -> Error {
     Error::BindingGap {
@@ -22,13 +24,26 @@ fn gap(operation: &str) -> Error {
 }
 impl QwenTokenizer {
     pub fn frozen() -> Result<Self, Error> {
+        Self::from_assets(
+            include_str!("../../../resources/qwen-tokenizer/vocab.json"),
+            include_str!("../../../resources/qwen-tokenizer/tokenizer_config.json"),
+            include_str!("../../../resources/qwen-tokenizer/merges.txt"),
+            151643,
+            151655,
+        )
+    }
+    /// Shared original Qwen2 BPE with separately locked model-owned assets/IDs.
+    pub fn from_assets(
+        vocabulary: &str,
+        config: &str,
+        merge_text: &str,
+        pad_token: i64,
+        image_token: i64,
+    ) -> Result<Self, Error> {
         let vocab: HashMap<String, i64> =
-            serde_json::from_str(include_str!("../../../resources/qwen-tokenizer/vocab.json"))
-                .map_err(|e| Error::Native(e.to_string()))?;
-        let config: Value = serde_json::from_str(include_str!(
-            "../../../resources/qwen-tokenizer/tokenizer_config.json"
-        ))
-        .map_err(|e| Error::Native(e.to_string()))?;
+            serde_json::from_str(vocabulary).map_err(|e| Error::Native(e.to_string()))?;
+        let config: Value =
+            serde_json::from_str(config).map_err(|e| Error::Native(e.to_string()))?;
         let mut added: Vec<(String, i64)> = vec![];
         for (id, t) in config["added_tokens_decoder"]
             .as_object()
@@ -52,10 +67,7 @@ impl QwenTokenizer {
         added.sort_by(|a, b| b.0.len().cmp(&a.0.len()).then(a.1.cmp(&b.1)));
         let mut merges = HashMap::new();
         let mut rank = 0;
-        for (i, line) in include_str!("../../../resources/qwen-tokenizer/merges.txt")
-            .lines()
-            .enumerate()
-        {
+        for (i, line) in merge_text.lines().enumerate() {
             let line = line.trim();
             if line.is_empty() || (i == 0 && line.starts_with("#version:")) {
                 continue;
@@ -87,6 +99,8 @@ impl QwenTokenizer {
             byte_encoder,
             added,
             cache: HashMap::new(),
+            pad_token,
+            image_token,
         })
     }
     fn bpe(&mut self, token: String) -> Vec<String> {
@@ -194,9 +208,11 @@ pub struct TokenizedPrompt {
     pub batches: Vec<Vec<WeightedToken>>,
     pub keep_vision: bool,
 }
+#[derive(Clone)]
 pub struct TokenizerOptions {
     pub images: usize,
     pub prevent_empty_text: bool,
+    /// Retained caller option; the current Qwen3-VL tokenizer ignores it.
     pub thinking: bool,
     pub keep_vision: bool,
     pub skip_template: bool,
@@ -260,9 +276,6 @@ fn template(text: &str, options: &TokenizerOptions) -> Result<String, Error> {
             options.system_prompt,
             &result[start..]
         );
-    }
-    if !options.thinking {
-        result.push_str("<think>\n\n</think>\n\n");
     }
     Ok(result)
 }
@@ -329,20 +342,20 @@ impl QwenTokenizer {
         // SDTokenizer's explicit minimum padding appends even when the existing
         // sequence already exceeds min_length.
         last.extend((0..options.min_padding).map(|_| WeightedToken {
-            token: PromptToken::Id(151643),
+            token: PromptToken::Id(self.pad_token),
             weight: 1.,
             word_id: 0,
         }));
         if last.len() < options.min_length {
             last.extend((last.len()..options.min_length).map(|_| WeightedToken {
-                token: PromptToken::Id(151643),
+                token: PromptToken::Id(self.pad_token),
                 weight: 1.,
                 word_id: 0,
             }));
         }
         let mut image = 0;
         for token in batches.iter_mut().flatten() {
-            if token.token == PromptToken::Id(151655) && image < options.images {
+            if token.token == PromptToken::Id(self.image_token) && image < options.images {
                 token.token = PromptToken::Image(image);
                 image += 1;
             }

@@ -256,6 +256,27 @@ impl Linear {
         training: bool,
         check: &mut dyn FnMut() -> Result<(), Error>,
     ) -> Result<Tensor, Error> {
+        unsafe { self.input_act(rt, x, "swiglu", None, 0., training, check) }
+    }
+
+    /// Original module-owned `linear_input_act`: try the prepared layout's
+    /// fused path, then preserve module input processing in the eager fallback.
+    /// # Safety
+    /// Same resident parameter and original fused-kernel contracts as forward.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Preserve source activation operands"
+    )]
+    pub unsafe fn input_act(
+        &self,
+        rt: &Runtime,
+        x: &Tensor,
+        activation: &str,
+        act_weight: Option<&Tensor>,
+        act_eps: f64,
+        training: bool,
+        check: &mut dyn FnMut() -> Result<(), Error>,
+    ) -> Result<Tensor, Error> {
         check()?;
         if !training
             && !self.full_precision
@@ -309,14 +330,49 @@ impl Linear {
                             ),
                         ),
                         ("convrot_groupsize".into(), Value::Int(group)),
-                        ("input_act".into(), Value::Text("swiglu".into())),
+                        ("input_act".into(), Value::Text(activation.into())),
+                        (
+                            "input_act_weight".into(),
+                            act_weight.map_or(Value::None, |w| Value::tensor(w.shallow_clone())),
+                        ),
+                        ("input_act_eps".into(), Value::Float(act_eps)),
                     ],
                 )?
                 .as_tensor()
             };
         }
-        let pieces = x.f_chunk(2, -1)?;
-        let y = pieces[0].f_silu()?.f_mul_(&pieces[1])?;
+        let y = match activation {
+            "swiglu" => {
+                let pieces = x.f_chunk(2, -1)?;
+                pieces[0].f_silu()?.f_mul_(&pieces[1])?
+            }
+            "situ" => {
+                let pieces = x.f_chunk(2, -1)?;
+                // Module training/fallback uses the out-of-place source
+                // expression; Kitchen's eager quantizer has its own order.
+                let gated = pieces[1]
+                    .f_div_scalar(4.)?
+                    .f_tanh()?
+                    .f_mul_scalar(4.)?
+                    .f_mul(&pieces[1].f_sigmoid()?)?;
+                gated.f_mul(&pieces[0].f_div_scalar(25.)?.f_tanh()?.f_mul_scalar(25.)?)?
+            }
+            "rms_norm" => {
+                let weight = act_weight
+                    .ok_or_else(|| Error::ReferenceException {
+                        class: "ValueError",
+                        message: "input_act 'rms_norm' requires act_weight".into(),
+                    })?
+                    .f_to_kind(x.kind())?;
+                x.f_rms_norm([*x.size().last().unwrap()], Some(&weight), Some(act_eps))?
+            }
+            _ => {
+                return Err(Error::BindingGap {
+                    backend: "comfy_ops".into(),
+                    operation: format!("linear_input_act {activation}"),
+                });
+            }
+        };
         check()?;
         unsafe { self.forward(rt, &y) }
     }
@@ -368,7 +424,7 @@ pub fn clamp_fp16(x: Tensor) -> Result<Tensor, Error> {
 /// vision position lookup retains the original weight dtype when unspecified.
 /// # Safety
 /// Indices, layout, storage and stream/device capacities satisfy original kernels.
-pub(super) unsafe fn embedding_rows(
+pub(crate) unsafe fn embedding_rows(
     rt: &Runtime,
     weight: &Value,
     ids: &Tensor,

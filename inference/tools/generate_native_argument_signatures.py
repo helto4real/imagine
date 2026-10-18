@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Frozen native nanobind diagnostics, inspected from the verified local module."""
+from reference_paths import reference_dir
 import argparse,hashlib,importlib,json,subprocess,sys
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--check',action='store_true');a=p.parse_args();project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());relative='comfy_kitchen/backends/cuda/_C.abi3.so';data=(a.site/relative).read_bytes();digest=hashlib.sha256(data).hexdigest();assert digest==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==relative)
+p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--check',action='store_true');a=p.parse_args();project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());relative='comfy_kitchen/backends/cuda/_C.abi3.so';data=(a.site/relative).read_bytes();digest=hashlib.sha256(data).hexdigest();assert digest==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==relative)
 sys.path.insert(0,str(a.site));module=importlib.import_module('comfy_kitchen.backends.cuda')._C
 names=['na3d','quantize_int8_rowwise', 'quantize_int8_rowwise_convrot', 'quantize_int8_rowwise_convrot64', 'quantize_int8_convrot_staged', 'quantize_int4_rowwise', 'quantize_int4_rowwise_convrot64', 'quantize_w4a8_convrot', 'quantize_wxa8_convrot_fused', 'quantize_nvfp4', 'dequantize_nvfp4']
 parts=[f'// Generated native signatures from {relative}, SHA256 {digest}.']

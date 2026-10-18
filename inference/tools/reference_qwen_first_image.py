@@ -4,6 +4,7 @@
 No graph/server/custom-node startup. Only the three selected model assets and
 new synthetic outputs are accessed. Original functions compute every phase.
 """
+from reference_paths import reference_dir
 import argparse
 import ctypes
 import gc
@@ -23,7 +24,7 @@ a = p.parse_args()
 project = Path(__file__).resolve().parents[2]
 profile = json.loads((a.profile or project / 'inference/profiles/qwen21-first-int8.json').read_text())
 assert profile in [json.loads((project / 'inference/profiles' / n).read_text()) for n in ('qwen21-first-int8.json', 'qwen21-1600x896-int8.json', 'qwen21-1600x896-40steps-int8.json', 'qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json')], 'Unregistered comparison profile'
-manifest = json.loads((project / 'design/reference-local/source-manifest.json').read_text())
+manifest = json.loads((reference_dir(project)/'source-manifest.json').read_text())
 frozen = {str(a.comfy / x['path']): x['sha256'] for x in manifest if x['root'] == 'comfy'}
 paths = {k: a.model_root / v for k, v in profile['checkpoints'].items()}
 a.own_root.mkdir(parents=True, exist_ok=False)

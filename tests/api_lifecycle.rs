@@ -99,15 +99,26 @@ async fn setup() -> Harness {
     let library = Arc::new(std::sync::Mutex::new(
         imagine_server::model_library::Library::default(),
     ));
+    // Test only synthetic prompts; never resolve the production encrypted defaults.
+    let profile_dir = dir.path().join("profiles");
+    std::fs::create_dir(&profile_dir).unwrap();
+    for entry in std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/profiles")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().and_then(|value| value.to_str()) != Some("yaml") {
+            continue;
+        }
+        let mut profile: serde_yaml::Value =
+            serde_yaml::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        profile["defaults"]["negative_prompt"] = "synthetic profile negative".into();
+        std::fs::write(
+            profile_dir.join(path.file_name().unwrap()),
+            serde_yaml::to_string(&profile).unwrap(),
+        )
+        .unwrap();
+    }
     let router = api::router(App {
         library: library.clone(),
-        profiles: Arc::new(
-            imagine_server::profiles::Catalog::load(std::path::Path::new(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/profiles"
-            )))
-            .unwrap(),
-        ),
+        profiles: Arc::new(imagine_server::profiles::Catalog::load(&profile_dir).unwrap()),
         store: store.clone(),
         control: control.clone(),
         engine,
@@ -124,6 +135,25 @@ async fn setup() -> Harness {
         router,
         probe,
     }
+}
+
+#[tokio::test]
+async fn comfy_selection_is_visible_without_starting_inference() {
+    let h = setup().await;
+    h.engine_state
+        .send_modify(|state| state.backend = "comfy".into());
+    let (status, listing) = req(&h.router, "GET", "/v1/models", None, None).await;
+    assert_eq!(status, 200);
+    assert_eq!(listing["models"][0]["engine"], "ComfyUI");
+    assert_eq!(listing["models"][0]["attention"], "comfy_kitchen_int8");
+    assert_eq!(listing["models"][2]["available"], false);
+    let (_, model) = req(&h.router, "GET", &format!("/v1/models/{MODEL}"), None, None).await;
+    assert_eq!(model["live_validated"], false);
+    assert_eq!(model["constraints"]["validated_resolutions"], json!([]));
+    let (_, runtime) = req(&h.router, "GET", "/v1/runtime", None, None).await;
+    assert_eq!(runtime["engine"]["backend"], "comfy");
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
+    stop(h).await;
 }
 async fn req(
     router: &Router,
@@ -621,6 +651,20 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
             .iter()
             .any(|p| p["id"] == "qwen")
     );
+    let profiles = catalog["profiles"].as_array().unwrap();
+    assert_eq!(profiles.len(), 5); // standard, Turbo, MOSS, sheets and upscale
+    for (id, name, model) in [
+        ("qwen", "Qwen Image 2.1", "qwen-image-2.1-int8"),
+        (
+            "quick-draft",
+            "Qwen Image 2.1 Turbo",
+            "qwen-image-2.1-turbo",
+        ),
+    ] {
+        let profile = profiles.iter().find(|profile| profile["id"] == id).unwrap();
+        assert_eq!(profile["name"], name);
+        assert_eq!(profile["model"], model);
+    }
     let (_, description) = req(&h.router, "GET", "/v1/profiles/qwen", None, None).await;
     for (profile, original_guidance) in [
         (
@@ -630,14 +674,6 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
         (
             "quick-draft",
             include_str!("../proxy/workflows/prompts/prompt-enhance-scene.md"),
-        ),
-        (
-            "image_generation",
-            include_str!("../proxy/workflows/prompts/prompt-enhance-scene.md"),
-        ),
-        (
-            "qwen_scene",
-            include_str!("../proxy/workflows/prompts/reference-aware-scene.md"),
         ),
     ] {
         let (status, described) = req(
@@ -658,7 +694,7 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
             .get("resolved_profile")
             .is_none()
     );
-    let body = json!({"profile":"qwen","profile_version":2,"prompt":"synthetic profile test", "width":1024,"sampling":{"steps":12},"model_options":{"qwen_image_2_1":{"generation":{"loras":[{"path":"synthetic.safetensors","strength":0.5}]}}}});
+    let body = json!({"profile":"qwen","profile_version":4,"prompt":"synthetic profile test", "width":1024,"sampling":{"steps":12},"model_options":{"qwen_image_2_1":{"generation":{"loras":[{"path":"synthetic.safetensors","strength":0.5}]}}}});
     let (status, validation) = req(
         &h.router,
         "POST",
@@ -687,7 +723,8 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
     wait_calls(&h.probe, 1).await;
     let effective = h.store.job(id, "local").await.unwrap().unwrap()["effective"].clone();
     assert_eq!(effective["resolved_profile"]["id"], "qwen");
-    assert_eq!(effective["resolved_profile"]["version"], 2);
+    assert_eq!(effective["resolved_profile"]["version"], 4);
+    assert_eq!(effective["negative_prompt"], "synthetic profile negative");
     assert_eq!(
         effective["resolved_profile"]["sha256"],
         description["sha256"]
@@ -791,15 +828,21 @@ async fn profiles_reject_invalid_overrides_before_batch_admission() {
         .await
         .unwrap();
     assert_eq!(count, 0);
-    // Frozen v2 still uses the original settings and native reference preprocessing.
-    let (_, frozen) = req(
-        &h.router,
-        "POST",
-        "/v1/jobs/validate",
-        Some(json!({"profile":"qwen-image21-1600x896-v2","prompt":"test"})),
-        None,
-    )
-    .await;
+    // The frozen comparison wrapper is preserved outside the active catalog.
+    let archived = imagine_server::profiles::Catalog::load(std::path::Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/profiles/archive"
+    )))
+    .unwrap();
+    let frozen = archived
+        .resolve(
+            json!({"profile":"qwen-image21-1600x896-v2","prompt":"synthetic frozen control"}),
+            &h.store,
+            "local",
+        )
+        .await
+        .unwrap();
+    let frozen = json!({"effective": frozen.effective()});
     assert_eq!(
         frozen["effective"]["profile_revision"],
         imagine_server::contract::PROFILE
@@ -1350,4 +1393,37 @@ async fn model_library_api_freezes_queued_selection_and_validates_before_admissi
     );
     assert_eq!(h.probe.calls.load(Ordering::SeqCst), 3);
     stop(h).await;
+}
+
+#[tokio::test]
+async fn rust_admission_exposes_its_own_capabilities_and_rejects_unsupported_sampler_before_queue()
+{
+    let h = setup().await;
+    h.engine_state.send_modify(|s| s.backend = "rust".into());
+    let (_, meta) = req(&h.router, "GET", &format!("/v1/models/{MODEL}"), None, None).await;
+    assert_eq!(meta["engine"], "Imagine Rust");
+    assert_eq!(meta["constraints"]["samplers"], json!(["er_sde", "euler"]));
+    let mut value: Value = serde_yaml::from_str::<Value>(include_str!("../profiles/qwen.yaml"))
+        .unwrap()["defaults"]
+        .clone();
+    value["prompt"] = json!("synthetic");
+    value["sampling"]["sampler"] = json!("res_multistep");
+    assert_eq!(
+        req(&h.router, "POST", "/v1/jobs", Some(value), None)
+            .await
+            .0,
+        422
+    );
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
+    let (_, moss) = req(
+        &h.router,
+        "GET",
+        &format!("/v1/models/{}", imagine_server::contract::MOSS),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(moss["operations"], json!(["text_to_image"]));
+    h.control.call(Action::Shutdown).await.unwrap();
+    h.task.await.unwrap().unwrap();
 }

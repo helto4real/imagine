@@ -33,6 +33,8 @@ pub trait Backend: Send {
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EngineState {
+    #[serde(default)]
+    pub backend: String,
     pub phase: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stage: Option<String>,
@@ -568,6 +570,27 @@ fn update_progress(state: &mut EngineState, step: u32, total: u32, seconds: f64)
     }
     .into();
     true
+}
+
+/// Backend-specific admission prevents an unimplemented sampler from falling
+/// through to another algorithm. Existing native/Comfy contracts are preserved.
+pub fn validate_selection(
+    backend: &str,
+    model: &str,
+    sampling: &crate::contract::Sampling,
+) -> Result<()> {
+    if model == crate::contract::MOSS && backend != "rust" {
+        bail!(EngineError("unsupported_model"))
+    }
+    if backend == "rust"
+        && (!matches!(sampling.sampler.as_str(), "euler" | "er_sde")
+            || (model == crate::contract::MOSS
+                && (sampling.sampler != "euler"
+                    || !matches!(sampling.scheduler.as_str(), "normal" | "sgm_uniform"))))
+    {
+        bail!(EngineError("unsupported_sampling"))
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Original named environment helpers and isolated JIT cache/environment order."""
+from reference_paths import reference_dir
 import argparse,hashlib,json,os,sys,tempfile
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 for name in ['triton/runtime/jit.py','triton/compiler/compiler.py','comfy_kitchen/backends/triton/quantization.py']:
  assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
 names=json.loads((project/'design/stage-1-triton-toolchain-lock.json').read_text())['reference_environment_header']['invalidating_names']

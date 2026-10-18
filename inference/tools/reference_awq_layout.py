@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Original AWQ layout/handler oracle with only owned synthetic tensors."""
+from reference_paths import reference_dir
 import argparse
 from contextlib import contextmanager
 import dataclasses
@@ -162,7 +163,7 @@ def capture(torch, devices, bits):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--site',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);args=parser.parse_args()
-    manifest=json.loads((Path(__file__).resolve().parents[2]/'design/reference-local/source-manifest.json').read_text());hashes={}
+    manifest=json.loads((reference_dir(Path(__file__).resolve().parents[2])/'source-manifest.json').read_text());hashes={}
     for name in ['comfy_kitchen/tensor/awq_w4a16.py','comfy_kitchen/tensor/base.py','comfy_kitchen/__init__.py','comfy_kitchen/tensor/int8.py']:
         h=hashlib.sha256((args.site/name).read_bytes()).hexdigest();assert h==next(item['sha256'] for item in manifest if item['root']=='site' and item['path']==name);hashes[name]=h
     sys.path.insert(0,str(args.site));import torch

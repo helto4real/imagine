@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Twelve explicitly approved zero-K cuBLAS cases; guard both consumed intermediate ranges."""
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import json
@@ -13,7 +14,7 @@ parser.add_argument('--site', type=Path, required=True)
 parser.add_argument('--output', type=Path, required=True)
 args = parser.parse_args()
 project = Path(__file__).resolve().parents[2]
-manifest = json.loads((project / 'design/reference-local/source-manifest.json').read_text())
+manifest = json.loads((reference_dir(project)/'source-manifest.json').read_text())
 hashes = {}
 for name in ['comfy_kitchen/backends/cuda/__init__.py', 'comfy_kitchen/constraints.py']:
     actual = hashlib.sha256((args.site / name).read_bytes()).hexdigest()

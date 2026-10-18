@@ -1,4 +1,5 @@
 """Defined nonzero-width original CUDA GEMV cases; no activation yet."""
+from reference_paths import reference_dir
 from reference_cuda_int8_m1 import operands
 from reference_checks import reject_resource_failure
 
@@ -54,7 +55,7 @@ if __name__=='__main__':
     from pathlib import Path
     parser=argparse.ArgumentParser();parser.add_argument('--site',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args();project=Path(__file__).resolve().parents[2]
-    manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={}
+    manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={}
     for name in ['comfy_kitchen/backends/cuda/__init__.py','comfy_kitchen/backends/_activations.py']:
         value=hashlib.sha256((args.site/name).read_bytes()).hexdigest()
         assert value==next(x['sha256'] for x in manifest if x['root']=='site' and x['path']==name)

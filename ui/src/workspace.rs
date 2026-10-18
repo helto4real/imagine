@@ -33,6 +33,55 @@ fn panel(ui: &Ui, rect: Rect, media: bool) {
     );
 }
 
+fn sampling_setting(
+    ui: &mut Ui,
+    metadata: Option<&Value>,
+    name: &str,
+    field: &str,
+    selected: &mut Option<String>,
+) {
+    let label = ui.label(name);
+    let default = metadata
+        .and_then(|m| m["defaults"]["sampling"][field].as_str())
+        .unwrap_or("Unavailable");
+    let constraint = format!("{field}s");
+    let choices = metadata.and_then(|m| m["constraints"][&constraint].as_array());
+    let manual = field == "scheduler"
+        && metadata.is_some_and(|m| {
+            m["defaults"]["sampling"]["custom_sigmas"]
+                .as_array()
+                .is_some_and(|s| !s.is_empty())
+        });
+    let text = if manual {
+        "Manual sigmas"
+    } else {
+        selected.as_deref().unwrap_or(default)
+    }
+    .to_owned();
+    let response = ui
+        .add_enabled_ui(!manual && choices.is_some(), |ui| {
+            egui::ComboBox::from_id_salt(field)
+                .width(ui.available_width().max(120.))
+                .selected_text(text)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(selected, None, format!("Default ({default})"));
+                    if let Some(choices) = choices {
+                        for choice in choices.iter().filter_map(Value::as_str) {
+                            ui.selectable_value(selected, Some(choice.to_owned()), choice);
+                        }
+                    }
+                })
+                .response
+                .labelled_by(label.id)
+        })
+        .inner;
+    if manual {
+        response
+            .on_disabled_hover_text("This model uses a fixed sigma list instead of a scheduler.");
+    }
+    ui.end_row();
+}
+
 impl ImagineApp {
     pub(super) fn editable(&self) -> bool {
         !self.busy() && !self.connecting && self.desk().pending.is_none()
@@ -1104,6 +1153,20 @@ impl ImagineApp {
                                 )
                                 .labelled_by(label.id);
                                 ui.end_row();
+                                sampling_setting(
+                                    ui,
+                                    self.metadata.as_ref(),
+                                    "Sampler",
+                                    "sampler",
+                                    &mut self.prefs.generation.sampler,
+                                );
+                                sampling_setting(
+                                    ui,
+                                    self.metadata.as_ref(),
+                                    "Scheduler",
+                                    "scheduler",
+                                    &mut self.prefs.generation.scheduler,
+                                );
                                 let label = ui.label("Reference size");
                                 let mut megapixels =
                                     f64::from(self.prefs.generation.reference_max_pixels_per_image)

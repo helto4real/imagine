@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Validate standalone compiler inputs without advancing the Stage 0 reference."""
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import json
@@ -18,7 +19,7 @@ llvm=args.root/'llvm'/lock['llvm']['distribution']
 def sha(path):return hashlib.file_digest(path.open('rb'),'sha256').hexdigest()
 assert subprocess.check_output(['git','-C',str(source),'rev-parse','HEAD'],text=True).strip()==lock['triton']['commit']
 for name,expected in lock['triton']['source_file_sha256'].items():assert sha(source/name)==expected,name
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 reference={x['path']:x['sha256'] for x in manifest if x['root']=='site'}
 for item in lock['triton']['installed_python_source_matches']:
     name='triton/'+item['installed']

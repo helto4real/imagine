@@ -4,6 +4,7 @@
 Every specialization is produced by the reference's own JIT warmup/binder. This
 does not impose a production shape limit or replace the missing general JIT path.
 """
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import json
@@ -21,7 +22,7 @@ import triton
 from comfy_kitchen.backends.triton import quantization as reference
 
 project=Path(__file__).resolve().parents[2]
-lock=json.loads((project/'design/reference-local/source-acquisition-lock.json').read_text())
+lock=json.loads((reference_dir(project)/'source-acquisition-lock.json').read_text())
 source=Path(reference.__file__)
 source_sha=hashlib.file_digest(source.open('rb'),'sha256').hexdigest()
 assert source_sha==lock['repos']['comfy-kitchen']['source_file_sha256']['comfy_kitchen/backends/triton/quantization.py']

@@ -1,8 +1,14 @@
 # Imagine
 
-A local image/video generation backend with a Rust API and no ComfyUI runtime
-dependency. The Rust service runs Qwen Image 2.1 through our frozen, optimized
-**stable-diffusion.cpp** engine. MiniMax H3 is declared but not enabled yet.
+A local image/video generation server. The default **Rust inference backend**
+uses our ComfyUI-compatible engine, LibTorch and Comfy Kitchen without Python
+inference or stable-diffusion.cpp. It supports the selected Qwen Image 2.1
+INT8/Turbo paths and experimental MOSS SFT INT8 text-to-image.
+See [Rust backend setup and coverage](docs/RUST-BACKEND.md).
+
+The frozen **stable-diffusion.cpp** backend remains available with
+`--backend native`. The optional [headless Comfy backend](docs/COMFY-BACKEND.md)
+uses `--backend comfy`. There is no automatic fallback. MiniMax H3 is not enabled.
 
 Start with [the design](design-document.md), the
 [frozen 1600×896 profile](experiments/qwen-image21-sage/BASELINE.md) and the
@@ -20,8 +26,9 @@ On this configured machine:
 ./start-server.sh
 ```
 
-This incrementally builds the Rust release server and starts it at
-`http://127.0.0.1:8080`. It loads the native engine only when a job runs.
+This incrementally builds the Rust worker and release server, verifies the
+prepared local dependencies and starts at `http://127.0.0.1:8080`. The worker
+and CUDA start only after a scheduled job acquires the GPU reservation.
 The launcher uses the proxy GPU queue at `.imagine/gpu.sock`; start
 `./start-proxy.sh` with your backend options before submitting jobs.
 The server starts without a password, YubiKey login or API token. Prompts and job history stay in memory; temporary images are ordinary
@@ -32,8 +39,9 @@ Ctrl-C clears history and stops the server and its worker. Optional arguments:
 Imagine uses one shared local workspace for API, UI and MCP clients. It does
 not create or read `access.json`; existing credential files are left unused.
 Local jobs and media are ignored by Git. Use Rust/Cargo
-and the frozen native executable/model files described below. A fresh clone must
-restore the frozen binary; the API does not substitute a different build.
+and the prepared Rust dependencies/model files described in the backend guide.
+For `--backend native`, restore the frozen native executable described below;
+the API does not substitute a different build.
 
 With `curl` and `jq`, from the project root:
 

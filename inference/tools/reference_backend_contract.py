@@ -4,6 +4,7 @@
 Only source/dependency files and newly allocated synthetic tensors are read.
 The emitted Rust table is development code generation, never a runtime worker.
 """
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import json
@@ -21,7 +22,7 @@ parser.add_argument('--rust-output', type=Path)
 parser.add_argument('--check-rust', type=Path)
 args = parser.parse_args()
 project = Path(__file__).resolve().parents[2]
-manifest = json.loads((project / 'design/reference-local/source-manifest.json').read_text())
+manifest = json.loads((reference_dir(project)/'source-manifest.json').read_text())
 paths = ['comfy_kitchen/constraints.py', 'comfy_kitchen/registry.py', 'comfy_kitchen/exceptions.py', 'comfy_kitchen/_rope_utils.py']
 paths += [f'comfy_kitchen/backends/{name}/__init__.py' for name in ['eager', 'cuda', 'triton']]
 source_hashes = {}

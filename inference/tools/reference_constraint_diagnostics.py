@@ -4,6 +4,7 @@
 No criterion is adopted here. Fresh-process hash/own-allocation contexts are
 explicit, and no pointer or unknown memory is read. GPU visibility is disabled.
 """
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import json
@@ -20,7 +21,7 @@ parser.add_argument('--padding',type=int,default=0)
 parser.add_argument('--kind',choices=['types','devices'],default='types')
 args=parser.parse_args()
 project=Path(__file__).resolve().parents[2]
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 backend = 'triton' if args.kind == 'devices' else 'cuda'
 paths=['comfy_kitchen/constraints.py',f'comfy_kitchen/backends/{backend}/__init__.py']
 hashes={}

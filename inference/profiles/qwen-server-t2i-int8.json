@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "purpose": "Bounded Imagine Rust backend text-to-image HTTP control against original ComfyUI",
+  "variant": "int8_convrot",
+  "checkpoints": {
+    "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+    "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+    "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+  },
+  "source_configuration": {
+    "static_patcher": true,
+    "disable_comfy_compiler": true,
+    "disable_async_offload": true,
+    "force_full_load_per_component": false,
+    "unload_between_components": true,
+    "attention": "pytorch",
+    "kitchen_triton": false,
+    "compute_dtype": "bfloat16",
+    "prefix_cache_device": "auto",
+    "prefix_cache_dtype": "default",
+    "inference_mode": true
+  },
+  "synthetic_prompt": "Change the reference image to a blue butterfly resting on a yellow flower, soft daylight.",
+  "width": 256,
+  "height": 256,
+  "batch": 1,
+  "seed": 3061383787,
+  "steps": 4,
+  "sampler": "er_sde",
+  "scheduler": "beta",
+  "shift": 0.69,
+  "cfg": 2.5,
+  "lora": [],
+  "references": [],
+  "negative_prompt": "Change the reference image to a red butterfly resting on a yellow flower, soft daylight.",
+  "reference_resolution": 256,
+  "reference_vae": true
+}

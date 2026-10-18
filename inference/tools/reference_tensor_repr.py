@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Default dense Tensor repr as observed by original Kitchen validation."""
+from reference_paths import reference_dir
 import argparse,hashlib,json,sys,warnings
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--device',choices=['cpu','cuda'],default='cpu');a=p.parse_args();project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--device',choices=['cpu','cuda'],default='cpu');a=p.parse_args();project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 for name in ['torch/_tensor_str.py','comfy_kitchen/constraints.py','comfy_kitchen/backends/eager/__init__.py']:
  assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
 sys.path.insert(0,str(a.site));import torch

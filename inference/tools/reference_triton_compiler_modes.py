@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """CPU-only original compiler/cache mode traces in exclusively owned directories."""
+from reference_paths import reference_dir
 import argparse,hashlib,json,sys
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--root',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--frontend-reference',type=Path,required=True);a=p.parse_args();assert not a.root.exists();a.root.mkdir(parents=True)
-project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
+project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
 for name in ['triton/compiler/compiler.py','triton/runtime/cache.py','comfy_kitchen/backends/triton/quantization.py']:assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==hashes[name]
 sys.path.insert(0,str(a.site));import triton
 from triton import knobs

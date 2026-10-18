@@ -1,0 +1,270 @@
+{
+  "schema": 1,
+  "profile": {
+    "schema": 1,
+    "purpose": "Bounded trained MOSS SFT INT8 ConvRot text-to-image parity control, not a quality preset",
+    "variant": "int8_convrot",
+    "checkpoints": {
+      "dit": "diffusion_models/moss/moss_image_sft_int8_convrot.safetensors",
+      "text": "text_encoders/moss/qwen3.5_9b_int8_convrot.safetensors",
+      "vae": "vae/flux.2/flux2-vae.safetensors"
+    },
+    "source_configuration": {
+      "static_patcher": true,
+      "disable_comfy_compiler": true,
+      "disable_async_offload": true,
+      "force_full_load_per_component": false,
+      "unload_between_components": true,
+      "attention": "pytorch",
+      "checkpoint_attention_preferences": true,
+      "kitchen_triton": false,
+      "dit_dtype": "bfloat16",
+      "dit_fused_qkv": true,
+      "text_storage_dtype": "bfloat16",
+      "text_compute_dtype": "float32",
+      "text_mtp_weights": true,
+      "vae_dtype": "bfloat16"
+    },
+    "synthetic_prompt": "A blue butterfly resting on a yellow flower, soft daylight, detailed natural photograph.",
+    "negative_prompt": "",
+    "width": 320,
+    "height": 224,
+    "batch": 1,
+    "seed": 3061383787,
+    "steps": 4,
+    "sampler": "euler",
+    "scheduler": "normal",
+    "shift": 5.0,
+    "multiplier": 1.0,
+    "cfg": 3.5
+  },
+  "model_sha256": {
+    "dit": "b4d1475bc7eeffd7b809e82ea13a1fba1fb85c4e18365af3813722faa5c0fe4f",
+    "text": "32e3787472f708fa5f83624acbf5ef23f7fc89c439e05065ea57cfe5a97f025a",
+    "vae": "d64f3a68e1cc4f9f4e29b6e0da38a0204fe9a49f2d4053f0ec1fa1ca02f9c4b5"
+  },
+  "metrics": {
+    "context": {
+      "shape": [
+        1,
+        26,
+        4096
+      ],
+      "sha256": [
+        "37450c784e7a4e35566b1290220551a66629bf6a39827097eaaf862d7ae391ed",
+        "37450c784e7a4e35566b1290220551a66629bf6a39827097eaaf862d7ae391ed"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    },
+    "negative-context": {
+      "shape": [
+        1,
+        10,
+        4096
+      ],
+      "sha256": [
+        "6643d2e88ce835bc69c236a07549c3559bc52e846045d0e5012eef227633a35d",
+        "6643d2e88ce835bc69c236a07549c3559bc52e846045d0e5012eef227633a35d"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    },
+    "latent": {
+      "shape": [
+        1,
+        128,
+        14,
+        20
+      ],
+      "sha256": [
+        "6cc1ad69eec02a199f423377b7f2a7442a025802b80a75ed47d4ca90f35c0dfe",
+        "6cc1ad69eec02a199f423377b7f2a7442a025802b80a75ed47d4ca90f35c0dfe"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    },
+    "noise": {
+      "shape": [
+        1,
+        128,
+        14,
+        20
+      ],
+      "sha256": [
+        "940d924795a00dc8f8ae9371d521da56e28f2dfb2823eb90ad8c621ecaf0c87e",
+        "940d924795a00dc8f8ae9371d521da56e28f2dfb2823eb90ad8c621ecaf0c87e"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    },
+    "image-rgb": {
+      "shape": [
+        1,
+        224,
+        320,
+        3
+      ],
+      "sha256": [
+        "3a8148b9eeab6eb46c37d73d960c65da3ddcaf0f5c6e7e5837d5575d78339db0",
+        "3a8148b9eeab6eb46c37d73d960c65da3ddcaf0f5c6e7e5837d5575d78339db0"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    },
+    "sigmas": {
+      "shape": [
+        5
+      ],
+      "sha256": [
+        "3e2079cf69100492d126f771451ab84cc24809e8dea59588be19393e76185397",
+        "3e2079cf69100492d126f771451ab84cc24809e8dea59588be19393e76185397"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    },
+    "text-mask-0": {
+      "shape": [
+        1,
+        26
+      ],
+      "sha256": [
+        "bed151e7dc389be7606626ec31ec6fd4dd42c9c29369a971056a0e87c29d188c",
+        "bed151e7dc389be7606626ec31ec6fd4dd42c9c29369a971056a0e87c29d188c"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    },
+    "text-mask-1": {
+      "shape": [
+        1,
+        10
+      ],
+      "sha256": [
+        "00e1a993efd5074e1fc9c7ff6fc46a151ee4ed93935d05ee2ab229ded34975c1",
+        "00e1a993efd5074e1fc9c7ff6fc46a151ee4ed93935d05ee2ab229ded34975c1"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    },
+    "step-000-denoised": {
+      "shape": [
+        1,
+        128,
+        14,
+        20
+      ],
+      "sha256": [
+        "24a017fee564d56cc727c568d3b61f5ce4a8c9a71cf96c069e9163496e2273aa",
+        "24a017fee564d56cc727c568d3b61f5ce4a8c9a71cf96c069e9163496e2273aa"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    },
+    "step-001-denoised": {
+      "shape": [
+        1,
+        128,
+        14,
+        20
+      ],
+      "sha256": [
+        "fda917e9cee5fd7b50f4d94e96abc531811925bc1dcc004e3facec5d88e6998f",
+        "fda917e9cee5fd7b50f4d94e96abc531811925bc1dcc004e3facec5d88e6998f"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    },
+    "step-002-denoised": {
+      "shape": [
+        1,
+        128,
+        14,
+        20
+      ],
+      "sha256": [
+        "65b3d538b0461d4746cc403986b760986dc768566e7d31f231e3d6cf2ffdf0b6",
+        "65b3d538b0461d4746cc403986b760986dc768566e7d31f231e3d6cf2ffdf0b6"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    },
+    "step-003-denoised": {
+      "shape": [
+        1,
+        128,
+        14,
+        20
+      ],
+      "sha256": [
+        "b33cb5b20ab447854a992d107a851a857c89240c3a9ec2f852245eae24b98213",
+        "b33cb5b20ab447854a992d107a851a857c89240c3a9ec2f852245eae24b98213"
+      ],
+      "exact_bytes": true,
+      "all_finite": true,
+      "unequal_values": 0,
+      "max_abs": 0.0,
+      "mean_abs": 0.0
+    }
+  },
+  "png": {
+    "exact": true,
+    "unequal_pixels": 0
+  },
+  "all_exact": true,
+  "timings_seconds": {
+    "rust": {
+      "dit_load": 0.683013159,
+      "pipeline_wall_including_exports_and_unload": 22.693802029,
+      "sampling": 1.237803448,
+      "text_encode": 1.175924841,
+      "text_load": 6.997396399,
+      "vae_decode": 0.077893844,
+      "vae_load": 0.37933458
+    },
+    "python": {
+      "text_load": 1.6213256760966033,
+      "text_encode": 1.041662845062092,
+      "dit_load": 0.6946203811094165,
+      "sampling": 0.48299746005795896,
+      "vae_load": 0.6606995479669422,
+      "vae_decode": 0.11138699483126402,
+      "pipeline_wall_including_exports_and_unload": 11.565515380119905
+    }
+  },
+  "scope": "Bounded trained arithmetic/control comparison; four Euler steps at 320x224, not a quality or performance acceptance preset",
+  "production_runtime_read": false
+}

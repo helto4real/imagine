@@ -195,11 +195,11 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     for (tool, args) in [
         (
             "generate",
-            json!({"job_id":"bad-size","profile":"qwen","parameters":{"prompt":"synthetic","max_side":4128}}),
+            json!({"job_id":"bad-size","profile":"qwen","parameters":{"negative_prompt":"synthetic negative","prompt":"synthetic","max_side":4128}}),
         ),
         (
             "generate",
-            json!({"job_id":"bad-sampling","profile":"qwen","parameters":{"prompt":"synthetic","sampling":{"steps":0}}}),
+            json!({"job_id":"bad-sampling","profile":"qwen","parameters":{"negative_prompt":"synthetic negative","prompt":"synthetic","sampling":{"steps":0}}}),
         ),
         (
             "generate",
@@ -211,7 +211,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
         ),
         (
             "generate_batch",
-            json!({"job_id":"bad-batch","profile":"qwen","items":[{"prompt":"valid"},{"prompt":"invalid","max_side":4128}]}),
+            json!({"job_id":"bad-batch","profile":"qwen","items":[{"prompt":"valid","negative_prompt":"synthetic negative"},{"prompt":"invalid","negative_prompt":"synthetic negative","max_side":4128}]}),
         ),
     ] {
         let rejected = mcp(&client, &mcp_url, tool, args).await;
@@ -296,7 +296,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     .await;
     assert_eq!(described["defaults"]["sampling"]["steps"], 8);
     assert!(described["defaults"].get("prompt").is_none());
-    let invalid = mcp(&client, &mcp_url, "generate_batch", json!({"job_id":"invalid-profile-batch","profile":"qwen","items":[{"prompt":"valid"},{"prompt":"bad","sampling":{"steps":0}}]})).await;
+    let invalid = mcp(&client, &mcp_url, "generate_batch", json!({"job_id":"invalid-profile-batch","profile":"qwen","items":[{"prompt":"valid","negative_prompt":"synthetic negative"},{"prompt":"bad","negative_prompt":"synthetic negative","sampling":{"steps":0}}]})).await;
     assert_eq!(invalid["error"]["category"], "validation");
     let missing = mcp(
         &client,
@@ -412,7 +412,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
         &client,
         &mcp_url,
         "generate",
-        json!({"job_id":"engine-failure","profile":"qwen","parameters":{"prompt":"synthetic"}}),
+        json!({"job_id":"engine-failure","profile":"qwen","parameters":{"negative_prompt":"synthetic negative","prompt":"synthetic"}}),
     )
     .await;
     assert_eq!(failed["status"], "failed");

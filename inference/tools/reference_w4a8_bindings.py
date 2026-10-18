@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Own synthetic W4A8/W6A8 operands, original backend bodies and exact errors."""
+from reference_paths import reference_dir
 import argparse, hashlib, itertools, json, math, sys
 from pathlib import Path
 from reference_checks import reject_resource_failure
@@ -115,7 +116,7 @@ def capture(torch, devices, bits, label_filter=None):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--label-filter');a=p.parse_args()
-    manifest=json.loads((Path(__file__).resolve().parents[2]/'design/reference-local/source-manifest.json').read_text());hashes={}
+    manifest=json.loads((reference_dir(Path(__file__).resolve().parents[2])/'source-manifest.json').read_text());hashes={}
     for e in manifest:
         if e['root']=='site'and e['path'].startswith('comfy_kitchen/')and Path(e['path']).suffix=='.py':
             h=hashlib.sha256((a.site/e['path']).read_bytes()).hexdigest();assert h==e['sha256'];hashes[e['path']]=h

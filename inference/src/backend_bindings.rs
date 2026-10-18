@@ -223,7 +223,8 @@ fn input_fuses(
             x.numel() as i64 / raw_width
         };
         let width = raw_width
-            / if matches!(get(a,k,7,"input_act"),Some(Value::Text(s)) if s == "swiglu") {
+            / if matches!(get(a,k,7,"input_act"),Some(Value::Text(s)) if s == "swiglu" || s == "situ")
+            {
                 2
             } else {
                 1
@@ -847,6 +848,7 @@ fn run(rt: &Runtime, cuda: bool, op: &str, a: &[Value], k: &Kwargs) -> Result<Va
                 Value::Text(s) if s == "none" => convrot::InputActivation::None,
                 Value::Text(s) if s == "gelu_tanh" => convrot::InputActivation::GeluTanh,
                 Value::Text(s) if s == "swiglu" => convrot::InputActivation::SwiGlu,
+                Value::Text(s) if s == "situ" => convrot::InputActivation::Situ,
                 Value::Text(s) if s == "rms_norm" => match rms_epsilon.unwrap() {
                     Value::None => convrot::InputActivation::RmsNormDefault {
                         weight: actw.as_ref(),
@@ -864,17 +866,15 @@ fn run(rt: &Runtime, cuda: bool, op: &str, a: &[Value], k: &Kwargs) -> Result<Va
                     return Err(Error::ReferenceException {
                         class: "ValueError",
                         message: format!(
-                            "unsupported input_act: {} (expected one of ['gelu_tanh', 'none', 'rms_norm', 'swiglu'])",
+                            "unsupported input_act: {} (expected one of ['gelu_tanh', 'none', 'rms_norm', 'situ', 'swiglu'])",
                             crate::python_value::repr_with_native(mode, &rt.native)?
                         ),
                     });
                 }
             };
-            // The fused CUDA quantizer converts eps even when the selected
-            // activation ignores it. The earlier no-activation M=1 route does not.
-            let raw_width = x.size().last().copied().unwrap_or(0);
-            let m1 = raw_width != 0 && x.numel() as i64 / raw_width == 1;
-            if fused && !rms && !(m1 && matches!(activation, convrot::InputActivation::None)) {
+            // Both fused quantizers, including the ConvRot M=1 GEMV, convert
+            // eps even when the selected activation ignores it.
+            if fused && !rms {
                 input_epsilon(rt, true, a, k)?;
             }
             let residual = optional_tensor(a, k, 10, "residual")?;

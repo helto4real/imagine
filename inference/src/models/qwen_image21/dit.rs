@@ -234,26 +234,10 @@ fn parameter(state: &BTreeMap<String, Value>, name: &str) -> Result<Value, Error
     state.get(name).cloned().ok_or_else(|| missing(name))
 }
 fn preference(
-    state: &BTreeMap<String, Value>,
+    state: &PreparedParameters,
     prefix: &str,
 ) -> Result<Option<serde_json::Value>, Error> {
-    let Some(value) = state.get(&format!("{prefix}.attn.comfy_attention.config")) else {
-        return Ok(None);
-    };
-    let metadata = value.as_tensor()?;
-    if metadata.device() != Device::Cpu {
-        return Err(Error::ReferenceException {class:"TypeError",message:"can't convert CUDA tensor to numpy. Use Tensor.cpu() to copy the tensor to host memory first.".into()});
-    }
-    let bytes = metadata
-        .f_contiguous()?
-        .f_view_dtype(Kind::Uint8)?
-        .f_reshape([-1])?;
-    let mut data = vec![0_u8; bytes.numel()];
-    let length = data.len();
-    bytes.f_copy_data_u8(&mut data, length)?;
-    serde_json::from_slice(&data)
-        .map(Some)
-        .map_err(|e| Error::Native(format!("Invalid ComfyAttention config: {e}")))
+    state.attention_config(&format!("{prefix}.attn.comfy_attention.config"))
 }
 fn linear(state: &PreparedParameters, name: &str, bias: bool) -> Result<Linear, Error> {
     Linear::from_parameters(state, name, bias)

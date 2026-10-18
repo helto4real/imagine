@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Numerical oracle for Rust-fronted cubins and original typed CUDA driver."""
+from reference_paths import reference_dir
 import argparse,hashlib,itertools,json,sys
 from pathlib import Path
 from reference_layout_completion import encoder
@@ -22,7 +23,7 @@ def capture(torch,devices,bits,compiler_reference):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--compiler-reference',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-    project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={}
+    project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={}
     for name in ['comfy_kitchen/backends/triton/quantization.py','triton/backends/nvidia/driver.c']:
         actual=hashlib.sha256((a.site/name).read_bytes()).hexdigest();assert actual==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name);hashes[name]=actual
     sys.path.insert(0,str(a.site));import torch

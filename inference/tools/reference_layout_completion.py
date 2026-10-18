@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """Source-defined layout API and dispatch on initialized owned tensors only."""
+from reference_paths import reference_dir
 import argparse, dataclasses, hashlib, itertools, json, math, struct, sys
 from contextlib import nullcontext
 from pathlib import Path
 from reference_checks import approved_diagnostic, reject_resource_failure
 from reference_dlpack import guarded_cuda_exports
 
-def encoder(torch,bits):
+def encoder(torch,bits,*,payload_hash=False):
     from comfy_kitchen.tensor import base
     def encode(v):
         if isinstance(v,base.QuantizedTensor):
             p=v._params
             return dict(type='quantized',layout=v._layout_cls,payload=encode(v._qdata),orig_dtype=str(p.orig_dtype),orig_shape=list(p.orig_shape),tensors={f.name:encode(getattr(p,f.name))for f in dataclasses.fields(p)if isinstance(getattr(p,f.name),torch.Tensor)},fields={f.name:getattr(p,f.name)for f in dataclasses.fields(p)if f.name not in ['orig_dtype','orig_shape']and not isinstance(getattr(p,f.name),torch.Tensor)},field_order=[f.name for f in dataclasses.fields(p)])
-        if isinstance(v,torch.Tensor):return dict(type='tensor',device=str(v.device),dtype=str(v.dtype),shape=list(v.shape),strides=list(v.stride()),payload_hex=bytes(bits(v)).hex(),requires_grad=v.requires_grad)
+        if isinstance(v,torch.Tensor):
+            raw=bytes(bits(v))
+            payload={'payload_sha256':hashlib.sha256(raw).hexdigest()}if payload_hash else{'payload_hex':raw.hex()}
+            return dict(type='tensor',device=str(v.device),dtype=str(v.dtype),shape=list(v.shape),strides=list(v.stride()),requires_grad=v.requires_grad,**payload)
         if isinstance(v,torch.dtype):return dict(type='dtype',name=str(v))
         if isinstance(v,torch.device):return dict(type='device',name=str(v))
         if isinstance(v,(tuple,list)):return dict(type='tuple'if isinstance(v,tuple)else'list',items=[encode(x)for x in v])
@@ -127,7 +131,7 @@ def capture(torch,devices,bits,label_filter=None):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--label-filter');a=p.parse_args()
-    manifest=json.loads((Path(__file__).resolve().parents[2]/'design/reference-local/source-manifest.json').read_text());hashes={}
+    manifest=json.loads((reference_dir(Path(__file__).resolve().parents[2])/'source-manifest.json').read_text());hashes={}
     for e in manifest:
         if e['root']=='site'and e['path'].startswith('comfy_kitchen/')and Path(e['path']).suffix=='.py':
             h=hashlib.sha256((a.site/e['path']).read_bytes()).hexdigest();assert h==e['sha256'];hashes[e['path']]=h

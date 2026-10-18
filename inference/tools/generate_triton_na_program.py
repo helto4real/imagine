@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+from reference_paths import reference_dir
 import argparse,ast,hashlib,json,re,struct
 from pathlib import Path
-parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);a=parser.parse_args();project=Path(__file__).resolve().parents[2];source=a.source;expected=next(e['sha256']for e in json.loads((project/'design/reference-local/source-manifest.json').read_text())if e['root']=='site'and e['path']=='comfy_kitchen/backends/triton/na.py');assert hashlib.sha256(source.read_bytes()).hexdigest()==expected
+parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True);parser.add_argument('--output',type=Path,required=True);a=parser.parse_args();project=Path(__file__).resolve().parents[2];source=a.source;expected=next(e['sha256']for e in json.loads((reference_dir(project)/'source-manifest.json').read_text())if e['root']=='site'and e['path']=='comfy_kitchen/backends/triton/na.py');assert hashlib.sha256(source.read_bytes()).hexdigest()==expected
 fn=next(n for n in ast.parse(source.read_text()).body if isinstance(n,ast.FunctionDef)and n.name=='_na3d_kernel');out=['// Generated from locked NA3D source; no saved IR.',f'// Source SHA256: {expected}'];scalars=[n.arg for n in fn.args.args[4:13]];out.append('pub const SCALAR_NAMES:[&str;9]='+json.dumps(scalars)+';');counter=0;last_position=None;origins={}
 def emit(s):out.append(s)
 def pos(n):return f'({n.lineno},{n.col_offset})'

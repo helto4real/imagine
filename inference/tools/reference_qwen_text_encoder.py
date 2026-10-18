@@ -38,7 +38,7 @@ operations.Embedding=namespace['Embedding']
 comfy.ldm=NS(common_dit=NS(rms_norm=namespace['rms_norm']))
 comfy.clip_model=NS(CLIPTextModel=torch.nn.Module)
 namespace.update(Qwen2Tokenizer=None,CLIPTokenizer=None)
-definitions('comfy/text_encoders/llama.py',['FixedKV','FixedKVBias','Llama2Config','Qwen3_8BConfig','Qwen3VL_8BConfig','RMSNorm','precompute_freqs_cis','rope_matrix','apply_rope','Attention','MLP','TransformerBlock','Llama2_','BaseLlama','BaseGenerate','BaseQwen3'])
+definitions('comfy/text_encoders/llama.py',['FixedKV','FixedKVState','FixedKVCache','Int8FixedKVCache','Llama2Config','Qwen3_8BConfig','Qwen3VL_8BConfig','RMSNorm','precompute_freqs_cis','rope_matrix','apply_rope','Attention','MLP','TransformerBlock','Llama2_','BaseLlama','BaseGenerate','BaseQwen3'])
 definitions('comfy/text_encoders/qwen3vl.py',['Qwen3VL'])
 definitions('comfy/sd1_clip.py',['gen_empty_tokens','ClipTokenWeightEncoder','SDClipModel','SD1CheckpointClipModel','SD1ClipModel'])
 namespace['sd1_clip']=NS(**{k:namespace[k]for k in ['SDClipModel','SD1ClipModel']})

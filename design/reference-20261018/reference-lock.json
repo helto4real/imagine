@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "scope": "base inference; no graphs/UI; initial Arch Linux + RTX 4070 Ti SUPER",
+  "comfy_revision": "446ef4e005fc7134d53ce6869ebd77d2134cd39c",
+  "roots": {
+    "comfy": "/home/thhel/git/ComfyUI",
+    "site": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages"
+  },
+  "kitchen_version": "0.2.38",
+  "torch_version": "2.13.0",
+  "source_count": 45345,
+  "artifacts": {
+    "source-manifest.json": "1956adc8a50397b6d0b301291a8030317ed11c9ac13e20ab241315be72ed4e5a",
+    "inference-inventory.json": "be694f0cbef138260fa77fb20e17634a81df320b3e850f38978f358cf328f8aa",
+    "dependencies.json": "a082ab2ed7746c60557685435511ecbc718802509b1b4867aa3036b147ac5928",
+    "environment.json": "fec62752762d81aa83244efa2374a6825b719d0f0af1cae25b8d62c56dbf7bf7",
+    "reference-source.tar.gz": "68cf3ec9a05a2c745208790a3b3d0183afad58ff0734fd57fb971836878544fc",
+    "boundary-source.tar.gz": "bcc1a67a7f01e75e1b8ba2b4eaf6cd0b066acf11f62b6c8a455310f1c03d83f5",
+    "tools/supplement.py": "40aa2373b70c8176ce91d3089acce65e4fb0a30e040b7c7bcef398ab6c54161e",
+    "capability-index.json": "5c8e08e7bc7328c0a67f10b28481c6e2556cbbd7f5c6311c3c8f8313a464879d",
+    "tools/index.py": "99f5fe9721e8b6e7282f3da5218ea3de4039ea612fb88e686504ccf152aa1c57",
+    "native-linkage-lock.json": "6bca01d23223bc42dcba4330bee6d0b842e01fb7eedd993cc6bb95610c8673bf",
+    "source-acquisition-lock.json": "47832eab9ff623ce46a9de31b7e130825af781a32eddd0d4899ee50c03da0d6c",
+    "tools/capture.py": "0916cb8bb91c3f355f6e22e7772eee1b48c67aee0236d1c02c249473751f4580",
+    "tools/native_linkage.py": "30cdb6aceff7dc2d646be360292daedd52f286603a855d51f4deab60b6fb1d12"
+  },
+  "capture_script_sha256": "0916cb8bb91c3f355f6e22e7772eee1b48c67aee0236d1c02c249473751f4580",
+  "activation": "not observed; static source predicates only",
+  "production_rust_libtorch_kitchen_build": "selected native .38 bridge built; 60 individual Python-free regressions passed; trained MOSS 1024x1024/50-step numerical and observed memory-policy equality; full upgraded registry parity pending"
+}

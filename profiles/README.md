@@ -6,17 +6,19 @@ unknown fields and duplicate IDs/keys fail startup. Restart Imagine after an edi
 increment `version` when changing a published profile. Already queued jobs retain
 their resolved settings. The proxy does not load graphs or YAML itself.
 
-`qwen.yaml` is a complete editable Qwen example. `quick-draft.yaml` selects Turbo.
-Both are version 2 and carry the full original `image_generation` prompt guidance,
-including reference-image instructions. `qwen_scene` retains its original specialized
-reference guidance. Model and sampling defaults are unchanged by this guidance update.
-`qwen-image21-1600x896-v2.yaml` selects the existing frozen runtime and native
-reference preprocessing. The existing `image_generation`, `qwen_scene` and
-`image_upscale` presets retain their original prompt/guidance values, reference
-limits and relevant model settings as YAML. Their encrypted prompts remain
-byte-identical envelopes; Imagine reads the unlocked Helto session only if such
-a value is used. Catalog descriptions never decrypt or expose default prompts.
-No native binaries, precision settings or frozen baseline files are changed.
+`qwen.yaml` is **Qwen Image 2.1** (version 4); `quick-draft.yaml` is
+**Qwen Image 2.1 Turbo** (version 3). Both accept zero to ten ordered references:
+no references selects text-to-image; references select image-edit. Each recipe
+owns its model files and sampling defaults. Standard Qwen retains the exact
+encrypted negative-prompt envelope from the former `image_generation` preset;
+Turbo retains its empty negative prompt and zero-negative-conditioning setting.
+Prompt guidance and other generation settings are unchanged.
+
+Character sheets and upscale retain their dedicated operation profiles.
+The overlapping `image_generation`, `qwen_scene` and frozen-v2 wrapper presets
+are preserved in `archive/`, outside the active catalog. Native frozen binaries,
+manifests and evidence are unchanged. Catalog descriptions never decrypt or
+expose default prompts.
 
 ## API
 
@@ -36,7 +38,7 @@ A normal JSON request selects a YAML profile and supplies overrides:
 ```json
 {
   "profile": "qwen",
-  "profile_version": 2,
+  "profile_version": 4,
   "prompt": "A blue ceramic teapot on a wooden table, studio photograph.",
   "width": 1024,
   "height": 1024,

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate a metadata-only adapter to pinned upstream launch wrappers."""
+from reference_paths import reference_dir
 import hashlib
 import json
 import re
@@ -8,7 +9,7 @@ import sys
 
 project=Path(__file__).resolve().parents[2]
 sources=Path(sys.argv[1]);output=Path(sys.argv[2]);output.mkdir(parents=True,exist_ok=True)
-lock=json.loads((project/'design/reference-local/source-acquisition-lock.json').read_text())
+lock=json.loads((reference_dir(project)/'source-acquisition-lock.json').read_text())
 # Validate transitive native headers as well as the direct compilation units.
 # Never advance the reference or accept an edited fetched dependency silently.
 for name in ['comfy-kitchen','cutlass','flash-attention']:
@@ -22,6 +23,9 @@ text=source.read_text()
 wrappers=text.split('NB_MODULE(_C, m) {',1)[0]
 wrappers=re.sub(r'^#include <nanobind/[^>]+>\n','',wrappers,flags=re.M)
 wrappers=wrappers.replace('namespace nb = nanobind;','')
+# Kitchen 0.2.38 declares this Python-only registration helper before the
+# module body. It is not a tensor operation or CUDA implementation.
+wrappers=wrappers.replace('void register_int8_decode(nb::module_& m);\n','')
 for before,after in [('nb::ndarray','TensorView'),('nb::device::cuda','CudaDevice'),('nb::ndim','Dims'),('nb::dlpack::dtype_code','DTypeCode'),('nb::dlpack::dtype','DType'),('nb::object','OptionalTensorView'),('nb::cast','view_cast'),('nb::dtype','view_dtype'),('nb::dict','PlanMap')]:
     wrappers=wrappers.replace(before,after)
 assert 'nb::' not in wrappers

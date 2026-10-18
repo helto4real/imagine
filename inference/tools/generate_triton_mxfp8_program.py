@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Development-only transcription of the pinned MXFP8 and integer helper bodies."""
+from reference_paths import reference_dir
 import argparse,ast,hashlib,json
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--quantization',type=Path,required=True);p.add_argument('--standard',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
 project=Path(__file__).resolve().parents[2]
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
 paths={'quantization':a.quantization,'standard':a.standard}
 for name,path in paths.items():
  relative='comfy_kitchen/backends/triton/quantization.py'if name=='quantization'else'triton/language/standard.py'

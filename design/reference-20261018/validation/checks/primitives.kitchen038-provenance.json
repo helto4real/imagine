@@ -1,0 +1,10 @@
+{
+  "archive_sha256": "424adc1eb2ba6958c5bc3edd43af456afabc605ae565bba06797eb611d87d239",
+  "reference_revision": "446ef4e005fc7134d53ce6869ebd77d2134cd39c",
+  "sections": {
+    "cuda_int8_activation": 1386,
+    "cuda_int8_m1": 504,
+    "cuda_int8_m1_selection": 5
+  },
+  "remaining_sections": "Preserved base captures; this merge does not claim a complete fresh Kitchen registry oracle"
+}

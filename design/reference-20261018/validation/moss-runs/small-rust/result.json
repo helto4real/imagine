@@ -1,0 +1,81 @@
+{
+  "context_shapes": [
+    [
+      1,
+      26,
+      4096
+    ],
+    [
+      1,
+      10,
+      4096
+    ]
+  ],
+  "cpu_threads": 23,
+  "latent_shape": [
+    1,
+    128,
+    14,
+    20
+  ],
+  "model_sha256": {
+    "dit": "b4d1475bc7eeffd7b809e82ea13a1fba1fb85c4e18365af3813722faa5c0fe4f",
+    "text": "32e3787472f708fa5f83624acbf5ef23f7fc89c439e05065ea57cfe5a97f025a",
+    "vae": "d64f3a68e1cc4f9f4e29b6e0da38a0204fe9a49f2d4053f0ec1fa1ca02f9c4b5"
+  },
+  "pixels_shape": [
+    1,
+    224,
+    320,
+    3
+  ],
+  "production_runtime_read": false,
+  "schema": 1,
+  "source_profile": {
+    "batch": 1,
+    "cfg": 3.5,
+    "checkpoints": {
+      "dit": "diffusion_models/moss/moss_image_sft_int8_convrot.safetensors",
+      "text": "text_encoders/moss/qwen3.5_9b_int8_convrot.safetensors",
+      "vae": "vae/flux.2/flux2-vae.safetensors"
+    },
+    "height": 224,
+    "multiplier": 1.0,
+    "negative_prompt": "",
+    "purpose": "Bounded trained MOSS SFT INT8 ConvRot text-to-image parity control, not a quality preset",
+    "sampler": "euler",
+    "scheduler": "normal",
+    "schema": 1,
+    "seed": 3061383787,
+    "shift": 5.0,
+    "source_configuration": {
+      "attention": "pytorch",
+      "checkpoint_attention_preferences": true,
+      "disable_async_offload": true,
+      "disable_comfy_compiler": true,
+      "dit_dtype": "bfloat16",
+      "dit_fused_qkv": true,
+      "force_full_load_per_component": false,
+      "kitchen_triton": false,
+      "static_patcher": true,
+      "text_compute_dtype": "float32",
+      "text_mtp_weights": true,
+      "text_storage_dtype": "bfloat16",
+      "unload_between_components": true,
+      "vae_dtype": "bfloat16"
+    },
+    "steps": 4,
+    "synthetic_prompt": "A blue butterfly resting on a yellow flower, soft daylight, detailed natural photograph.",
+    "variant": "int8_convrot",
+    "width": 320
+  },
+  "timings_seconds": {
+    "dit_load": 0.683013159,
+    "pipeline_wall_including_exports_and_unload": 22.693802029,
+    "sampling": 1.237803448,
+    "text_encode": 1.175924841,
+    "text_load": 6.997396399,
+    "vae_decode": 0.077893844,
+    "vae_load": 0.37933458
+  }
+}

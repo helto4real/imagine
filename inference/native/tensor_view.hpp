@@ -13,7 +13,8 @@ struct DType { uint8_t code; uint8_t bits; uint16_t lanes; bool operator==(const
 template<class T> DType view_dtype() {
     if constexpr(std::is_same_v<T,float>) return {2,32,1};
     if constexpr(std::is_same_v<T,int32_t>) return {0,32,1};
-    static_assert(std::is_same_v<T,float> || std::is_same_v<T,int32_t>);
+    if constexpr(std::is_same_v<T,int8_t>) return {0,8,1};
+    static_assert(std::is_same_v<T,float> || std::is_same_v<T,int32_t> || std::is_same_v<T,int8_t>);
 }
 using PlanMap=std::map<std::string,int64_t>;
 struct CudaDevice {};

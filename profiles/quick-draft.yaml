@@ -1,6 +1,6 @@
 schema_version: 1
 id: quick-draft
-version: 2
+version: 3
 name: Qwen Image 2.1 Turbo
 description: Snabba utkast med Qwen Image 2.1 Turbo.
 prompt_guidance: 'IMAGE PROMPT REWRITING EXPERT — STRUCTURED REFERENCE SCENES
@@ -744,7 +744,7 @@ defaults:
   sampling:
     steps: 8
     cfg_scale: 1.0
-    sampler: res_multistep
+    sampler: euler
     scheduler: simple
     custom_sigmas: [1, 0.978453, 0.954180, 0.926626, 0.895080, 0.845148, 0.704534, 0.414568, 0]
   inputs:

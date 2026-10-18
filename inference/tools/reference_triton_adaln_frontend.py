@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Original AdaLN AST and compiler on typed synthetic signatures; no GPU work."""
+from reference_paths import reference_dir
 import argparse,hashlib,itertools,json,re,shutil,sys
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--epsilon-types',nargs='+',choices=['fp32','i32','i32_div16','i64','u64','u64_div16','one','u1'],default=['fp32']);p.add_argument('--scalar-slice',action='store_true');a=p.parse_args()
-project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
+project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
 for name in ['triton/compiler/code_generator.py','triton/backends/nvidia/compiler.py','comfy_kitchen/backends/triton/adaln.py']:
     assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==hashes[name]
 sys.path.insert(0,str(a.site))

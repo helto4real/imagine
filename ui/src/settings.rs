@@ -95,6 +95,9 @@ pub const ASPECT_RATIOS: [&str; 9] = [
 pub struct GenerationSettings {
     pub steps: u32,
     pub cfg_scale: f32,
+    // None inherits the selected model's defaults, including older saved settings.
+    pub sampler: Option<String>,
+    pub scheduler: Option<String>,
     pub random_seed: bool,
     pub seed: u32,
     pub aspect_ratio: String,
@@ -106,6 +109,8 @@ impl Default for GenerationSettings {
         Self {
             steps: 40,
             cfg_scale: 2.5,
+            sampler: None,
+            scheduler: None,
             random_seed: true,
             seed: 42,
             aspect_ratio: "16:9".into(),
@@ -588,6 +593,8 @@ mod tests {
             generation: GenerationSettings {
                 steps: 24,
                 cfg_scale: 3.,
+                sampler: Some("euler".into()),
+                scheduler: Some("simple".into()),
                 random_seed: false,
                 seed: u32::MAX,
                 aspect_ratio: "3:4".into(),

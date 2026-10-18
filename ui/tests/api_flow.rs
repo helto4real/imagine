@@ -184,6 +184,8 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     assert_eq!(shared_asset.status(), 200);
     let refs = vec![b.id, a.id];
     let settings = GenerationSettings {
+        sampler: None,
+        scheduler: None,
         steps: 24,
         cfg_scale: 3.25,
         random_seed: false,

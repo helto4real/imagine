@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate exact binary64 latent statistics from the locked ComfyUI source."""
+from reference_paths import reference_dir
 import argparse
 import ast
 import hashlib
@@ -14,7 +15,7 @@ p.add_argument('--check',action='store_true')
 a=p.parse_args()
 project=Path(__file__).resolve().parents[2]
 name='comfy/latent_formats.py'
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 source=(a.comfy/name).read_text()
 assert hashlib.sha256(source.encode()).hexdigest()==next(e['sha256']for e in manifest if e['root']=='comfy'and e['path']==name)
 cls=next(n for n in ast.parse(source).body if isinstance(n,ast.ClassDef)and n.name=='QwenImage21')

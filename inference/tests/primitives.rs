@@ -6,6 +6,8 @@ use serde_json::Value;
 use std::path::Path;
 use tch::{Device, Kind, Tensor};
 
+#[path = "support/attention_attributes.rs"]
+mod attention_attribute_tests;
 #[path = "support/awq_layout.rs"]
 mod awq_layout_tests;
 #[path = "support/backend_bindings.rs"]
@@ -14,6 +16,10 @@ mod backend_binding_tests;
 mod binding_tests;
 #[path = "support/conv_bindings.rs"]
 mod conv_binding_tests;
+#[path = "support/cuda_convrot_dequant.rs"]
+mod cuda_convrot_dequant_tests;
+#[path = "support/cuda_memory_startup.rs"]
+mod cuda_memory_startup_tests;
 #[path = "support/kitchen_direct.rs"]
 mod kitchen_direct_tests;
 #[path = "support/layout_completion.rs"]
@@ -75,6 +81,24 @@ mod checkpoint_tests;
 mod comfy_sdpa_tests;
 #[path = "support/model_management.rs"]
 mod model_management_tests;
+#[path = "support/moss_conditioning.rs"]
+mod moss_conditioning_tests;
+#[path = "support/moss_delta.rs"]
+mod moss_delta_tests;
+#[path = "support/moss_dit.rs"]
+mod moss_dit_tests;
+#[path = "support/moss_sampling.rs"]
+mod moss_sampling_tests;
+#[path = "support/moss_text.rs"]
+mod moss_text_tests;
+#[path = "support/moss_tokenizer.rs"]
+mod moss_tokenizer_tests;
+#[path = "support/moss_vae_attention.rs"]
+mod moss_vae_attention_tests;
+#[path = "support/moss_vae_conversion.rs"]
+mod moss_vae_conversion_tests;
+#[path = "support/moss_vae.rs"]
+mod moss_vae_tests;
 #[path = "support/qwen_components.rs"]
 mod qwen_component_tests;
 #[path = "support/qwen_host_cache.rs"]
@@ -2507,6 +2531,7 @@ fn cuda_activation<'a>(
         None | Some("none") => A::None,
         Some("gelu_tanh") => A::GeluTanh,
         Some("swiglu") => A::SwiGlu,
+        Some("situ") => A::Situ,
         Some("rms_norm") => A::RmsNorm {
             weight,
             epsilon: 0.0,

@@ -1,0 +1,11 @@
+   Compiling imagine-server v0.1.0 (/home/thhel/ChatGPT/imagine)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.45s
+     Running tests/rust_backend.rs (target/debug/deps/rust_backend-83ff3dd724b9e005)
+
+running 3 tests
+test unsupported_sampler_fails_before_launch_and_changed_runtime_is_rejected ... ok
+test cancel_reaps_before_release_and_worker_failures_are_sanitized ... ok
+test native_frames_preserve_raw_references_progress_png_and_persistent_child ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+

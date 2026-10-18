@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Preserve original driver bodies; replace only Python ownership/error binding."""
+from reference_paths import reference_dir
 import argparse,hashlib,json,subprocess
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--site',type=Path,required=True);a=p.parse_args()
-project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());name='triton/backends/nvidia/driver.c';path=a.site/name
+project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());name='triton/backends/nvidia/driver.c';path=a.site/name
 actual=hashlib.sha256(path.read_bytes()).hexdigest();assert actual==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
 src=path.read_text();start=src.index('static void _launch(');end=src.index('\nstatic PyObject *data_ptr_str',start);launch=src[start:end]
 start=src.index('  CUfunction fun;',src.index('static PyObject *loadBinary('));end=src.index('  Py_END_ALLOW_THREADS;',start);load=src[start:end].replace('  Py_BEGIN_ALLOW_THREADS;','')

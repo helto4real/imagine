@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Prepare frozen compiler configuration data, never saved kernel specializations."""
+from reference_paths import reference_dir
 import argparse,hashlib,json,sys
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={}
+project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={}
 for name in ['triton/compiler/compiler.py','triton/runtime/cache.py','triton/backends/nvidia/compiler.py','comfy_kitchen/backends/triton/quantization.py']:
     h=hashlib.sha256((a.site/name).read_bytes()).hexdigest();assert h==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name);hashes[name]=h
 sys.path.insert(0,str(a.site))

@@ -1,4 +1,23 @@
-Latest complete verification, 2026-10-18: **Stage 1 foundation complete**.
+The current development reference is ComfyUI `446ef4e` with Kitchen 0.2.38.
+The [upgrade and MOSS report](../design/comfy-reference-upgrade-20261018.md)
+separates preservation, changed source paths, bounded tests and trained controls.
+Full upgraded registry/model parity is still in progress. The completed-stage
+claims below describe the preserved `ba994879` / `c0d291c` baseline.
+
+Selected upgrade regressions, with prepared local dependencies and no weights
+mounted, run through `tools/check_reference_upgrade.sh`. Fresh .38 kernel
+captures are retained in `fixtures/kitchen-038-upgrade.json.gz` and verified
+against the selected source lock before merging into the preserved base fixture.
+MOSS's reusable Rust components and execution adapter live in
+`models::moss_image`; `moss-first-image` and
+`tools/check_moss_reference_upgrade.py` are explicitly bounded development
+controls, with a preflight default and opt-in trained comparison.
+The final selected set passes all 60 individual Python-free checks. MOSS SFT
+INT8 ConvRot 1024×1024/50-step outputs and observed memory policy are exact;
+[retained evidence](../design/reference-20261018/validation/README.md) also records
+the remaining Qwen automatic BF16/Turbo placement differences.
+
+Previous complete verification, 2026-10-18: **Stage 1 foundation complete**.
 The [final report](../design/stage-1-final-validation.md) and
 [checkpoint](../design/stage-1-final-checkpoint.json) record 155 crate tests,
 146 unfiltered Python-free primitive tests, 64,413 physical fixture records and
@@ -25,7 +44,7 @@ Run an already prepared local development environment with the selected model
 root and a fresh output name:
 
 ```bash
-export IMAGINE_PARITY_ROOT=/tmp/imagine-rust-comfy-parity-20261017
+export IMAGINE_PARITY_ROOT=/home/thhel/ChatGPT/imagine/comfyui/moss-20261018
 export IMAGINE_REFERENCE_SITE=/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages
 bash inference/tools/launch_qwen21.sh /mnt/media/gemensam/AI/ComfyUI/models \
   run FRESH_RUN_NAME inference/profiles/qwen21-lora-bf16.json

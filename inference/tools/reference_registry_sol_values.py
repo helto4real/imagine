@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """CPU-only original structured metadata; no backend execution or GPU allocation."""
+from reference_paths import reference_dir
 import argparse,hashlib,json,sys
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--project',type=Path,required=True);a=p.parse_args();manifest=json.loads((a.project/'design/reference-local/source-manifest.json').read_text())
+p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--project',type=Path,required=True);a=p.parse_args();manifest=json.loads((reference_dir(a.project)/'source-manifest.json').read_text())
 for name in ['comfy_kitchen/constraints.py','comfy_kitchen/backends/eager/__init__.py','comfy_kitchen/backends/triton/__init__.py','comfy_kitchen/backends/cuda/__init__.py']:
  assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
 sys.path[:0]=[str(a.site),str(a.project/'inference/tools')]

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "source_fingerprints_verified": 45345,
+  "reference_artifact_hashes": "passed",
+  "native_distribution_and_system_elf_hashes": "passed",
+  "undefined_python_symbols_in_native_kitchen_bridge": false,
+  "python_tool_ast": "passed",
+  "shell_syntax": "passed",
+  "cargo_fmt": "passed",
+  "cargo_clippy_all_targets_deny_warnings": "passed",
+  "git_diff_check_inference_design": "passed",
+  "individual_python_free_tests": 60,
+  "full_unfiltered_upgraded_registry_tested": false,
+  "old_reference_lock_changed": false,
+  "sandbox_escalations": "granted for main upgrade and isolated GPU namespaces; no auto-review rejection"
+}

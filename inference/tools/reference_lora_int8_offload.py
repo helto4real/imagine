@@ -9,7 +9,7 @@ namespace['args'].cuda_malloc=False
 namespace['_GROUPED_INT8_FORMATS']={'asym_w4a8_int8':4,'w6a8_int8':6}
 mm.get_offload_stream=lambda device:None
 definitions('comfy/model_management.py',['sync_stream']);mm.sync_stream=namespace['sync_stream']
-definitions('comfy/ops.py',['cast_bias_weight','_quantized_weight_state_dict','_swiglu_eager','_input_act_weight','_eager_input_act','_linear_residual','_fp16_linear_wanted','linear_input_act','linear_input_act_'])
+definitions('comfy/ops.py',['cast_bias_weight','_quantized_weight_state_dict','_swiglu_eager','_situ_eager','_try_quantized_linear_input_act','_input_act_weight','_eager_input_act','_linear_residual','_fp16_linear_wanted','linear_input_act','linear_input_act_'])
 namespace['INPUT_ACT_EAGER']={'swiglu':namespace['_swiglu_eager']}
 from comfy_kitchen.tensor.int8 import TensorWiseINT8Layout
 namespace['TensorWiseINT8Layout']=TensorWiseINT8Layout

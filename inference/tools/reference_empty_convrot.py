@@ -5,6 +5,7 @@ This is controlled-state evidence under the explicitly approved empty-width
 criterion, separate from ordinary golden numerical fixtures. Never read
 an unwritten allocation unless its pointer matches our own known-value buffer.
 """
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import json
@@ -17,7 +18,7 @@ parser.add_argument('--output',type=Path,required=True)
 parser.add_argument('--variants',action='store_true',help='Approved rowwise64/staged extension only')
 args=parser.parse_args()
 project=Path(__file__).resolve().parents[2]
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 names=['comfy_kitchen/backends/cuda/__init__.py','comfy_kitchen/constraints.py']
 hashes={}
 for name in names:

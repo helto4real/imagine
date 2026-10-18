@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Frozen checkpoint functions on newly created, synthetic files/parameters only."""
+from reference_paths import reference_dir
 import argparse
 import ast
 import ctypes
@@ -23,7 +24,7 @@ p.add_argument('--output',type=Path,required=True)
 p.add_argument('--work',type=Path,required=True)
 a=p.parse_args()
 project=Path(__file__).resolve().parents[2]
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 sources={}
 for root, names in [('comfy',['comfy/utils.py','comfy/ops.py','comfy/quant_ops.py','comfy/memory_management.py']),
                     ('site',['comfy_aimdo/aimdo.so','comfy_aimdo/model_mmap.py'])]:

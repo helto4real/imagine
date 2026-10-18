@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Development-only typed transcription of locked NVFP4 kernel expressions."""
+from reference_paths import reference_dir
 import argparse,ast,hashlib,json,struct
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--source',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--family',choices=['quantize','dequantize'],required=True);a=p.parse_args()
-project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());expected=next(e['sha256']for e in manifest if e['root']=='site'and e['path']=='comfy_kitchen/backends/triton/quantization.py');assert hashlib.sha256(a.source.read_bytes()).hexdigest()==expected
+project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());expected=next(e['sha256']for e in manifest if e['root']=='site'and e['path']=='comfy_kitchen/backends/triton/quantization.py');assert hashlib.sha256(a.source.read_bytes()).hexdigest()==expected
 module=ast.parse(a.source.read_text());fn=next(n for n in module.body if isinstance(n,ast.FunctionDef)and n.name==a.family+'_nvfp4_kernel_tl');out=['// Generated from the locked NVFP4 source; no saved IR.',f'// Source SHA256: {expected}'];next_id=0
 scalars=[n.arg for n in fn.args.args[4:fn.args.args.index(next(n for n in fn.args.args if n.arg=='block_size'))]]
 out.append('pub const SCALAR_NAMES: [&str;'+str(len(scalars))+'] = '+json.dumps(scalars)+';')

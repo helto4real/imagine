@@ -54,19 +54,19 @@ pub fn constructor_schema() -> Result<ConstructorSchema, Error> {
 pub fn normalize_text_keys(state: BTreeMap<String, Tensor>) -> BTreeMap<String, Tensor> {
     state
         .into_iter()
-        .map(|(name, t)| {
-            let name = if let Some(suffix) = name.strip_prefix("model.language_model.") {
-                format!("model.{suffix}")
-            } else if let Some(suffix) = name.strip_prefix("model.visual.") {
-                format!("visual.{suffix}")
-            } else if let Some(suffix) = name.strip_prefix("lm_head.") {
-                format!("model.lm_head.{suffix}")
-            } else {
-                name
-            };
-            (name, t)
-        })
+        .map(|(name, t)| (normalized_text_key(&name), t))
         .collect()
+}
+pub fn normalized_text_key(name: &str) -> String {
+    if let Some(suffix) = name.strip_prefix("model.language_model.") {
+        format!("model.{suffix}")
+    } else if let Some(suffix) = name.strip_prefix("model.visual.") {
+        format!("visual.{suffix}")
+    } else if let Some(suffix) = name.strip_prefix("lm_head.") {
+        format!("model.lm_head.{suffix}")
+    } else {
+        name.into()
+    }
 }
 fn gap(op: impl Into<String>) -> Error {
     Error::BindingGap {
@@ -199,7 +199,21 @@ pub fn prepare_resident_component_with_options(
     }
     // Nonpersistent source vision rotary buffer is constructed even for T2I.
     for b in &spec.buffers {
-        if component == "text" && b.name == "visual.rotary_pos_emb.inv_freq" && b.shape == [18] {
+        if let Some(value) = state.remove(&b.name) {
+            if value.size() != b.shape {
+                return Err(gap(format!(
+                    "Alternate constructor buffer shape {}",
+                    b.name
+                )));
+            }
+            prepared.values.insert(
+                b.name.clone(),
+                Value::tensor(rt.native.clone_tensor(&value)?.f_detach()?),
+            );
+        } else if component == "text"
+            && b.name == "visual.rotary_pos_emb.inv_freq"
+            && b.shape == [18]
+        {
             let inv = Tensor::f_arange_start_step(0, 36, 2, (Kind::Float, Device::Cpu))?
                 .f_div_scalar(36)?;
             let inv = Tensor::f_pow_scalar(10000., &inv)?
@@ -210,7 +224,7 @@ pub fn prepare_resident_component_with_options(
             return Err(gap(format!("Unbound constructor buffer {}", b.name)));
         }
     }
-    // Optional source attention metadata is a buffer, not a weight to cast.
+    // ComfyAttention decodes JSON into Python attributes, outside Module.to.
     let metadata = state
         .keys()
         .filter(|k| k.ends_with(".comfy_attention.config"))
@@ -218,8 +232,7 @@ pub fn prepare_resident_component_with_options(
         .collect::<Vec<_>>();
     for key in metadata {
         prepared
-            .values
-            .insert(key.clone(), Value::tensor(state.remove(&key).unwrap()));
+            .insert_attention_config(key.clone(), Value::tensor(state.remove(&key).unwrap()))?;
     }
     if !state.is_empty() {
         return Err(gap(format!(
@@ -241,7 +254,9 @@ pub fn prepare_resident_component_with_options(
             ),
             _ => {
                 let t = value.as_tensor()?;
-                let k = if name == "visual.rotary_pos_emb.inv_freq" {
+                let k = if !t.f_is_floating_point()? && !t.f_is_complex()? {
+                    t.kind()
+                } else if name == "visual.rotary_pos_emb.inv_freq" {
                     Kind::Float
                 } else {
                     options.dtype

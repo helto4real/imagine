@@ -93,11 +93,17 @@ async fn session(State(app): State<App>) -> Json<Value> {
     // Preserve the response shape for clients that inspect the storage mode.
     Json(json!({"id": app.store.session.id, "encrypted": false}))
 }
-async fn models() -> Json<Value> {
-    Json(contract::models())
+async fn models(State(app): State<App>) -> Json<Value> {
+    let mut value = contract::models();
+    let backend = app.engine.borrow().backend.clone();
+    for model in value["models"].as_array_mut().unwrap() {
+        *model = crate::comfy_engine::model_metadata(model.take(), &backend);
+    }
+    Json(value)
 }
-async fn model(Path(id): Path<String>) -> Result<Json<Value>, Fault> {
+async fn model(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Fault> {
     contract::model(&id)
+        .map(|model| crate::comfy_engine::model_metadata(model, &app.engine.borrow().backend))
         .map(Json)
         .ok_or(Fault::new(404, "model_not_found"))
 }
@@ -342,6 +348,18 @@ async fn resolve_request(app: &App, value: Value) -> Result<crate::contract::Job
     .await
     .map_err(|_| Fault::new(500, "model_library_unavailable"))??;
     let mut request = app.profiles.resolve(value, &app.store, LOCAL_OWNER).await?;
+    crate::engine::validate_selection(
+        &app.engine.borrow().backend,
+        &request.model,
+        &request.sampling,
+    )
+    .map_err(|e| {
+        Fault::new(
+            422,
+            e.downcast_ref::<crate::engine::EngineError>()
+                .map_or("unsupported_sampling", |e| e.0),
+        )
+    })?;
     request.resolved_models = if resolved.is_some() {
         resolved
     } else {
@@ -394,7 +412,12 @@ async fn library_action(
                 .scan()
                 .map_err(|_| Fault::new(422, "model_library_scan_failed"))?;
         }
-        Ok(Json(library.snapshot()))
+        let mut snapshot = library.snapshot();
+        let backend = app.engine.borrow().backend.clone();
+        for model in &mut snapshot.models {
+            *model = crate::comfy_engine::model_metadata(model.take(), &backend);
+        }
+        Ok(Json(snapshot))
     })
     .await
     .map_err(|_| Fault::new(500, "model_library_unavailable"))?

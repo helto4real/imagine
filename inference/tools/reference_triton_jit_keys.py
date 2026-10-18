@@ -5,10 +5,11 @@ Existing frontend matrices supply typed signatures. Their AST is cut immediately
 at construction of ASTSource; no lowering, compiler stages or tensor calls run.
 The original JIT binder then derives its own signature/constants/attributes.
 """
+from reference_paths import reference_dir
 import argparse,ast,hashlib,json,sys,tempfile
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();project=Path(__file__).resolve().parents[2]
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 for name in ['triton/runtime/jit.py','triton/compiler/compiler.py']:
  assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
 sys.path.insert(0,str(a.site))

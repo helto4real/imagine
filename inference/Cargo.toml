@@ -22,3 +22,8 @@ torch-sys = { path = "vendor/torch-sys" }
 
 [dev-dependencies]
 torch-sys = { version = "=0.26.0", features = ["imagine-test-errors"] }
+
+# Full-checkpoint SHA256 is development provenance, outside tensor arithmetic.
+# Keep cold multi-gigabyte validation practical in the otherwise debug engine.
+[profile.dev.package.sha2]
+opt-level = 3

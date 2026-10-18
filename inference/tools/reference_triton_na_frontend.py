@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Frozen INT8 matmul source/compiler oracles; no GPU tensor execution."""
+from reference_paths import reference_dir
 import argparse,hashlib,itertools,json,re,shutil,sys
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--dynamic-kernels',action='store_true');p.add_argument('--unsigned-scales',action='store_true');p.add_argument('--integer-boundaries',action='store_true');a=p.parse_args()
-project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
+project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
 for name in ['triton/compiler/code_generator.py','triton/backends/nvidia/compiler.py','comfy_kitchen/backends/triton/na.py']:assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==hashes[name]
 sys.path.insert(0,str(a.site));import triton.language.standard as standard
 from triton._C.libtriton import ir

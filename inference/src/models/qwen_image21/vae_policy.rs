@@ -196,6 +196,44 @@ pub fn image_vae_is_oom(native: &crate::native::Kitchen, device: Device, error: 
     accelerator
 }
 #[derive(Clone, Copy)]
+pub enum ImageVaeMemory {
+    Wan22Image,
+    /// AutoencoderKL's original estimate, with Flux.2's latent BatchNorm
+    /// multiplier on decode. The AMD ratio is a source hardware predicate.
+    Flux2 {
+        amd: bool,
+    },
+}
+impl ImageVaeMemory {
+    pub fn required(self, operation: VaeOperation, shape: &[i64], dtype: Kind) -> f64 {
+        match self {
+            Self::Wan22Image => {
+                let factor = match operation {
+                    VaeOperation::Encode => 600,
+                    VaeOperation::Decode => 900 * 16 * 16,
+                };
+                (factor * shape[2] * shape[3]) as f64 * dtype.elt_size_in_bytes() as f64
+            }
+            Self::Flux2 { amd } => {
+                let ratio = if amd { 2.73 } else { 1. };
+                match operation {
+                    VaeOperation::Encode => {
+                        (1767 * shape[2] * shape[3]) as f64
+                            * dtype.elt_size_in_bytes() as f64
+                            * ratio
+                    }
+                    VaeOperation::Decode => {
+                        (2178 * shape[2] * shape[3] * 64) as f64
+                            * dtype.elt_size_in_bytes() as f64
+                            * ratio
+                            * 4.
+                    }
+                }
+            }
+        }
+    }
+}
+#[derive(Clone, Copy)]
 pub struct ImageVaePolicy {
     pub device: Device,
     pub dtype: Kind,
@@ -215,6 +253,16 @@ impl ImageVaePolicy {
         options: ImageTileOptions,
         services: &mut S,
     ) -> Result<Tensor, Error> {
+        self.execute_tiled_with_memory(op, input, options, services, ImageVaeMemory::Wan22Image)
+    }
+    pub fn execute_tiled_with_memory<S: ImageVaeServices>(
+        &self,
+        op: VaeOperation,
+        input: &Tensor,
+        options: ImageTileOptions,
+        services: &mut S,
+        memory: ImageVaeMemory,
+    ) -> Result<Tensor, Error> {
         let mut memory_shape = input.size();
         if op == VaeOperation::Decode {
             // _tile_bounded_shape clamps only explicitly supplied dimensions;
@@ -226,7 +274,7 @@ impl ImageVaePolicy {
                 memory_shape[3] = memory_shape[3].min(x);
             }
         }
-        services.load(self.memory_used(op, &memory_shape))?;
+        services.load(memory.required(op, &memory_shape, self.dtype))?;
         let default = if op == VaeOperation::Encode {
             ImageTiles::encode()
         } else {
@@ -249,11 +297,7 @@ impl ImageVaePolicy {
         })
     }
     pub fn memory_used(&self, operation: VaeOperation, shape: &[i64]) -> f64 {
-        let factor = match operation {
-            VaeOperation::Encode => 600,
-            VaeOperation::Decode => 900 * 16 * 16,
-        };
-        (factor * shape[2] * shape[3]) as f64 * self.dtype.elt_size_in_bytes() as f64
+        ImageVaeMemory::Wan22Image.required(operation, shape, self.dtype)
     }
     fn process_output(&self, mut x: Tensor) -> Result<Tensor, Error> {
         super::vae_process_output(&mut x)?;
@@ -295,6 +339,15 @@ impl ImageVaePolicy {
         input: &Tensor,
         services: &mut S,
     ) -> Result<Tensor, Error> {
+        self.execute_with_memory(op, input, services, ImageVaeMemory::Wan22Image)
+    }
+    pub fn execute_with_memory<S: ImageVaeServices>(
+        &self,
+        op: VaeOperation,
+        input: &Tensor,
+        services: &mut S,
+        estimate: ImageVaeMemory,
+    ) -> Result<Tensor, Error> {
         let input = if op == VaeOperation::Decode && input.dim() == 5 {
             input.f_select(2, 0)?
         } else {
@@ -303,7 +356,7 @@ impl ImageVaePolicy {
         // Keep the failed attempt's temporaries out of scope before empty_cache
         // and the tiled retry, like the source's post-except do_tile branch.
         let attempt = (|| {
-            let memory = self.memory_used(op, &input.size());
+            let memory = estimate.required(op, &input.size(), self.dtype);
             services.load(memory)?;
             let divisor = if op == VaeOperation::Encode {
                 memory.max(1.)

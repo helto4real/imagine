@@ -1,0 +1,555 @@
+{
+  "schema": 1,
+  "artifacts": [
+    {
+      "file": "README.md",
+      "bytes": 3429,
+      "sha256": "ea918a4808aaa8c4028cf48dc89c6bc141c5dbb47eeb4f17d168d34ae6e5212c"
+    },
+    {
+      "file": "checks/clippy-upgrade-final.log",
+      "bytes": 150,
+      "sha256": "9bfc91f861ecb4d4e308e80048f532659ce819589e609d62d1004ccbc0446264"
+    },
+    {
+      "file": "checks/final-verification.json",
+      "bytes": 641,
+      "sha256": "5430df5a1800b2f24e60fe3cc6cbed2bcd730a245f35fb1b51313f811568c524"
+    },
+    {
+      "file": "checks/isolations/cuda_int8_full_activation_and_route_selection_match_reference-isolation.json",
+      "bytes": 14086,
+      "sha256": "a1781d20635882179b2152dd7ed42a81aa61e806f89171fbe953aa5486c6ef3b"
+    },
+    {
+      "file": "checks/isolations/cuda_int8_noactivation_linear_routes_and_errors_match_reference-isolation.json",
+      "bytes": 14088,
+      "sha256": "90335e393542ed6d6822f883e953390d339ba9dd5c54c3405704270a57e8996a"
+    },
+    {
+      "file": "checks/isolations/cuda_memory_query_initializes_allocator_before_any_tensor_allocation-isolation.json",
+      "bytes": 14120,
+      "sha256": "d67c9b7b7aaf7b7fe52e495160de33f389d6dca66b1eab997cceaef285b87940"
+    },
+    {
+      "file": "checks/isolations/cuda_original_convrot_wide_dequantization_matches-isolation.json",
+      "bytes": 14102,
+      "sha256": "5194a6f887aaa1a26586cb7ae072cd0904a94e796c5c0837ade86accf083c129"
+    },
+    {
+      "file": "checks/isolations/moss_original_complete_dit_int8_bf16_fused_split_training_hooks_and_lifecycle_match-isolation.json",
+      "bytes": 14124,
+      "sha256": "c856c8e87bee567f48d9a3f418471a1bc6c8caf6c4303caa6faf68e156265042"
+    },
+    {
+      "file": "checks/isolations/moss_original_complete_text_conditioning_final_norm_weights_sections_padding_and_masks_match-isolation.json",
+      "bytes": 14142,
+      "sha256": "7ad2d7357c1c024c7e1c0d5e76c9d22cad8aba9e32b3f71134815f23c16bd412"
+    },
+    {
+      "file": "checks/isolations/moss_original_discrete_flow_schedules_percent_mapping_and_model_vae_memory_estimates_match-isolation.json",
+      "bytes": 14136,
+      "sha256": "c2200406c2e5e59df09b382b9f268bdab90c28713dec494ab3cd83615345ef30"
+    },
+    {
+      "file": "checks/isolations/moss_original_flux2_diffusers_checkpoint_key_shape_and_storage_conversion_matches-isolation.json",
+      "bytes": 14133,
+      "sha256": "6adb8d4288cc9babe023a17b5583d7f0766de68454eedefaf4980d84534670b7"
+    },
+    {
+      "file": "checks/isolations/moss_original_flux2_vae_encode_decode_bn_packing_persistent_buffer_dtypes_and_manual_casts_match-isolation.json",
+      "bytes": 14137,
+      "sha256": "316d83cc6ad01c3acdc77d19fb1a77484f2ff84cb8e28c0f5551d6575dc0bc42"
+    },
+    {
+      "file": "checks/isolations/moss_original_flux_vae_attention_memory_slicing_typed_failures_and_retry_lifetimes_match-isolation.json",
+      "bytes": 14139,
+      "sha256": "11f3b7173ffb626168cb407cb489f318e8c19de9304e8b494f31f360b510109b"
+    },
+    {
+      "file": "checks/isolations/moss_original_qwen35_chunked_delta_prefill_padding_dtype_and_recurrent_state_match-isolation.json",
+      "bytes": 14125,
+      "sha256": "0e959eee2bec05cee4026fae26e7bc340a9cf9b9a67286e338474efaf687cbbf"
+    },
+    {
+      "file": "checks/isolations/moss_original_qwen35_hybrid_prefill_full_attention_gqa_int8_bf16_masks_and_input_lifetime_match-isolation.json",
+      "bytes": 14137,
+      "sha256": "8ecb3c84f26a05db8a7f3eef75a8ac813064fa858bbbc9a214bb064621070286"
+    },
+    {
+      "file": "checks/isolations/moss_original_qwen35_tokenizer_bpe_trim_thinking_templates_images_and_padding_match-isolation.json",
+      "bytes": 14130,
+      "sha256": "ae96ed90f2c23636efa3403a248dfa996b862b0cb72f62b833ff85f2259adc30"
+    },
+    {
+      "file": "checks/isolations/original_comfy_attention_attributes_state_dict_bytes_and_static_memory_ownership_match-isolation.json",
+      "bytes": 14138,
+      "sha256": "55deb95a25efbbd8ab245c5ef25638b28058814aa81db2cce1023d4e3ce6741f"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_all_unicode_scalar_nfc_and_contextual_regex_hashes_match-isolation.json",
+      "bytes": 14125,
+      "sha256": "4a2bf2b6e6630e92f8bc8262c69005e3eeb1b98a70b9fdfd4744a5bf927105a9"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_beta_schedules_quantiles_duplicates_and_errors_match-isolation.json",
+      "bytes": 14120,
+      "sha256": "c12638172610fce7b836b35e1c55a48ca1a9a55ffe3eeb06fc81ff6b6463695d"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_bf16_cpu_and_mixed_weights_preserve_cuda_forward_bytes-isolation.json",
+      "bytes": 14121,
+      "sha256": "8f07f07a3db6d18178e4685e0b16cdaeaf6d229ee84b9fa06ad7423bf31f5a9f"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_boxed_aten_preserves_oom_and_accelerator_recovery_types-isolation.json",
+      "bytes": 14124,
+      "sha256": "2b61a3a356f2f61292e700bb59233fcf9bc8b170ba07bffae9d4d32b6612a166"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_c10_oom_type_accelerator_code_and_plain_errors_remain_distinct-isolation.json",
+      "bytes": 14132,
+      "sha256": "6e9cdeb346b8b7e01e6d786d2ce055f87eb14aeda2a542d9c980e537e323cf16"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_checkpoint_aimdo_types_offsets_errors_and_storage_lifetime_match-isolation.json",
+      "bytes": 14129,
+      "sha256": "b6a6496bde55d60d4f8e1cb9d6343f35bd4985be7268e5390d5d22951b80f138"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_comfy_sdpa_small_large_gqa_and_backend_state_match-isolation.json",
+      "bytes": 14115,
+      "sha256": "6ac1e9bae5bcfce8ba0ce7b9687818ccef779b8dab83bf2b4d0e29f15b46edaf"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_complete_dit_bf16_int8_turbo_hooks_cache_and_attention_match-isolation.json",
+      "bytes": 14131,
+      "sha256": "438ebafb890db30ef840d3ad62db95a4ca46d3254c8de5703a2d91d233ddedde"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_complete_dit_fp16_fp32_hooks_cache_and_attention_match-isolation.json",
+      "bytes": 14125,
+      "sha256": "742a6eb37c375f942ff375e16d91718052bf8841fed45f600df545cb1a2dfe7f"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_complete_resident_parameter_loading_matches-isolation.json",
+      "bytes": 14108,
+      "sha256": "becc40893f560cbe4409844788f98cc561d7efb0eb83568a160e3a8b6de6fb99"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_component_math_sequences_and_int8_bf16_turbo_projections_match-isolation.json",
+      "bytes": 14129,
+      "sha256": "507f3f5cef76a5a97761c6136fc51a0d3735c0d0513cb2828a4e3c84993b898e"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_component_nonleaf_parameters_buffers_and_dtype_policies_match-isolation.json",
+      "bytes": 14130,
+      "sha256": "8d7761d2ff1c3e07f803e0b2df76f5d30a8147ec3ab3488c0b9c03b00af35fd7"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_embedding_checkpoint_scales_convrot_and_aliases_match-isolation.json",
+      "bytes": 14118,
+      "sha256": "3d8e3fab76cf5233da9b7332684b02b318689d83fc0e2d2c0e7c0ca21798afa8"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_er_sde_const_stages_noise_and_full_histories_match-isolation.json",
+      "bytes": 14118,
+      "sha256": "765ecccef9a906b1e674584a1af31a54d5fd0c4419030083612021d89db4e9cc"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_execution_contexts_and_sampler_grad_state_match-isolation.json",
+      "bytes": 14114,
+      "sha256": "c17de24777e55f393fad9f83be1b8ad8db7985b23d02b05e75ed99d0740c2387"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_flux_const_schedules_noise_rng_and_euler_histories_match-isolation.json",
+      "bytes": 14124,
+      "sha256": "33c6abbc4babc900868d97f58eb4a86db8ac0b59a6f53f2f54b597e104505e2c"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_full_area_cfg_condition_batches_memory_and_order_match-isolation.json",
+      "bytes": 14117,
+      "sha256": "84a18ae47f6f28fc4ca509170dc6282927f3d56c59cd6d0db61677f75be1b006"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_image_spans_system_filter_keep_vision_and_slots_match-isolation.json",
+      "bytes": 14128,
+      "sha256": "c22c43d30de4fcd24c44c3868410d4a9764df8b6fdacc0e29159a655bae50593"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_image_vae_memory_batches_oom_retry_and_failure_classes_match-isolation.json",
+      "bytes": 14130,
+      "sha256": "b3de9305833679688fd105c15c72b4d0bf7eb480c6466b1d384aa73553b3909d"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_independent_component_dtypes_and_constructor_grad_flags_match-isolation.json",
+      "bytes": 14130,
+      "sha256": "769dd76d0c91e659425d2695f8d3f0f06b76adfef4b18df3d38cedfc4d4fb4b1"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_int8_offload_inventory_and_lazy_linear_match-isolation.json",
+      "bytes": 14108,
+      "sha256": "f3e36b5e7bf575e7244c4222d251dfbb8c1be2e49fee3d1ac7b470c5bc3f1514"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_logical_shape_detection_preserves_fused_split_and_prefix_rules-isolation.json",
+      "bytes": 14129,
+      "sha256": "2b6ffc24574d9b57c14ed57ee12b88031ef002ff76e7fd359275d6deb4dea4a5"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_lora_loading_aliases_override_precedence_and_key_seeds_match-isolation.json",
+      "bytes": 14124,
+      "sha256": "df81c6a5b790e986ed7086aa938571ff2e637ac20e34f02741d9698163acc343"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_lora_patch_owner_restores_backup_values_between_selections-isolation.json",
+      "bytes": 14122,
+      "sha256": "37d156c5f88c2bbdb7ad166ad008900352c11e791dbf2204c7f311367822b50d"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_lora_registry_patch_math_dora_offsets_and_rounding_match-isolation.json",
+      "bytes": 14120,
+      "sha256": "1c9de2691b6d76fa027a6cd92d1db6c875a2bb70b47ebbb98c674c67b3a6fd9b"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_lora_static_fp16_patch_int8_convrot_requantization_matches-isolation.json",
+      "bytes": 14122,
+      "sha256": "42b236d510e2dbebc1fe0d14c0d0731e8bc63b4ffdeff97717adf1d0cb62e5f8"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_multimodal_positions_sorted_deepstack_and_mask_match-isolation.json",
+      "bytes": 14127,
+      "sha256": "da43a99478789a6e60ab2a9bc275f0def8c8ec30eb99756923d94c1998c7d189"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_pillow_lanczos_alpha_reference_geometry_and_vae_inputs_match-isolation.json",
+      "bytes": 14136,
+      "sha256": "8ab4e025b58fbe0794576cadddeb52feaea6602fee612a168460098210245136"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_prefix_cache_selection_preserves_memory_thresholds_and_policy-isolation.json",
+      "bytes": 14132,
+      "sha256": "0efa9110b0e258911bbc131d2a9b57ac74d5385e7420dbb0889525ad258cbd96"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_quantized_checkpoint_module_parameters_and_policy_match-isolation.json",
+      "bytes": 14120,
+      "sha256": "e9452a1a37489d34a6590f1575965f7a4f05fe3b0b6da1b9c95957a47dcdf7bc"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_qwen3vl_complete_multimodal_expansion_language_and_filter_match-isolation.json",
+      "bytes": 14133,
+      "sha256": "925aa2fea9bb74601f74e69a80f5091a9971e814b0750a0fb5b9c224fbbc14e9"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_qwen3vl_language_prefill_conditioning_and_prefinal_norm_match-isolation.json",
+      "bytes": 14133,
+      "sha256": "4c0729d1482096d0941b6565bc446a6a38e7fd08ee1ac3be15bb5ec27fdba2b1"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_qwen3vl_vision_transformer_positions_mergers_and_deepstack_match-isolation.json",
+      "bytes": 14138,
+      "sha256": "69b2e9292cd3490e1041d734e5c7b5ffb128d3eaefeea6843968396dc49e0d51"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_resident_attention_cache_services_and_cancellation_match-isolation.json",
+      "bytes": 14124,
+      "sha256": "309c67c24408c48eccb4563a0ec93f9d61e48d0cbc9b07e349c70ad86997fca9"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_sampler_buffer_lifecycle_and_full_model_accounting_match-isolation.json",
+      "bytes": 14123,
+      "sha256": "76230a8a44ff16ccf18d28eaa940c34a9590cda4c2a41cf2fa094c6000a1ffc4"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_shared_host_registration_cap_alias_and_owner_release_match-isolation.json",
+      "bytes": 14129,
+      "sha256": "5e10a8629d47a95b6fc0be3a4c2e2eabb2f0b3c452801808ad1e6273331e065e"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_shared_model_manager_order_pressure_weak_owners_and_failures_match-isolation.json",
+      "bytes": 14137,
+      "sha256": "d6ddae28dbc9b41a36a5fdbfb33ca07e02ca5b0799ccca7e3413da3aeb774c36"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_shared_static_clones_patch_switches_and_forced_cpu_patches_match-isolation.json",
+      "bytes": 14135,
+      "sha256": "1a0bc38e3f6731c20a9a0e79e0dfe56089748e246fb91f5499cb7dcfb69741a4"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_shared_static_multiple_models_partial_eviction_and_reloads_match-isolation.json",
+      "bytes": 14135,
+      "sha256": "5a1d1cc0d21df5940449e6783099703e1d9694ff9ccea6fa2740c1e26efd33ce"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_static_host_prefix_pinning_staging_and_budget_match-isolation.json",
+      "bytes": 14121,
+      "sha256": "05455a318624b20311ae52548ae6dc5f2c3ca3f58fcd322850afb65173f5fe26"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_static_host_registration_copy_and_release_match-isolation.json",
+      "bytes": 14114,
+      "sha256": "6e76e4b5cc24c7218df38a425c779aeeaf5b2239663124ce292de99477be85f2"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_static_offload_placements_unloads_and_budgets_match-isolation.json",
+      "bytes": 14118,
+      "sha256": "c1a0b4490bc2b488410b47280c07d09ecdc3126f9ddeea98a841a7c67effb29a"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_tiled_scale_feather_order_default_dtype_and_batch_match-isolation.json",
+      "bytes": 14125,
+      "sha256": "2ab918d59b881c1ffb978bba484a72713b4396161b797a3b407c4cb66978b1a4"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_tokenizer_ids_templates_padding_images_and_unicode_match-isolation.json",
+      "bytes": 14125,
+      "sha256": "9a03867c0eac1a3bfa1a6b9402276eba078f19e8646a7107747df2f0584bc239"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_vision_patching_resize_normalization_and_first_image_match-isolation.json",
+      "bytes": 14133,
+      "sha256": "8081598b2e5291a84cdea0bf2aaa220538d41cd5e45facb7ef61e1ce3053c3e7"
+    },
+    {
+      "file": "checks/isolations/qwen_image21_original_wan22_image_encode_decode_rgba_and_strips_match-isolation.json",
+      "bytes": 14110,
+      "sha256": "570bad9dcaeeeca3bcfdf68121670aa75c3720bd2b324683b800eb2833a66d33"
+    },
+    {
+      "file": "checks/moss-driver-build.log",
+      "bytes": 150,
+      "sha256": "614885549d76e170ecfe7ac379833dee92f28a2f729cef172367bde4e1d5f225"
+    },
+    {
+      "file": "checks/native-closure-audit.log",
+      "bytes": 70,
+      "sha256": "da96d89bbe64554d2ecd9275bfb6e014084dd94895e70f0cb6065deefd87b93c"
+    },
+    {
+      "file": "checks/primitives.kitchen038-provenance.json",
+      "bytes": 390,
+      "sha256": "a905d3da9e3bd61b36b805588a0da8161a86e21ae45aa9a14694b93ad450bbbd"
+    },
+    {
+      "file": "checks/reference-upgrade-final-check.log",
+      "bytes": 140776,
+      "sha256": "ce0ff78fd7c8dbfb2e5fa0cf4e6afb2951830c6003fd8d78df87c00284437180"
+    },
+    {
+      "file": "implementation-inputs.json",
+      "bytes": 118135,
+      "sha256": "4dddc7b389ed9b3994c969ff8882332e49f2dc48693a34357ee6668a88283a5f"
+    },
+    {
+      "file": "moss-1024-final-buffered/comparison.json",
+      "bytes": 26104,
+      "sha256": "c0bb28ebd7c6e06b5e5f2f8387bcdf35e32e76e95ec39f2ab2e1f7ca42ace465"
+    },
+    {
+      "file": "moss-1024-final-buffered/isolation.json",
+      "bytes": 14553,
+      "sha256": "b0043598aea2db7782845489b05a7753fa953b0ac887310f4c0cfb82efce92a5"
+    },
+    {
+      "file": "moss-1024-final-buffered/results.json",
+      "bytes": 470,
+      "sha256": "17ee8d78ea44a2bd455a09d912f81afbd77cbcaf5186ca538d4813c148850984"
+    },
+    {
+      "file": "moss-1024-source-comparison/comparison.json",
+      "bytes": 26106,
+      "sha256": "eb8c8ea73921bfe7a4670f579cd13b1680ff1f09606ff9d39e00de1e336ab956"
+    },
+    {
+      "file": "moss-1024-source-comparison/isolation.json",
+      "bytes": 14553,
+      "sha256": "56947498687b4f4a0fe33c081a5e34ee20b0608cdaa630d1573e2ed23857442a"
+    },
+    {
+      "file": "moss-1024-source-comparison/results.json",
+      "bytes": 409,
+      "sha256": "6a2321b17e1f0c3dc1fa61dc823ab842c2c48d3048313b83f9d6dd995f9e2df8"
+    },
+    {
+      "file": "moss-first-trained-fused/comparison.json",
+      "bytes": 7202,
+      "sha256": "8b4150e7c19105a8c8836b17077f155f83b0fb4c9635d9cf283ec881ca852593"
+    },
+    {
+      "file": "moss-first-trained-fused/isolation.json",
+      "bytes": 14553,
+      "sha256": "8a7d26138b39c7a77980cdb684d45bf152c34b692df2308a07cb2a0fcb3b58c4"
+    },
+    {
+      "file": "moss-first-trained-fused/results.json",
+      "bytes": 409,
+      "sha256": "f81c1b5191e13a0c8427845c7ffd858daf7f4e07943b452120c00856f3936095"
+    },
+    {
+      "file": "moss-runs/large-python/image.png",
+      "bytes": 1226761,
+      "sha256": "166a1f1c470af2b1bb022e1aa5db0decbc57660b96a0b7b27b55187c74ae208a"
+    },
+    {
+      "file": "moss-runs/large-python/memory-policy.json",
+      "bytes": 115702,
+      "sha256": "aff0c04ba67cce624a5eda630f5f90cb69b347fa2bf44084524165116618ec3d"
+    },
+    {
+      "file": "moss-runs/large-python/result.json",
+      "bytes": 35261,
+      "sha256": "e265b1cfd02b56cb48efd14aa7ff8417ac1625540b8e23242f47488d8cc8e8e6"
+    },
+    {
+      "file": "moss-runs/large-python/tensor-artifacts.json",
+      "bytes": 9516,
+      "sha256": "7c578ed9afa7c99a2d471449bb81e5e9ab8c71aa133dde12cb75cb89e17328df"
+    },
+    {
+      "file": "moss-runs/large-rust/image.png",
+      "bytes": 1789425,
+      "sha256": "1e3fd0bcf8b474e8b9032ccf7a0fb02393a69b78ef6509d8a514b8af6a83e3a2"
+    },
+    {
+      "file": "moss-runs/large-rust/memory-policy.json",
+      "bytes": 115701,
+      "sha256": "4d2580b5c21557e7c612d562d80aa594953d4207f39c5b65e17a62372b70fac0"
+    },
+    {
+      "file": "moss-runs/large-rust/result.json",
+      "bytes": 2144,
+      "sha256": "bf94122f5f46c6751fda70f0ecd370e1ddbf8b5276c2f77163bf5197e3684ce8"
+    },
+    {
+      "file": "moss-runs/large-rust/tensor-artifacts.json",
+      "bytes": 9523,
+      "sha256": "29c8b11cfc5651fe10e13f34ab4e53e5f02df832cefb0c5a4aeaeeb4d5b95043"
+    },
+    {
+      "file": "moss-runs/small-python/image.png",
+      "bytes": 88890,
+      "sha256": "39ab3a7113c2c0f8a422c2a2bcd4551abb6025299e2ece2129ee5aac4b227ace"
+    },
+    {
+      "file": "moss-runs/small-python/memory-policy.json",
+      "bytes": 104774,
+      "sha256": "ac07978f92e77df42b8913bec4492475c9f790aa4b7d3b60a1c48986c27e1774"
+    },
+    {
+      "file": "moss-runs/small-python/result.json",
+      "bytes": 31879,
+      "sha256": "6b897e32c47adf1e264cae01729e3faacd202ea3f572d6725b2799415404566c"
+    },
+    {
+      "file": "moss-runs/small-python/tensor-artifacts.json",
+      "bytes": 2006,
+      "sha256": "b97f4fc98a659ccc23c0b9043141b9526b9994bd0b2605fe29ee7f3774f5589f"
+    },
+    {
+      "file": "moss-runs/small-rust/image.png",
+      "bytes": 133622,
+      "sha256": "c25bd2b8f5eb17861e52ca082c43e5a81adae7040113f7054287440ee1a26208"
+    },
+    {
+      "file": "moss-runs/small-rust/memory-policy.json",
+      "bytes": 64389,
+      "sha256": "efe79c16a91c276f035b38a496322063a863d11176ad6b1ef496de932f0b8f86"
+    },
+    {
+      "file": "moss-runs/small-rust/result.json",
+      "bytes": 2120,
+      "sha256": "da8f821b75ccf28ea099a19d965c2ff19bfad247d3a3f010db722d6c5dfda0a5"
+    },
+    {
+      "file": "moss-runs/small-rust/tensor-artifacts.json",
+      "bytes": 2016,
+      "sha256": "1828aef15fc3351c831f6c45ea2f08a9a8e8253e918eae54c7a3792856888526"
+    },
+    {
+      "file": "preservation/frozen-pip-check.log",
+      "bytes": 1783,
+      "sha256": "d218af88012838420b2bf0198d84c92208610fb9f338481c06c52d234e398f51"
+    },
+    {
+      "file": "preservation/frozen-reference-validation.log",
+      "bytes": 781,
+      "sha256": "fd5cff73894cb4dd0fd637460e102e97b80f8f402b85de297247bbef35b0fedf"
+    },
+    {
+      "file": "preservation/pip-check.log",
+      "bytes": 1783,
+      "sha256": "d218af88012838420b2bf0198d84c92208610fb9f338481c06c52d234e398f51"
+    },
+    {
+      "file": "preservation/reference-path-edits.json",
+      "bytes": 5613,
+      "sha256": "b2157fdef7cb1ebd1268e39532d65455191fe9236960173837a48576424f7ccc"
+    },
+    {
+      "file": "preservation/reference-path-validation.json",
+      "bytes": 204,
+      "sha256": "f9832967906e4aace5971cf3a9c5d483da8516a2f9bf91a81a1f25cf7b98eb4d"
+    },
+    {
+      "file": "qwen/automatic-bf16-turbo/bf16-comparison.json",
+      "bytes": 179614,
+      "sha256": "ca973f766857fafc5ce114ac54b5c9a83be0282ae60d9b34fbc2b881ad6e36e1"
+    },
+    {
+      "file": "qwen/automatic-bf16-turbo/bf16-isolation.json",
+      "bytes": 15080,
+      "sha256": "54ebed6ea39de365234a3d4569f43a3d1ae2cdfa26e40f4fac5719b85f28d636"
+    },
+    {
+      "file": "qwen/automatic-bf16-turbo/turbo-comparison.json",
+      "bytes": 179622,
+      "sha256": "d31022998bb21986dc21a4eb59e0663c4f9f5588b6be6301f103a5fa78d8184e"
+    },
+    {
+      "file": "qwen/automatic-bf16-turbo/turbo-isolation.json",
+      "bytes": 15092,
+      "sha256": "6f17c160cf6307cda43ffc1354828a06502ae304ffeed265553a2a46511a3e11"
+    },
+    {
+      "file": "qwen/automatic-int8/int8-comparison.json",
+      "bytes": 179488,
+      "sha256": "bdbea2f2b3a6c6720437ad4e07967e04fd97cca16d3cf15a898f048a9d9f3fcd"
+    },
+    {
+      "file": "qwen/automatic-int8/int8-isolation.json",
+      "bytes": 15095,
+      "sha256": "2220142228f13dfa4eac10465042c8f2009ad13dc1219885fb10621bf4553efc"
+    },
+    {
+      "file": "qwen/recorded-placement-diagnostic/bf16-comparison.json",
+      "bytes": 179600,
+      "sha256": "807160ee6862902598683438da59b9d5c6fd02a4650f9b4f6ac6ada1860be484"
+    },
+    {
+      "file": "qwen/recorded-placement-diagnostic/bf16-isolation.json",
+      "bytes": 15080,
+      "sha256": "54ebed6ea39de365234a3d4569f43a3d1ae2cdfa26e40f4fac5719b85f28d636"
+    },
+    {
+      "file": "qwen/recorded-placement-diagnostic/bf16-original-memory-plan.json",
+      "bytes": 31788,
+      "sha256": "a2641bd76454b092b45fcde0ea4584672fd4e2aef3a4edc5ded93560ff0fdf63"
+    },
+    {
+      "file": "qwen/recorded-placement-diagnostic/turbo-comparison.json",
+      "bytes": 179609,
+      "sha256": "d336d50db75f643410ba5fb32ff349123fa695305b758847014dfbf40e321273"
+    },
+    {
+      "file": "qwen/recorded-placement-diagnostic/turbo-isolation.json",
+      "bytes": 15092,
+      "sha256": "6f17c160cf6307cda43ffc1354828a06502ae304ffeed265553a2a46511a3e11"
+    },
+    {
+      "file": "qwen/recorded-placement-diagnostic/turbo-original-memory-plan.json",
+      "bytes": 31800,
+      "sha256": "8d68e219baee159b53888a4c1922fa8ef5faaa9dad42a37fa472fea8f90f2da9"
+    }
+  ]
+}

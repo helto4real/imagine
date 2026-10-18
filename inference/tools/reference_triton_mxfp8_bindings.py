@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Original MXFP8 wrapper on initialized own storage; tails use a separate observer."""
+from reference_paths import reference_dir
 import argparse,hashlib,itertools,json,math,sys
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parent))
@@ -50,7 +51,7 @@ def capture(torch,devices,bits):
  return dict(triton_mxfp8_bindings=cases,triton_mxfp8_known_storage=known,triton_mxfp8_large=large)
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
- project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());name='comfy_kitchen/backends/triton/quantization.py';h=hashlib.sha256((a.site/name).read_bytes()).hexdigest();assert h==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
+ project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());name='comfy_kitchen/backends/triton/quantization.py';h=hashlib.sha256((a.site/name).read_bytes()).hexdigest();assert h==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
  sys.path.insert(0,str(a.site));import torch
  def bits(t):return t.detach().contiguous().reshape(-1).view(torch.uint8).cpu().tolist()
  report=capture(torch,['cpu','cuda:0'],bits);report['source_hashes']={name:h};a.output.write_text(json.dumps(report,indent=2)+'\n');print({k:len(v)for k,v in report.items()if isinstance(v,list)},flush=True)

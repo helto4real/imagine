@@ -5,6 +5,7 @@ No Torch import, model constructor, CUDA allocation or ordinary runtime data.
 Only policy inputs (including logical retention counts) are synthetic; ordering,
 LoadedModel weak ownership and all coordinator functions execute frozen source.
 """
+from reference_paths import reference_dir
 import argparse
 import ast
 import gc
@@ -20,7 +21,7 @@ p.add_argument('--comfy', type=Path, required=True)
 p.add_argument('--output', type=Path, required=True)
 a = p.parse_args()
 project = Path(__file__).resolve().parents[2]
-manifest = json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest = json.loads((reference_dir(project)/'source-manifest.json').read_text())
 path = a.comfy/'comfy/model_management.py'
 digest = hashlib.sha256(path.read_bytes()).hexdigest()
 assert digest == next(e['sha256'] for e in manifest if e['root']=='comfy' and e['path']=='comfy/model_management.py')

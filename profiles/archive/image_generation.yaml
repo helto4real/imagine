@@ -1,7 +1,7 @@
 schema_version: 1
 id: image_generation
-version: 1
-name: Qwen Image 2.1
+version: 2
+name: Qwen T2I
 description: Generate an image from text using the configured Qwen profile. Read prompt_guidance via describe_profile
   before composing the image prompt.
 prompt_guidance: 'IMAGE PROMPT REWRITING EXPERT — STRUCTURED REFERENCE SCENES

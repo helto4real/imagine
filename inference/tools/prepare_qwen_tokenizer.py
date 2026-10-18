@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Freeze Qwen vocabulary and exact reference Unicode/regex tables for Rust."""
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import json
@@ -12,9 +13,10 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--site',type=Path,required=True)
 p.add_argument('--comfy',type=Path,required=True)
 p.add_argument('--output',type=Path,required=True)
+p.add_argument('--family',choices=['qwen_image21','moss_image'],default='qwen_image21')
 a=p.parse_args()
 project=Path(__file__).resolve().parents[2]
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 sources={}
 def verify(root,name):
  path=(a.site if root=='site'else a.comfy)/name
@@ -24,11 +26,18 @@ def verify(root,name):
  return path
 a.output.mkdir(parents=True,exist_ok=True)
 for name in ['vocab.json','merges.txt','tokenizer_config.json']:
- source=verify('comfy',f'comfy/text_encoders/qwen25_tokenizer/{name}')
+ directory='qwen25_tokenizer'if a.family=='qwen_image21'else'qwen35_tokenizer'
+ source=verify('comfy',f'comfy/text_encoders/{directory}/{name}')
  shutil.copyfile(source,a.output/name)
 verify('site','transformers/models/qwen2/tokenization_qwen2.py')
 verify('site','regex/_regex.cpython-312-x86_64-linux-gnu.so')
 verify('site','regex/_regex_core.py')
+if a.family=='moss_image':
+ (a.output/'source-lock.json').write_text(json.dumps(dict(schema=1,
+     comfy_revision=json.loads((reference_dir(project)/'reference-lock.json').read_text())['comfy_revision'],
+     sha256=sources),indent=2)+'\n')
+ print('Prepared original Qwen3.5 tokenizer assets; shared locked Qwen2 Unicode/regex implementation')
+ sys.exit(0)
 sys.path.insert(0,str(a.site))
 import regex
 chars=[chr(i)for i in range(0x110000)if not 0xD800<=i<=0xDFFF]

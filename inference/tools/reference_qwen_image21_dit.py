@@ -22,7 +22,7 @@ mm.device_supports_non_blocking=lambda device:False
 mm.is_device_cpu=lambda device:device.type=='cpu'
 # All parameters are resident: no offload stream is requested by cast_bias_weight.
 comfy.memory_management=NS(aimdo_enabled=False)
-definitions('comfy/ops.py',['cast_bias_weight','uncast_bias_weight','CastBiasWeightContext','_swiglu_eager','_input_act_weight','_eager_input_act','_linear_residual','_fp16_linear_wanted','linear_input_act','linear_input_act_'])
+definitions('comfy/ops.py',['cast_bias_weight','uncast_bias_weight','CastBiasWeightContext','_swiglu_eager','_situ_eager','_input_act_weight','_eager_input_act','_linear_residual','_fp16_linear_wanted','_try_quantized_linear_input_act','linear_input_act','linear_input_act_'])
 namespace.update(interrupt_processing=False,interrupt_processing_mutex=threading.RLock())
 definitions('comfy/model_management.py',['InterruptProcessingException','throw_exception_if_processing_interrupted'])
 mm.throw_exception_if_processing_interrupted=namespace['throw_exception_if_processing_interrupted']
@@ -34,7 +34,7 @@ def count_operation():
  if operation_state.interrupt_at==operation_state.count:namespace['interrupt_processing']=True
  original_run_every_op()
 namespace['run_every_op']=count_operation
-namespace['INPUT_ACT_EAGER']={'swiglu':namespace['_swiglu_eager'],'gelu_tanh':lambda x:torch.nn.functional.gelu(x,approximate='tanh')}
+namespace['INPUT_ACT_EAGER']={'swiglu':namespace['_swiglu_eager'],'situ':namespace['_situ_eager'],'gelu_tanh':lambda x:torch.nn.functional.gelu(x,approximate='tanh')}
 ops=NS(**{n:namespace[n]for n in ['cast_bias_weight','uncast_bias_weight','linear_input_act']})
 comfy.ops=ops
 # Execute the original nested mixed-precision Linear methods on initialized

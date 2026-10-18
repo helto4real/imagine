@@ -1,0 +1,15 @@
+{
+  "positive_slots": [],
+  "negative_slots": [],
+  "positive_shape": [
+    1,
+    25,
+    4096
+  ],
+  "negative_shape": [
+    1,
+    9,
+    4096
+  ],
+  "negative_attention_mask": false
+}

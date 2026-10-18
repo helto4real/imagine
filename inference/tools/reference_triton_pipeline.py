@@ -4,6 +4,7 @@
 Development oracle only. TTIR frontend/general runtime specialization is not
 implemented by this tool, and saved IR is not a supported-shape runtime cache.
 """
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import json
@@ -16,7 +17,7 @@ parser.add_argument('--site',type=Path,required=True)
 parser.add_argument('--output',type=Path,required=True)
 args=parser.parse_args()
 project=Path(__file__).resolve().parents[2]
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 source_paths=['triton/backends/nvidia/compiler.py','triton/compiler/compiler.py',
               'comfy_kitchen/backends/triton/quantization.py']
 hashes={}

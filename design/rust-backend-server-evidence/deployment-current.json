@@ -1,0 +1,23 @@
+{
+  "binary": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/target/debug/imagine-worker",
+  "environment": {
+    "IMAGINE_AIMDO_LIBRARY": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/aimdo/aimdo.so",
+    "IMAGINE_KITCHEN_LIBRARY": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/kitchen-manylinux/libimagine_kitchen.so",
+    "IMAGINE_PILLOW_LIBRARY": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/pillow/libimagine_pillow.so",
+    "IMAGINE_TRITON_COMPILER_PROFILE": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/runtime/triton-compiler-profile.json",
+    "IMAGINE_TRITON_DRIVER_LIBRARY": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/triton-driver/libimagine_triton_driver.so",
+    "IMAGINE_TRITON_FRONTEND_CUBINS": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/triton-frontend/standalone",
+    "LD_LIBRARY_PATH": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib",
+    "OMP_NUM_THREADS": "2"
+  },
+  "files": {
+    "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/aimdo/aimdo.so": "8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59",
+    "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/kitchen-manylinux/libimagine_kitchen.so": "f8c0e344949a9283ff5e0c5bb392f8c30e40b0e07b1a079e64266afe6908a898",
+    "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/pillow/libimagine_pillow.so": "095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3",
+    "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/runtime/triton-compiler-profile.json": "f5c036937a02cc570fc9fb4e82fd8167a8d1720641cc0f9fa583a51d33e098e3",
+    "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/target/debug/imagine-worker": "95c1a2405fe284c521394b3b0d413e8ca7e07840d84feaf088643c1478eb70a6",
+    "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/triton-driver/libimagine_triton_driver.so": "bd124a1b2de3c096e3df0e472699c8734b5f456f58f6201454d6aee566121aeb"
+  },
+  "reference_revision": "446ef4e005fc7134d53ce6869ebd77d2134cd39c",
+  "schema": 1
+}

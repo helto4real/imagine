@@ -4,11 +4,12 @@
 The engine consumes compiled Rust, never this generator, Python, source AST,
 or captured IR. Type promotion and lowering live in triton_frontend_rope.rs.
 """
+from reference_paths import reference_dir
 import argparse, ast, hashlib, json
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--source',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
 project=Path(__file__).resolve().parents[2]
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 expected=next(e['sha256']for e in manifest if e['root']=='site'and e['path']=='comfy_kitchen/backends/triton/rms_rope.py')
 assert hashlib.sha256(a.source.read_bytes()).hexdigest()==expected
 module=ast.parse(a.source.read_text());main=next(n for n in module.body if isinstance(n,ast.FunctionDef)and n.name=='rms_rope_kernel')

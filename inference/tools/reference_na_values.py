@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Own CPU-only eager NA argument and index conversion probes."""
+from reference_paths import reference_dir
 import argparse,hashlib,importlib,json,sys
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--device',choices=['cpu','cuda'],default='cpu');a=p.parse_args();project=Path(__file__).resolve().parents[2];sys.path.insert(0,str(project/'inference/tools'));from reference_checks import reject_resource_failure
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());name='comfy_kitchen/backends/eager/na.py';assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());name='comfy_kitchen/backends/eager/na.py';assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
 sys.path.insert(0,str(a.site));import torch
 from reference_layout_completion import encoder
 encode=encoder(torch,lambda t:t.detach().contiguous().reshape(-1).view(torch.uint8).cpu().tolist());fn=importlib.import_module('comfy_kitchen.backends.eager.na').na3d;cases=[]

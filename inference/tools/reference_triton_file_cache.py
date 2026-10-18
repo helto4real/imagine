@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Original local FileCacheManager on newly owned, synthetic filesystem state."""
+from reference_paths import reference_dir
 import argparse,hashlib,itertools,json,os,sys,tempfile
 from pathlib import Path
 
@@ -67,5 +68,5 @@ def capture(workspace):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--workspace',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-    project=Path(__file__).resolve().parents[2];name='triton/runtime/cache.py';h=hashlib.sha256((a.site/name).read_bytes()).hexdigest();manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());assert h==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
+    project=Path(__file__).resolve().parents[2];name='triton/runtime/cache.py';h=hashlib.sha256((a.site/name).read_bytes()).hexdigest();manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());assert h==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
     sys.path.insert(0,str(a.site));report=capture(a.workspace);report['source_hashes']={name:h};a.output.write_text(json.dumps(report,indent=2)+'\n');print(f"{len(report['triton_file_cache'])} local-cache scenarios",flush=True)

@@ -1,4 +1,5 @@
 """Defined positive-K SM89 full typed INT8 activation/route selection oracle."""
+from reference_paths import reference_dir
 from reference_cuda_int8_m1 import operands as base_operands
 from reference_checks import reject_resource_failure
 
@@ -25,9 +26,9 @@ def capture(torch,native,bits):
        for dtype in [torch.float32,torch.float16,torch.bfloat16]:
         for out in [torch.float32,torch.float16,torch.bfloat16]:
          for shape,n,rotate,group in geometries:
-          for act in [None,'gelu_tanh','swiglu','rms_norm']:
+          for act in [None,'gelu_tanh','swiglu','rms_norm','situ']:
            for mode in ['plain','full']+(['missing_norm_weight'] if act=='rms_norm' else []):
-            raw_shape=[*shape[:-1],shape[-1]*(2 if act=='swiglu' else 1)]
+            raw_shape=[*shape[:-1],shape[-1]*(2 if act in ('swiglu','situ') else 1)]
             case=dict(dtype=str(dtype),output_dtype=str(out),shape=raw_shape,weight_k=shape[-1],n=n,convrot=rotate,group=group,
                 mode=mode,activation=act,disable_cutlass=disabled)
             x,w,ws,bias,r,rs,aw=operands(torch,case)
@@ -35,8 +36,8 @@ def capture(torch,native,bits):
             for name in ['int8_linear_m1','int8_gemv_dequant','quantize_int8_rowwise','quantize_int8_rowwise_convrot','quantize_int8_rowwise_convrot64',
                          'cutlass_int8_dequant','cutlass_int8_dequant_residual','cublas_gemm_int8','dequantize_int8_linear']:
                 saved[name]=getattr(native._C,name)
-                def traced(*args,_name=name):
-                    item=dict(name=_name);calls.append(item);value=saved[_name](*args)
+                def traced(*args,_name=name,**kwargs):
+                    item=dict(name=_name);calls.append(item);value=saved[_name](*args,**kwargs)
                     if _name.startswith('cutlass_'):item['returned']=value
                     return value
                 setattr(native._C,name,traced)
@@ -51,7 +52,7 @@ def capture(torch,native,bits):
                 for name,value in saved.items():setattr(native._C,name,value)
             case['native_calls']=calls;cases.append(case)
     finally:native._DISABLE_CUTLASS_INT8=policy
-    assert len(cases)==1134
+    assert len(cases)==1386
     return dict(cuda_int8_activation=cases)
 
 
@@ -60,7 +61,7 @@ if __name__=='__main__':
     from pathlib import Path
     parser=argparse.ArgumentParser();parser.add_argument('--site',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args();project=Path(__file__).resolve().parents[2]
-    manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={}
+    manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={}
     for name in ['comfy_kitchen/backends/cuda/__init__.py','comfy_kitchen/backends/_activations.py']:
         h=hashlib.sha256((args.site/name).read_bytes()).hexdigest()
         assert h==next(x['sha256'] for x in manifest if x['root']=='site' and x['path']==name);hashes[name]=h

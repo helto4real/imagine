@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "purpose": "Bounded trained MOSS SFT INT8 ConvRot text-to-image parity control, not a quality preset",
+  "variant": "int8_convrot",
+  "checkpoints": {
+    "dit": "diffusion_models/moss/moss_image_sft_int8_convrot.safetensors",
+    "text": "text_encoders/moss/qwen3.5_9b_int8_convrot.safetensors",
+    "vae": "vae/flux.2/flux2-vae.safetensors"
+  },
+  "source_configuration": {
+    "static_patcher": true,
+    "disable_comfy_compiler": true,
+    "disable_async_offload": true,
+    "force_full_load_per_component": false,
+    "unload_between_components": true,
+    "attention": "pytorch",
+    "checkpoint_attention_preferences": true,
+    "kitchen_triton": false,
+    "dit_dtype": "bfloat16",
+    "dit_fused_qkv": true,
+    "text_storage_dtype": "bfloat16",
+    "text_compute_dtype": "float32",
+    "text_mtp_weights": true,
+    "vae_dtype": "bfloat16"
+  },
+  "synthetic_prompt": "A blue butterfly resting on a yellow flower, soft daylight, detailed natural photograph.",
+  "negative_prompt": "",
+  "width": 320,
+  "height": 224,
+  "batch": 1,
+  "seed": 3061383787,
+  "steps": 4,
+  "sampler": "euler",
+  "scheduler": "normal",
+  "shift": 5.0,
+  "multiplier": 1.0,
+  "cfg": 3.5
+}

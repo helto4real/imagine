@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Original flexible RoPE wrappers, initialized synthetic storage only."""
+from reference_paths import reference_dir
 import argparse,hashlib,itertools,json,math,sys
 from pathlib import Path
 from reference_layout_completion import encoder
@@ -95,7 +96,7 @@ def capture_known_storage(torch,bits):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--known-storage-only',action='store_true');a=p.parse_args()
-    manifest=json.loads((Path(__file__).resolve().parents[2]/'design/reference-local/source-manifest.json').read_text());hashes={}
+    manifest=json.loads((reference_dir(Path(__file__).resolve().parents[2])/'source-manifest.json').read_text());hashes={}
     for name in ['comfy_kitchen/backends/triton/rope.py','comfy_kitchen/_rope_utils.py']:
         h=hashlib.sha256((a.site/name).read_bytes()).hexdigest();assert h==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name);hashes[name]=h
     sys.path.insert(0,str(a.site));import torch

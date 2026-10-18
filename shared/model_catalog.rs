@@ -2,6 +2,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, path::PathBuf};
+pub const MOSS_GROUP: &str = "moss-image";
 pub const QWEN_GROUP: &str = "qwen-image-2.1";
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ModelFile {

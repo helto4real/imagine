@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Frozen dynamic public arguments on exclusively initialized synthetic tensors."""
+from reference_paths import reference_dir
 import argparse,hashlib,importlib,json,sys,subprocess,tempfile
 from pathlib import Path
 from reference_checks import reject_resource_failure
-p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--cold-jit',action='store_true');a=p.parse_args();project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--cold-jit',action='store_true');a=p.parse_args();project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 for name in ['triton/runtime/jit.py','comfy_kitchen/backends/triton/na.py','comfy_kitchen/backends/triton/quantization.py','comfy_kitchen/backends/eager/quantization.py','comfy_kitchen/backends/cuda/__init__.py']:
  assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
 sys.path.insert(0,str(a.site));import torch

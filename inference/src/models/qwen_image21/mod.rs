@@ -42,6 +42,7 @@ pub use dit::*;
 pub use geometry::{
     PositionEncoding, Segment, Sequence, SequenceProjections, TextProjection, build_sequence,
 };
+pub(crate) use layers::embedding_rows;
 pub use layers::{Linear, Modulation};
 pub use numeric::{
     LatentNormalization, gated_residual, modulated_norm, prefix_cache_key, round_timesteps,

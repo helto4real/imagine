@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "workspace_passed": 150,
+  "workspace_ignored": 2,
+  "test_threads": 2,
+  "clippy_workspace": "passed",
+  "clippy_inference_all_targets": "passed",
+  "binary_privacy_tests": 2,
+  "trained_http_pixel_comparisons": [
+    "moss",
+    "qwen-int8",
+    "qwen-turbo",
+    "qwen-t2i",
+    "qwen-empty-negative"
+  ],
+  "manual_browser_or_native_window": false,
+  "ordinary_server_restarted": false,
+  "committed": false,
+  "focused_pipe_tests": 3
+}

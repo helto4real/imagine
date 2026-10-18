@@ -6,6 +6,7 @@ ordinary runtime directory is mounted. Primitive mode mounts no weights;
 explicit Qwen-driver mode adds its three authorized models and selected,
 hash-checked reference tensor fixtures when the registered profile requests them.
 """
+from reference_paths import reference_dir
 import argparse
 import hashlib
 import json
@@ -27,10 +28,10 @@ parser.add_argument('--backend-fixture',type=Path,required=True)
 parser.add_argument('--test-filter',help='Run one exact test; require one executed success')
 parser.add_argument('--pillow-library',type=Path,help='Verified original-source Pillow buffer ABI; no interpreter')
 parser.add_argument('--aimdo-library',type=Path,help='Explicit isolated copy of the frozen AIMDO ELF')
-parser.add_argument('--qwen-driver-profile',type=Path,help='Explicit frozen first-image development profile; switches from primitive tests to the standalone driver')
-parser.add_argument('--qwen-model-root',type=Path,help='Authorized local model root; mount only the three profile checkpoint files read-only')
-parser.add_argument('--qwen-mode',choices=['preflight','load-check','run'],default='preflight')
-parser.add_argument('--qwen-run-name',default='qwen21-first-image',help='Fresh isolated output directory name; no paths')
+parser.add_argument('--qwen-driver-profile','--driver-profile',dest='qwen_driver_profile',type=Path,help='Explicit frozen first-image development profile; switches from primitive tests to the standalone driver')
+parser.add_argument('--qwen-model-root','--model-root',dest='qwen_model_root',type=Path,help='Authorized local model root; mount only the three profile checkpoint files read-only')
+parser.add_argument('--qwen-mode','--driver-mode',dest='qwen_mode',choices=['preflight','load-check','run'],default='preflight')
+parser.add_argument('--qwen-run-name','--run-name',dest='qwen_run_name',default='qwen21-first-image',help='Fresh isolated output directory name; no paths')
 args=parser.parse_args()
 project=Path(__file__).resolve().parents[2]
 driver_mounts=[];driver_args=None;model_files=[];reference_files=[]
@@ -38,7 +39,7 @@ if args.qwen_driver_profile is not None:
     if args.test_filter or args.qwen_model_root is None or args.aimdo_library is None:
         parser.error('Driver mode requires explicit model root/AIMDO and cannot use a primitive test filter')
     profile=json.loads(args.qwen_driver_profile.read_text())
-    assert profile in [json.loads((project/'inference/profiles'/name).read_text())for name in ['qwen21-first-int8.json','qwen21-1600x896-int8.json','qwen21-1600x896-40steps-int8.json','qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8-seed3061383787.json','qwen21-lora-int8.json','qwen21-lora-bf16.json','qwen21-lora-turbo.json','qwen21-lora-text-int8.json','qwen21-lora-stack-int8.json','qwen21-lora-portrait-1600-int8.json','qwen21-lora-int8-bf16-encoder.json','qwen21-lora-bf16-bf16-encoder.json','qwen21-lora-turbo-bf16-encoder.json','qwen21-cfg-er-sde-int8.json','qwen21-cfg-er-sde-bf16.json','qwen21-cfg-er-sde-turbo.json','qwen21-tiled-int8.json']],'Explicit registered comparison profile required'
+    assert profile in [json.loads((project/'inference/profiles'/name).read_text())for name in ['qwen21-first-int8.json','qwen21-1600x896-int8.json','qwen21-1600x896-40steps-int8.json','qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8-seed3061383787.json','qwen21-lora-int8.json','qwen21-lora-bf16.json','qwen21-lora-turbo.json','qwen21-lora-text-int8.json','qwen21-lora-stack-int8.json','qwen21-lora-portrait-1600-int8.json','qwen21-lora-int8-bf16-encoder.json','qwen21-lora-bf16-bf16-encoder.json','qwen21-lora-turbo-bf16-encoder.json','qwen21-cfg-er-sde-int8.json','qwen21-cfg-er-sde-bf16.json','qwen21-cfg-er-sde-turbo.json','qwen21-tiled-int8.json','moss-first-int8.json','moss-1024x1024-int8.json']],'Explicit registered comparison profile required'
     for rel in profile['checkpoints'].values():
         relative=Path(rel);assert not relative.is_absolute()and'..'not in relative.parts
         source=args.qwen_model_root/relative;assert source.is_file(),source
@@ -71,7 +72,7 @@ if args.qwen_driver_profile is not None:
     if args.qwen_mode=='run':driver_args+=['--run']
 elif args.qwen_model_root is not None or args.qwen_mode!='preflight':
     parser.error('Qwen root/mode require --qwen-driver-profile')
-lock=json.loads((project/'design/reference-local/native-linkage-lock.json').read_text())
+lock=json.loads((reference_dir(project)/'native-linkage-lock.json').read_text())
 objects={Path(x['path']):x for x in lock['distribution_objects']}
 files=[Path(p) for p in lock['initial_target_linkage_audit']['package_object_closure'] if '/torch/lib/' in p or '/nvidia/' in p]
 # cuDNN, NVRTC builtins and Torch/cuSOLVER linear algebra are dlopen dependencies, invisible to
@@ -114,7 +115,7 @@ for library in compiler_profile['external_libraries']:
 source=compiler_profile['source_file'];source_copy=Path(source['copy']);source_path=Path(source['path'])
 assert source_path==args.site/'comfy_kitchen/backends/triton/quantization.py'
 source_hash=hashlib.file_digest(source_copy.open('rb'),'sha256').hexdigest();assert source_hash==source['sha256']
-source_manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+source_manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 assert source_hash==next(e['sha256']for e in source_manifest if e['root']=='site'and e['path']=='comfy_kitchen/backends/triton/quantization.py')
 assert source_copy.stat().st_size==source['size']and source_copy.stat().st_mtime_ns==source['mtime_ns']
 triton_mounts+=['--ro-bind',str(source_copy),str(source_copy),'--ro-bind',str(source_copy),str(source_path)]
@@ -220,5 +221,5 @@ report={'schema':1,'result':'passed','interpreter_available':False,'comfyui_tree
     'backend_fixture_sha256':hashlib.file_digest(args.backend_fixture.open('rb'),'sha256').hexdigest(),
     'fixture_sha256':hashlib.file_digest(fixture.open('rb'),'sha256').hexdigest()}
 report_name='isolation-filtered-result.json' if args.test_filter else 'isolation-result.json'
-if driver_args is not None:report_name='qwen21-'+args.qwen_mode+'-isolation.json'
+if driver_args is not None:report_name=('moss-'if profile.get('purpose','').startswith('Bounded trained MOSS')else'qwen21-')+args.qwen_mode+'-isolation.json'
 (args.root/'runtime'/report_name).write_text(json.dumps(report,indent=2)+'\n')

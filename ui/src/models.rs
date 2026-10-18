@@ -2,9 +2,7 @@
 use super::*;
 use crate::{
     icons::Icon,
-    model_catalog::{
-        Components, LibrarySettings, LibrarySnapshot, QWEN_GROUP, SelectedLora, Selection,
-    },
+    model_catalog::{Components, LibrarySettings, LibrarySnapshot, SelectedLora, Selection},
     settings::{LoraSetting, ModelGroupSettings},
 };
 use anyhow::{Result, bail};
@@ -80,6 +78,15 @@ impl ImagineApp {
         if self.group_settings().variant == id {
             return;
         }
+        if let Some(group) = self
+            .models
+            .catalog
+            .as_ref()
+            .and_then(|c| c.models.iter().find(|m| m["id"] == id))
+            .and_then(|m| m["group"].as_str())
+        {
+            self.prefs.model_group = group.to_owned();
+        }
         self.prefs
             .model_groups
             .entry(self.prefs.model_group.clone())
@@ -87,12 +94,21 @@ impl ImagineApp {
             .variant = id;
         self.metadata = self.selected_model().cloned();
         if let Some(meta) = &self.metadata {
+            self.prefs.generation.sampler = None;
+            self.prefs.generation.scheduler = None;
             if let Some(steps) = meta["defaults"]["sampling"]["steps"].as_u64() {
                 self.prefs.generation.steps = steps as u32;
             }
             if let Some(cfg) = meta["defaults"]["sampling"]["cfg_scale"].as_f64() {
                 self.prefs.generation.cfg_scale = cfg as f32;
             }
+        }
+        if self
+            .metadata
+            .as_ref()
+            .is_some_and(|m| m["constraints"]["loras"] == false)
+        {
+            self.models.open = false;
         }
         self.save_preferences();
     }
@@ -216,7 +232,16 @@ impl ImagineApp {
                     .iter()
                     .filter(|l| l.enabled)
                     .count();
-                if helto::icon_button(ui, Icon::Lora, "LoRAs", self.models.open).clicked() {
+                if ui
+                    .add_enabled_ui(
+                        self.metadata
+                            .as_ref()
+                            .is_none_or(|m| m["constraints"]["loras"] != false),
+                        |ui| helto::icon_button(ui, Icon::Lora, "LoRAs", self.models.open),
+                    )
+                    .inner
+                    .clicked()
+                {
                     self.models.open = !self.models.open;
                 }
                 if count > 0 {
@@ -290,7 +315,7 @@ impl ImagineApp {
                             for file in library.files.iter().filter(|f| {
                                 f.kind == kind
                                     && f.supported
-                                    && f.group.as_deref() == Some(QWEN_GROUP)
+                                    && f.group.as_deref() == model["group"].as_str()
                             }) {
                                 ui.selectable_value(selected, file.id.clone(), &file.path);
                             }

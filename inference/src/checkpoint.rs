@@ -369,7 +369,8 @@ impl<'de> Visitor<'de> for OrderedHeader {
         Ok(items)
     }
 }
-fn parse_header(bytes: &[u8], path: &Path) -> Result<Vec<(String, Json)>, Error> {
+/// Header-only parsing preserves Python dictionary order and duplicate updates.
+pub fn parse_header(bytes: &[u8], path: &Path) -> Result<Vec<(String, Json)>, Error> {
     use serde::de::Deserializer;
     let text = std::str::from_utf8(bytes).map_err(|_| gap("Python UTF-8 decoder diagnostics"))?;
     let mut decoder = serde_json::Deserializer::from_str(text);

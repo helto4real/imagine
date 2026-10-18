@@ -611,8 +611,9 @@ impl<B: ModelBuffers> StaticOffload<B> {
         sampling: B,
     ) -> Result<Self, Error> {
         let modules = prepare_offload_modules(&parameters, modules)?;
-        let model_size =
-            modules.iter().map(|m| m.module_bytes).sum::<u64>() + sampling.buffer_bytes();
+        let model_size = modules.iter().map(|m| m.module_bytes).sum::<u64>()
+            + sampling.buffer_bytes()
+            + parameters.attention_state_dict_bytes();
         Ok(Self {
             parameters,
             patch_owner: crate::patching::PatchOwner::new(),

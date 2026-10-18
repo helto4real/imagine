@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Original registered Python signatures and binding-only synthetic failures."""
+from reference_paths import reference_dir
 import argparse,hashlib,inspect,json,subprocess,sys
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--rust-output',type=Path);p.add_argument('--check-rust',type=Path);a=p.parse_args();project=Path(__file__).resolve().parents[2];manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
+p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--rust-output',type=Path);p.add_argument('--check-rust',type=Path);a=p.parse_args();project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
 for name,expected in hashes.items():
  if name.startswith('comfy_kitchen/')and name.endswith('.py'):assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==expected
 sys.path.insert(0,str(a.site));from comfy_kitchen.backends import eager,cuda,triton

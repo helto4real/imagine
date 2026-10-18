@@ -1,6 +1,7 @@
+from reference_paths import reference_dir
 import argparse,hashlib,json,sys
 from pathlib import Path
-p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();project=Path('/home/thhel/ChatGPT/imagine');manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text())
+p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();project=Path('/home/thhel/ChatGPT/imagine');manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text())
 for name in ['triton/compiler/compiler.py','triton/runtime/jit.py','comfy_kitchen/backends/triton/quantization.py']:
  assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==next(e['sha256']for e in manifest if e['root']=='site'and e['path']==name)
 sys.path.insert(0,str(a.site));import torch

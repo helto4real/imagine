@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "comfy_revision": "446ef4e005fc7134d53ce6869ebd77d2134cd39c",
+  "sha256": {
+    "comfy/comfy/text_encoders/qwen35_tokenizer/vocab.json": "ce99b4cb2983d118806ce0a8b777a35b093e2000a503ebde25853284c9dfa003",
+    "comfy/comfy/text_encoders/qwen35_tokenizer/merges.txt": "a9d356d7bdf1ef4949e3e748e95b8e10ad9d4e2e838eddc38a0a7b6b94d1db8d",
+    "comfy/comfy/text_encoders/qwen35_tokenizer/tokenizer_config.json": "49e2b6e395f959f077f1e992b338919c0d4a9732fc6e613995e06557f843500c",
+    "site/transformers/models/qwen2/tokenization_qwen2.py": "23f05697fcaf26fe5e328abaf524f010510a2b9f4ba2e2edc9dca0a4015a09a2",
+    "site/regex/_regex.cpython-312-x86_64-linux-gnu.so": "6c05e765fe23960ca97d18ba52b72da3d1f54cf8b3eb62ebb8e8948ed24db78b",
+    "site/regex/_regex_core.py": "a8378b9e67b747e5490c898656a4ba23672afa3772d3ec3ce976a5f2348d0c7a"
+  }
+}

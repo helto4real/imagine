@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "backend": "rust",
+  "model": "qwen-image-2.1-int8",
+  "control_sha256": "ab502e8edf16bc5f7b4c7e8d6175b3c50050f55d926e407e54711338c6d1c2e1",
+  "server_binary_sha256": "800d99af91e833e75a0f67b1817828fb94f5802cca7507a066cda23d5f263aee",
+  "wall_seconds": 22.418384592980146,
+  "startup_did_not_launch_worker": true,
+  "worker_maps_contain_python": false,
+  "pixel_sha256": "82bcb96f8063c6bc7174db69ca4a9e4080d4a7391e7aaf69b58ba4acd14d73fc",
+  "width": 320,
+  "height": 224,
+  "library_model_selectable": true,
+  "progress": {
+    "completed": 4,
+    "elapsed_seconds": 21.193616328,
+    "remaining_seconds": 0.0,
+    "total": 4,
+    "updated_at_ms": 1792355725318
+  },
+  "pixels_exact": true
+}

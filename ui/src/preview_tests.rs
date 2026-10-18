@@ -632,6 +632,8 @@ fn preferences_survive_folder_change_and_app_restart() {
     app.prefs.generation = crate::settings::GenerationSettings {
         steps: 25,
         cfg_scale: 3.5,
+        sampler: Some("euler".into()),
+        scheduler: Some("simple".into()),
         random_seed: false,
         seed: 0,
         aspect_ratio: "9:16".into(),

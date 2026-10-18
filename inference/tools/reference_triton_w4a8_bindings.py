@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Owned synthetic original W4A8 unpack/INT8 boundaries and complete outputs."""
+from reference_paths import reference_dir
 import argparse,hashlib,itertools,json,math,sys
 from pathlib import Path
 project=Path(__file__).resolve().parents[2];sys.path.insert(0,str(project/'inference/tools'))
 from reference_layout_completion import encoder
 from reference_checks import reject_resource_failure
 p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
+manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
 for name in ['comfy_kitchen/backends/triton/w4a8_int8.py','comfy_kitchen/backends/triton/quantization.py','comfy_kitchen/backends/eager/w4a8_int8.py']:assert hashlib.sha256((a.site/name).read_bytes()).hexdigest()==hashes[name]
 sys.path.insert(0,str(a.site));import torch
 from comfy_kitchen.backends.triton import w4a8_int8 as w4,quantization as q

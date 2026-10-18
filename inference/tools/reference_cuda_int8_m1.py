@@ -1,4 +1,5 @@
 """Frozen CUDA int8_linear M=1 route; ordinary outputs are all defined/nonempty."""
+from reference_paths import reference_dir
 from reference_checks import reject_resource_failure
 
 
@@ -42,9 +43,9 @@ def capture(torch,native,bits):
         for case in specs_for_mode:
             x,w,ws,bias,r,rs=operands(torch,case)
             original=native._C.int8_linear_m1;called=[]
-            def traced(*args):
+            def traced(*args,**kwargs):
                 called.append(True)
-                return original(*args)
+                return original(*args,**kwargs)
             native._C.int8_linear_m1=traced
             try:
                 value=native.int8_linear(x,w,ws,bias,getattr(torch,case['output_dtype'].split('.')[-1]),
@@ -69,7 +70,7 @@ if __name__=='__main__':
     from pathlib import Path
     parser=argparse.ArgumentParser();parser.add_argument('--site',type=Path,required=True);parser.add_argument('--output',type=Path,required=True)
     args=parser.parse_args();project=Path(__file__).resolve().parents[2]
-    manifest=json.loads((project/'design/reference-local/source-manifest.json').read_text());hashes={}
+    manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={}
     for name in ['comfy_kitchen/backends/cuda/__init__.py','comfy_kitchen/backends/_activations.py']:
         value=hashlib.sha256((args.site/name).read_bytes()).hexdigest()
         assert value==next(x['sha256'] for x in manifest if x['root']=='site' and x['path']==name)

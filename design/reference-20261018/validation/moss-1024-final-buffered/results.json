@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "mode": "run",
+  "binary_sha256": "01190c5c2471b1457db5c2f5b2959609669709514b3f2bc58cb4e35bd8ea2e2f",
+  "host_ram_guard": {
+    "available": 54300925952,
+    "required": 23791210360
+  },
+  "commands": [
+    {
+      "label": "rust",
+      "returncode": 0
+    },
+    {
+      "label": "comparison",
+      "returncode": 0
+    }
+  ],
+  "original_run_reused": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/runtime/moss-1024-source-comparison-python"
+}

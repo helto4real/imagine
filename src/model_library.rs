@@ -117,8 +117,10 @@ impl Library {
                 };
                 meta["id"] = json!(file.id);
                 meta["model"] = json!(model);
-                meta["group"] = json!(QWEN_GROUP);
-                meta["name"] = json!(if model == contract::TURBO {
+                meta["group"] = json!(file.group);
+                meta["name"] = json!(if model == contract::MOSS {
+                    "MOSS Image · SFT INT8"
+                } else if model == contract::TURBO {
                     "Qwen Image 2.1 · Turbo"
                 } else {
                     "Qwen Image 2.1 · INT8"
@@ -220,12 +222,17 @@ impl Library {
             .ok_or("model_file_missing")
     }
     fn components(&self, diffusion: &str) -> std::result::Result<Components, &'static str> {
+        let group = self
+            .file(diffusion, "diffusion_models")?
+            .group
+            .as_deref()
+            .ok_or("incompatible_component")?;
         if let Some(choice) = self.settings.components.get(diffusion) {
             for (id, kind) in [
                 (&choice.text_encoder, "text_encoders"),
                 (&choice.vae, "vae"),
             ] {
-                if self.file(id, kind)?.group.as_deref() != Some(QWEN_GROUP) {
+                if self.file(id, kind)?.group.as_deref() != Some(group) {
                     return Err("incompatible_component");
                 }
             }
@@ -235,7 +242,7 @@ impl Library {
             let found: Vec<_> = self
                 .files
                 .iter()
-                .filter(|f| f.kind == kind && f.supported && f.group.as_deref() == Some(QWEN_GROUP))
+                .filter(|f| f.kind == kind && f.supported && f.group.as_deref() == Some(group))
                 .collect();
             match found.as_slice() {
                 [file] => Ok(file.id.clone()),
@@ -256,7 +263,7 @@ impl Library {
         if self.settings.root.as_os_str().is_empty() {
             return Ok(None);
         }
-        let paths = if let Some(w) = &request.model_options.qwen_image_2_1.workflow {
+        let paths = if let Some(w) = request.model_options.generation(&request.model) {
             let mut paths = vec![
                 w.diffusion_model.clone(),
                 w.text_encoder.clone(),
@@ -314,6 +321,7 @@ impl Library {
         }
         if !value["model_options"]["qwen_image_2_1"]["generation"].is_null()
             || !value["model_options"]["qwen_image_2_1"]["workflow"].is_null()
+            || !value["model_options"]["moss_image"].is_null()
         {
             return Err(invalid("model_selection_settings_conflict"));
         }
@@ -360,10 +368,14 @@ impl Library {
             .entry("model_options")
             .or_insert_with(|| json!({}));
         let options = options.as_object_mut().ok_or(invalid("invalid_request"))?;
-        let qwen = options.entry("qwen_image_2_1").or_insert_with(|| json!({}));
-        qwen.as_object_mut()
-            .ok_or(invalid("invalid_request"))?
-            .insert("generation".into(), json!(workflow));
+        if model == contract::MOSS {
+            options.insert("moss_image".into(), json!(workflow));
+        } else {
+            let qwen = options.entry("qwen_image_2_1").or_insert_with(|| json!({}));
+            qwen.as_object_mut()
+                .ok_or(invalid("invalid_request"))?
+                .insert("generation".into(), json!(workflow));
+        }
         let stamps = files
             .iter()
             .map(|f| {
@@ -386,9 +398,20 @@ impl Library {
 }
 
 pub fn model_metadata(model: &str) -> Value {
+    if model == contract::MOSS {
+        let mut v = contract::model(model).unwrap();
+        v["defaults"]["model_options"]
+            .as_object_mut()
+            .unwrap()
+            .remove("moss_image");
+        return v;
+    }
     let mut meta = contract::model(contract::MODEL).unwrap();
     meta["id"] = json!(model);
     meta["constraints"]["loras"] = json!(true);
+    // Library selection resolves a workflow, whose validation accepts these choices.
+    meta["constraints"]["samplers"] = json!(["er_sde", "euler", "res_multistep"]);
+    meta["constraints"]["schedulers"] = json!(["beta", "simple"]);
     meta["request_schema"]["properties"]["model_selection"] = json!({
         "type":"object", "additionalProperties":false,"required":["diffusion"],
         "properties":{"diffusion":{"type":"string"},"loras":{"type":"array","maxItems":64,
@@ -454,15 +477,27 @@ fn scan_dir(
         let model = match (kind, name) {
             ("diffusion_models", DIFFUSION) => Some(contract::MODEL.into()),
             ("diffusion_models", TURBO_DIFFUSION) => Some(contract::TURBO.into()),
+            ("diffusion_models", "moss_image_sft_int8_convrot.safetensors") => {
+                Some(contract::MOSS.into())
+            }
             _ => None,
         };
-        let known = model.is_some()
+        let moss = model.as_deref() == Some(contract::MOSS)
+            || kind == "text_encoders" && name == "qwen3.5_9b_int8_convrot.safetensors"
+            || kind == "vae" && name == "flux2-vae.safetensors";
+        let known = moss
+            || model.is_some()
             || (kind == "text_encoders" && name == ENCODER)
             || (kind == "vae" && name == VAE);
-        let mut group = known.then(|| QWEN_GROUP.to_owned());
+        let mut group = known.then(|| if moss { MOSS_GROUP } else { QWEN_GROUP }.to_owned());
         let mut supported = known || kind == "loras";
         if known {
-            supported = model_header_matches(&path, kind).unwrap_or(false);
+            supported = if moss {
+                moss_header_matches(&path, kind)
+            } else {
+                model_header_matches(&path, kind)
+            }
+            .unwrap_or(false);
             if !supported {
                 warnings.push(format!(
                     "Model header does not match the supported component: {relative}"
@@ -541,6 +576,20 @@ fn model_header_matches(path: &Path, kind: &str) -> Result<bool> {
         _ => false,
     })
 }
+fn moss_header_matches(path: &Path, kind: &str) -> Result<bool> {
+    let h = read_header(path)?;
+    let has = |suffix: &str| h.as_object().unwrap().keys().any(|k| k.ends_with(suffix));
+    Ok(match kind {
+        "diffusion_models" => has("video_embedder.weight") && has("layers.41.proj.qkv.weight"),
+        "text_encoders" => {
+            has("layers.0.linear_attn.in_proj_qkv.weight")
+                && has("layers.3.self_attn.q_proj.weight")
+        }
+        "vae" => has("bn.running_mean") && has("decoder.conv_in.weight"),
+        _ => false,
+    })
+}
+
 #[cfg(test)]
 #[path = "model_library_tests.rs"]
 mod tests;
