@@ -1,5 +1,22 @@
 # Stage 2 — Qwen Image 2.1
 
+The [shared-ownership continuation](stage-2-qwen-image21-ownership.md) adds the
+original weak model registry, shared static clone/patch ownership, common
+loading/freeing coordinator and model/cache pin accounting. All 35 focused
+regressions and four new Python-free tests pass. Fresh automatic INT8
+1600×1600/40, BF16 320×224/4 and Turbo 320×224/8 LoRA pairs have exact tensors,
+PNG pixels and all measured sampler/counter/residency phases. This verifies the
+selected static path; general dynamic and multi-component acceptance remain
+open. Historical checkpoints below retain their original scope.
+
+The [sampler-buffer continuation](stage-2-qwen-image21-sampler-buffer.md)
+implements original registered-buffer ownership, full/partial load transitions
+and cached versus loaded accounting. Six source sequences / 28 transitions,
+31 focused regressions, a new Python-free lifecycle test and a fresh selected
+1600×1600 INT8 LoRA comparison pass. The earlier 40,000-byte full-load gap is
+closed; original counters and CUDA→CPU buffer state now match. Broader Stage 2
+acceptance remains incomplete. Historical checkpoints below retain their scope.
+
 Started 2026-10-18. Status: Stage 2 is **in progress**. Resident DiT, language,
 tokenizer, image VAE, initial parameter loading and selected sampling services
 are implemented. [First-image preparation](stage-2-qwen-image21-first-image.md)
@@ -52,6 +69,16 @@ seed 3061383787 removes the severe artifacts to the same extent in both exact
 outputs. Tomas accepted it as a new [development baseline](stage-2-qwen-image21-editing-baseline.md)
 on 2026-10-18 and requested preservation in Git. This is selected-workload
 acceptance, not complete editing coverage or a demonstrated seed-handling bug.
+
+The [LoRA continuation](stage-2-qwen-image21-lora.md) implements original adapter
+math, model/text aliases, stacking, INT8 ConvRot requantization and selected
+static patch/offload restoration. INT8 model, text and ordered-stack functional
+pairs match exactly. The freed-memory continuation repairs original reload
+function state, patch/move order and lazy-copy behavior. Automatic BF16/Turbo
+LoRA functional pairs now also pass exactly; failed earlier runs and replay
+only diagnostics remain preserved. General memory/clone/config coverage is open.
+No numerical criterion or automatic policy was relaxed. General LoRA lifecycle
+and Stage 2 acceptance remain incomplete.
 
 Tomas first requested a stop before generation; that gate was reached. He then
 authorized: “Ja gör det, spännande, jämför tider och kvalitet mot comfyui
@@ -211,16 +238,19 @@ images, model VRAM/latency and production acceptance remain untested.
 
 ## Remaining Stage 2 work
 
-The coverage matrix keeps the remaining continuation explicit: general loader
-detection/conversion and error behavior; complete vision/editing/reference
-conditioning; remaining sampler/scheduler/guider and CFG combinations; LoRA
-merge/requantization/restoration; dynamic compiler/vbars, prefetch/offload,
-host cache/pinned-memory and OOM/tiled policies; and trained end-to-end
-differential acceptance for all three variants. Initial resident loading,
-language/tokenizer, image VAE and selected sampling are now verified at the
-component boundary. The first isolated INT8 image run is prepared and deliberately
-unrun, as recorded in [the readiness report](stage-2-qwen-image21-first-image.md).
-This is not full Stage 2/model-support acceptance.
+The selected text-to-image and reference-editing paths for INT8 ConvRot, BF16
+and Turbo now have trained exact comparisons, including selected LoRAs and
+static shared ownership. This does not complete general model support.
+Remaining gates include general loader detection/conversion/error behavior;
+broader editing and independent component precisions; remaining applicable
+sampler/scheduler/guider and CFG combinations; LoRA config/bypass/shape-changing
+and arbitrary hook/object/attachment clone semantics; dynamic compiler/vbars
+ownership and RAM/pin eviction; general encoder/VAE shared-manager binding;
+OOM/tiled policies; and broader trained reuse/pressure/failure acceptance.
+
+The initial prepared-but-unrun image gate in the readiness report is historical
+and was subsequently fulfilled. The latest coverage and continuation reports
+above distinguish completed selected paths from these remaining gates.
 
 No departure from ComfyUI or the agreed design was introduced. GPU and isolated
 runtime checks required sandbox escalation; no escalation was rejected.

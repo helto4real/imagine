@@ -1,0 +1,46 @@
+{
+  "strict_gate_passed": false,
+  "error": "AssertionError: Sampler lifecycle phases differ",
+  "rust_phases": [
+    "dit_initial",
+    "dit_sampling",
+    "dit_unloaded"
+  ],
+  "python_phases": [
+    "dit_initial",
+    "dit_sampling"
+  ],
+  "tensor_boundaries": {
+    "context": {
+      "rust_sha256": "befc7af7d980e1931b92b213d9495a1249d1c5a4d9b14d919da2d1f76ca3f9cb",
+      "python_sha256": "befc7af7d980e1931b92b213d9495a1249d1c5a4d9b14d919da2d1f76ca3f9cb",
+      "exact": true
+    },
+    "negative-context": {
+      "rust_sha256": "d22b2f691b1395ae5c4e34cf9a7b2474dafd760b733ffef6fc6b882b68b21d36",
+      "python_sha256": "d22b2f691b1395ae5c4e34cf9a7b2474dafd760b733ffef6fc6b882b68b21d36",
+      "exact": true
+    },
+    "reference-vision-0": {
+      "rust_sha256": "b5e55de9caa4608106726730169a6f986db3e0b06f68dfe2a25e9b67eba8e4c6",
+      "python_sha256": "b5e55de9caa4608106726730169a6f986db3e0b06f68dfe2a25e9b67eba8e4c6",
+      "exact": true
+    },
+    "reference-latent-0": {
+      "rust_sha256": "790831589c1ef11722ead4d22c73ce2fdc4db7ac18358234a832f90153fcdede",
+      "python_sha256": "790831589c1ef11722ead4d22c73ce2fdc4db7ac18358234a832f90153fcdede",
+      "exact": true
+    },
+    "latent": {
+      "rust_sha256": "dbd29e74ea666dce7808bf7d99a861547b4231d0884c0d69ff47baca69896ad3",
+      "python_sha256": "dbd29e74ea666dce7808bf7d99a861547b4231d0884c0d69ff47baca69896ad3",
+      "exact": true
+    },
+    "image-rgba": {
+      "rust_sha256": "39cea4a5f4276ae02b2bc9a80ec8d4b282a75508b42faafd5938e84698a76ca8",
+      "python_sha256": "39cea4a5f4276ae02b2bc9a80ec8d4b282a75508b42faafd5938e84698a76ca8",
+      "exact": true
+    }
+  },
+  "reason": "Reference owner deleted before original unload callback could observe it; missing evidence is not replaced by expected values"
+}

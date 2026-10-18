@@ -38,12 +38,22 @@ if args.qwen_driver_profile is not None:
     if args.test_filter or args.qwen_model_root is None or args.aimdo_library is None:
         parser.error('Driver mode requires explicit model root/AIMDO and cannot use a primitive test filter')
     profile=json.loads(args.qwen_driver_profile.read_text())
-    assert profile in [json.loads((project/'inference/profiles'/name).read_text())for name in ['qwen21-first-int8.json','qwen21-1600x896-int8.json','qwen21-1600x896-40steps-int8.json','qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8-seed3061383787.json']],'Explicit registered comparison profile required'
+    assert profile in [json.loads((project/'inference/profiles'/name).read_text())for name in ['qwen21-first-int8.json','qwen21-1600x896-int8.json','qwen21-1600x896-40steps-int8.json','qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8-seed3061383787.json','qwen21-lora-int8.json','qwen21-lora-bf16.json','qwen21-lora-turbo.json','qwen21-lora-text-int8.json','qwen21-lora-stack-int8.json','qwen21-lora-portrait-1600-int8.json']],'Explicit registered comparison profile required'
     for rel in profile['checkpoints'].values():
         relative=Path(rel);assert not relative.is_absolute()and'..'not in relative.parts
         source=args.qwen_model_root/relative;assert source.is_file(),source
         target='/models/'+relative.as_posix();driver_mounts+=['--ro-bind',str(source),target]
         model_files.append(dict(source=str(source),target=target,bytes=source.stat().st_size))
+    for spec in profile.get('lora',[]):
+        relative=Path(spec['path']);assert not relative.is_absolute() and '..' not in relative.parts
+        if 'fixture_file' in spec:
+            fixture=Path(spec['fixture_file']);assert not fixture.is_absolute() and '..' not in fixture.parts
+            source=project/fixture;assert source.resolve().is_relative_to((project/'inference/fixtures').resolve())
+        else:source=args.qwen_model_root/relative
+        assert source.is_file()
+        assert hashlib.file_digest(source.open('rb'),'sha256').hexdigest()==spec['sha256']
+        target='/models/'+relative.as_posix();driver_mounts+=['--ro-bind',str(source),target]
+        model_files.append(dict(source=str(source),target=target,bytes=source.stat().st_size,sha256=spec['sha256'],role='lora'))
     for index,spec in enumerate(profile.get('references',[])):
         if 'tensor_file' not in spec:continue
         relative=Path(spec['tensor_file']);assert not relative.is_absolute() and '..' not in relative.parts
@@ -64,10 +74,11 @@ elif args.qwen_model_root is not None or args.qwen_mode!='preflight':
 lock=json.loads((project/'design/reference-local/native-linkage-lock.json').read_text())
 objects={Path(x['path']):x for x in lock['distribution_objects']}
 files=[Path(p) for p in lock['initial_target_linkage_audit']['package_object_closure'] if '/torch/lib/' in p or '/nvidia/' in p]
-# cuDNN components and NVRTC builtins are dlopen dependencies, invisible to
+# cuDNN, NVRTC builtins and Torch/cuSOLVER linear algebra are dlopen dependencies, invisible to
 # the initial DT_NEEDED closure. Expose only the already locked ELF objects.
 lazy_files=sorted(path for path in objects if path.parent==args.site/'nvidia/cudnn/lib'
-                  or path.parent==args.site/'nvidia/cu13/lib' and path.name.startswith('libnvrtc-builtins'))
+                  or path.parent==args.site/'nvidia/cu13/lib' and (path.name.startswith('libnvrtc-builtins') or path.name=='libcusolver.so.12')
+                  or path==args.site/'torch/lib/libtorch_cuda_linalg.so')
 files=list(dict.fromkeys([*files,*lazy_files]))
 bridge=args.root/'kitchen-manylinux/libimagine_kitchen.so'
 if args.aimdo_library is not None:

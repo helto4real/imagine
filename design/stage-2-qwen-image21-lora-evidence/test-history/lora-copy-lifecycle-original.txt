@@ -1,0 +1,1 @@
+Captured 6 original A/B/unpatch lifecycles and 4 patch-memory load lists

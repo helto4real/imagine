@@ -20,6 +20,7 @@ pub struct LinearPolicy {
 pub struct PreparedParameters {
     pub values: BTreeMap<String, Value>,
     pub linear_policies: BTreeMap<String, LinearPolicy>,
+    pub lowvram_patches: BTreeMap<String, Vec<crate::patching::Patch>>,
 }
 impl std::ops::Deref for PreparedParameters {
     type Target = BTreeMap<String, Value>;
@@ -32,6 +33,7 @@ impl PreparedParameters {
         Self {
             values,
             linear_policies: BTreeMap::new(),
+            lowvram_patches: BTreeMap::new(),
         }
     }
     /// Consume the source loader's result. Biases/norms and other super-loader

@@ -19,6 +19,17 @@ and a Python timing/quality comparison; see the
 `tools/benchmark_qwen_first_image.sh` explicitly runs three matched pairs in
 fresh processes; ordinary tests never invoke trained image generation.
 
+The [LoRA continuation](../design/stage-2-qwen-image21-lora.md) adds the original
+adapter arithmetic, Qwen model/text aliases, INT8 ConvRot requantization,
+stacking and backup restoration. Selected INT8 model/text/stack pairs match
+exactly. After memory was freed, original reload/lazy-function state,
+transfer ordering and copy semantics were repaired. Automatic BF16/Turbo pairs
+now also match exactly for the selected 320×224 profiles. Failed earlier runs
+and recorded-placement diagnostics remain separate historical evidence.
+`tools/check_qwen_lora.sh` is the explicit trained comparison entrypoint;
+ordinary tests retain only bounded synthetic operands. Full LoRA acceptance
+and Stage 2 completion remain pending.
+
 # Rust / LibTorch inference foundation
 
 Stage 1 development workspace for the approved [parity design](../design/rust-comfy-parity-engine.md).
@@ -269,3 +280,14 @@ Tomas accepted the [seed-3061383787 editing baseline](../design/stage-2-qwen-ima
 on 2026-10-18. Its image is visibly more natural while Rust and ComfyUI remain
 exact; only seed differs from the preserved seed-17 control. The acceptance is
 for this selected workload, with complete Stage 2/product support still pending.
+
+The separately requested [1600×1600 portrait LoRA comparison](../design/stage-2-qwen-image21-lora-1600.md) extends selected INT8/ConvRot static offload coverage. Its explicit profile preserves the earlier 1 MP control; see that report for measured acceptance and limits.
+
+The [sampler-buffer continuation](../design/stage-2-qwen-image21-sampler-buffer.md) adds actual wrapper-buffer ownership, original full/partial load accounting and full CPU unload, with bounded source-derived lifecycle regression coverage. See its report for final trained evidence.
+
+The [shared-ownership continuation](../design/stage-2-qwen-image21-ownership.md)
+adds the original weak model registry, static clone/patch selection lifecycle,
+shared loading/freeing coordinator and model/cache pin budget. The automatic
+DiT driver uses this coordinator. Its bounded regression fixtures exercise
+original code without constructing trained models; general dynamic ownership,
+encoder/VAE shared binding and full Stage 2 acceptance remain open.

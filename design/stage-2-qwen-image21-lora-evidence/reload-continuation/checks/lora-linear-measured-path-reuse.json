@@ -1,0 +1,49 @@
+{
+  "scope": "Copy guard adds copy=True only for resident lazy weights/bias. Observed trained paths have no such module; CPU offload already uses fresh storage. Model outputs and timings reused, not claimed as fresh runs of the copy guard.",
+  "profiles": {
+    "bf16": [
+      {
+        "phase": "dit_initial",
+        "loaded_bytes": [
+          13122953216,
+          13122953216
+        ],
+        "physical_residency_differences": [],
+        "patched_lazy_pass_differences": [],
+        "resident_patched_lazy_modules": []
+      },
+      {
+        "phase": "dit_sampling",
+        "loaded_bytes": [
+          13121904640,
+          13120856064
+        ],
+        "physical_residency_differences": [],
+        "patched_lazy_pass_differences": [],
+        "resident_patched_lazy_modules": []
+      }
+    ],
+    "turbo": [
+      {
+        "phase": "dit_initial",
+        "loaded_bytes": [
+          13122953216,
+          13122953216
+        ],
+        "physical_residency_differences": [],
+        "patched_lazy_pass_differences": [],
+        "resident_patched_lazy_modules": []
+      },
+      {
+        "phase": "dit_sampling",
+        "loaded_bytes": [
+          13120856064,
+          13120856064
+        ],
+        "physical_residency_differences": [],
+        "patched_lazy_pass_differences": [],
+        "resident_patched_lazy_modules": []
+      }
+    ]
+  }
+}

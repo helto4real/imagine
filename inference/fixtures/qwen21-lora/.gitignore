@@ -1,0 +1,2 @@
+# Explicit bounded synthetic LoRA test weights only.
+!*.safetensors

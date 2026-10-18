@@ -16,6 +16,14 @@ impl FluxSampling {
     pub fn qwen21() -> Result<Self, Error> {
         Self::new(0.69, 10000)
     }
+    /// Registered buffer storage follows Module.to without rebuilding its values.
+    pub fn to_device(&mut self, device: Device) -> Result<(), Error> {
+        self.sigmas = self.sigmas.f_to_device(device)?;
+        Ok(())
+    }
+    pub fn buffer_bytes(&self) -> u64 {
+        (self.sigmas.numel() * self.sigmas.kind().elt_size_in_bytes()) as u64
+    }
     fn shift_time(mu: f64, t: &Tensor) -> Result<Tensor, Error> {
         let e = mu.exp();
         Ok(t.f_reciprocal()?

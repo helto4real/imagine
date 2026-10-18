@@ -1,0 +1,32 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/imagine-rust-comfy-parity-20261017/pillow
+[100%] Built target imagine_pillow
+Prepared original Pillow core without Python: 095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3
+   Compiling imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+error[E0252]: the name `Linear` is defined multiple times
+  --> src/models/qwen_image21/mod.rs:33:18
+   |
+14 | pub use layers::Linear;
+   |         -------------- previous import of the type `Linear` here
+...
+33 | pub use layers::{Linear, Modulation};
+   |                  ^^^^^^--
+   |                  |
+   |                  `Linear` reimported here
+   |                  help: remove unnecessary import
+   |
+   = note: `Linear` must be defined only once in the type namespace of this module
+
+warning: unused import: `Linear`
+  --> src/models/qwen_image21/mod.rs:33:18
+   |
+33 | pub use layers::{Linear, Modulation};
+   |                  ^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0252`.
+warning: `imagine-inference` (lib) generated 1 warning
+error: could not compile `imagine-inference` (lib) due to 1 previous error; 1 warning emitted

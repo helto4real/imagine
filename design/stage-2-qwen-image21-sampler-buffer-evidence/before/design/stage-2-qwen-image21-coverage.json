@@ -1,0 +1,267 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "stage": 2,
+  "status": "in_progress",
+  "preservation_commit": "059c875",
+  "required_variants": [
+    "qwen_image21_int8_convrot",
+    "qwen_image21_bf16",
+    "qwen_image21_turbo"
+  ],
+  "complete_model_support": false,
+  "model_weights_read": true,
+  "production_runtime_read": false,
+  "new_parity_exceptions": [],
+  "boundaries": [
+    {
+      "id": "logical_shape_detection",
+      "status": "implemented_and_component_tested",
+      "scope": "Full detector precedence and checkpoint metadata loader remain pending"
+    },
+    {
+      "id": "resident_projection_sequence_rope",
+      "status": "implemented_and_component_tested",
+      "scope": "BF16 and actual INT8 ConvRot synthetic weights; Turbo label shares BF16 component arithmetic only"
+    },
+    {
+      "id": "norm_modulation_timestep_latent_format",
+      "status": "implemented_and_component_tested",
+      "scope": "Original helpers and Kitchen AdaLN; complete model path remains pending"
+    },
+    {
+      "id": "checkpoint_loading_quantized_parameters",
+      "status": "synthetic-verified",
+      "scope": "AIMDO storage and original loaders tested synthetically and with all three selected components in a complete INT8 smoke pipeline. General detection/conversion/malformed branches remain pending."
+    },
+    {
+      "id": "comfy_ops_casting_fused_activations",
+      "status": "resident_casting_and_int8_swiglu_implemented",
+      "scope": "Original resident mixed-precision Linear, manual-cast norms, fused activation and per-operation cancellation checkpoints; vbars, patch functions, LoRA and sampling-owner integration pending"
+    },
+    {
+      "id": "dit_attention_blocks_control",
+      "status": "implemented_resident_differential",
+      "scope": "Complete forward, 2/32 blocks, split/fused MLP, hooks/wrappers, attention preference/override, FunControl; tested selected resident policies"
+    },
+    {
+      "id": "qwen3vl8b_tokenizer_text_vision",
+      "status": "selected_multimodal_trained_exact",
+      "scope": "Prior tokenizer/Unicode/language controls retained; 100 geometry/filter cases, 27 complete bounded vision forwards, 40 complete bounded multimodal calls. Selected trained editing contexts exact with the INT8 ConvRot encoder. Broader precision/malformed/autoregressive contracts remain pending."
+    },
+    {
+      "id": "vae_editing_conditioning",
+      "status": "selected_trained_editing_exact",
+      "scope": "Original inner/outer image processing, original Pillow C without Python, Qwen21 crop/pad/process-input and actual reference VAE encoding/DiT binding. 96 preprocessing/memory cases and five functional trained pairs exact; final shared-VAE two-reference pair also exact. General OOM/tiled/shared memory policy remains pending."
+    },
+    {
+      "id": "sampling_scheduler_cfg_turbo",
+      "status": "synthetic-verified",
+      "scope": "FLUX/CONST, 3 selected schedules, Euler/churn/RNG/callbacks and CFG algebra/full-area CFG1 verified. Remaining source algorithms and general Turbo configuration coverage remain pending. Designed eight-step custom-sigma Turbo trained T2I now passes three exact pairs."
+    },
+    {
+      "id": "lora_patch_requantize_restore",
+      "status": "selected_int8_bf16_turbo_lora_exact_general_lifecycle_pending",
+      "scope": "Six adapter bodies, aliases and original patch/rounding fixtures; static INT8 ConvRot requantization and restoration. Added twelve original reload states, mixed-cost two-phase allocation trace and twelve repeated CPU/CUDA Linear cases (24 forwards) with immutable stored parameters. Selected INT8 model/text/stack and automatic BF16/Turbo LoRA pairs exact. Original reload function state, transfer order and lazy copy behavior repaired. Broader config/bypass/shape-changing and clone/shared-memory acceptance remain open.",
+      "report": "stage-2-qwen-image21-lora.md"
+    },
+    {
+      "id": "memory_prefix_cache_prefetch_hooks",
+      "status": "synthetic-verified",
+      "scope": "Original cache policy/storage and concrete static GPU-resident services with actual free+reserved-active counters. Dynamic vbars/compiler, host transfer/pinning and shared memory manager remain pending. Selected plain BF16 DiT static synchronous load/partial-unload/host registration now implemented and trained-tested; dynamic vbars, host-cache staging, patched/multi-model memory management remain pending. Reference-conditioned required/minimum sampling memory now follows original positive/negative shape accounting before CFG1 shortcut; 12 exact IEEE754-bit cases. Original host prefix-cache services now tested for selected graph-free static execution: RAM/cgroup budget, actual registration and two synchronous-current-stream staging buffers. Real 1MP reference edit selects identical 2.03 GiB pinned CPU cache in both engines. Shared/inactive model-pin eviction remains pending and explicit."
+    },
+    {
+      "id": "complete_model_differential",
+      "status": "selected_int8_bf16_turbo_t2i_and_editing_exact",
+      "scope": "Three exact pairs each for 512x512/4 steps, 1600x896/4 steps, 1600x896/40 steps, plus a fresh three-pair four-step storage control; INT8 ConvRot, Euler/simple, CFG1, seed17. Other variants, editing, LoRA, broader numerical and memory acceptance remain required. Three exact BF16 DiT 1600x896/40 pairs use original static offload with unchanged INT8 text/BF16 VAE. Three exact Turbo BF16 DiT 1600x896/eight-explicit-sigma-step pairs now pass with the same offload policy. All-BF16 encoder/editing/LoRA/general memory acceptance remains pending. Selected 320x224 synthetic reference/editing profiles now pass one pair each for INT8, BF16, Turbo, two references and no-reference-VAE keep-vision, plus final shared-VAE revalidation. This is bounded functional acceptance, not general editing or performance/quality acceptance."
+    }
+  ],
+  "dit_status": "complete_resident_computation_shared_services_and_trained_model_acceptance_pending",
+  "latest_report": "stage-2-qwen-image21-portrait-seed3061383787.md",
+  "latest_checkpoint": "stage-2-qwen-image21-portrait-seed3061383787-checkpoint.json",
+  "retained_reference_results_and_decisions": 2172,
+  "focused_tests_passed": 25,
+  "python_free_tests_passed": 25,
+  "trained_forward_executed": true,
+  "image_generation_executed": true,
+  "first_image_gate": "Earlier readiness stop fulfilled; user then authorized first trained image and Python timing/quality comparison",
+  "selected_first_variant": "int8_convrot",
+  "authorized_model_root": "/mnt/media/gemensam/AI/ComfyUI/models",
+  "first_image_preflight_status": "load_only_passed_then_trained_generation_authorized",
+  "first_image_status": "three_matched_pairs_exact_int8_smoke",
+  "verification_scope": "Accepted T2I and 1MP editing controls preserved. LoRA allocation-order source passes all 29 focused tests; final copy-only guard reruns four focused LoRA tests and four Python-free isolations, reusing the other 25 unchanged checks. Five selected automatic model/text/stack/variant pairs exact, with explicit unchanged-path reuse for the final copy guard. Earlier failures and placement diagnostics retained separately. Full Stage 2, broader precision/editing and general LoRA/shared-memory acceptance remain incomplete.",
+  "first_image_comparison": {
+    "profile": "512x512, seed17, four Euler/simple steps, CFG1, BF16, PyTorch attention, static full residency, Kitchen Triton disabled as source startup",
+    "matched_pairs": 3,
+    "all_context_latent_pixels_exact": true,
+    "all_png_pixels_exact": true,
+    "same_results_all_six_images": true,
+    "production_quality_assessed": false
+  },
+  "large_image_comparison": {
+    "profile": "1600x896, seed17, four Euler/simple steps; only geometry/purpose differs from the preserved 512 profile",
+    "matched_pairs": 3,
+    "all_context_latent_pixels_exact": true,
+    "all_png_pixels_exact": true,
+    "same_results_all_six_images": true,
+    "memory_policy_changed": false,
+    "peak_vram_measured": false,
+    "production_quality_assessed": false
+  },
+  "forty_step_comparison": {
+    "profile": "1600x896, seed17, 40 Euler/simple steps; only steps/purpose differs from the four-step control",
+    "matched_pairs": 3,
+    "all_context_latent_pixels_exact": true,
+    "all_png_pixels_exact": true,
+    "same_results_all_six_images": true,
+    "settings_or_autotuning_changed_beyond_steps": false,
+    "peak_vram_measured": false,
+    "quality_observation": "Sharper wing veins/edges and petal detail on the synthetic butterfly prompt; same pixels from both backends, not a general quality benchmark"
+  },
+  "same_storage_four_step_control": {
+    "matched_pairs": 3,
+    "exact_and_repeatable": true,
+    "matches_preserved_prior_control_bytes": true,
+    "reason": "Fresh matched control after lossless migration of quota-limited temporary test storage; old evidence preserved"
+  },
+  "bf16_forty_step_comparison": {
+    "status": "bf16_dit_offload_three_pairs_exact",
+    "dit": "bf16",
+    "text": "int8_convrot",
+    "vae": "bf16",
+    "resolution": [
+      1600,
+      896
+    ],
+    "steps": 40,
+    "matched_pairs": 3,
+    "exact_and_repeatable": true,
+    "memory_policy": "original static synchronous source policy, approved S2-14",
+    "rust_owns_offload": true,
+    "all_bf16_pipeline": false
+  },
+  "turbo_comparison": {
+    "status": "turbo_eight_step_offload_three_pairs_exact",
+    "dit": "turbo_bf16",
+    "text": "int8_convrot",
+    "vae": "bf16",
+    "resolution": [
+      1600,
+      896
+    ],
+    "steps": 8,
+    "custom_sigmas": [
+      1,
+      0.978453,
+      0.95418,
+      0.926626,
+      0.89508,
+      0.845148,
+      0.704534,
+      0.414568,
+      0
+    ],
+    "matched_pairs": 3,
+    "exact_and_repeatable": true,
+    "memory_policy": "unchanged original static synchronous source policy, approved S2-14",
+    "rust_owns_offload": true,
+    "all_bf16_pipeline": false
+  },
+  "reference_editing": {
+    "status": "selected_trained_editing_exact",
+    "original_cases": 263,
+    "patching": 42,
+    "positions_and_deepstack": 10,
+    "conditioning_filter": 48,
+    "vision_transformer_pending": false,
+    "complete_multimodal_encoder_pending": false,
+    "outer_lanczos_binding_pending": false,
+    "trained_editing_pending": false,
+    "baseline_commit": "de955e5",
+    "vision_full_forwards": 27,
+    "multimodal_full_calls": 40,
+    "lanczos_cases": 24,
+    "outer_image_cases": 28,
+    "vae_input_cases": 32,
+    "reference_memory_cases": 12,
+    "broader_editing_acceptance_pending": true,
+    "trained_pairs": 6,
+    "final_shared_vae_revalidation_pairs": 1,
+    "trained_scope": "320x224 synthetic inputs; four Euler/simple steps for INT8/BF16, eight designed sigmas for Turbo; INT8 text/BF16 VAE; CFG1; two-reference and keep-vision variants tested with INT8 DiT",
+    "new_parity_exceptions": [],
+    "continuation_committed": false,
+    "portrait_1mpx": {
+      "status": "one_pair_exact_shared_visual_artifacts_observed",
+      "reference_shape": [
+        1,
+        1024,
+        1024,
+        4
+      ],
+      "pixels": 1048576,
+      "output": [
+        1024,
+        1024
+      ],
+      "steps": 40,
+      "variant": "int8_convrot",
+      "cfg": 1,
+      "source_and_native_png_pixels_exact": true,
+      "all_six_tensor_boundaries_exact": true,
+      "cache_store": "cpu",
+      "cache_bytes": 2176319488,
+      "cache_pinned_bytes": 2176319488,
+      "cache_staging_buffers": 2,
+      "quality_observation": "Same facial features/composition retained and background changed, but strongly exaggerated local contrast/coarse skin and hair in both identical outputs; no validated quality fix",
+      "comparative_timing_benchmark": false,
+      "timings_seconds": {
+        "rust_pipeline": 30.69730183,
+        "python_pipeline": 31.525373683078215,
+        "rust_sampling": 23.48958141,
+        "python_sampling": 23.54982070811093
+      }
+    },
+    "host_cache_source_cases": 31
+  },
+  "accepted_editing_baseline": {
+    "date": "2026-10-18",
+    "report": "stage-2-qwen-image21-editing-baseline.md",
+    "profile": "inference/profiles/qwen21-editing-portrait-1mpx-int8-seed3061383787.json",
+    "seed": 3061383787,
+    "scope": "One 1024x1024 40-step INT8 ConvRot reference-editing pair; natural appearance accepted, six exact tensor boundaries and PNG parity. Earlier seed17/T2I controls retained.",
+    "stage2_complete": false,
+    "new_parity_exceptions": [],
+    "preservation": "Source, dependencies subset/license, regression fixtures/oracles, isolated launchers and evidence in the commit containing the accepted baseline report."
+  },
+  "lora_continuation": {
+    "report": "stage-2-qwen-image21-lora.md",
+    "checkpoint": "stage-2-qwen-image21-lora-checkpoint.json",
+    "stage2_complete": false,
+    "automatic_trained_pairs_exact": [
+      "int8_model",
+      "int8_text",
+      "int8_ordered_stack",
+      "bf16_model",
+      "turbo_model"
+    ],
+    "recorded_placement_diagnostic_pairs_exact": [
+      "bf16_model",
+      "turbo_model"
+    ],
+    "diagnostic_is_automatic_acceptance": false,
+    "fresh_automatic_validation": "User confirmed memory free; automatic BF16 and Turbo pairs pass after source reload/transfer-order fixes. Final lazy-copy branch is separately tested and not taken by measured pairs; explicit measured-path evidence reuse.",
+    "new_parity_exceptions": [],
+    "committed": false,
+    "earlier_automatic_pairs_failed": [
+      "bf16_model",
+      "turbo_model"
+    ],
+    "reload_states": 12,
+    "allocation_order_traces": 1,
+    "repeated_linear_cases": 12,
+    "repeated_linear_forwards": 24,
+    "final_copy_guard_focused_checks": 4,
+    "unchanged_focused_checks_reused": 25,
+    "final_standalone_isolations": 4
+  }
+}

@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libcusolver.so.12'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+
+running 1 test
+test qwen_offload_tests::qwen_image21_original_sampler_buffer_lifecycle_and_full_model_accounting_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 176 filtered out; finished in 0.71s
+

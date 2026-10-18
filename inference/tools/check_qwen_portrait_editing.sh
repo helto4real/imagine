@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Explicit trained 1MP comparison. Reuses the pinned generated portrait fixture.
+# Explicit trained portrait comparison. Reuses the pinned generated portrait fixture.
 set -euo pipefail
 parity_root=${IMAGINE_PARITY_ROOT:?Set the isolated development root}
 reference_site=${IMAGINE_REFERENCE_SITE:?Set the frozen package source}
@@ -21,4 +21,4 @@ bash inference/tools/launch_reference.sh inference/tools/compare_qwen_first_imag
     --site "$reference_site" --rust "$parity_root/runtime/$prefix-rust/first-image" \
     --python "$parity_root/runtime/$prefix-python" \
     --output "$reports/comparison.json" > "$reports/comparison.log"
-echo '1MP portrait editing: exact parity passed'
+echo 'Portrait editing: exact parity passed'

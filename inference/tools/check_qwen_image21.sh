@@ -63,7 +63,17 @@ for test_name in \
     qwen_host_cache_tests::qwen_image21_original_static_host_prefix_pinning_staging_and_budget_match \
     qwen_offload_tests::qwen_image21_original_static_offload_placements_unloads_and_budgets_match \
     qwen_offload_tests::qwen_image21_original_static_host_registration_copy_and_release_match \
-    qwen_offload_tests::qwen_image21_original_bf16_cpu_and_mixed_weights_preserve_cuda_forward_bytes; do
+    qwen_offload_tests::qwen_image21_original_bf16_cpu_and_mixed_weights_preserve_cuda_forward_bytes \
+    qwen_lora_tests::qwen_image21_original_lora_loading_aliases_override_precedence_and_key_seeds_match \
+    qwen_lora_tests::qwen_image21_original_lora_patch_owner_restores_backup_values_between_selections \
+    qwen_lora_tests::qwen_image21_original_lora_registry_patch_math_dora_offsets_and_rounding_match \
+    qwen_lora_tests::qwen_image21_original_lora_static_fp16_patch_int8_convrot_requantization_matches \
+    qwen_lora_tests::qwen_image21_original_int8_offload_inventory_and_lazy_linear_match \
+    qwen_offload_tests::qwen_image21_original_sampler_buffer_lifecycle_and_full_model_accounting_match \
+    model_management_tests::qwen_image21_original_shared_model_manager_order_pressure_weak_owners_and_failures_match \
+    model_management_tests::qwen_image21_original_shared_static_clones_patch_switches_and_forced_cpu_patches_match \
+    model_management_tests::qwen_image21_original_shared_host_registration_cap_alias_and_owner_release_match \
+    model_management_tests::qwen_image21_original_shared_static_multiple_models_partial_eviction_and_reloads_match; do
     python3 -B inference/tools/test_isolation.py --root "$parity_root" --site "$reference_site" \
         --binary "$primitive_binary" --aot-library "$IMAGINE_TRITON_PROBE_LIBRARY" \
         --aot-fixture "$IMAGINE_TRITON_PROBE_FIXTURE" \

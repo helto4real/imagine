@@ -1,0 +1,142 @@
+--- design/stage-2-qwen-image21-ownership-evidence/before/inference/src/bin/qwen21-first-image.rs	2026-10-18 17:22:57.940766157 +0200
++++ inference/src/bin/qwen21-first-image.rs	2026-10-18 17:34:49.649419566 +0200
+@@ -297,6 +297,10 @@
+     let mut timings = BTreeMap::new();
+     let offload = p["source_configuration"]["force_full_load_per_component"] == false;
+     let mut memory_records = Vec::new();
++    let mut manager_records = Vec::new();
++    let pins = q::HostPins::new(rt.native.clone())?;
++    let mut memory_manager = imagine_inference::memory::Manager::new();
++    let mut memory_services = q::StaticMemoryServices::new(rt.native.clone(), pins.clone());
+     let dev = Device::Cuda(0);
+     let editing = p.get("reference_resolution").is_some();
+     let mut references = None;
+@@ -514,19 +518,32 @@
+         eprintln!("loading diffusion component");
+         let start = Instant::now();
+         let load_start = start;
+-        let mut managed = if offload {
++        let managed = if offload {
+             let params = load(rt, aimdo, "dit", &paths["dit"], Device::Cpu)?;
+             let patches = q::component_patch_owner("dit", &params, &loras)?;
+             record_lora(&output, "dit", &patches)?;
+-            let mut owner =
+-                q::StaticOffload::new(params, rt.native.clone())?.with_patches(patches)?;
+-            owner.load_for_patched(rt, None, 0.)?;
+-            replay_memory_plan(rt, &mut owner, own, p, "dit_initial")?;
+-            memory_records.push(memory_record(&output, "dit_initial", &owner)?);
+-            Some(owner)
++            let owner = q::StaticOffload::new(params, rt.native.clone())?
++                .with_shared_pins(pins.clone())
++                .with_patches(patches)?;
++            Some(q::StaticModel::new(owner, rt))
+         } else {
+             None
+         };
++        let patcher = managed.as_ref().map(|model| model.patcher());
++        if let (Some(model), Some(patcher)) = (&managed, &patcher) {
++            memory_manager.load(
++                std::slice::from_ref(patcher),
++                0.,
++                None,
++                false,
++                false,
++                &mut memory_services,
++            )?;
++            let mut owner = model.owner.borrow_mut();
++            replay_memory_plan(rt, &mut owner, own, p, "dit_initial")?;
++            memory_records.push(memory_record(&output, "dit_initial", &owner)?);
++            manager_records.push(json!({"phase":"dit_initial","registered_models":memory_manager.registrations(),"total_pinned_bytes":pins.bytes()}));
++        }
+         let mut resident_sampling = if offload {
+             None
+         } else {
+@@ -548,7 +565,7 @@
+         };
+         timings.insert("dit_load", elapsed(rt, start)?);
+         let start = Instant::now();
+-        if let Some(owner) = &mut managed {
++        if let (Some(model), Some(patcher)) = (&managed, &patcher) {
+             let refs = references
+                 .as_ref()
+                 .map(|r| {
+@@ -564,11 +581,21 @@
+                 vec![]
+             };
+             let (required, minimum) = q::qwen_sampling_memory_with_references(&shape, &groups);
+-            owner.load_for_patched(rt, Some(minimum), required)?;
+-            replay_memory_plan(rt, owner, own, p, "dit_sampling")?;
+-            memory_records.push(memory_record(&output, "dit_sampling", owner)?);
++            memory_manager.load(
++                std::slice::from_ref(patcher),
++                required,
++                Some(minimum),
++                false,
++                false,
++                &mut memory_services,
++            )?;
++            let mut owner = model.owner.borrow_mut();
++            replay_memory_plan(rt, &mut owner, own, p, "dit_sampling")?;
++            memory_records.push(memory_record(&output, "dit_sampling", &owner)?);
++            manager_records.push(json!({"phase":"dit_sampling","registered_models":memory_manager.registrations(),"total_pinned_bytes":pins.bytes()}));
+         }
+-        let params = managed
++        let borrowed = managed.as_ref().map(|model| model.owner.borrow());
++        let params = borrowed
+             .as_ref()
+             .map(|m| &m.parameters)
+             .or(resident.as_ref())
+@@ -577,10 +604,7 @@
+         let mut cache = q::PrefixCache::new(
+             rt,
+             Default::default(),
+-            q::StaticCacheServices::new(
+-                rt.native.clone(),
+-                managed.as_ref().map_or(0, |m| m.pinned_bytes as usize),
+-            )?,
++            q::StaticCacheServices::with_shared_pins(rt.native.clone(), pins.clone())?,
+         );
+         model.reset_prefix_cache(true, &mut cache)?;
+         let exec = q::ResidentExecution::bind(rt, params, model.config.num_layers, attention(dev))?;
+@@ -601,7 +625,7 @@
+             save_f32(&sigmas, &output.join("sigmas-f32.bin"))?;
+             sigmas
+         } else {
+-            managed
++            borrowed
+                 .as_ref()
+                 .map(|owner| &owner.sampling)
+                 .or(resident_sampling.as_ref())
+@@ -666,9 +690,18 @@
+         timings.insert("sampling", elapsed(rt, start)?);
+         drop(denoiser);
+         drop(model);
+-        if let Some(owner) = &mut managed {
+-            owner.unload()?;
+-            memory_records.push(memory_record(&output, "dit_unloaded", owner)?);
++        drop(borrowed);
++        if let Some(model) = &managed {
++            memory_manager.unload_all(dev, &mut memory_services)?;
++            memory_records.push(memory_record(
++                &output,
++                "dit_unloaded",
++                &model.owner.borrow(),
++            )?);
++            manager_records.push(json!({"phase":"dit_unloaded","registered_models":memory_manager.registrations(),"total_pinned_bytes":pins.bytes()}));
++            if memory_manager.registrations() != 0 || pins.bytes() != 0 {
++                return Err("Managed DiT release retained registrations".into());
++            }
+         }
+         if let Some(sampling) = &mut resident_sampling {
+             sampling.to_device(Device::Cpu)?;
+@@ -718,6 +751,10 @@
+             output.join("memory-policy.json"),
+             serde_json::to_vec_pretty(&memory_records)?,
+         )?;
++        fs::write(
++            output.join("memory-manager.json"),
++            serde_json::to_vec_pretty(&manager_records)?,
++        )?;
+     }
+     save_f32(&pixels, &output.join("image-rgba-f32.bin"))?;
+     pixels.save(output.join("image-rgba-f32.ot"))?;

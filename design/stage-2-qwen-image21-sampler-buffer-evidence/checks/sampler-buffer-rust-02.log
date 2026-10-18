@@ -1,0 +1,30 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/imagine-rust-comfy-parity-20261017/pillow
+[100%] Built target imagine_pillow
+Prepared original Pillow core without Python: 095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3
+   Compiling imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.53s
+     Running tests/primitives.rs (/tmp/imagine-rust-comfy-parity-20261017/target/debug/deps/primitives-117aa4f84f921881)
+
+running 1 test
+test qwen_offload_tests::qwen_image21_original_sampler_buffer_lifecycle_and_full_model_accounting_match ... FAILED
+
+failures:
+
+---- qwen_offload_tests::qwen_image21_original_sampler_buffer_lifecycle_and_full_model_accounting_match stdout ----
+
+thread 'qwen_offload_tests::qwen_image21_original_sampler_buffer_lifecycle_and_full_model_accounting_match' (772097) panicked at tests/support/binding.rs:218:17:
+assertion `left == right` failed: unchanged tiny weights: requires_grad
+  left: false
+ right: true
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    qwen_offload_tests::qwen_image21_original_sampler_buffer_lifecycle_and_full_model_accounting_match
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 176 filtered out; finished in 0.21s
+
+error: test failed, to rerun pass `--test primitives`

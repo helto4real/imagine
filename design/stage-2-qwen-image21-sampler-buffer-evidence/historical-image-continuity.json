@@ -1,0 +1,6 @@
+{
+  "pre_change_comparison": "design/stage-2-qwen-image21-lora-1600-evidence/comparison.json",
+  "new_comparison": "comparison-02.json",
+  "image_rgba_f32_sha256": "39cea4a5f4276ae02b2bc9a80ec8d4b282a75508b42faafd5938e84698a76ca8",
+  "unchanged_image": true
+}

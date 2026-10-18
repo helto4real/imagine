@@ -1,0 +1,9 @@
+{
+  "qwen3vl_8b.transformer.model.layers.0.self_attn.q_proj.weight": [
+    {
+      "model_strength": 1.0,
+      "offset": null,
+      "strength": 1.0
+    }
+  ]
+}

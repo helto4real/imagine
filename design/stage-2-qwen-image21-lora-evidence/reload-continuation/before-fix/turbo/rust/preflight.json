@@ -1,0 +1,99 @@
+{
+  "checkpoints": {
+    "dit": {
+      "file_bytes": 14230280616,
+      "header_sha256": "c43378af5fb061aee50cfc245837a6d897685da018b5a6e13e8fb31fac56f378",
+      "parameters": 265,
+      "path": "diffusion_models/qwen-image2.1/qwen_image_2.1_turbo_bf16.safetensors"
+    },
+    "text": {
+      "file_bytes": 9350798360,
+      "header_sha256": "b55c03ca5443ee1514738dbf69dceddf9074ae5e745bce5a2310754e0b37078d",
+      "parameters": 750,
+      "path": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors"
+    },
+    "vae": {
+      "file_bytes": 675509688,
+      "header_sha256": "c091c3d231f352db5fb44840e22388d2abe9c2c37b4daf97bdc6cc3448387759",
+      "parameters": 238,
+      "path": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+    }
+  },
+  "cuda_memory_before": [
+    14564327424,
+    16769744896,
+    0,
+    0
+  ],
+  "image_generation_executed": false,
+  "production_runtime_read": false,
+  "schema": 1,
+  "source_profile": {
+    "batch": 1,
+    "cfg": 1.0,
+    "checkpoints": {
+      "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_turbo_bf16.safetensors",
+      "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "custom_sigmas": [
+      1,
+      0.978453,
+      0.95418,
+      0.926626,
+      0.89508,
+      0.845148,
+      0.704534,
+      0.414568,
+      0
+    ],
+    "height": 224,
+    "lora": [
+      {
+        "path": "loras/qwen-image-21/lenovo_qwen21.safetensors",
+        "sha256": "7f1e95c3ec1e9c7cea197f7b6f80f601af8e6b479f6ead78ab16df542f447c0e",
+        "strength_clip": 0.0,
+        "strength_model": 1.0
+      }
+    ],
+    "negative_prompt": "",
+    "purpose": "isolated LoRA functional parity against frozen ComfyUI; no production runtime inputs; earlier unpatched controls preserved",
+    "reference_resolution": 256,
+    "reference_vae": true,
+    "references": [
+      {
+        "byte_multiplier": 37,
+        "byte_offset": 19,
+        "shape": [
+          1,
+          64,
+          96,
+          4
+        ]
+      }
+    ],
+    "sampler": "euler",
+    "scheduler": "simple",
+    "schema": 1,
+    "seed": 3061383787,
+    "shift": 0.69,
+    "source_configuration": {
+      "attention": "pytorch",
+      "compute_dtype": "bfloat16",
+      "disable_async_offload": true,
+      "disable_comfy_compiler": true,
+      "force_full_load_per_component": false,
+      "kitchen_triton": false,
+      "prefix_cache_device": "auto",
+      "prefix_cache_dtype": "default",
+      "static_patcher": true,
+      "unload_between_components": true
+    },
+    "steps": 8,
+    "synthetic_prompt": "Change the reference image to a blue butterfly resting on a yellow flower, soft daylight.",
+    "variant": "turbo_bf16",
+    "width": 320
+  },
+  "status": "headers_preflight_passed",
+  "trained_forward_executed": false
+}

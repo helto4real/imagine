@@ -1,0 +1,14 @@
+{
+  "qwen-image21-lora.json": {
+    "exact": true,
+    "sha256": "f99fc910b0a3b80f1452e5ca492cda95fb1b75346b1e347c60d4178097ccb31a"
+  },
+  "qwen-image21-lora-weight.json": {
+    "exact": true,
+    "sha256": "6dadccc190bcc40b1fcb28f5ee1fc75187a1b9435edb6dc01fb80af011a50f70"
+  },
+  "qwen-image21-lora-lifecycle.json": {
+    "exact": true,
+    "sha256": "791968f25712f374526c8a8bfb8ad4cc363a0337b3cc172a92647dc6bb0dbbe9"
+  }
+}

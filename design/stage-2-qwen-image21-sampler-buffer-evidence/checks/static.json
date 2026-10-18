@@ -1,0 +1,27 @@
+{
+  "fmt": "passed",
+  "all_targets_clippy_deny_warnings": "passed",
+  "locked_offline_build": "passed",
+  "python_asts": 3,
+  "shell_syntax": "passed",
+  "focused_whitespace": "passed",
+  "historical_1600_evidence_hashes_verified": 51,
+  "historical_source_snapshots": {
+    "design/stage-2-qwen-image21-coverage.json": "before/design/stage-2-qwen-image21-coverage.json",
+    "design/stage-2-qwen-image21.md": "before/design/stage-2-qwen-image21.md",
+    "inference/README.md": "before/inference/README.md",
+    "inference/fixtures/README.md": "before/inference/fixtures/README.md",
+    "inference/src/bin/qwen21-first-image.rs": "before/inference/src/bin/qwen21-first-image.rs",
+    "inference/src/models/qwen_image21/offload.rs": "before/inference/src/models/qwen_image21/offload.rs",
+    "inference/tests/support/qwen_offload.rs": "before/inference/tests/support/qwen_offload.rs",
+    "inference/tools/check_qwen_image21.sh": "before/inference/tools/check_qwen_image21.sh",
+    "inference/tools/compare_qwen_first_image.py": "before/inference/tools/compare_qwen_first_image.py",
+    "inference/tools/reference_qwen_editing.py": "before/inference/tools/reference_qwen_editing.py"
+  },
+  "stage0_lock_hashes": {
+    "reference-lock.json": "4765e81dfe84ff32ee8352ba84c68e89f578876061fdbcd439a3a7ccac7674bb",
+    "source-manifest.json": "3e233cb602129a5e6bcb51aecd8e4215448551e176e8286df04fbf47ecd781c9",
+    "source-acquisition-lock.json": "b1148f2b24bb2fa66f69478cc1ec7960acfe4579f4aae18c63e88815ba220e77",
+    "native-linkage-lock.json": "37737a4525ec3db12f6314d2dd0e69a8fb4c5374d8ad04797ade0447e110bfa6"
+  }
+}

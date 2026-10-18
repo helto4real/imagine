@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "metrics": {
+    "context": {
+      "shape": [
+        1,
+        31,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26",
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 126976,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "latent": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "6b0f54cf51a57cc965b510d259e317d9a5429e2f754eaa9ec30645bad0b8cdce",
+        "6b0f54cf51a57cc965b510d259e317d9a5429e2f754eaa9ec30645bad0b8cdce"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 17920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "image-rgba": {
+      "shape": [
+        1,
+        224,
+        320,
+        4
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "2d8d08e90b4682ca5104e74bb809e62c94cbdfae4503263b70d65256680dc289",
+        "2d8d08e90b4682ca5104e74bb809e62c94cbdfae4503263b70d65256680dc289"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 286720,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "sigmas": {
+      "shape": [
+        9
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "fe5385494537d4b785034e9728ce82a163e0123ffba1f2d4b476688321a6e098",
+        "fe5385494537d4b785034e9728ce82a163e0123ffba1f2d4b476688321a6e098"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 9,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "negative-context": {
+      "shape": [
+        1,
+        15,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660",
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 61440,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-vision-0": {
+      "shape": [
+        1,
+        224,
+        320,
+        3
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8",
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 215040,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-latent-0": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206",
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 17920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "png_rgba8": {
+      "exact": true,
+      "unequal_channels": 0,
+      "unequal_pixels": 0,
+      "max_abs": 0,
+      "mean_abs": 0.0
+    }
+  },
+  "timings_seconds": {
+    "rust": {
+      "dit_load": 5.183012643,
+      "pipeline_wall_including_unload_and_intermediate_export": 12.696748198,
+      "reference_vae_load_and_encode": 0.462416557,
+      "sampling": 2.582143056,
+      "text_encode": 0.605140091,
+      "text_load": 1.391054494,
+      "vae_decode": 0.068955408,
+      "vae_load": 0.303305155
+    },
+    "python": {
+      "reference_vae_load_and_encode": 0.44493852090090513,
+      "text_load": 14.580202024197206,
+      "text_encode": 1.031437313882634,
+      "dit_load": 2.80910884286277,
+      "sampling": 1.47792758513242,
+      "vae_load": 0.481977665098384,
+      "vae_decode": 0.0732561971526593,
+      "pipeline_wall_including_unload_and_intermediate_export": 22.12264374899678
+    }
+  },
+  "scope": "DIAGNOSTIC: Rust replays recorded original placements; automatic physical-memory decisions are not acceptance evidence here. One first-process 320x224 8-step synthetic turbo_bf16 DiT sample; OS model cache already warm. Not a production quality or steady-state benchmark.",
+  "production_runtime_read": false,
+  "lora_patched_parameters": {
+    "text": 0,
+    "dit": 192
+  },
+  "diagnostic_memory_plan": true
+}

@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "metrics": {
+    "context": {
+      "shape": [
+        1,
+        31,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26",
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 126976,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "latent": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "3083edb8034356bd312fc885fd13a97d8d7d21b409942601194edbe8b6e5186b",
+        "3083edb8034356bd312fc885fd13a97d8d7d21b409942601194edbe8b6e5186b"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 17920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "image-rgba": {
+      "shape": [
+        1,
+        224,
+        320,
+        4
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "ef93d2973a77b07b12baf84d38762e33037eaf22366b8ffbe3148a2ddecc707b",
+        "ef93d2973a77b07b12baf84d38762e33037eaf22366b8ffbe3148a2ddecc707b"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 286720,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "sigmas": {
+      "shape": [
+        9
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "fe5385494537d4b785034e9728ce82a163e0123ffba1f2d4b476688321a6e098",
+        "fe5385494537d4b785034e9728ce82a163e0123ffba1f2d4b476688321a6e098"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 9,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "negative-context": {
+      "shape": [
+        1,
+        15,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660",
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 61440,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-vision-0": {
+      "shape": [
+        1,
+        224,
+        320,
+        3
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8",
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 215040,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-latent-0": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206",
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 17920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "png_rgba8": {
+      "exact": true,
+      "unequal_channels": 0,
+      "unequal_pixels": 0,
+      "max_abs": 0,
+      "mean_abs": 0.0
+    }
+  },
+  "timings_seconds": {
+    "rust": {
+      "dit_load": 13.996469634,
+      "pipeline_wall_including_unload_and_intermediate_export": 21.672144189,
+      "reference_vae_load_and_encode": 0.431573781,
+      "sampling": 1.190248033,
+      "text_encode": 0.584027838,
+      "text_load": 2.321505955,
+      "vae_decode": 0.050795653,
+      "vae_load": 1.08512779
+    },
+    "python": {
+      "reference_vae_load_and_encode": 0.4105841349810362,
+      "text_load": 14.090491412905976,
+      "text_encode": 0.7219056969042867,
+      "dit_load": 3.045972263906151,
+      "sampling": 1.2281855449546129,
+      "vae_load": 0.29813879216089845,
+      "vae_decode": 0.05427540000528097,
+      "pipeline_wall_including_unload_and_intermediate_export": 20.953552482882515
+    }
+  },
+  "scope": "One first-process 320x224 8-step synthetic turbo_bf16 DiT sample; OS model cache already warm. Not a production quality or steady-state benchmark.",
+  "production_runtime_read": false,
+  "lora_patched_parameters": {
+    "text": 0,
+    "dit": 192
+  },
+  "diagnostic_memory_plan": false
+}

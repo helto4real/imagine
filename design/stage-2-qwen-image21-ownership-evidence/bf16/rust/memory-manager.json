@@ -1,0 +1,17 @@
+[
+  {
+    "phase": "dit_initial",
+    "registered_models": 1,
+    "total_pinned_bytes": 1577058304
+  },
+  {
+    "phase": "dit_sampling",
+    "registered_models": 1,
+    "total_pinned_bytes": 1577058304
+  },
+  {
+    "phase": "dit_unloaded",
+    "registered_models": 0,
+    "total_pinned_bytes": 0
+  }
+]

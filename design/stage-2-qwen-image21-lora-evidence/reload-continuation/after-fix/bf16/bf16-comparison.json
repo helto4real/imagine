@@ -1,0 +1,153 @@
+{
+  "schema": 1,
+  "metrics": {
+    "context": {
+      "shape": [
+        1,
+        31,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26",
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 126976,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "latent": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": false,
+      "hashes": [
+        "2a0f03ec5432e7dab36d020a5325d25eb2c7d720bdd96a33ee726ce85f062e4d",
+        "bf7e50eff7e554d61bd2179bd5d3f04a4567bc8dd15cf734e306f4e9496d29cd"
+      ],
+      "all_finite": true,
+      "unequal_values": 17770,
+      "values": 17920,
+      "max_abs": 0.4220278263092041,
+      "mean_abs": 0.03645680425163716,
+      "rmse": 0.0481906532509701
+    },
+    "image-rgba": {
+      "shape": [
+        1,
+        224,
+        320,
+        4
+      ],
+      "exact_bytes": false,
+      "hashes": [
+        "08b0b00bf07b8d84163151f72b54a0be75185bdb2dfa5900d5fb1dd86ab0a000",
+        "0b5f7ad38eb39dbe117df22da826830692c87040f8a2f09df331b0e4e6f0a4ef"
+      ],
+      "all_finite": true,
+      "unequal_values": 206256,
+      "values": 286720,
+      "max_abs": 0.11474609375,
+      "mean_abs": 0.003605155922040077,
+      "rmse": 0.005688628531213631
+    },
+    "negative-context": {
+      "shape": [
+        1,
+        15,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660",
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 61440,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-vision-0": {
+      "shape": [
+        1,
+        224,
+        320,
+        3
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8",
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 215040,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-latent-0": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206",
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 17920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "png_rgba8": {
+      "exact": false,
+      "unequal_channels": 158040,
+      "unequal_pixels": 69552,
+      "max_abs": 29,
+      "mean_abs": 0.9135219029017857
+    }
+  },
+  "timings_seconds": {
+    "rust": {
+      "dit_load": 3.56554539,
+      "pipeline_wall_including_unload_and_intermediate_export": 10.720333744,
+      "reference_vae_load_and_encode": 0.435837118,
+      "sampling": 0.693418304,
+      "text_encode": 0.587825044,
+      "text_load": 2.753516789,
+      "vae_decode": 0.053584709,
+      "vae_load": 0.552201669
+    },
+    "python": {
+      "reference_vae_load_and_encode": 0.8991069279145449,
+      "text_load": 13.774442333960906,
+      "text_encode": 0.8776035928167403,
+      "dit_load": 2.8207514518871903,
+      "sampling": 0.7131725989747792,
+      "vae_load": 0.23025577911175787,
+      "vae_decode": 0.07017557392828166,
+      "pipeline_wall_including_unload_and_intermediate_export": 20.517449256032705
+    }
+  },
+  "scope": "One first-process 320x224 4-step synthetic bf16 DiT sample; OS model cache already warm. Not a production quality or steady-state benchmark.",
+  "production_runtime_read": false,
+  "lora_patched_parameters": {
+    "text": 0,
+    "dit": 192
+  },
+  "diagnostic_memory_plan": false
+}

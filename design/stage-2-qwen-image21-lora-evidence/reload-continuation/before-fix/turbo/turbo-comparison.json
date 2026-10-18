@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "metrics": {
+    "context": {
+      "shape": [
+        1,
+        31,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26",
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 126976,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "latent": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": false,
+      "hashes": [
+        "3083edb8034356bd312fc885fd13a97d8d7d21b409942601194edbe8b6e5186b",
+        "d80a7946fc3be89f99d293de185a777cd84404532c6f1aee29433fcf94d99a40"
+      ],
+      "all_finite": true,
+      "unequal_values": 17855,
+      "values": 17920,
+      "max_abs": 0.26295948028564453,
+      "mean_abs": 0.020601827174998887,
+      "rmse": 0.029905757168418062
+    },
+    "image-rgba": {
+      "shape": [
+        1,
+        224,
+        320,
+        4
+      ],
+      "exact_bytes": false,
+      "hashes": [
+        "ef93d2973a77b07b12baf84d38762e33037eaf22366b8ffbe3148a2ddecc707b",
+        "0788e578d14a89ee79964239d22faf7c53134d60f79c34394593dc394babb03b"
+      ],
+      "all_finite": true,
+      "unequal_values": 149274,
+      "values": 286720,
+      "max_abs": 0.13037109375,
+      "mean_abs": 0.00177019167479427,
+      "rmse": 0.0041694536012257385
+    },
+    "sigmas": {
+      "shape": [
+        9
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "fe5385494537d4b785034e9728ce82a163e0123ffba1f2d4b476688321a6e098",
+        "fe5385494537d4b785034e9728ce82a163e0123ffba1f2d4b476688321a6e098"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 9,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "negative-context": {
+      "shape": [
+        1,
+        15,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660",
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 61440,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-vision-0": {
+      "shape": [
+        1,
+        224,
+        320,
+        3
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8",
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 215040,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-latent-0": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206",
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 17920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "png_rgba8": {
+      "exact": false,
+      "unequal_channels": 85416,
+      "unequal_pixels": 50940,
+      "max_abs": 33,
+      "mean_abs": 0.4518310546875
+    }
+  },
+  "timings_seconds": {
+    "rust": {
+      "dit_load": 19.023306854,
+      "pipeline_wall_including_unload_and_intermediate_export": 25.883991806,
+      "reference_vae_load_and_encode": 1.3043165079999999,
+      "sampling": 1.194588725,
+      "text_encode": 0.57060117,
+      "text_load": 1.31547511,
+      "vae_decode": 0.060164331,
+      "vae_load": 0.341482745
+    },
+    "python": {
+      "reference_vae_load_and_encode": 1.0507091518957168,
+      "text_load": 2.8047241719905287,
+      "text_encode": 0.8102937480434775,
+      "dit_load": 4.264783806167543,
+      "sampling": 1.2132058951538056,
+      "vae_load": 0.27552485512569547,
+      "vae_decode": 0.05734737287275493,
+      "pipeline_wall_including_unload_and_intermediate_export": 11.635531655978411
+    }
+  },
+  "scope": "One first-process 320x224 8-step synthetic turbo_bf16 DiT sample; OS model cache already warm. Not a production quality or steady-state benchmark.",
+  "production_runtime_read": false,
+  "lora_patched_parameters": {
+    "text": 0,
+    "dit": 192
+  },
+  "diagnostic_memory_plan": false
+}

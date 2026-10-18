@@ -1,0 +1,219 @@
+--- design/stage-2-qwen-image21-ownership-evidence/before/inference/src/models/qwen_image21/offload.rs	2026-10-18 17:22:57.940387506 +0200
++++ inference/src/models/qwen_image21/offload.rs	2026-10-18 17:34:49.820419553 +0200
+@@ -498,6 +498,8 @@
+     pins: BTreeMap<String, Tensor>,
+     native: Kitchen,
+     pin_limit: f64,
++    shared_pins: Option<super::HostPins>,
++    forced_lowvram: BTreeSet<String>,
+     pub pinned_bytes: u64,
+ }
+ impl StaticOffload {
+@@ -529,6 +531,8 @@
+             model_lowvram: false,
+             pins: BTreeMap::new(),
+             pin_limit: host_pin_limit()?,
++            shared_pins: None,
++            forced_lowvram: BTreeSet::new(),
+             pinned_bytes: 0,
+             native,
+         })
+@@ -536,6 +540,26 @@
+     pub fn model_size(&self) -> u64 {
+         self.model_size
+     }
++    pub fn with_shared_pins(mut self, pins: super::HostPins) -> Self {
++        self.shared_pins = Some(pins);
++        self
++    }
++    pub fn partially_load_with_runtime(
++        &mut self,
++        rt: &crate::execution::Runtime,
++        extra: f64,
++        force: bool,
++    ) -> Result<(), Error> {
++        self.partially_load_forced(extra, Some(rt), force)
++    }
++    pub(crate) fn load_after_unpatch(
++        &mut self,
++        rt: &crate::execution::Runtime,
++        extra: f64,
++        force: bool,
++    ) -> Result<(), Error> {
++        self.load_or_unload(extra, Some(rt), force, false)
++    }
+     /// Original partially_load on the selected single owner, without hooks/clones.
+     pub fn partially_load(&mut self, extra_memory: f64) -> Result<(), Error> {
+         self.partially_load_impl(extra_memory, None)
+@@ -545,10 +569,27 @@
+         extra: f64,
+         rt: Option<&crate::execution::Runtime>,
+     ) -> Result<(), Error> {
+-        if extra < 0. {
++        self.partially_load_forced(extra, rt, false)
++    }
++    fn partially_load_forced(
++        &mut self,
++        extra: f64,
++        rt: Option<&crate::execution::Runtime>,
++        force: bool,
++    ) -> Result<(), Error> {
++        self.load_or_unload(extra, rt, force, true)
++    }
++    fn load_or_unload(
++        &mut self,
++        extra: f64,
++        rt: Option<&crate::execution::Runtime>,
++        force: bool,
++        unload_negative: bool,
++    ) -> Result<(), Error> {
++        if extra < 0. && unload_negative {
+             let mut next = self.placement.clone();
+             next.unload(&self.modules, -extra);
+-            self.apply_impl(next, rt)?;
++            self.apply_impl_forced(next, rt, force)?;
+             self.model_lowvram = true;
+             // partially_unload moves selected leaf modules only, not buffers.
+             return Ok(());
+@@ -568,7 +609,7 @@
+         }
+         let lowvram = !next.lowvram_passes.is_empty();
+         let result = (|| {
+-            self.apply_impl(next, rt)?;
++            self.apply_impl_forced(next, rt, force)?;
+             if full && !lowvram {
+                 self.sampling.to_device(Device::Cuda(0))?;
+                 self.placement.loaded_bytes = self.model_size as i64;
+@@ -584,10 +625,15 @@
+     /// Original unpatch_model(offload_device, unpatch_weights=True).
+     pub fn unload(&mut self) -> Result<(), Error> {
+         for (_, t) in std::mem::take(&mut self.pins) {
+-            self.native.host_registration(&t, false)?;
++            if let Some(pins) = &self.shared_pins {
++                pins.unpin(&t)?;
++            } else {
++                self.native.host_registration(&t, false)?;
++            }
+         }
+         self.pinned_bytes = 0;
+         self.patch_owner.restore(&mut self.parameters)?;
++        self.forced_lowvram.clear();
+         for value in self.parameters.values.values_mut() {
+             *value = move_parameter(&self.native, value, Device::Cpu)?;
+         }
+@@ -637,6 +683,14 @@
+         next: StaticPlacement,
+         rt: Option<&crate::execution::Runtime>,
+     ) -> Result<(), Error> {
++        self.apply_impl_forced(next, rt, false)
++    }
++    fn apply_impl_forced(
++        &mut self,
++        next: StaticPlacement,
++        rt: Option<&crate::execution::Runtime>,
++        force: bool,
++    ) -> Result<(), Error> {
+         if !self.patch_owner.patches.is_empty() && rt.is_none() {
+             return Err(gap("Patched static owner requires its original runtime"));
+         }
+@@ -664,10 +718,38 @@
+         // load configures lazy functions before patching any resident weights.
+         for m in &self.modules {
+             for name in &m.parameters {
++                if next.resident.contains(&m.name) {
++                    self.forced_lowvram.remove(name);
++                }
++                if force
++                    && next.lowvram_passes.contains_key(&m.name)
++                    && !self.placement.lowvram_passes.contains_key(&m.name)
++                    && let Some(patches) = self.patch_owner.patches.get(name)
++                {
++                    let base = self.parameters[name].clone();
++                    let patched = unsafe {
++                        crate::patching::patch_weight(
++                            rt.unwrap(),
++                            &base,
++                            patches,
++                            &format!("{}{name}", self.patch_owner.key_prefix),
++                            Device::Cpu,
++                            Kind::Float,
++                            &mut self.patch_owner.diagnostics,
++                        )?
++                    };
++                    self.patch_owner.backup.insert(name.clone(), base);
++                    self.parameters.values.insert(name.clone(), patched);
++                    self.forced_lowvram.insert(name.clone());
++                }
+                 self.patch_owner.bind_lowvram(
+                     &mut self.parameters,
+                     name,
+-                    next.lowvram_passes.get(&m.name).copied().unwrap_or(0),
++                    if self.forced_lowvram.contains(name) {
++                        0
++                    } else {
++                        next.lowvram_passes.get(&m.name).copied().unwrap_or(0)
++                    },
+                 );
+             }
+         }
+@@ -678,14 +760,15 @@
+                         continue;
+                     }
+                     for name in &m.parameters {
+-                        if let Some(t) = self.pins.remove(name)
+-                            && self.native.host_registration(&t, false)?
+-                        {
++                        if let Some(t) = self.pins.remove(name) {
++                            if let Some(pins) = &self.shared_pins {
++                                pins.unpin(&t)?;
++                            } else {
++                                self.native.host_registration(&t, false)?;
++                            }
+                             self.pinned_bytes -= (t.numel() * t.kind().elt_size_in_bytes()) as u64;
+                         }
+-                        if let Some(patches) = self.patch_owner.patches.get(name)
+-                            && !self.patch_owner.backup.contains_key(name)
+-                        {
++                        if let Some(patches) = self.patch_owner.patches.get(name) {
+                             let base = self.parameters[name].clone();
+                             let patched = unsafe {
+                                 crate::patching::patch_weight(
+@@ -699,7 +782,7 @@
+                                 )?
+                             };
+                             let saved = parameter_to_device(&self.native, &base, Device::Cpu)?;
+-                            self.patch_owner.backup.insert(name.clone(), saved);
++                            self.patch_owner.backup.entry(name.clone()).or_insert(saved);
+                             self.parameters.values.insert(name.clone(), patched);
+                         }
+                     }
+@@ -740,9 +823,13 @@
+             value => value.as_tensor()?,
+         };
+         let bytes = (t.numel() * t.kind().elt_size_in_bytes()) as u64;
+-        if self.pinned_bytes as f64 + bytes as f64 <= self.pin_limit
+-            && self.native.host_registration(&t, true)?
+-        {
++        let pinned = if let Some(pins) = &self.shared_pins {
++            pins.pin(&t)?
++        } else {
++            self.pinned_bytes as f64 + bytes as f64 <= self.pin_limit
++                && self.native.host_registration(&t, true)?
++        };
++        if pinned {
+             self.pinned_bytes += bytes;
+             self.pins.insert(name.to_owned(), t);
+         }
+@@ -785,7 +872,11 @@
+     fn drop(&mut self) {
+         let _ = self.native.synchronize_device(0);
+         for t in self.pins.values() {
+-            let _ = self.native.host_registration(t, false);
++            if let Some(pins) = &self.shared_pins {
++                let _ = pins.unpin(t);
++            } else {
++                let _ = self.native.host_registration(t, false);
++            }
+         }
+     }
+ }

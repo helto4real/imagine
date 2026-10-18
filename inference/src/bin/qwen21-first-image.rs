@@ -100,6 +100,18 @@ fn load(
     }
     Ok(q::prepare_initial_component(rt, component, state, device)?)
 }
+fn record_lora(
+    own: &Path,
+    component: &str,
+    owner: &imagine_inference::patching::PatchOwner,
+) -> Result<()> {
+    let observations=owner.patches.iter().map(|(key,patches)|(format!("{}{key}",owner.key_prefix),patches.iter().map(|p|json!({"strength":p.strength,"model_strength":p.model_strength,"offset":p.offset})).collect::<Vec<_>>())).collect::<BTreeMap<_,_>>();
+    fs::write(
+        own.join(format!("lora-{component}.json")),
+        serde_json::to_vec_pretty(&observations)?,
+    )?;
+    Ok(())
+}
 fn validate_profile(p: &Value) -> Result<()> {
     let registered = [
         include_str!("../../profiles/qwen21-first-int8.json"),
@@ -116,6 +128,12 @@ fn validate_profile(p: &Value) -> Result<()> {
         include_str!("../../profiles/qwen21-portrait-1mpx-int8.json"),
         include_str!("../../profiles/qwen21-editing-portrait-1mpx-int8.json"),
         include_str!("../../profiles/qwen21-editing-portrait-1mpx-int8-seed3061383787.json"),
+        include_str!("../../profiles/qwen21-lora-int8.json"),
+        include_str!("../../profiles/qwen21-lora-bf16.json"),
+        include_str!("../../profiles/qwen21-lora-turbo.json"),
+        include_str!("../../profiles/qwen21-lora-text-int8.json"),
+        include_str!("../../profiles/qwen21-lora-stack-int8.json"),
+        include_str!("../../profiles/qwen21-lora-portrait-1600-int8.json"),
     ];
     if !registered
         .iter()
@@ -170,10 +188,74 @@ impl q::EulerExecution for Denoiser<'_> {
         Ok(())
     }
 }
+// Explicit development diagnostic: replay recorded original placements to
+// distinguish arithmetic differences from different physical allocator inputs.
+// Normal runs continue to use the original automatic load policy.
+fn replay_memory_plan(
+    rt: &Runtime,
+    owner: &mut q::StaticOffload,
+    own: &Path,
+    profile: &Value,
+    phase: &str,
+) -> Result<()> {
+    let path = own.join("reference-memory-plan.json");
+    if !path.is_file() {
+        return Ok(());
+    }
+    let plan: Value = serde_json::from_slice(&fs::read(path)?)?;
+    if plan["profile"] != *profile {
+        return Err("Recorded memory diagnostic profile differs".into());
+    }
+    let record = plan["phases"]
+        .as_array()
+        .ok_or("Missing diagnostic phases")?
+        .iter()
+        .find(|p| p["phase"] == phase)
+        .ok_or("Missing diagnostic phase")?;
+    let placement = q::StaticPlacement {
+        resident: record["resident"]
+            .as_array()
+            .ok_or("Missing diagnostic residency")?
+            .iter()
+            .map(|s| s.as_str().unwrap().to_owned())
+            .collect(),
+        loaded_bytes: record["loaded_bytes"].as_i64().unwrap(),
+        buffer_bytes: record["buffer_bytes"].as_u64().unwrap(),
+        lowvram_passes: serde_json::from_value(
+            record
+                .get("lowvram_passes")
+                .ok_or("Recorded diagnostic lacks original lowvram function state")?
+                .clone(),
+        )?,
+    };
+    let sampling_device = match record["sampler_buffer"]["device"].as_str() {
+        Some("cpu") => Device::Cpu,
+        Some("cuda:0") => Device::Cuda(0),
+        _ => return Err("Recorded diagnostic lacks sampler buffer placement".into()),
+    };
+    let lowvram = record["model_lowvram"]
+        .as_bool()
+        .ok_or("Recorded diagnostic lacks lowvram state")?;
+    owner.replay_state(rt, placement, sampling_device, lowvram)?;
+    Ok(())
+}
+fn memory_record(output: &Path, phase: &str, owner: &q::StaticOffload) -> Result<Value> {
+    save_f32(
+        &owner.sampling.sigmas,
+        &output.join(format!("sampler-{phase}-f32.bin")),
+    )?;
+    Ok(
+        json!({"phase":phase,"placement":owner.placement,"pinned_bytes":owner.pinned_bytes,
+        "model_size":owner.model_size(),"model_lowvram":owner.model_lowvram,
+        "sampler_buffer":{"device":if owner.sampling.sigmas.device()==Device::Cpu {"cpu"} else {"cuda:0"},
+            "dtype":"float32","shape":owner.sampling.sigmas.size(),"bytes":owner.sampling.buffer_bytes()}}),
+    )
+}
 fn generate(
     rt: &Runtime,
     aimdo: &Aimdo,
     paths: &BTreeMap<String, PathBuf>,
+    model_root: &Path,
     p: &Value,
     own: &Path,
 ) -> Result<()> {
@@ -181,9 +263,44 @@ fn generate(
     let output = own.join("first-image");
     fs::create_dir(&output)?;
     let total_start = Instant::now();
+    let mut loras = Vec::new();
+    for spec in p["lora"].as_array().unwrap() {
+        let relative = Path::new(spec["path"].as_str().ok_or("Missing LoRA path")?);
+        if relative.is_absolute()
+            || relative
+                .components()
+                .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
+            return Err("Invalid registered LoRA path".into());
+        }
+        let path = model_root.join(relative);
+        if hash_file(&path)? != spec["sha256"].as_str().ok_or("Missing LoRA hash")? {
+            return Err("Registered LoRA hash changed".into());
+        }
+        let state = Safetensors::load_aimdo(&path, aimdo, &rt.native)?
+            .tensors
+            .into_iter()
+            .map(|(n, t)| {
+                (
+                    n,
+                    imagine_inference::execution_value::Value::tensor(t.tensor),
+                )
+            })
+            .collect();
+        loras.push((
+            state,
+            spec["strength_model"].as_f64().unwrap(),
+            spec["strength_clip"].as_f64().unwrap(),
+        ));
+    }
+
     let mut timings = BTreeMap::new();
     let offload = p["source_configuration"]["force_full_load_per_component"] == false;
     let mut memory_records = Vec::new();
+    let mut manager_records = Vec::new();
+    let pins = q::HostPins::new(rt.native.clone())?;
+    let mut memory_manager = imagine_inference::memory::Manager::new();
+    let mut memory_services = q::StaticMemoryServices::new(rt.native.clone(), pins.clone());
     let dev = Device::Cuda(0);
     let editing = p.get("reference_resolution").is_some();
     let mut references = None;
@@ -301,7 +418,12 @@ fn generate(
     let conditioning = {
         eprintln!("loading text component");
         let start = Instant::now();
-        let params = load(rt, aimdo, "text", &paths["text"], dev)?;
+        let mut params = load(rt, aimdo, "text", &paths["text"], dev)?;
+        let mut patches = q::component_patch_owner("text", &params, &loras)?;
+        record_lora(&output, "text", &patches)?;
+        unsafe {
+            patches.apply(rt, &mut params, dev, Kind::Half)?;
+        }
         let encoder = q::QwenTextEncoder::from_parameters(Default::default(), &params)?;
         let vision = if editing {
             Some(q::QwenVisionEncoder::from_parameters(
@@ -396,23 +518,54 @@ fn generate(
         eprintln!("loading diffusion component");
         let start = Instant::now();
         let load_start = start;
-        let mut managed = if offload {
+        let managed = if offload {
             let params = load(rt, aimdo, "dit", &paths["dit"], Device::Cpu)?;
-            let mut owner = q::StaticOffload::new(params, rt.native.clone())?;
-            owner.load_for(None, 0.)?;
-            memory_records.push(json!({"phase":"dit_initial", "placement":owner.placement,"pinned_bytes":owner.pinned_bytes}));
-            Some(owner)
+            let patches = q::component_patch_owner("dit", &params, &loras)?;
+            record_lora(&output, "dit", &patches)?;
+            let owner = q::StaticOffload::new(params, rt.native.clone())?
+                .with_shared_pins(pins.clone())
+                .with_patches(patches)?;
+            Some(q::StaticModel::new(owner, rt))
         } else {
             None
+        };
+        let patcher = managed.as_ref().map(|model| model.patcher());
+        if let (Some(model), Some(patcher)) = (&managed, &patcher) {
+            memory_manager.load(
+                std::slice::from_ref(patcher),
+                0.,
+                None,
+                false,
+                false,
+                &mut memory_services,
+            )?;
+            let mut owner = model.owner.borrow_mut();
+            replay_memory_plan(rt, &mut owner, own, p, "dit_initial")?;
+            memory_records.push(memory_record(&output, "dit_initial", &owner)?);
+            manager_records.push(json!({"phase":"dit_initial","registered_models":memory_manager.registrations(),"total_pinned_bytes":pins.bytes()}));
+        }
+        let mut resident_sampling = if offload {
+            None
+        } else {
+            Some(q::FluxSampling::qwen21()?)
         };
         let resident = if offload {
             None
         } else {
-            Some(load(rt, aimdo, "dit", &paths["dit"], dev)?)
+            Some({
+                let mut params = load(rt, aimdo, "dit", &paths["dit"], dev)?;
+                let mut patches = q::component_patch_owner("dit", &params, &loras)?;
+                record_lora(&output, "dit", &patches)?;
+                unsafe {
+                    patches.apply(rt, &mut params, dev, Kind::Half)?;
+                }
+                resident_sampling.as_mut().unwrap().to_device(dev)?;
+                params
+            })
         };
         timings.insert("dit_load", elapsed(rt, start)?);
         let start = Instant::now();
-        if let Some(owner) = &mut managed {
+        if let (Some(model), Some(patcher)) = (&managed, &patcher) {
             let refs = references
                 .as_ref()
                 .map(|r| {
@@ -428,10 +581,21 @@ fn generate(
                 vec![]
             };
             let (required, minimum) = q::qwen_sampling_memory_with_references(&shape, &groups);
-            owner.load_for(Some(minimum), required)?;
-            memory_records.push(json!({"phase":"dit_sampling", "placement":owner.placement,"pinned_bytes":owner.pinned_bytes}));
+            memory_manager.load(
+                std::slice::from_ref(patcher),
+                required,
+                Some(minimum),
+                false,
+                false,
+                &mut memory_services,
+            )?;
+            let mut owner = model.owner.borrow_mut();
+            replay_memory_plan(rt, &mut owner, own, p, "dit_sampling")?;
+            memory_records.push(memory_record(&output, "dit_sampling", &owner)?);
+            manager_records.push(json!({"phase":"dit_sampling","registered_models":memory_manager.registrations(),"total_pinned_bytes":pins.bytes()}));
         }
-        let params = managed
+        let borrowed = managed.as_ref().map(|model| model.owner.borrow());
+        let params = borrowed
             .as_ref()
             .map(|m| &m.parameters)
             .or(resident.as_ref())
@@ -440,10 +604,7 @@ fn generate(
         let mut cache = q::PrefixCache::new(
             rt,
             Default::default(),
-            q::StaticCacheServices::new(
-                rt.native.clone(),
-                managed.as_ref().map_or(0, |m| m.pinned_bytes as usize),
-            )?,
+            q::StaticCacheServices::with_shared_pins(rt.native.clone(), pins.clone())?,
         );
         model.reset_prefix_cache(true, &mut cache)?;
         let exec = q::ResidentExecution::bind(rt, params, model.config.num_layers, attention(dev))?;
@@ -464,7 +625,12 @@ fn generate(
             save_f32(&sigmas, &output.join("sigmas-f32.bin"))?;
             sigmas
         } else {
-            q::FluxSampling::qwen21()?.simple(p["steps"].as_u64().unwrap() as usize)?
+            borrowed
+                .as_ref()
+                .map(|owner| &owner.sampling)
+                .or(resident_sampling.as_ref())
+                .unwrap()
+                .simple(p["steps"].as_u64().unwrap() as usize)?
         }
         .f_to_device(dev)?;
         let mut cpu_rng = rt
@@ -522,6 +688,24 @@ fn generate(
         )?;
         q::PrefixKv::free(&mut denoiser.cache)?;
         timings.insert("sampling", elapsed(rt, start)?);
+        drop(denoiser);
+        drop(model);
+        drop(borrowed);
+        if let Some(model) = &managed {
+            memory_manager.unload_all(dev, &mut memory_services)?;
+            memory_records.push(memory_record(
+                &output,
+                "dit_unloaded",
+                &model.owner.borrow(),
+            )?);
+            manager_records.push(json!({"phase":"dit_unloaded","registered_models":memory_manager.registrations(),"total_pinned_bytes":pins.bytes()}));
+            if memory_manager.registrations() != 0 || pins.bytes() != 0 {
+                return Err("Managed DiT release retained registrations".into());
+            }
+        }
+        if let Some(sampling) = &mut resident_sampling {
+            sampling.to_device(Device::Cpu)?;
+        }
         latent
     };
     rt.native.cuda_soft_empty_cache(0)?;
@@ -567,6 +751,10 @@ fn generate(
             output.join("memory-policy.json"),
             serde_json::to_vec_pretty(&memory_records)?,
         )?;
+        fs::write(
+            output.join("memory-manager.json"),
+            serde_json::to_vec_pretty(&manager_records)?,
+        )?;
     }
     save_f32(&pixels, &output.join("image-rgba-f32.bin"))?;
     pixels.save(output.join("image-rgba-f32.ot"))?;
@@ -579,7 +767,7 @@ fn generate(
     fs::write(
         output.join("result.json"),
         serde_json::to_vec_pretty(
-            &json!({"schema":1,"pixels_shape":pixels.size(),"context_shape":context_shape,"latent_shape":latent_shape,"timings_seconds":timings,"timing_method":"monotonic wall clock, CUDA synchronized at phase boundaries; per-step callbacks before Euler update","dtype":"float32","channels":"RGBA","profile":if editing {"qwen21-editing"} else if p["variant"]=="turbo_bf16" {"qwen21-1600x896-8steps-turbo-offload"} else if offload {"qwen21-1600x896-40steps-bf16-offload"} else if p["variant"]=="bf16" {"qwen21-1600x896-40steps-bf16"} else if p["steps"]==40 {"qwen21-1600x896-40steps-int8"} else if p["width"]==1600 {"qwen21-1600x896-int8"} else {"qwen21-first-int8"},"source_profile":p,"cpu_threads":tch::get_num_threads(),"kitchen_triton_disabled":rt.backends.policy.list_backends()["triton"].disabled,"diagnostic_trace":own.join("trace-enabled").is_file(),"production_runtime_read":false}),
+            &json!({"schema":1,"pixels_shape":pixels.size(),"context_shape":context_shape,"latent_shape":latent_shape,"timings_seconds":timings,"timing_method":"monotonic wall clock, CUDA synchronized at phase boundaries; per-step callbacks before Euler update","dtype":"float32","channels":"RGBA","profile":if editing {"qwen21-editing"} else if p["variant"]=="turbo_bf16" {"qwen21-1600x896-8steps-turbo-offload"} else if offload {"qwen21-1600x896-40steps-bf16-offload"} else if p["variant"]=="bf16" {"qwen21-1600x896-40steps-bf16"} else if p["steps"]==40 {"qwen21-1600x896-40steps-int8"} else if p["width"]==1600 {"qwen21-1600x896-int8"} else {"qwen21-first-int8"},"source_profile":p,"cpu_threads":tch::get_num_threads(),"kitchen_triton_disabled":rt.backends.policy.list_backends()["triton"].disabled,"diagnostic_trace":own.join("trace-enabled").is_file(),"diagnostic_memory_plan":own.join("reference-memory-plan.json").is_file(),"production_runtime_read":false}),
         )?,
     )?;
     Ok(())
@@ -727,5 +915,5 @@ fn main() -> Result<()> {
         println!("Preflight passed. No trained forward or image generation executed.");
         return Ok(());
     }
-    generate(&rt, &aimdo, &paths, &p, &own)
+    generate(&rt, &aimdo, &paths, &model_root, &p, &own)
 }

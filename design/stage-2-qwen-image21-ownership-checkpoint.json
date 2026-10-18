@@ -1,0 +1,513 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "stage": 2,
+  "stage2_complete": false,
+  "status": "selected_shared_static_model_ownership_verified",
+  "report": "stage-2-qwen-image21-ownership.md",
+  "source_revision": "ba994879b88d0ebd9950b1e5c1e923d928f216ba",
+  "prior_report": "stage-2-qwen-image21-sampler-buffer.md",
+  "decisions": [
+    "S2-OWNER-01",
+    "S2-OWNER-02",
+    "S2-OWNER-03",
+    "S2-OWNER-04",
+    "S2-OWNER-05"
+  ],
+  "source_policy_sequences": 18,
+  "source_policy_actions": 23,
+  "actual_clone_states": 22,
+  "actual_two_model_states": 7,
+  "focused_tests_passed": 35,
+  "focused_tests_seconds": 167.95,
+  "new_python_free_tests_passed": 4,
+  "fresh_all_35_isolated_suite": false,
+  "trained_pairs": {
+    "int8-1600": {
+      "profile": "inference/profiles/qwen21-lora-portrait-1600-int8.json",
+      "rust_run": "qwen-ownership-20261018-01-int8-rust",
+      "python_run": "qwen-ownership-20261018-01-int8-python",
+      "tensor_boundaries": 6,
+      "all_finite_exact": true,
+      "png_pixels_exact": true,
+      "automatic_no_replay": true,
+      "lora_patched_parameters": {
+        "text": 0,
+        "dit": 192
+      },
+      "memory_phases": [
+        {
+          "phase": "dit_initial",
+          "loaded_bytes": 7256748608,
+          "buffer_bytes": 0,
+          "pinned_bytes": 0,
+          "resident_modules": 330,
+          "lowvram_modules": 0,
+          "sampler": {
+            "bytes": 40000,
+            "device": "cuda:0",
+            "dtype": "float32",
+            "shape": [
+              10000
+            ]
+          },
+          "all_observed_fields_equal": true
+        },
+        {
+          "phase": "dit_sampling",
+          "loaded_bytes": 7256748608,
+          "buffer_bytes": 0,
+          "pinned_bytes": 0,
+          "resident_modules": 330,
+          "lowvram_modules": 0,
+          "sampler": {
+            "bytes": 40000,
+            "device": "cuda:0",
+            "dtype": "float32",
+            "shape": [
+              10000
+            ]
+          },
+          "all_observed_fields_equal": true
+        },
+        {
+          "phase": "dit_unloaded",
+          "loaded_bytes": 0,
+          "buffer_bytes": 0,
+          "pinned_bytes": 0,
+          "resident_modules": 0,
+          "lowvram_modules": 0,
+          "sampler": {
+            "bytes": 40000,
+            "device": "cpu",
+            "dtype": "float32",
+            "shape": [
+              10000
+            ]
+          },
+          "all_observed_fields_equal": true
+        }
+      ],
+      "manager": [
+        {
+          "phase": "dit_initial",
+          "registered_models": 1,
+          "total_pinned_bytes": 0
+        },
+        {
+          "phase": "dit_sampling",
+          "registered_models": 1,
+          "total_pinned_bytes": 0
+        },
+        {
+          "phase": "dit_unloaded",
+          "registered_models": 0,
+          "total_pinned_bytes": 0
+        }
+      ],
+      "prefix_cache": {
+        "memory_bytes": 5271715840,
+        "pinned_bytes": 5271715840,
+        "staging_buffers": 2,
+        "store_device": "cpu"
+      },
+      "timings_seconds": {
+        "rust": {
+          "dit_load": 1.129093927,
+          "pipeline_wall_including_unload_and_intermediate_export": 103.323030599,
+          "reference_vae_load_and_encode": 0.75087384,
+          "sampling": 87.153578373,
+          "text_encode": 8.326278099,
+          "text_load": 1.249263269,
+          "vae_decode": 1.05488761,
+          "vae_load": 1.07146796
+        },
+        "python": {
+          "reference_vae_load_and_encode": 0.6106878949794918,
+          "text_load": 1.4591777231544256,
+          "text_encode": 8.428681274177507,
+          "dit_load": 1.1729320280719548,
+          "sampling": 86.79543418087997,
+          "vae_load": 0.9022180878091604,
+          "vae_decode": 1.066778883105144,
+          "pipeline_wall_including_unload_and_intermediate_export": 102.25159341003746
+        }
+      }
+    },
+    "bf16": {
+      "profile": "inference/profiles/qwen21-lora-bf16.json",
+      "rust_run": "qwen-ownership-20261018-01-small-bf16-rust",
+      "python_run": "qwen-ownership-20261018-01-small-bf16-python",
+      "tensor_boundaries": 6,
+      "all_finite_exact": true,
+      "png_pixels_exact": true,
+      "automatic_no_replay": true,
+      "lora_patched_parameters": {
+        "text": 0,
+        "dit": 192
+      },
+      "memory_phases": [
+        {
+          "phase": "dit_initial",
+          "loaded_bytes": 12653191168,
+          "buffer_bytes": 100663296,
+          "pinned_bytes": 1577058304,
+          "resident_modules": 283,
+          "lowvram_modules": 47,
+          "sampler": {
+            "bytes": 40000,
+            "device": "cpu",
+            "dtype": "float32",
+            "shape": [
+              10000
+            ]
+          },
+          "all_observed_fields_equal": true
+        },
+        {
+          "phase": "dit_sampling",
+          "loaded_bytes": 12653191168,
+          "buffer_bytes": 100663296,
+          "pinned_bytes": 1577058304,
+          "resident_modules": 283,
+          "lowvram_modules": 47,
+          "sampler": {
+            "bytes": 40000,
+            "device": "cpu",
+            "dtype": "float32",
+            "shape": [
+              10000
+            ]
+          },
+          "all_observed_fields_equal": true
+        },
+        {
+          "phase": "dit_unloaded",
+          "loaded_bytes": 0,
+          "buffer_bytes": 0,
+          "pinned_bytes": 0,
+          "resident_modules": 0,
+          "lowvram_modules": 0,
+          "sampler": {
+            "bytes": 40000,
+            "device": "cpu",
+            "dtype": "float32",
+            "shape": [
+              10000
+            ]
+          },
+          "all_observed_fields_equal": true
+        }
+      ],
+      "manager": [
+        {
+          "phase": "dit_initial",
+          "registered_models": 1,
+          "total_pinned_bytes": 1577058304
+        },
+        {
+          "phase": "dit_sampling",
+          "registered_models": 1,
+          "total_pinned_bytes": 1577058304
+        },
+        {
+          "phase": "dit_unloaded",
+          "registered_models": 0,
+          "total_pinned_bytes": 0
+        }
+      ],
+      "prefix_cache": {
+        "memory_bytes": 163053568,
+        "pinned_bytes": 0,
+        "staging_buffers": 0,
+        "store_device": "cuda:0"
+      },
+      "timings_seconds": {
+        "rust": {
+          "dit_load": 6.392757852,
+          "pipeline_wall_including_unload_and_intermediate_export": 12.095638762,
+          "reference_vae_load_and_encode": 0.380008014,
+          "sampling": 0.79019811,
+          "text_encode": 0.499072075,
+          "text_load": 1.261333741,
+          "vae_decode": 0.064795119,
+          "vae_load": 0.682813785
+        },
+        "python": {
+          "reference_vae_load_and_encode": 0.42264232598245144,
+          "text_load": 10.9329966919031,
+          "text_encode": 0.8125830690842122,
+          "dit_load": 2.744907808955759,
+          "sampling": 0.8170285238884389,
+          "vae_load": 0.5165470058564097,
+          "vae_decode": 0.06640819483436644,
+          "pipeline_wall_including_unload_and_intermediate_export": 17.55888708215207
+        }
+      }
+    },
+    "turbo": {
+      "profile": "inference/profiles/qwen21-lora-turbo.json",
+      "rust_run": "qwen-ownership-20261018-01-small-turbo-rust",
+      "python_run": "qwen-ownership-20261018-01-small-turbo-python",
+      "tensor_boundaries": 7,
+      "all_finite_exact": true,
+      "png_pixels_exact": true,
+      "automatic_no_replay": true,
+      "lora_patched_parameters": {
+        "text": 0,
+        "dit": 192
+      },
+      "memory_phases": [
+        {
+          "phase": "dit_initial",
+          "loaded_bytes": 12653191168,
+          "buffer_bytes": 100663296,
+          "pinned_bytes": 1577058304,
+          "resident_modules": 283,
+          "lowvram_modules": 47,
+          "sampler": {
+            "bytes": 40000,
+            "device": "cpu",
+            "dtype": "float32",
+            "shape": [
+              10000
+            ]
+          },
+          "all_observed_fields_equal": true
+        },
+        {
+          "phase": "dit_sampling",
+          "loaded_bytes": 12653191168,
+          "buffer_bytes": 100663296,
+          "pinned_bytes": 1577058304,
+          "resident_modules": 283,
+          "lowvram_modules": 47,
+          "sampler": {
+            "bytes": 40000,
+            "device": "cpu",
+            "dtype": "float32",
+            "shape": [
+              10000
+            ]
+          },
+          "all_observed_fields_equal": true
+        },
+        {
+          "phase": "dit_unloaded",
+          "loaded_bytes": 0,
+          "buffer_bytes": 0,
+          "pinned_bytes": 0,
+          "resident_modules": 0,
+          "lowvram_modules": 0,
+          "sampler": {
+            "bytes": 40000,
+            "device": "cpu",
+            "dtype": "float32",
+            "shape": [
+              10000
+            ]
+          },
+          "all_observed_fields_equal": true
+        }
+      ],
+      "manager": [
+        {
+          "phase": "dit_initial",
+          "registered_models": 1,
+          "total_pinned_bytes": 1577058304
+        },
+        {
+          "phase": "dit_sampling",
+          "registered_models": 1,
+          "total_pinned_bytes": 1577058304
+        },
+        {
+          "phase": "dit_unloaded",
+          "registered_models": 0,
+          "total_pinned_bytes": 0
+        }
+      ],
+      "prefix_cache": {
+        "memory_bytes": 163053568,
+        "pinned_bytes": 0,
+        "staging_buffers": 0,
+        "store_device": "cuda:0"
+      },
+      "timings_seconds": {
+        "rust": {
+          "dit_load": 3.977352415,
+          "pipeline_wall_including_unload_and_intermediate_export": 11.22102,
+          "reference_vae_load_and_encode": 0.440825611,
+          "sampling": 1.368601956,
+          "text_encode": 0.595144351,
+          "text_load": 2.235166007,
+          "vae_decode": 0.076487947,
+          "vae_load": 0.535425929
+        },
+        "python": {
+          "reference_vae_load_and_encode": 0.3827163251116872,
+          "text_load": 1.4486018461175263,
+          "text_encode": 0.8230367081705481,
+          "dit_load": 2.7040964299812913,
+          "sampling": 1.3895867269020528,
+          "vae_load": 0.25280261784791946,
+          "vae_decode": 0.05404532793909311,
+          "pipeline_wall_including_unload_and_intermediate_export": 8.251601416850463
+        }
+      }
+    }
+  },
+  "isolated_runtime_root": "/tmp/imagine-rust-comfy-parity-20261017/runtime",
+  "pre_change_int8_boundaries_unchanged": true,
+  "original_expected_numerics_relaxed": false,
+  "earlier_exact_test_failure_retained": true,
+  "autotuning_policy": "unchanged",
+  "new_parity_exceptions": [],
+  "approval_pending": false,
+  "production_runtime_read": false,
+  "sandbox_escalation": "approved GPU and namespace validation",
+  "automatic_approval_rejection": false,
+  "committed": false,
+  "pushed": false,
+  "static_checks": {
+    "fmt": true,
+    "all_targets_clippy_deny_warnings": true,
+    "locked_offline_build": true,
+    "python_asts": 2,
+    "shell_syntax": true,
+    "scoped_whitespace": true,
+    "coordinator_recapture_bytes_equal": true,
+    "historical_evidence_files_verified": {
+      "sampler-buffer": 58,
+      "lora-1600": 51,
+      "lora": 408
+    }
+  },
+  "remaining": [
+    "dynamic ownership/vbars/compiler and dynamic pin/RAM eviction",
+    "general encoder/VAE shared-manager binding and OOM/tiling",
+    "arbitrary hook/object/attachment/bypass/shape-changing clones",
+    "broader trained precision/sampling/reuse/failure acceptance"
+  ],
+  "source_inputs_record": "stage-2-qwen-image21-ownership-evidence/verified-inputs.json",
+  "evidence_sha256": {
+    "before/design/stage-2-qwen-image21-coverage.json": "2238ba94c1c95b3b928280ce5c06d1b335fc9cd04c0d605d82f00e99b33348fd",
+    "before/design/stage-2-qwen-image21.md": "10ba343e6bead80ab5d2d7d220a2b615934990a3df761f91181dc0303b10dd8d",
+    "before/inference/src/bin/qwen21-first-image.rs": "28765dde3877a72c0c1ac4b850421986d659ad46700c007679f3f8a4305bf0a1",
+    "before/inference/src/lib.rs": "d63e839d2ad1ff741b70e8bf28bc1a5a7dc8106380b88cf2a05a70a8b7900fec",
+    "before/inference/src/models/qwen_image21/host_cache.rs": "a51bf8d8b729e976e02cf05b5caf84ed26b831d9e994915fe589ac8126b5475a",
+    "before/inference/src/models/qwen_image21/offload.rs": "a655d22eab02bd8df13095d3da88c5630da7eed3c93e35491c3ae7563bf66189",
+    "before/inference/tests/primitives.rs": "e47251670f5d3c4a76ed095ae35586f1e5b32309216b9dc93d0e7663e35e01eb",
+    "before/inference/tools/check_qwen_image21.sh": "6d55ca474116e59b09dba7cf68ace302dbad806b1b70b37713ce48783e7ed82f",
+    "bf16/comparison.json": "b2da0fd70348cbcf00681ff63077103d00d403cb9110c7cb7961d8309605fac1",
+    "bf16/comparison.log": "b2da0fd70348cbcf00681ff63077103d00d403cb9110c7cb7961d8309605fac1",
+    "bf16/isolation.json": "b2c780db00c5bd0946e4b4f98c261cef23671607533397e73feb389b3a7307f8",
+    "bf16/python/conditioning.json": "b024957bb14c9a1ed6a6120bafcd6d7124d99e1edff4f6bfc6df605f132033af",
+    "bf16/python/image.png": "8c3d99efd458e15733ffe7675d2f10e73ad5a757054d2d6c62d85124bf026451",
+    "bf16/python/lora-dit.json": "284d11f3e4d6daabea412a22efbbe22d69d0bcb89fef530db453e4d5fd9d7be3",
+    "bf16/python/lora-text.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+    "bf16/python/memory-policy.json": "3355594055fd2e01d12fc604ff89225f2fc0adb22b622525f3d0a490a5b5d1f9",
+    "bf16/python/prefix-cache.json": "489474029f6ad2e990efc2bc0522eb703772b5082129f45ae683e5218f37584b",
+    "bf16/python/result.json": "309a88cca2cbbeaa7799055aaa4dcb2d76e2b9b4844ecd32a5d96d7d57ea4d0c",
+    "bf16/python/sampler-dit_initial-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "bf16/python/sampler-dit_sampling-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "bf16/python/sampler-dit_unloaded-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "bf16/python.log": "33e6da646fc68a27a451af56fc4569f497a171726208820c17299a80316e77ca",
+    "bf16/rust/conditioning.json": "fb4bd483429dfe1cdde344ed89543438d3eadf93fd205446f66a92b942d8d018",
+    "bf16/rust/image.png": "c39771ecdf308268cfda7d5ac910fb7f8fbdcd0d982f5911671af1155bd199b5",
+    "bf16/rust/lora-dit.json": "68ed8ab3a7b6f3102577bc6aa6607b1cfee50891854787215e8fbeab488b3a4e",
+    "bf16/rust/lora-text.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "bf16/rust/memory-manager.json": "4f1d06779f843f329d14aff9f9ccc02421e775267a3173e8ec40b2406b110d75",
+    "bf16/rust/memory-policy.json": "7acf9083004e107d694b0fb088e4df388c4fd78743735971127d0cb10b34e3b1",
+    "bf16/rust/prefix-cache.json": "94bcce8db4244309bedbd857f0227e0611153f0f437469e5210c009fc4fcf6c2",
+    "bf16/rust/result.json": "21a5ea155065f5d77478581ed8b391aacf39c416f85de149bc18a9ef65cc03b4",
+    "bf16/rust/sampler-dit_initial-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "bf16/rust/sampler-dit_sampling-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "bf16/rust/sampler-dit_unloaded-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "bf16/rust/step-seconds.json": "7a3fdc65aa985fd9831a37333be957ca5235e8d0904223c33320b188c8dd297d",
+    "bf16/rust.log": "2488f0cac1ca2247acb9bba01de1029a949616680dc35abba52107dd39334e27",
+    "clippy-first.log": "5c30758ef84f528ce8a93eacd5ca4beb971c81d5a0f9048d206d8b8a2e70e1fc",
+    "focused-first.log": "94e5e81b01b9fae10661bbf442ea804ea10aca07df7a449a3b26da8e3b4241e4",
+    "focused-fourth.log": "307af35f699fb80de5487b0c73ed0ad7b0ad8bf95fa4dfcfd598f0dac64c93ef",
+    "focused-second.log": "115fa5e068ccbfb89b621d5804d381fb6df01b747d0a45ce7ab2d564dec7c0a2",
+    "focused-third.log": "fde785d9812dd6ff7e60e1ffadd61364f3bd81800fad8f009c5935045501f0c9",
+    "historical-image-continuity.json": "b4a33f272946749b0981ef76621e565e79b4494f9e67a9af5060e972c4d8e8fd",
+    "host_cache.rs.diff": "41ff3eaebe8a4c0e45ebcc1bd39227fdacc8f3359531be7cbcd750d408deb24f",
+    "initial-qwen_image21_original_shared_host_registration_cap_alias_and_owner_release_match-isolation.json": "8927d3b7456c3d8c56184777b9068b5d02a87d440579261f8a0d3666b6e04e2c",
+    "initial-qwen_image21_original_shared_model_manager_order_pressure_weak_owners_and_failures_match-isolation.json": "25c90d91b34c392a05bbe390578cd330b777dcd121aebb52a6a4b91b2a5981e0",
+    "initial-qwen_image21_original_shared_static_clones_patch_switches_and_forced_cpu_patches_match-isolation.json": "2662c1a94b92e6d2147b30f67d4ec8cde66cd5c620a9b3fcb8adfbea7d203c53",
+    "initial-qwen_image21_original_shared_static_multiple_models_partial_eviction_and_reloads_match-isolation.json": "5bf49de4812d2920d4d749313be353d68b7d381ac9d8e15c7bd6632161e09259",
+    "int8-1600/comparison.json": "b872af108f714ebaf69acbd0967954fa8940bacef6f3500ece7303fc4fe14b4c",
+    "int8-1600/comparison.log": "b872af108f714ebaf69acbd0967954fa8940bacef6f3500ece7303fc4fe14b4c",
+    "int8-1600/isolation.json": "324ecfba3819f303fb858c193029f131ccbeb3723e22f44b1e97704822fadcc1",
+    "int8-1600/python/conditioning.json": "30c7955dd3dd4b31105ad182cb4552993e75bfdda6e0de6863661e6088e305b3",
+    "int8-1600/python/image.png": "9b1c141818e1003738918b089d7d10d5a70806e7fbed97e60dad489f4a7454b6",
+    "int8-1600/python/lora-dit.json": "284d11f3e4d6daabea412a22efbbe22d69d0bcb89fef530db453e4d5fd9d7be3",
+    "int8-1600/python/lora-text.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+    "int8-1600/python/memory-policy.json": "a84267f2d0944e6beb83f8934e5bbd16770fc884b4337474b6af89af977f6381",
+    "int8-1600/python/prefix-cache.json": "8282e492a93831bc168d63908d05aa0252354b86f74796b5d998c9e9a7eb0a2d",
+    "int8-1600/python/result.json": "38992b34c2927c28b0c1d898613c0e75c6eb0fd2182cc1eef88b63426d86f16f",
+    "int8-1600/python/sampler-dit_initial-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "int8-1600/python/sampler-dit_sampling-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "int8-1600/python/sampler-dit_unloaded-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "int8-1600/python.log": "6b80de8d949194bcbc540452b285a8015bd754f66233351ffc61abda9f19d6e3",
+    "int8-1600/rust/conditioning.json": "914d0554fe83bc28db88c31e584a388e9a110533ded325001bf63808b73b6a66",
+    "int8-1600/rust/image.png": "d89ee3581d9404269965a63fbe8153b487aa2cfe0d32d08a7a6b90dc3fb8f84d",
+    "int8-1600/rust/lora-dit.json": "68ed8ab3a7b6f3102577bc6aa6607b1cfee50891854787215e8fbeab488b3a4e",
+    "int8-1600/rust/lora-text.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "int8-1600/rust/memory-manager.json": "1da88119662796a3f289b962699b53479ec84f577b81645af65d3c1dff280d2c",
+    "int8-1600/rust/memory-policy.json": "a855868ac934955c60f8c9013410d18072a4cb257e321610754f5ed33b87d21a",
+    "int8-1600/rust/prefix-cache.json": "ce6a8f31ca72a184de6b04d37598b59d7133254c918aeae1fa2deaffa0349fb9",
+    "int8-1600/rust/result.json": "8281f2cc22ea099dd98da9d4987c9b8e6107421717dcea8079cd718c77fdc6c3",
+    "int8-1600/rust/sampler-dit_initial-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "int8-1600/rust/sampler-dit_sampling-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "int8-1600/rust/sampler-dit_unloaded-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "int8-1600/rust/step-seconds.json": "cccfbbe887b021fcc483915fb5e531fce3c909525ab0e5e3c30ceee72b1f4309",
+    "int8-1600/rust.log": "bd4c25ed991dfc3888a40c0dbe31ede1230ebb5e7c3b70bf1128bc55b0bad8ac",
+    "locked-source-check.json": "0fa024b0c496ad4f8ab96eedbf6aefce06ca5558d9a30884e580b5728970c219",
+    "offload.rs.diff": "22e5ce7f9587f9d878360b2290f3a40f50acc181e8095e58b76627f19bb48ecd",
+    "qwen21-first-image.rs.diff": "1cf54e954475417b9110ed3426d35662134f66087d8d239fbe87df2220db62cb",
+    "qwen_image21_original_shared_host_registration_cap_alias_and_owner_release_match-isolation.json": "b022610937c8ad09c7691d3d2f85e8603d3ebaceedc022de9a0849b5e94cfa27",
+    "qwen_image21_original_shared_model_manager_order_pressure_weak_owners_and_failures_match-isolation.json": "67659b1d4314d3e9175728cdf7cf7a6c185b2c4a54191f293adc87b8a1103a00",
+    "qwen_image21_original_shared_static_clones_patch_switches_and_forced_cpu_patches_match-isolation.json": "aa4ebcd0db3ee80c48876ae9ab953c2c202243064454e82b2f1493bb8464b171",
+    "qwen_image21_original_shared_static_multiple_models_partial_eviction_and_reloads_match-isolation.json": "86653b8075a74bfb9538db71dc7f9ecf3bcca264d2a72c72d4a7ec7f7e4ad87b",
+    "reference-final.log": "bacee88a8f031c502c432ff6452df659d5aac723f96280e1949e71a29e622dff",
+    "reference-tiny.log": "5d746568c0f37bc3913bede476ee84b0a7e1872cc6d20c9eabca15aac4afc8b0",
+    "replay-focused-validation.sh": "dfc9283d1bca15981e2b3b9926a6cad0781c84e5caf278709dee4fa95f2cba9c",
+    "replay-trained.sh": "634dc18e49a0b9f6b39174b042b397b49333b96d1bee3576611786f237ead078",
+    "static-checks.json": "c35795bc44f8ffbbbbee62d1583108e25a837b1870e11b6c204017dbea5ae525",
+    "trained.log": "52a7b34d5b804a364345d3c2b0a65f153592b2491941d312bbad63a4426083ee",
+    "turbo/comparison.json": "7ee177945392045814e6d9843760437d190fa7f3c8b68d59cad84abf856d139e",
+    "turbo/comparison.log": "7ee177945392045814e6d9843760437d190fa7f3c8b68d59cad84abf856d139e",
+    "turbo/isolation.json": "ca0fdf83ae9282767f37e075e657bf6609ad36d453ec93f0dd896c1bd19c4d3b",
+    "turbo/python/conditioning.json": "b024957bb14c9a1ed6a6120bafcd6d7124d99e1edff4f6bfc6df605f132033af",
+    "turbo/python/image.png": "34b9a4e4e2c364e4d92d0699abeece032afeb63c601d73cea0d79759892ae122",
+    "turbo/python/lora-dit.json": "284d11f3e4d6daabea412a22efbbe22d69d0bcb89fef530db453e4d5fd9d7be3",
+    "turbo/python/lora-text.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+    "turbo/python/memory-policy.json": "3355594055fd2e01d12fc604ff89225f2fc0adb22b622525f3d0a490a5b5d1f9",
+    "turbo/python/prefix-cache.json": "489474029f6ad2e990efc2bc0522eb703772b5082129f45ae683e5218f37584b",
+    "turbo/python/result.json": "c75439cbb6f30494694e754c70aaf9ad8b1d32cddf68b2cffab2016ab7ca7e37",
+    "turbo/python/sampler-dit_initial-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "turbo/python/sampler-dit_sampling-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "turbo/python/sampler-dit_unloaded-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "turbo/python.log": "e3307cb668b1e49eff80d7ae1521a2b0a2c91a6bcc6fbdd8256352995efec153",
+    "turbo/rust/conditioning.json": "fb4bd483429dfe1cdde344ed89543438d3eadf93fd205446f66a92b942d8d018",
+    "turbo/rust/image.png": "c4ac332200239609a655291d7bcf00a6660bb0fabbbe4eec8933f5a425bf056f",
+    "turbo/rust/lora-dit.json": "68ed8ab3a7b6f3102577bc6aa6607b1cfee50891854787215e8fbeab488b3a4e",
+    "turbo/rust/lora-text.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "turbo/rust/memory-manager.json": "4f1d06779f843f329d14aff9f9ccc02421e775267a3173e8ec40b2406b110d75",
+    "turbo/rust/memory-policy.json": "7acf9083004e107d694b0fb088e4df388c4fd78743735971127d0cb10b34e3b1",
+    "turbo/rust/prefix-cache.json": "94bcce8db4244309bedbd857f0227e0611153f0f437469e5210c009fc4fcf6c2",
+    "turbo/rust/result.json": "67b92b7eb3e245b415a3e1ad5e491ff696997d9d0800b6741dc769ac2fcc91bd",
+    "turbo/rust/sampler-dit_initial-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "turbo/rust/sampler-dit_sampling-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "turbo/rust/sampler-dit_unloaded-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "turbo/rust/step-seconds.json": "ea86ee0b7a33ac04eeaa2dcfe29213cca651ca03ea426c73f0b9dea9b4cd6263",
+    "turbo/rust.log": "fe83956bc99bc00f13f32cfe11580c2a0a87af132d3efe10ec22fcdcaefd1a00",
+    "validation-final-02.log": "b632ff534415f8a850dfb8c85cef7557bc24175d0a3532ad5559953f4094f12d",
+    "validation-final.log": "f48a9ee7bf737851f2eea2fafdb8045b540aeea28910ce6e10642e2e2f4de975",
+    "validation-initial.log": "b64f939d0af4572336f5bb1685c6011c5344a5f3d4a0386eb1bb57f88b5ce454",
+    "verified-inputs.json": "3e8766e3b2dfc75789a6b4980ecb309d4702190fa987a0a8eef1ca90ad893a8c",
+    "verified-model-hashes.json": "91dac202ba2a78c9d8098bd5b1cfa08f8f03559bbe9c6cc206a97f89363ced45"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "reason": "OFT/BOFT linalg runtime closure, both already pinned by Stage 0; no dependency update",
+  "sha256": {
+    "torch/lib/libtorch_cuda_linalg.so": "83a9ea9e7c8f82029eb1328e6e68ec45e578864ae0c4c2a3d235e64b07175fe2",
+    "nvidia/cu13/lib/libcusolver.so.12": "c571d524fc5571e6c8a5784d51f75fbe8cf17590463c397a06e48428cb926c48"
+  }
+}

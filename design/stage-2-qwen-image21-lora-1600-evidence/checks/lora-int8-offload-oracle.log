@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/home/thhel/ChatGPT/imagine/inference/tools/reference_lora_int8_offload.py", line 39, in <module>
+    original=namespace['_load_list'](NS(model=model,patches={n:[]for n in patch_names}))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/thhel/git/ComfyUI/comfy/model_patcher.py", line 978, in _load_list
+    module_mem = comfy.model_management.module_size(m)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/thhel/git/ComfyUI/comfy/model_management.py", line 649, in module_size
+    sd = module.state_dict()
+         ^^^^^^^^^^^^^^^^^^^
+  File "/home/thhel/ChatGPT/imagine/inference/tools/reference_lora_int8_offload.py", line 26, in state_dict
+    return namespace['_quantized_weight_state_dict'](self,destination if destination is not None else {},prefix,extra_quant_params=('input_scale','pre_quant_scale'))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/thhel/git/ComfyUI/comfy/ops.py", line 1376, in _quantized_weight_state_dict
+    elif module.quant_format in _GROUPED_INT8_FORMATS:
+                                ^^^^^^^^^^^^^^^^^^^^^
+NameError: name '_GROUPED_INT8_FORMATS' is not defined

@@ -1,0 +1,1282 @@
+{
+  "schema": 1,
+  "source": {
+    "path": "/home/thhel/git/ComfyUI/comfy/model_management.py",
+    "sha256": "045ab96003386a43e647c8ab96f22fbf3be6c577e2fc578ea31c6faa22facbd5"
+  },
+  "safety": {
+    "torch_imported": false,
+    "model_weights_allocated": false,
+    "logical_retention_counts": true
+  },
+  "cases": [
+    {
+      "name": "partial",
+      "initial": [
+        {
+          "name": "a",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 400
+        },
+        {
+          "name": "b",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 200
+        },
+        {
+          "name": "c",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 300
+        },
+        {
+          "name": "cpu",
+          "used": true,
+          "device": "cpu",
+          "loaded": 100
+        }
+      ],
+      "capacity": 1000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "partial",
+          "command": "free",
+          "inputs": {
+            "required": 999999150,
+            "keep": [],
+            "device": "cuda:0",
+            "pins": 123
+          },
+          "events": [
+            [
+              "partial",
+              "b",
+              50
+            ],
+            [
+              "pin-budget",
+              123
+            ],
+            [
+              "pin-registerable",
+              123
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 400
+            },
+            {
+              "name": "b",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 100
+            },
+            {
+              "name": "c",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 300
+            },
+            {
+              "name": "cpu",
+              "used": true,
+              "device": "cpu",
+              "loaded": 100
+            }
+          ],
+          "returned": [],
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "full",
+      "initial": [
+        {
+          "name": "a",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 400
+        },
+        {
+          "name": "b",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 200
+        },
+        {
+          "name": "c",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 300
+        },
+        {
+          "name": "cpu",
+          "used": true,
+          "device": "cpu",
+          "loaded": 100
+        }
+      ],
+      "capacity": 1000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "full",
+          "command": "free",
+          "inputs": {
+            "required": 1000000100,
+            "keep": [],
+            "device": "cuda:0",
+            "pins": 123
+          },
+          "events": [
+            [
+              "detach",
+              "b",
+              true
+            ],
+            [
+              "detach",
+              "c",
+              true
+            ],
+            [
+              "detach",
+              "a",
+              true
+            ],
+            [
+              "pin-budget",
+              123
+            ],
+            [
+              "pin-registerable",
+              123
+            ],
+            [
+              "empty"
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "cpu",
+              "used": true,
+              "device": "cpu",
+              "loaded": 100
+            }
+          ],
+          "returned": [
+            "c",
+            "b",
+            "a"
+          ],
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "keep",
+      "initial": [
+        {
+          "name": "a",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 400
+        },
+        {
+          "name": "b",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 200
+        },
+        {
+          "name": "c",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 300
+        },
+        {
+          "name": "cpu",
+          "used": true,
+          "device": "cpu",
+          "loaded": 100
+        }
+      ],
+      "capacity": 1000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "keep",
+          "command": "free",
+          "inputs": {
+            "required": 999999300,
+            "keep": [
+              "b"
+            ],
+            "device": "cuda:0",
+            "pins": 123
+          },
+          "events": [
+            [
+              "partial",
+              "c",
+              200
+            ],
+            [
+              "pin-budget",
+              123
+            ],
+            [
+              "pin-registerable",
+              123
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 400
+            },
+            {
+              "name": "b",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 200
+            },
+            {
+              "name": "c",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 100
+            },
+            {
+              "name": "cpu",
+              "used": true,
+              "device": "cpu",
+              "loaded": 100
+            }
+          ],
+          "returned": [],
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "no-device",
+      "initial": [
+        {
+          "name": "a",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 400
+        },
+        {
+          "name": "b",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 200
+        },
+        {
+          "name": "c",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 300
+        },
+        {
+          "name": "cpu",
+          "used": true,
+          "device": "cpu",
+          "loaded": 100
+        }
+      ],
+      "capacity": 1000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "no-device",
+          "command": "free",
+          "inputs": {
+            "required": 1e+30,
+            "keep": [],
+            "device": null,
+            "pins": 123
+          },
+          "events": [
+            [
+              "pin-budget",
+              123
+            ],
+            [
+              "pin-registerable",
+              123
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 400
+            },
+            {
+              "name": "b",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 200
+            },
+            {
+              "name": "c",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 300
+            },
+            {
+              "name": "cpu",
+              "used": false,
+              "device": "cpu",
+              "loaded": 100
+            }
+          ],
+          "returned": [],
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "cpu-filter",
+      "initial": [
+        {
+          "name": "a",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 400
+        },
+        {
+          "name": "b",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 200
+        },
+        {
+          "name": "c",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 300
+        },
+        {
+          "name": "cpu",
+          "used": true,
+          "device": "cpu",
+          "loaded": 100
+        }
+      ],
+      "capacity": 1000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "cpu-filter",
+          "command": "free",
+          "inputs": {
+            "required": 1e+30,
+            "keep": [],
+            "device": "cpu",
+            "pins": 123
+          },
+          "events": [
+            [
+              "detach",
+              "cpu",
+              true
+            ],
+            [
+              "pin-budget",
+              123
+            ],
+            [
+              "pin-registerable",
+              123
+            ],
+            [
+              "empty"
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 400
+            },
+            {
+              "name": "b",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 200
+            },
+            {
+              "name": "c",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 300
+            }
+          ],
+          "returned": [
+            "cpu"
+          ],
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "cache-equality",
+      "initial": [
+        {
+          "name": "a",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 400
+        },
+        {
+          "name": "b",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 200
+        },
+        {
+          "name": "c",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 300
+        },
+        {
+          "name": "cpu",
+          "used": true,
+          "device": "cpu",
+          "loaded": 100
+        }
+      ],
+      "capacity": 1000000000,
+      "unused": 249999750,
+      "steps": [
+        {
+          "name": "cache-equality",
+          "command": "free",
+          "inputs": {
+            "required": 0,
+            "keep": [],
+            "device": "cuda:0",
+            "pins": 123
+          },
+          "events": [
+            [
+              "pin-budget",
+              123
+            ],
+            [
+              "pin-registerable",
+              123
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 400
+            },
+            {
+              "name": "b",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 200
+            },
+            {
+              "name": "c",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 300
+            },
+            {
+              "name": "cpu",
+              "used": true,
+              "device": "cpu",
+              "loaded": 100
+            }
+          ],
+          "returned": [],
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "cache-above",
+      "initial": [
+        {
+          "name": "a",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 400
+        },
+        {
+          "name": "b",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 200
+        },
+        {
+          "name": "c",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 300
+        },
+        {
+          "name": "cpu",
+          "used": true,
+          "device": "cpu",
+          "loaded": 100
+        }
+      ],
+      "capacity": 1000000000,
+      "unused": 249999751,
+      "steps": [
+        {
+          "name": "cache-above",
+          "command": "free",
+          "inputs": {
+            "required": 0,
+            "keep": [],
+            "device": "cuda:0",
+            "pins": 123
+          },
+          "events": [
+            [
+              "pin-budget",
+              123
+            ],
+            [
+              "pin-registerable",
+              123
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 400
+            },
+            {
+              "name": "b",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 200
+            },
+            {
+              "name": "c",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 300
+            },
+            {
+              "name": "cpu",
+              "used": true,
+              "device": "cpu",
+              "loaded": 100
+            }
+          ],
+          "returned": [],
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "order-dedup",
+      "initial": [],
+      "capacity": 10000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "order-dedup",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "a",
+              "b",
+              "a"
+            ]
+          },
+          "events": [
+            [
+              "pin-budget",
+              1400000000
+            ],
+            [
+              "pin-registerable",
+              1400000000
+            ],
+            [
+              "load",
+              "b",
+              8721576140.8,
+              false
+            ],
+            [
+              "load",
+              "a",
+              7921576140.8,
+              false
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 600000000
+            },
+            {
+              "name": "b",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 800000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "reuse",
+      "initial": [],
+      "capacity": 10000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "initial",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "a"
+            ]
+          },
+          "events": [
+            [
+              "pin-budget",
+              600000000
+            ],
+            [
+              "pin-registerable",
+              600000000
+            ],
+            [
+              "load",
+              "a",
+              8721576140.8,
+              false
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 600000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        },
+        {
+          "name": "reuse",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "a"
+            ],
+            "memory": 9000000000,
+            "minimum": 8800000000
+          },
+          "events": [
+            [
+              "detach",
+              "a",
+              false
+            ],
+            [
+              "pin-budget",
+              600000000
+            ],
+            [
+              "pin-registerable",
+              600000000
+            ],
+            [
+              "load",
+              "a",
+              180569600,
+              false
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 600000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "clone",
+      "initial": [],
+      "capacity": 10000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "initial",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "a"
+            ]
+          },
+          "events": [
+            [
+              "pin-budget",
+              600000000
+            ],
+            [
+              "pin-registerable",
+              600000000
+            ],
+            [
+              "load",
+              "a",
+              8721576140.8,
+              false
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 600000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        },
+        {
+          "name": "child",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "child"
+            ]
+          },
+          "events": [
+            [
+              "detach",
+              "a",
+              false
+            ],
+            [
+              "pin-budget",
+              600000000
+            ],
+            [
+              "pin-registerable",
+              600000000
+            ],
+            [
+              "load",
+              "child",
+              8121576140.799999,
+              false
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "child",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 600000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "additional",
+      "initial": [],
+      "capacity": 10000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "additional",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "a",
+              "b"
+            ]
+          },
+          "events": [
+            [
+              "pin-budget",
+              1400000000
+            ],
+            [
+              "pin-registerable",
+              1400000000
+            ],
+            [
+              "load",
+              "b",
+              8721576140.8,
+              false
+            ],
+            [
+              "load",
+              "a",
+              7921576140.8,
+              false
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 600000000
+            },
+            {
+              "name": "b",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 800000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "cpu",
+      "initial": [],
+      "capacity": 10000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "cpu",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "a"
+            ]
+          },
+          "events": [
+            [
+              "load",
+              "a",
+              1e+32,
+              false
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cpu",
+              "loaded": 600000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "force-full",
+      "initial": [],
+      "capacity": 10000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "force-full",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "a"
+            ],
+            "full": true,
+            "force": true
+          },
+          "events": [
+            [
+              "pin-budget",
+              600000000
+            ],
+            [
+              "pin-registerable",
+              600000000
+            ],
+            [
+              "load",
+              "a",
+              1e+32,
+              true
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 600000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "pressure",
+      "initial": [],
+      "capacity": 1500000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "pressure",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "a",
+              "b"
+            ]
+          },
+          "events": [
+            [
+              "pin-budget",
+              1400000000
+            ],
+            [
+              "pin-registerable",
+              1400000000
+            ],
+            [
+              "load",
+              "b",
+              221576140.79999995,
+              false
+            ],
+            [
+              "load",
+              "a",
+              0.1,
+              false
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 0.1
+            },
+            {
+              "name": "b",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 221576140.79999995
+            }
+          ],
+          "returned": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "load-failure",
+      "initial": [],
+      "capacity": 10000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "load-failure",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "a",
+              "b"
+            ]
+          },
+          "events": [
+            [
+              "pin-budget",
+              1400000000
+            ],
+            [
+              "pin-registerable",
+              1400000000
+            ],
+            [
+              "load",
+              "b",
+              8721576140.8,
+              false
+            ],
+            [
+              "load",
+              "a",
+              7921576140.8,
+              false
+            ],
+            [
+              "detach",
+              "a",
+              true
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "b",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 800000000
+            }
+          ],
+          "returned": null,
+          "error": "synthetic load failure"
+        }
+      ]
+    },
+    {
+      "name": "parent-fallback",
+      "initial": [],
+      "capacity": 10000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "initial",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "a"
+            ]
+          },
+          "events": [
+            [
+              "pin-budget",
+              600000000
+            ],
+            [
+              "pin-registerable",
+              600000000
+            ],
+            [
+              "load",
+              "a",
+              8721576140.8,
+              false
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 600000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        },
+        {
+          "name": "child",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "child"
+            ]
+          },
+          "events": [
+            [
+              "detach",
+              "a",
+              false
+            ],
+            [
+              "pin-budget",
+              600000000
+            ],
+            [
+              "pin-registerable",
+              600000000
+            ],
+            [
+              "load",
+              "child",
+              8121576140.799999,
+              false
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "child",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 600000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        },
+        {
+          "name": "parent-fallback",
+          "command": "drop",
+          "inputs": {
+            "name": "child"
+          },
+          "events": [],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 600000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "dead-cleanup",
+      "initial": [],
+      "capacity": 10000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "initial",
+          "command": "load",
+          "inputs": {
+            "models": [
+              "a"
+            ]
+          },
+          "events": [
+            [
+              "pin-budget",
+              600000000
+            ],
+            [
+              "pin-registerable",
+              600000000
+            ],
+            [
+              "load",
+              "a",
+              8721576140.8,
+              false
+            ]
+          ],
+          "loaded": [
+            {
+              "name": "a",
+              "used": true,
+              "device": "cuda:0",
+              "loaded": 600000000
+            }
+          ],
+          "returned": null,
+          "error": null
+        },
+        {
+          "name": "dead-cleanup",
+          "command": "drop",
+          "inputs": {
+            "name": "a"
+          },
+          "events": [],
+          "loaded": [
+            {
+              "name": null,
+              "used": true,
+              "device": "cuda:0",
+              "loaded": null
+            }
+          ],
+          "returned": null,
+          "error": null
+        }
+      ]
+    },
+    {
+      "name": "dynamic-free",
+      "initial": [
+        {
+          "name": "a",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 300
+        },
+        {
+          "name": "b",
+          "used": true,
+          "device": "cuda:0",
+          "loaded": 400
+        }
+      ],
+      "capacity": 1000000000,
+      "unused": 0,
+      "steps": [
+        {
+          "name": "dynamic-free",
+          "command": "free",
+          "inputs": {
+            "required": 1e+30,
+            "device": "cuda:0",
+            "dynamic": true
+          },
+          "events": [],
+          "loaded": [
+            {
+              "name": "a",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 300
+            },
+            {
+              "name": "b",
+              "used": false,
+              "device": "cuda:0",
+              "loaded": 400
+            }
+          ],
+          "returned": [],
+          "error": null
+        }
+      ]
+    }
+  ]
+}

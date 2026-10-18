@@ -1,0 +1,225 @@
+{
+  "schema": 1,
+  "metrics": {
+    "context": {
+      "shape": [
+        1,
+        31,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26",
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 126976,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "latent": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "c54e50dbe00d29e72aaf8b477d7c37e9567487de6b71715c0527ba54061a63f5",
+        "c54e50dbe00d29e72aaf8b477d7c37e9567487de6b71715c0527ba54061a63f5"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 17920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "image-rgba": {
+      "shape": [
+        1,
+        224,
+        320,
+        4
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "2f17bd13d5721fe993577e4cf281e51a0546e52214a0eb1db48759b774e06176",
+        "2f17bd13d5721fe993577e4cf281e51a0546e52214a0eb1db48759b774e06176"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 286720,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "sigmas": {
+      "shape": [
+        9
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "fe5385494537d4b785034e9728ce82a163e0123ffba1f2d4b476688321a6e098",
+        "fe5385494537d4b785034e9728ce82a163e0123ffba1f2d4b476688321a6e098"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 9,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "negative-context": {
+      "shape": [
+        1,
+        15,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660",
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 61440,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-vision-0": {
+      "shape": [
+        1,
+        224,
+        320,
+        3
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8",
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 215040,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-latent-0": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206",
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 17920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "png_rgba8": {
+      "exact": true,
+      "unequal_channels": 0,
+      "unequal_pixels": 0,
+      "max_abs": 0,
+      "mean_abs": 0.0
+    }
+  },
+  "timings_seconds": {
+    "rust": {
+      "dit_load": 3.977352415,
+      "pipeline_wall_including_unload_and_intermediate_export": 11.22102,
+      "reference_vae_load_and_encode": 0.440825611,
+      "sampling": 1.368601956,
+      "text_encode": 0.595144351,
+      "text_load": 2.235166007,
+      "vae_decode": 0.076487947,
+      "vae_load": 0.535425929
+    },
+    "python": {
+      "reference_vae_load_and_encode": 0.3827163251116872,
+      "text_load": 1.4486018461175263,
+      "text_encode": 0.8230367081705481,
+      "dit_load": 2.7040964299812913,
+      "sampling": 1.3895867269020528,
+      "vae_load": 0.25280261784791946,
+      "vae_decode": 0.05404532793909311,
+      "pipeline_wall_including_unload_and_intermediate_export": 8.251601416850463
+    }
+  },
+  "scope": "One first-process 320x224 8-step synthetic turbo_bf16 DiT sample; OS model cache already warm. Not a production quality or steady-state benchmark.",
+  "production_runtime_read": false,
+  "lora_patched_parameters": {
+    "text": 0,
+    "dit": 192
+  },
+  "sampler_lifecycle": {
+    "phases": [
+      {
+        "phase": "dit_initial",
+        "sampler_buffer": {
+          "bytes": 40000,
+          "device": "cpu",
+          "dtype": "float32",
+          "shape": [
+            10000
+          ]
+        },
+        "buffer_sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+        "cached_model_size": 14230289472,
+        "same_leaf_placement": true,
+        "loaded_bytes_equal": true,
+        "rust_loaded_bytes": 12653191168,
+        "python_loaded_bytes": 12653191168
+      },
+      {
+        "phase": "dit_sampling",
+        "sampler_buffer": {
+          "bytes": 40000,
+          "device": "cpu",
+          "dtype": "float32",
+          "shape": [
+            10000
+          ]
+        },
+        "buffer_sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+        "cached_model_size": 14230289472,
+        "same_leaf_placement": true,
+        "loaded_bytes_equal": true,
+        "rust_loaded_bytes": 12653191168,
+        "python_loaded_bytes": 12653191168
+      },
+      {
+        "phase": "dit_unloaded",
+        "sampler_buffer": {
+          "bytes": 40000,
+          "device": "cpu",
+          "dtype": "float32",
+          "shape": [
+            10000
+          ]
+        },
+        "buffer_sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+        "cached_model_size": 14230289472,
+        "same_leaf_placement": true,
+        "loaded_bytes_equal": true,
+        "rust_loaded_bytes": 0,
+        "python_loaded_bytes": 0
+      }
+    ],
+    "sampler_lifecycle_exact": true
+  },
+  "diagnostic_memory_plan": false
+}

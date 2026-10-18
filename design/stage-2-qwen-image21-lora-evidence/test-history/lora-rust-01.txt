@@ -1,0 +1,19 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/imagine-rust-comfy-parity-20261017/pillow
+[100%] Built target imagine_pillow
+Prepared original Pillow core without Python: 095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3
+   Compiling imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+error: float literals must have an integer part
+   --> tests/support/qwen_lora.rs:248:68
+    |
+248 |                 .insert("unit.weight".into(), vec![p::Patch::new(a,.375)]);
+    |                                                                    ^^^^
+    |
+help: must have an integer part
+    |
+248 |                 .insert("unit.weight".into(), vec![p::Patch::new(a,0.375)]);
+    |                                                                    +
+
+error: could not compile `imagine-inference` (test "primitives") due to 1 previous error

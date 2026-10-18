@@ -1,0 +1,11 @@
+{
+  "all_six_boundaries_equal_preserved_sampler_control": true,
+  "hashes": {
+    "context": "befc7af7d980e1931b92b213d9495a1249d1c5a4d9b14d919da2d1f76ca3f9cb",
+    "latent": "dbd29e74ea666dce7808bf7d99a861547b4231d0884c0d69ff47baca69896ad3",
+    "image-rgba": "39cea4a5f4276ae02b2bc9a80ec8d4b282a75508b42faafd5938e84698a76ca8",
+    "negative-context": "d22b2f691b1395ae5c4e34cf9a7b2474dafd760b733ffef6fc6b882b68b21d36",
+    "reference-vision-0": "b5e55de9caa4608106726730169a6f986db3e0b06f68dfe2a25e9b67eba8e4c6",
+    "reference-latent-0": "790831589c1ef11722ead4d22c73ce2fdc4db7ac18358234a832f90153fcdede"
+  }
+}

@@ -61,13 +61,14 @@
     },
     {
       "id": "lora_patch_requantize_restore",
-      "status": "pending",
-      "scope": "Same patch arithmetic, quantization and lifecycle as ComfyUI"
+      "status": "selected_int8_bf16_turbo_lora_exact_general_lifecycle_pending",
+      "scope": "Six adapter bodies, aliases and original patch/rounding fixtures; static INT8 ConvRot requantization and restoration. Added twelve original reload states, mixed-cost two-phase allocation trace and twelve repeated CPU/CUDA Linear cases (24 forwards) with immutable stored parameters. Selected INT8 model/text/stack and automatic BF16/Turbo LoRA pairs exact. Original reload function state, transfer order and lazy copy behavior repaired. Selected static clones now share backups/storage while retaining separate patch configurations, including forced CPU patch/reload and negative-budget patch switching. Broader config/bypass/shape-changing and arbitrary hook/object/attachment clone acceptance remain open.",
+      "report": "stage-2-qwen-image21-lora.md"
     },
     {
       "id": "memory_prefix_cache_prefetch_hooks",
-      "status": "synthetic-verified",
-      "scope": "Original cache policy/storage and concrete static GPU-resident services with actual free+reserved-active counters. Dynamic vbars/compiler, host transfer/pinning and shared memory manager remain pending. Selected plain BF16 DiT static synchronous load/partial-unload/host registration now implemented and trained-tested; dynamic vbars, host-cache staging, patched/multi-model memory management remain pending. Reference-conditioned required/minimum sampling memory now follows original positive/negative shape accounting before CFG1 shortcut; 12 exact IEEE754-bit cases. Original host prefix-cache services now tested for selected graph-free static execution: RAM/cgroup budget, actual registration and two synchronous-current-stream staging buffers. Real 1MP reference edit selects identical 2.03 GiB pinned CPU cache in both engines. Shared/inactive model-pin eviction remains pending and explicit."
+      "status": "selected_static_shared_manager_clone_and_pins_verified",
+      "scope": "Original Linux NORMAL_VRAM coordinator with weak patcher/model registration, clone switching, per-device load/free ordering and static model/cache pin accounting. 18 bounded policy sequences/23 actions, 22 actual BF16/INT8 clone states and seven real two-model pressure/reload states verified. Fresh trained INT8, BF16 and Turbo automatic paths have equal counters, resident sets and sampler devices/bytes; final registrations and pins zero. Earlier source cache, cgroup, staging and budget controls retained. Dynamic vbars/compiler, dynamic pin/RAM eviction, graph RAM callbacks, general encoder/VAE manager binding and OOM/tiling remain pending."
     },
     {
       "id": "complete_model_differential",
@@ -75,12 +76,12 @@
       "scope": "Three exact pairs each for 512x512/4 steps, 1600x896/4 steps, 1600x896/40 steps, plus a fresh three-pair four-step storage control; INT8 ConvRot, Euler/simple, CFG1, seed17. Other variants, editing, LoRA, broader numerical and memory acceptance remain required. Three exact BF16 DiT 1600x896/40 pairs use original static offload with unchanged INT8 text/BF16 VAE. Three exact Turbo BF16 DiT 1600x896/eight-explicit-sigma-step pairs now pass with the same offload policy. All-BF16 encoder/editing/LoRA/general memory acceptance remains pending. Selected 320x224 synthetic reference/editing profiles now pass one pair each for INT8, BF16, Turbo, two references and no-reference-VAE keep-vision, plus final shared-VAE revalidation. This is bounded functional acceptance, not general editing or performance/quality acceptance."
     }
   ],
-  "dit_status": "complete_resident_computation_shared_services_and_trained_model_acceptance_pending",
-  "latest_report": "stage-2-qwen-image21-portrait-seed3061383787.md",
-  "latest_checkpoint": "stage-2-qwen-image21-portrait-seed3061383787-checkpoint.json",
+  "dit_status": "complete_resident_computation_selected_static_shared_owner_verified_general_acceptance_pending",
+  "latest_report": "stage-2-qwen-image21-ownership.md",
+  "latest_checkpoint": "stage-2-qwen-image21-ownership-checkpoint.json",
   "retained_reference_results_and_decisions": 2172,
-  "focused_tests_passed": 25,
-  "python_free_tests_passed": 25,
+  "focused_tests_passed": 35,
+  "python_free_tests_passed": 4,
   "trained_forward_executed": true,
   "image_generation_executed": true,
   "first_image_gate": "Earlier readiness stop fulfilled; user then authorized first trained image and Python timing/quality comparison",
@@ -88,7 +89,7 @@
   "authorized_model_root": "/mnt/media/gemensam/AI/ComfyUI/models",
   "first_image_preflight_status": "load_only_passed_then_trained_generation_authorized",
   "first_image_status": "three_matched_pairs_exact_int8_smoke",
-  "verification_scope": "Prior T2I and small editing controls preserved. One new 1MP portrait edit pair exact across six tensors and PNG, identical automatic pinned-host cache. All 25 focused Qwen tests pass. New host-cache standalone isolation is finalized in the latest checkpoint; prior 24 isolation successes remain historical evidence. Broader memory/precision/editing, quality and LoRA acceptance remain incomplete.",
+  "verification_scope": "35 focused Qwen regressions pass; four new ownership tests also pass separately in Python-free isolation. Fresh automatic INT8 1600x1600/40, BF16 320x224/4 and Turbo 320x224/8 LoRA editing pairs have exact finite tensors, PNG pixels and all three sampler/counter/residency phases. INT8 output matches the preserved sampler control. Dynamic ownership, general encoder/VAE sharing, arbitrary clone/patch wrappers and broader Stage 2 acceptance remain incomplete.",
   "first_image_comparison": {
     "profile": "512x512, seed17, four Euler/simple steps, CFG1, BF16, PyTorch attention, static full residency, Kitchen Triton disabled as source startup",
     "matched_pairs": 3,
@@ -231,5 +232,75 @@
     "stage2_complete": false,
     "new_parity_exceptions": [],
     "preservation": "Source, dependencies subset/license, regression fixtures/oracles, isolated launchers and evidence in the commit containing the accepted baseline report."
+  },
+  "lora_continuation": {
+    "report": "stage-2-qwen-image21-lora.md",
+    "checkpoint": "stage-2-qwen-image21-lora-checkpoint.json",
+    "stage2_complete": false,
+    "automatic_trained_pairs_exact": [
+      "int8_model",
+      "int8_text",
+      "int8_ordered_stack",
+      "bf16_model",
+      "turbo_model"
+    ],
+    "recorded_placement_diagnostic_pairs_exact": [
+      "bf16_model",
+      "turbo_model"
+    ],
+    "diagnostic_is_automatic_acceptance": false,
+    "fresh_automatic_validation": "User confirmed memory free; automatic BF16 and Turbo pairs pass after source reload/transfer-order fixes. Final lazy-copy branch is separately tested and not taken by measured pairs; explicit measured-path evidence reuse.",
+    "new_parity_exceptions": [],
+    "committed": false,
+    "earlier_automatic_pairs_failed": [
+      "bf16_model",
+      "turbo_model"
+    ],
+    "reload_states": 12,
+    "allocation_order_traces": 1,
+    "repeated_linear_cases": 12,
+    "repeated_linear_forwards": 24,
+    "final_copy_guard_focused_checks": 4,
+    "unchanged_focused_checks_reused": 25,
+    "final_standalone_isolations": 4
+  },
+  "sampler_buffer_lifecycle": {
+    "report": "stage-2-qwen-image21-sampler-buffer.md",
+    "checkpoint": "stage-2-qwen-image21-sampler-buffer-checkpoint.json",
+    "status": "selected_source_sequences_and_trained_int8_path_exact",
+    "registered_buffer_bytes": 40000,
+    "source_sequences": 6,
+    "source_transitions": 28,
+    "focused_tests_rerun": 31,
+    "new_python_free_test": 1,
+    "trained_profile": "inference/profiles/qwen21-lora-portrait-1600-int8.json",
+    "trained_tensor_boundaries_exact": 6,
+    "png_pixels_exact": true,
+    "trained_lifecycle_phases": [
+      "dit_initial",
+      "dit_sampling",
+      "dit_unloaded"
+    ],
+    "full_load_counter_delta_bytes": 0,
+    "stage2_complete": false,
+    "new_parity_exceptions": [],
+    "uncommitted": true
+  },
+  "historical_python_free_tests_passed": 25,
+  "python_free_verification_scope": "Four fresh shared-ownership tests only; the earlier 25-test snapshot remains historical, not a new 35-test isolated-suite claim.",
+  "shared_model_ownership": {
+    "report": "stage-2-qwen-image21-ownership.md",
+    "status": "selected_static_path_verified",
+    "policy_sequences": 18,
+    "policy_actions": 23,
+    "actual_clone_states": 22,
+    "multi_model_states": 7,
+    "new_regression_tests": 4,
+    "new_python_free_tests": 4,
+    "focused_tests": 35,
+    "trained_pairs": 3,
+    "trained_placements_counters_sampler_states_exact": true,
+    "final_registrations_and_pins_zero": true,
+    "complete_stage2": false
   }
 }

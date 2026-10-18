@@ -1,0 +1,38 @@
+{
+  "phases": [
+    {
+      "phase": "dit_initial",
+      "resident_modules": 330,
+      "resident_equal": true,
+      "lazy_modules": 0,
+      "lazy_equal": true,
+      "rust_loaded_bytes": 7256708608,
+      "python_loaded_bytes": 7256748608,
+      "counter_delta_bytes": 40000,
+      "pin_bytes": 0,
+      "buffer_bytes": 0
+    },
+    {
+      "phase": "dit_sampling",
+      "resident_modules": 330,
+      "resident_equal": true,
+      "lazy_modules": 0,
+      "lazy_equal": true,
+      "rust_loaded_bytes": 7256708608,
+      "python_loaded_bytes": 7256748608,
+      "counter_delta_bytes": 40000,
+      "pin_bytes": 0,
+      "buffer_bytes": 0
+    }
+  ],
+  "prefix_cache_equal": true,
+  "prefix_cache": {
+    "memory_bytes": 5271715840,
+    "pinned_bytes": 5271715840,
+    "staging_buffers": 2,
+    "store_device": "cpu"
+  },
+  "trained_lazy_weight_path_exercised": false,
+  "wrapper_accounting_complete": false,
+  "sampler_buffer_bytes": 40000
+}

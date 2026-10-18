@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "algorithm": "CPU Float32 sin(arange + offset) * .015 -> FP16; rank 2",
+  "target": "model.layers.0.self_attn.q_proj.weight",
+  "target_shape": [
+    4096,
+    4096
+  ],
+  "rank": 2,
+  "bytes": 33176,
+  "sha256": "e6e14424a45841f77395a5c30c609f27fb99b2ce30a533fc45c0cfc2e138cd88"
+}

@@ -1,0 +1,16 @@
+{
+  "fmt": "passed",
+  "python_ast_files": [
+    "reference_lora.py",
+    "reference_lora_weight.py",
+    "reference_lora_lifecycle.py",
+    "prepare_qwen_lora_fixture.py",
+    "reference_qwen_editing.py",
+    "test_isolation.py",
+    "compare_qwen_first_image.py"
+  ],
+  "shell_syntax": "passed",
+  "focused_tracked_whitespace": "passed",
+  "clippy": "all-targets -D warnings passed; separate retained log",
+  "production_runtime_read": false
+}

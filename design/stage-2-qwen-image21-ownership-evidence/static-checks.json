@@ -1,0 +1,7 @@
+{
+  "python_asts": 2,
+  "source_coordinator_recapture_bytes_equal": true,
+  "shell_syntax": true,
+  "focused_git_diff_check": true,
+  "production_runtime_read": false
+}

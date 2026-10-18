@@ -1,0 +1,94 @@
+{
+  "channels": "RGBA",
+  "context_shape": [
+    1,
+    55,
+    4096
+  ],
+  "cpu_threads": 23,
+  "diagnostic_memory_plan": false,
+  "diagnostic_trace": false,
+  "dtype": "float32",
+  "kitchen_triton_disabled": true,
+  "latent_shape": [
+    1,
+    64,
+    100,
+    100
+  ],
+  "pixels_shape": [
+    1,
+    1600,
+    1600,
+    4
+  ],
+  "production_runtime_read": false,
+  "profile": "qwen21-editing",
+  "schema": 1,
+  "source_profile": {
+    "batch": 1,
+    "cfg": 1.0,
+    "checkpoints": {
+      "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+      "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "height": 1600,
+    "lora": [
+      {
+        "path": "loras/qwen-image-21/lenovo_qwen21.safetensors",
+        "sha256": "7f1e95c3ec1e9c7cea197f7b6f80f601af8e6b479f6ead78ab16df542f447c0e",
+        "strength_clip": 0.0,
+        "strength_model": 1.0
+      }
+    ],
+    "negative_prompt": "",
+    "purpose": "user-requested isolated 1600-max-side portrait reference editing with Lenovo LoRA; original automatic offload; earlier baselines preserved",
+    "reference_resolution": 1600,
+    "reference_vae": true,
+    "references": [
+      {
+        "shape": [
+          1,
+          1024,
+          1024,
+          4
+        ],
+        "tensor_file": "inference/fixtures/qwen21-portrait-1mpx/reference.f32",
+        "tensor_sha256": "4256a0499cd68d2cfe5413e6ecff48da73ad420e9fcd261ff979c06515ca2fbf"
+      }
+    ],
+    "sampler": "euler",
+    "scheduler": "simple",
+    "schema": 1,
+    "seed": 3061383787,
+    "shift": 0.69,
+    "source_configuration": {
+      "attention": "pytorch",
+      "compute_dtype": "bfloat16",
+      "disable_async_offload": true,
+      "disable_comfy_compiler": true,
+      "force_full_load_per_component": false,
+      "kitchen_triton": false,
+      "prefix_cache_device": "auto",
+      "prefix_cache_dtype": "default",
+      "static_patcher": true,
+      "unload_between_components": true
+    },
+    "steps": 40,
+    "synthetic_prompt": "A photographic head-and-shoulders portrait of the same adult woman, wearing a blue blouse, in a sunlit garden with soft green foliage behind her. Preserve her face, hairstyle, expression and framing.",
+    "variant": "int8_convrot",
+    "width": 1600
+  },
+  "timing_method": "monotonic wall clock, CUDA synchronized at phase boundaries; per-step callbacks before Euler update",
+  "timings_seconds": {
+    "dit_load": 1.129093927,
+    "pipeline_wall_including_unload_and_intermediate_export": 103.323030599,
+    "reference_vae_load_and_encode": 0.75087384,
+    "sampling": 87.153578373,
+    "text_encode": 8.326278099,
+    "text_load": 1.249263269,
+    "vae_decode": 1.05488761,
+    "vae_load": 1.07146796
+  }
+}

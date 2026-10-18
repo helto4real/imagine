@@ -1,0 +1,2 @@
+bf16: strict comparison passed
+turbo: strict comparison passed

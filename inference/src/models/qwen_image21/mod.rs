@@ -13,7 +13,9 @@ mod geometry;
 mod layers;
 mod numeric;
 mod offload;
+mod ownership;
 pub use offload::*;
+pub use ownership::*;
 mod resident;
 pub use resident::*;
 mod sampling;
@@ -44,3 +46,6 @@ pub use vision_encoder::*;
 
 mod image_preprocess;
 pub use image_preprocess::*;
+
+mod patching;
+pub use patching::component_patch_owner;

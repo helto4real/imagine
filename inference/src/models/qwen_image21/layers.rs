@@ -14,10 +14,21 @@ fn offload_cast(rt: &Runtime, value: &Value, x: &Tensor) -> Result<Option<Value>
         rt.native.copy_tensor(&mut out, &t, true)?;
         return Ok(Some(Value::tensor(out.f_to_kind(x.kind())?)));
     }
+    if let Ok(q) = value.as_quantized()
+        && q.payload.device() == tch::Device::Cpu
+        && matches!(x.device(), tch::Device::Cuda(_))
+    {
+        let mut out = q.empty_like(&rt.native, Some(x.device()), None)?;
+        out.copy_from(&rt.native, &q, true)?;
+        out.params.original_kind = x.kind();
+        return Ok(Some(Value::quantized(out)));
+    }
     Ok(None)
 }
 
 pub struct Linear {
+    pub weight_patches: Vec<crate::patching::Patch>,
+    pub bias_patches: Vec<crate::patching::Patch>,
     pub weight: Value,
     pub bias: Option<Value>,
     pub full_precision: bool,
@@ -43,6 +54,16 @@ impl Linear {
         let policy = state.linear_policies.get(name).cloned().unwrap_or_default();
         Ok(Self {
             weight: get("weight")?,
+            weight_patches: state
+                .lowvram_patches
+                .get(&format!("{name}.weight"))
+                .cloned()
+                .unwrap_or_default(),
+            bias_patches: state
+                .lowvram_patches
+                .get(&format!("{name}.bias"))
+                .cloned()
+                .unwrap_or_default(),
             bias: if bias { Some(get("bias")?) } else { None },
             full_precision: policy.full_precision,
             force_forward: policy.force_forward,
@@ -71,7 +92,11 @@ impl Linear {
                 "TensorWiseINT8Layout" | "TensorCoreConvRotW4A4Layout" | "AsymW4A8Int8Layout"
             )
         });
-        let use_quantized = layout.is_some() && !self.full_precision && !self.force_forward;
+        let use_quantized = layout.is_some()
+            && !self.full_precision
+            && !self.force_forward
+            && self.weight_patches.is_empty()
+            && self.bias_patches.is_empty();
         let weight_only = use_quantized && !quantize_input;
         let mut input = Value::tensor(x.shallow_clone());
         let mut reshaped = false;
@@ -136,39 +161,65 @@ impl Linear {
         let mut w = if let Some(w) = offload_cast(rt, &self.weight, x)? {
             w
         } else {
+            let mut options = vec![
+                ("dtype".into(), Value::DType(x.kind())),
+                ("device".into(), Value::Device(x.device())),
+            ];
+            if !self.weight_patches.is_empty() {
+                // cast_bias_weight copies before applying mutating functions.
+                options.push(("copy".into(), Value::Bool(true)));
+            }
             unsafe {
                 rt.op(
                     "aten::to.dtype_layout",
                     std::slice::from_ref(&self.weight),
-                    &vec![
-                        ("dtype".into(), Value::DType(x.kind())),
-                        ("device".into(), Value::Device(x.device())),
-                    ],
+                    &options,
                 )?
             }
         };
-        if cast_dequantize {
+        if cast_dequantize || !self.weight_patches.is_empty() {
             w = unsafe { rt.dequantize_args(&w)? };
         }
-        let bias = match &self.bias {
+        let mut bias = match &self.bias {
             Some(b) => {
                 if let Some(b) = offload_cast(rt, b, x)? {
                     b
                 } else {
-                    unsafe {
-                        rt.op(
-                            "aten::to.dtype_layout",
-                            std::slice::from_ref(b),
-                            &vec![
-                                ("dtype".into(), Value::DType(x.kind())),
-                                ("device".into(), Value::Device(x.device())),
-                            ],
-                        )?
+                    let mut options = vec![
+                        ("dtype".into(), Value::DType(x.kind())),
+                        ("device".into(), Value::Device(x.device())),
+                    ];
+                    if !self.bias_patches.is_empty() {
+                        options.push(("copy".into(), Value::Bool(true)));
                     }
+                    unsafe { rt.op("aten::to.dtype_layout", std::slice::from_ref(b), &options)? }
                 }
             }
             None => Value::None,
         };
+        // Original LowVramPatch runs after cast_bias_weight, in the execution
+        // dtype; it is not the resident FP16 patch-and-requantize route.
+        for (value, patches) in [
+            (&mut w, &self.weight_patches),
+            (&mut bias, &self.bias_patches),
+        ] {
+            if !patches.is_empty() {
+                let t = value.as_tensor()?;
+                let mut diagnostics = crate::patching::Diagnostics::default();
+                *value = Value::tensor(crate::patching::calculate_weight(
+                    &rt.native,
+                    patches,
+                    t,
+                    "lowvram",
+                    x.kind(),
+                    None,
+                    &mut diagnostics,
+                )?);
+                for message in diagnostics.errors {
+                    eprintln!("{message}");
+                }
+            }
+        }
         // MixedPrecisionOps' weight-only quantization preserves the logical
         // layout; F.linear still decomposes the non-contiguous image path.
         if matches!(w, Value::Quantized(_))
@@ -209,6 +260,8 @@ impl Linear {
         if !training
             && !self.full_precision
             && !self.force_forward
+            && self.weight_patches.is_empty()
+            && self.bias_patches.is_empty()
             && let Ok(q) = self.weight.as_quantized()
             && q.layout == "TensorWiseINT8Layout"
             && q.params.fields.get("transposed") != Some(&ScalarField::Bool(true))

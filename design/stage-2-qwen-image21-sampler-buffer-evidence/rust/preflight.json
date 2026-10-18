@@ -1,0 +1,88 @@
+{
+  "checkpoints": {
+    "dit": {
+      "file_bytes": 7256783064,
+      "header_sha256": "64ac1c737e46bf4f181d302e4836591306e26e4f62d547b2bef08270c9c97567",
+      "parameters": 265,
+      "path": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors"
+    },
+    "text": {
+      "file_bytes": 9350798360,
+      "header_sha256": "b55c03ca5443ee1514738dbf69dceddf9074ae5e745bce5a2310754e0b37078d",
+      "parameters": 750,
+      "path": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors"
+    },
+    "vae": {
+      "file_bytes": 675509688,
+      "header_sha256": "c091c3d231f352db5fb44840e22388d2abe9c2c37b4daf97bdc6cc3448387759",
+      "parameters": 238,
+      "path": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+    }
+  },
+  "cuda_memory_before": [
+    14007599104,
+    16769744896,
+    0,
+    0
+  ],
+  "image_generation_executed": false,
+  "production_runtime_read": false,
+  "schema": 1,
+  "source_profile": {
+    "batch": 1,
+    "cfg": 1.0,
+    "checkpoints": {
+      "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+      "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "height": 1600,
+    "lora": [
+      {
+        "path": "loras/qwen-image-21/lenovo_qwen21.safetensors",
+        "sha256": "7f1e95c3ec1e9c7cea197f7b6f80f601af8e6b479f6ead78ab16df542f447c0e",
+        "strength_clip": 0.0,
+        "strength_model": 1.0
+      }
+    ],
+    "negative_prompt": "",
+    "purpose": "user-requested isolated 1600-max-side portrait reference editing with Lenovo LoRA; original automatic offload; earlier baselines preserved",
+    "reference_resolution": 1600,
+    "reference_vae": true,
+    "references": [
+      {
+        "shape": [
+          1,
+          1024,
+          1024,
+          4
+        ],
+        "tensor_file": "inference/fixtures/qwen21-portrait-1mpx/reference.f32",
+        "tensor_sha256": "4256a0499cd68d2cfe5413e6ecff48da73ad420e9fcd261ff979c06515ca2fbf"
+      }
+    ],
+    "sampler": "euler",
+    "scheduler": "simple",
+    "schema": 1,
+    "seed": 3061383787,
+    "shift": 0.69,
+    "source_configuration": {
+      "attention": "pytorch",
+      "compute_dtype": "bfloat16",
+      "disable_async_offload": true,
+      "disable_comfy_compiler": true,
+      "force_full_load_per_component": false,
+      "kitchen_triton": false,
+      "prefix_cache_device": "auto",
+      "prefix_cache_dtype": "default",
+      "static_patcher": true,
+      "unload_between_components": true
+    },
+    "steps": 40,
+    "synthetic_prompt": "A photographic head-and-shoulders portrait of the same adult woman, wearing a blue blouse, in a sunlit garden with soft green foliage behind her. Preserve her face, hairstyle, expression and framing.",
+    "variant": "int8_convrot",
+    "width": 1600
+  },
+  "status": "headers_preflight_passed",
+  "trained_forward_executed": false
+}

@@ -1,0 +1,19 @@
+{
+  "negative_attention_mask": false,
+  "negative_shape": [
+    1,
+    15,
+    4096
+  ],
+  "negative_slots": [
+    8
+  ],
+  "positive_shape": [
+    1,
+    31,
+    4096
+  ],
+  "positive_slots": [
+    8
+  ]
+}

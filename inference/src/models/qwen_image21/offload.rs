@@ -1,4 +1,4 @@
-//! Frozen static ModelPatcher, synchronous BF16 weights, no patches/vbars.
+//! Frozen static ModelPatcher, synchronous BF16/INT8 weights and optional LoRA patches.
 //! Placement arithmetic is independently tested against the original methods.
 use crate::{
     checkpoint::PreparedParameters,
@@ -63,8 +63,13 @@ pub struct OffloadModule {
 #[derive(Default, Clone, Deserialize, Serialize)]
 pub struct StaticPlacement {
     pub resident: BTreeSet<String>,
-    pub loaded_bytes: u64,
+    // Original recomputed accounting can become negative after a subsequent
+    // partial unload. Physical residency and this counter are distinct state.
+    pub loaded_bytes: i64,
     pub buffer_bytes: u64,
+    /// Low-vram mode and ordered patch passes, including still-resident weights.
+    #[serde(default)]
+    pub lowvram_passes: BTreeMap<String, usize>,
 }
 fn sorted(modules: &[OffloadModule], reverse: bool) -> Vec<&OffloadModule> {
     let mut list = modules.iter().collect::<Vec<_>>();
@@ -76,6 +81,26 @@ fn sorted(modules: &[OffloadModule], reverse: bool) -> Vec<&OffloadModule> {
     }
     list
 }
+/// Original load_completely.sort(reverse=True), then separate patch/move loops.
+pub enum RegularLoadAction<'a> {
+    Patch(&'a OffloadModule),
+    Move(&'a OffloadModule),
+}
+pub fn regular_load_actions<'a>(
+    modules: &'a [OffloadModule],
+    resident: &BTreeSet<String>,
+) -> Vec<RegularLoadAction<'a>> {
+    let mut selected = modules
+        .iter()
+        .filter(|m| resident.contains(&m.name))
+        .collect::<Vec<_>>();
+    selected.sort_by(|a, b| (b.module_bytes, &b.name).cmp(&(a.module_bytes, &a.name)));
+    selected
+        .iter()
+        .map(|m| RegularLoadAction::Patch(m))
+        .chain(selected.iter().map(|m| RegularLoadAction::Move(m)))
+        .collect()
+}
 impl StaticPlacement {
     pub fn reload(&self, modules: &[OffloadModule], extra: f64) -> Self {
         if extra < 0. {
@@ -84,7 +109,7 @@ impl StaticPlacement {
             return next;
         }
         let total: u64 = modules.iter().map(|m| m.module_bytes).sum();
-        if self.loaded_bytes == total {
+        if self.loaded_bytes == total as i64 {
             return self.clone();
         }
         let budget = self.loaded_bytes as f64 + extra;
@@ -93,6 +118,12 @@ impl StaticPlacement {
         // to CPU merely because a new fit calculation skips their module.
         // Preserve those objects independently of its recomputed byte counter.
         next.resident.extend(self.resident.iter().cloned());
+        for (name, passes) in &mut next.lowvram_passes {
+            if let Some(previous) = self.lowvram_passes.get(name) {
+                // load() skips an already-lowvram module, retaining functions.
+                *passes = *previous;
+            }
+        }
         next
     }
     /// Original NUM_STREAMS=0 branch. Existing resident entries are patched only
@@ -101,12 +132,14 @@ impl StaticPlacement {
         let mut out = Self::default();
         for m in sorted(modules, true) {
             let potential = out.buffer_bytes.max(m.offload_bytes);
-            let fits = ((out.loaded_bytes + m.module_bytes + potential) as f64) < budget;
+            let fits =
+                ((out.loaded_bytes + m.module_bytes as i64 + potential as i64) as f64) < budget;
             if !full && m.cast_weights && !fits {
                 out.buffer_bytes = potential;
+                out.lowvram_passes.insert(m.name.clone(), 1);
             } else if full || fits {
                 out.resident.insert(m.name.clone());
-                out.loaded_bytes += m.module_bytes;
+                out.loaded_bytes += m.module_bytes as i64;
             } else {
                 out.buffer_bytes = potential;
             }
@@ -123,9 +156,12 @@ impl StaticPlacement {
             if self.resident.remove(&m.name) {
                 freed += m.module_bytes;
                 self.buffer_bytes = self.buffer_bytes.max(m.offload_bytes);
+                if m.cast_weights {
+                    *self.lowvram_passes.entry(m.name.clone()).or_default() += 1;
+                }
             }
         }
-        self.loaded_bytes -= freed;
+        self.loaded_bytes -= freed as i64;
         freed
     }
 }
@@ -299,101 +335,526 @@ pub fn host_pin_limit() -> Result<f64, Error> {
             .min(ram + swap as f64 - 16. * 1024_f64.powi(3)),
     ))
 }
+/// Original _load_list/low_vram_patch_estimate_vram extra math workspace.
+pub fn patched_module_offload_bytes(base: u64, patched_elements: &[u64], kind: Kind) -> u64 {
+    base + patched_elements.iter().sum::<u64>() * kind.elt_size_in_bytes() as u64 * 2
+}
+fn parameter_shape_kind(value: &Value) -> Result<(Vec<i64>, Kind, bool), Error> {
+    match value {
+        Value::Quantized(_) => {
+            let q = value.as_quantized()?;
+            Ok((q.params.original_shape, q.params.original_kind, true))
+        }
+        _ => {
+            let t = value.as_tensor()?;
+            Ok((t.size(), t.kind(), false))
+        }
+    }
+}
+fn parameter_to_device(native: &Kitchen, value: &Value, device: Device) -> Result<Value, Error> {
+    match value {
+        Value::Quantized(_) => Ok(Value::quantized(
+            value
+                .as_quantized()?
+                .to(native, Some(device), None, false)?
+                .as_ref()
+                .shallow_parts(),
+        )),
+        _ => Ok(Value::tensor(value.as_tensor()?.f_to_device(device)?)),
+    }
+}
+// Module._apply re-wraps moved ordinary Parameters with their previous grad
+// flag even inside no_grad. Backup tensor.to intentionally has other semantics.
+fn move_parameter(native: &Kitchen, value: &Value, device: Device) -> Result<Value, Error> {
+    let moved = parameter_to_device(native, value, device)?;
+    if let Value::Tensor(_) = value {
+        let original = value.as_tensor()?;
+        return Ok(Value::tensor(
+            moved
+                .as_tensor()?
+                .f_set_requires_grad(original.requires_grad())?,
+        ));
+    }
+    Ok(moved)
+}
+/// Original module_size(state_dict) includes serialized scales and comfy_quant
+/// JSON, while pinning uses QuantizedTensor.nbytes (packed payload only).
+/// Templates retain the source module traversal and cast_weights attributes.
+pub fn prepare_offload_modules(
+    parameters: &PreparedParameters,
+    mut modules: Vec<OffloadModule>,
+) -> Result<Vec<OffloadModule>, Error> {
+    use crate::storage::ScalarField;
+    let names = modules
+        .iter()
+        .flat_map(|m| m.parameters.iter().cloned())
+        .collect::<BTreeSet<_>>();
+    if names != parameters.keys().cloned().collect() {
+        return Err(gap(
+            "alternate constructor/metadata outside selected static binding",
+        ));
+    }
+    for module in &mut modules {
+        module.module_bytes = 0;
+        let mut extra = 0;
+        if parameters
+            .linear_policies
+            .get(&module.name)
+            .is_some_and(|p| p.pre_quant_scale.is_some() || p.input_scale.is_some())
+        {
+            return Err(gap("Static offload extra registered scale parameters"));
+        }
+        for name in &module.parameters {
+            let value = &parameters[name];
+            let (shape, kind, quantized) = parameter_shape_kind(value)?;
+            if kind != Kind::BFloat16 {
+                return Err(gap(format!("Expected BF16 logical weight {name}")));
+            }
+            if quantized {
+                let q = value.as_quantized()?;
+                if q.layout != "TensorWiseINT8Layout" || q.payload.device() != Device::Cpu {
+                    return Err(gap(format!("Expected CPU tensorwise INT8 weight {name}")));
+                }
+                let mut conf = serde_json::json!({"format":"int8_tensorwise"});
+                if parameters
+                    .linear_policies
+                    .get(&module.name)
+                    .is_some_and(|p| p.full_precision_config)
+                {
+                    conf["full_precision_matrix_mult"] = true.into();
+                }
+                if q.params.fields.get("convrot") == Some(&ScalarField::Bool(true)) {
+                    conf["convrot"] = true.into();
+                    conf["convrot_groupsize"] = match q.params.fields.get("convrot_groupsize") {
+                        Some(ScalarField::Integer(n)) => (*n).into(),
+                        _ => 256.into(),
+                    };
+                }
+                // Python json.dumps adds one space after every colon/comma.
+                let json_bytes = serde_json::to_vec(&conf)
+                    .map_err(|e| Error::Native(e.to_string()))?
+                    .len()
+                    + 2 * conf.as_object().unwrap().len()
+                    - 1;
+                module.module_bytes += json_bytes as u64;
+                for (_, t) in crate::layouts::tensorwise_state_dict(&q, "weight")? {
+                    module.module_bytes += (t.numel() * t.kind().elt_size_in_bytes()) as u64;
+                }
+            } else {
+                let t = value.as_tensor()?;
+                if t.device() != Device::Cpu {
+                    return Err(gap(format!("Expected CPU weight {name}")));
+                }
+                module.module_bytes += (t.numel() * t.kind().elt_size_in_bytes()) as u64;
+            }
+            if module.cast_weights && (quantized || kind != Kind::BFloat16) {
+                extra += shape.iter().product::<i64>() as u64 * 2;
+            }
+        }
+        module.offload_bytes = module.module_bytes + extra;
+    }
+    Ok(modules)
+}
+/// Original _load_list patch workspace replaces the unpatched cast workspace.
+pub fn prepare_patched_offload_modules(
+    parameters: &PreparedParameters,
+    owner: &crate::patching::PatchOwner,
+    mut modules: Vec<OffloadModule>,
+) -> Result<Vec<OffloadModule>, Error> {
+    for module in &mut modules {
+        if module.cast_weights {
+            module.offload_bytes = module.module_bytes;
+            for name in &module.parameters {
+                let value = &parameters[name];
+                let (shape, kind, quantized) = parameter_shape_kind(value)?;
+                let elements = shape.iter().product::<i64>() as u64;
+                if let Some(patches) = owner.patches.get(name) {
+                    if crate::patching::calculate_shape_from_shape(patches, shape.clone())? != shape
+                    {
+                        return Err(gap("Static offload forced shape-changing patch lifecycle"));
+                    }
+                    module.offload_bytes = patched_module_offload_bytes(
+                        module.offload_bytes,
+                        &[elements],
+                        Kind::BFloat16,
+                    );
+                } else if quantized || kind != Kind::BFloat16 {
+                    module.offload_bytes += elements * 2;
+                }
+            }
+        }
+    }
+    Ok(modules)
+}
 pub struct StaticOffload {
     pub parameters: PreparedParameters,
+    pub patch_owner: crate::patching::PatchOwner,
     pub modules: Vec<OffloadModule>,
     pub placement: StaticPlacement,
+    pub sampling: super::FluxSampling,
+    /// Original ModelPatcher caches module_size before patch/load transitions.
+    model_size: u64,
+    pub model_lowvram: bool,
     pins: BTreeMap<String, Tensor>,
     native: Kitchen,
     pin_limit: f64,
+    shared_pins: Option<super::HostPins>,
+    forced_lowvram: BTreeSet<String>,
     pub pinned_bytes: u64,
 }
 impl StaticOffload {
     pub fn new(parameters: PreparedParameters, native: Kitchen) -> Result<Self, Error> {
-        let modules = bf16_dit_modules()?;
-        let names = modules
-            .iter()
-            .flat_map(|m| m.parameters.iter().cloned())
-            .collect::<BTreeSet<_>>();
-        if names != parameters.keys().cloned().collect() {
-            return Err(gap(
-                "alternate constructor/metadata outside selected BF16 static binding",
-            ));
-        }
-        for (n, v) in &parameters.values {
-            let t = v.as_tensor()?;
-            if t.kind() != Kind::BFloat16 || t.device() != Device::Cpu {
-                return Err(gap(format!("Expected CPU BF16 weight {n}")));
-            }
-        }
+        Self::from_modules(
+            parameters,
+            native,
+            bf16_dit_modules()?,
+            super::FluxSampling::qwen21()?,
+        )
+    }
+    /// Explicit source module inventory, also used by bounded lifecycle oracles.
+    pub fn from_modules(
+        parameters: PreparedParameters,
+        native: Kitchen,
+        modules: Vec<OffloadModule>,
+        sampling: super::FluxSampling,
+    ) -> Result<Self, Error> {
+        let modules = prepare_offload_modules(&parameters, modules)?;
+        let model_size =
+            modules.iter().map(|m| m.module_bytes).sum::<u64>() + sampling.buffer_bytes();
         Ok(Self {
             parameters,
+            patch_owner: crate::patching::PatchOwner::new(),
             modules,
             placement: StaticPlacement::default(),
+            sampling,
+            model_size,
+            model_lowvram: false,
             pins: BTreeMap::new(),
             pin_limit: host_pin_limit()?,
+            shared_pins: None,
+            forced_lowvram: BTreeSet::new(),
             pinned_bytes: 0,
             native,
         })
+    }
+    pub fn model_size(&self) -> u64 {
+        self.model_size
+    }
+    pub fn with_shared_pins(mut self, pins: super::HostPins) -> Self {
+        self.shared_pins = Some(pins);
+        self
+    }
+    pub fn partially_load_with_runtime(
+        &mut self,
+        rt: &crate::execution::Runtime,
+        extra: f64,
+        force: bool,
+    ) -> Result<(), Error> {
+        self.partially_load_forced(extra, Some(rt), force)
+    }
+    pub(crate) fn load_after_unpatch(
+        &mut self,
+        rt: &crate::execution::Runtime,
+        extra: f64,
+        force: bool,
+    ) -> Result<(), Error> {
+        self.load_or_unload(extra, Some(rt), force, false)
+    }
+    /// Original partially_load on the selected single owner, without hooks/clones.
+    pub fn partially_load(&mut self, extra_memory: f64) -> Result<(), Error> {
+        self.partially_load_impl(extra_memory, None)
+    }
+    fn partially_load_impl(
+        &mut self,
+        extra: f64,
+        rt: Option<&crate::execution::Runtime>,
+    ) -> Result<(), Error> {
+        self.partially_load_forced(extra, rt, false)
+    }
+    fn partially_load_forced(
+        &mut self,
+        extra: f64,
+        rt: Option<&crate::execution::Runtime>,
+        force: bool,
+    ) -> Result<(), Error> {
+        self.load_or_unload(extra, rt, force, true)
+    }
+    fn load_or_unload(
+        &mut self,
+        extra: f64,
+        rt: Option<&crate::execution::Runtime>,
+        force: bool,
+        unload_negative: bool,
+    ) -> Result<(), Error> {
+        if extra < 0. && unload_negative {
+            let mut next = self.placement.clone();
+            next.unload(&self.modules, -extra);
+            self.apply_impl_forced(next, rt, force)?;
+            self.model_lowvram = true;
+            // partially_unload moves selected leaf modules only, not buffers.
+            return Ok(());
+        }
+        if !self.model_lowvram && self.placement.loaded_bytes > 0 {
+            return Ok(());
+        }
+        let budget = self.placement.loaded_bytes as f64 + extra;
+        let full = budget > self.model_size as f64;
+        let mut next = StaticPlacement::load(&self.modules, budget, full);
+        next.resident
+            .extend(self.placement.resident.iter().cloned());
+        for (name, passes) in &mut next.lowvram_passes {
+            if let Some(previous) = self.placement.lowvram_passes.get(name) {
+                *passes = *previous;
+            }
+        }
+        let lowvram = !next.lowvram_passes.is_empty();
+        let result = (|| {
+            self.apply_impl_forced(next, rt, force)?;
+            if full && !lowvram {
+                self.sampling.to_device(Device::Cuda(0))?;
+                self.placement.loaded_bytes = self.model_size as i64;
+            }
+            self.model_lowvram = lowvram;
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = self.unload();
+        }
+        result
+    }
+    /// Original unpatch_model(offload_device, unpatch_weights=True).
+    pub fn unload(&mut self) -> Result<(), Error> {
+        for (_, t) in std::mem::take(&mut self.pins) {
+            if let Some(pins) = &self.shared_pins {
+                pins.unpin(&t)?;
+            } else {
+                self.native.host_registration(&t, false)?;
+            }
+        }
+        self.pinned_bytes = 0;
+        self.patch_owner.restore(&mut self.parameters)?;
+        self.forced_lowvram.clear();
+        for value in self.parameters.values.values_mut() {
+            *value = move_parameter(&self.native, value, Device::Cpu)?;
+        }
+        self.sampling.to_device(Device::Cpu)?;
+        self.placement = StaticPlacement::default();
+        self.model_lowvram = false;
+        Ok(())
+    }
+    /// Explicit diagnostic replay must carry buffer placement and low-VRAM state.
+    pub fn replay_state(
+        &mut self,
+        rt: &crate::execution::Runtime,
+        placement: StaticPlacement,
+        sampling_device: Device,
+        lowvram: bool,
+    ) -> Result<(), Error> {
+        self.apply_impl(placement, Some(rt))?;
+        self.sampling.to_device(sampling_device)?;
+        self.model_lowvram = lowvram;
+        Ok(())
+    }
+    pub fn with_patches(mut self, owner: crate::patching::PatchOwner) -> Result<Self, Error> {
+        self.modules = prepare_patched_offload_modules(
+            &self.parameters,
+            &owner,
+            std::mem::take(&mut self.modules),
+        )?;
+        self.patch_owner = owner;
+        Ok(self)
+    }
+    pub fn apply_patched(
+        &mut self,
+        rt: &crate::execution::Runtime,
+        next: StaticPlacement,
+    ) -> Result<(), Error> {
+        self.apply_impl(next, Some(rt))
     }
     pub fn free_memory(&self) -> Result<f64, Error> {
         let [free, _, active, reserved] = self.native.cuda_memory(0)?;
         Ok((free + reserved - active) as f64)
     }
     pub fn apply(&mut self, next: StaticPlacement) -> Result<(), Error> {
-        // Source load_completely.sort(reverse=True): size/name descending;
-        // here offload_bytes==module_bytes for the selected plain BF16 model.
-        for m in sorted(&self.modules, true) {
-            let target = if next.resident.contains(&m.name) {
-                Device::Cuda(0)
-            } else {
-                Device::Cpu
-            };
-            for name in &m.parameters {
-                if target == Device::Cuda(0)
-                    && let Some(t) = self.pins.remove(name)
-                    && self.native.host_registration(&t, false)?
-                {
-                    self.pinned_bytes -= (t.numel() * t.kind().elt_size_in_bytes()) as u64;
+        self.apply_impl(next, None)
+    }
+    fn apply_impl(
+        &mut self,
+        next: StaticPlacement,
+        rt: Option<&crate::execution::Runtime>,
+    ) -> Result<(), Error> {
+        self.apply_impl_forced(next, rt, false)
+    }
+    fn apply_impl_forced(
+        &mut self,
+        next: StaticPlacement,
+        rt: Option<&crate::execution::Runtime>,
+        force: bool,
+    ) -> Result<(), Error> {
+        if !self.patch_owner.patches.is_empty() && rt.is_none() {
+            return Err(gap("Patched static owner requires its original runtime"));
+        }
+        // partial_unload walks ascending _load_list order, restores originals,
+        // moves a complete module, then pins it before considering the next one.
+        let removed = sorted(&self.modules, false)
+            .into_iter()
+            .filter(|m| {
+                self.placement.resident.contains(&m.name) && !next.resident.contains(&m.name)
+            })
+            .map(|m| m.parameters.clone())
+            .collect::<Vec<_>>();
+        for names in removed {
+            for name in &names {
+                if let Some(base) = self.patch_owner.backup.remove(name) {
+                    self.parameters.values.insert(name.clone(), base);
                 }
-                let t = self.parameters[name].as_tensor()?;
-                if t.device() != target {
-                    self.parameters
-                        .values
-                        .insert(name.clone(), Value::tensor(t.f_to_device(target)?));
-                }
+                let moved = move_parameter(&self.native, &self.parameters[name], Device::Cpu)?;
+                self.parameters.values.insert(name.clone(), moved);
             }
-            if target == Device::Cuda(0) && !self.placement.resident.contains(&m.name) {
-                self.native.synchronize_device(0)?;
+            for name in &names {
+                self.pin_parameter(name)?;
             }
         }
-        // Original offloaded traversal follows descending _load_list order.
-        for m in sorted(&self.modules, true) {
-            if !next.resident.contains(&m.name)
-                && (m.cast_weights || self.placement.resident.contains(&m.name))
-            {
-                for name in &m.parameters {
-                    if self.pins.contains_key(name) {
+        // load configures lazy functions before patching any resident weights.
+        for m in &self.modules {
+            for name in &m.parameters {
+                if next.resident.contains(&m.name) {
+                    self.forced_lowvram.remove(name);
+                }
+                if force
+                    && next.lowvram_passes.contains_key(&m.name)
+                    && !self.placement.lowvram_passes.contains_key(&m.name)
+                    && let Some(patches) = self.patch_owner.patches.get(name)
+                {
+                    let base = self.parameters[name].clone();
+                    let patched = unsafe {
+                        crate::patching::patch_weight(
+                            rt.unwrap(),
+                            &base,
+                            patches,
+                            &format!("{}{name}", self.patch_owner.key_prefix),
+                            Device::Cpu,
+                            Kind::Float,
+                            &mut self.patch_owner.diagnostics,
+                        )?
+                    };
+                    self.patch_owner.backup.insert(name.clone(), base);
+                    self.parameters.values.insert(name.clone(), patched);
+                    self.forced_lowvram.insert(name.clone());
+                }
+                self.patch_owner.bind_lowvram(
+                    &mut self.parameters,
+                    name,
+                    if self.forced_lowvram.contains(name) {
+                        0
+                    } else {
+                        next.lowvram_passes.get(&m.name).copied().unwrap_or(0)
+                    },
+                );
+            }
+        }
+        for action in regular_load_actions(&self.modules, &next.resident) {
+            match action {
+                RegularLoadAction::Patch(m) => {
+                    if self.placement.resident.contains(&m.name) {
                         continue;
                     }
-                    let t = self.parameters[name].as_tensor()?;
-                    let bytes = (t.numel() * t.kind().elt_size_in_bytes()) as u64;
-                    if self.pinned_bytes as f64 + bytes as f64 <= self.pin_limit
-                        && self.native.host_registration(&t, true)?
-                    {
-                        self.pinned_bytes += bytes;
-                        self.pins.insert(name.clone(), t);
+                    for name in &m.parameters {
+                        if let Some(t) = self.pins.remove(name) {
+                            if let Some(pins) = &self.shared_pins {
+                                pins.unpin(&t)?;
+                            } else {
+                                self.native.host_registration(&t, false)?;
+                            }
+                            self.pinned_bytes -= (t.numel() * t.kind().elt_size_in_bytes()) as u64;
+                        }
+                        if let Some(patches) = self.patch_owner.patches.get(name) {
+                            let base = self.parameters[name].clone();
+                            let patched = unsafe {
+                                crate::patching::patch_weight(
+                                    rt.unwrap(),
+                                    &base,
+                                    patches,
+                                    &format!("{}{name}", self.patch_owner.key_prefix),
+                                    Device::Cuda(0),
+                                    Kind::Half,
+                                    &mut self.patch_owner.diagnostics,
+                                )?
+                            };
+                            let saved = parameter_to_device(&self.native, &base, Device::Cpu)?;
+                            self.patch_owner.backup.entry(name.clone()).or_insert(saved);
+                            self.parameters.values.insert(name.clone(), patched);
+                        }
+                    }
+                    self.native.synchronize_device(0)?;
+                }
+                RegularLoadAction::Move(m) => {
+                    for name in &m.parameters {
+                        let moved =
+                            move_parameter(&self.native, &self.parameters[name], Device::Cuda(0))?;
+                        self.parameters.values.insert(name.clone(), moved);
                     }
                 }
+            }
+        }
+        let offloaded = sorted(&self.modules, true)
+            .into_iter()
+            .filter(|m| {
+                !next.resident.contains(&m.name)
+                    && (m.cast_weights || self.placement.resident.contains(&m.name))
+            })
+            .map(|m| m.parameters.clone())
+            .collect::<Vec<_>>();
+        for names in offloaded {
+            for name in &names {
+                self.pin_parameter(name)?;
             }
         }
         self.placement = next;
+        Ok(())
+    }
+    fn pin_parameter(&mut self, name: &str) -> Result<(), Error> {
+        if self.pins.contains_key(name) {
+            return Ok(());
+        }
+        // QuantizedTensor.nbytes/data_ptr describe only its packed payload.
+        let t = match &self.parameters[name] {
+            Value::Quantized(_) => self.parameters[name].as_quantized()?.payload,
+            value => value.as_tensor()?,
+        };
+        let bytes = (t.numel() * t.kind().elt_size_in_bytes()) as u64;
+        let pinned = if let Some(pins) = &self.shared_pins {
+            pins.pin(&t)?
+        } else {
+            self.pinned_bytes as f64 + bytes as f64 <= self.pin_limit
+                && self.native.host_registration(&t, true)?
+        };
+        if pinned {
+            self.pinned_bytes += bytes;
+            self.pins.insert(name.to_owned(), t);
+        }
         Ok(())
     }
     /// The original removes same-model/clone registrations with detach(false)
     /// before free_memory. In this isolated single-model owner there is then
     /// no registered model to evict; only the original allocator-cache check.
     pub fn load_for(&mut self, minimum: Option<f64>, requested: f64) -> Result<(), Error> {
+        self.load_for_impl(minimum, requested, None)
+    }
+    pub fn load_for_patched(
+        &mut self,
+        rt: &crate::execution::Runtime,
+        minimum: Option<f64>,
+        requested: f64,
+    ) -> Result<(), Error> {
+        self.load_for_impl(minimum, requested, Some(rt))
+    }
+    fn load_for_impl(
+        &mut self,
+        minimum: Option<f64>,
+        requested: f64,
+        rt: Option<&crate::execution::Runtime>,
+    ) -> Result<(), Error> {
         let extra = minimum_inference_memory().max(requested + LINUX_RESERVED);
         let minimum = minimum.or(Some(extra - LINUX_RESERVED));
         {
@@ -404,15 +865,18 @@ impl StaticOffload {
         }
         let loaded = self.placement.loaded_bytes as f64;
         let budget = static_load_budget(self.free_memory()?, loaded, minimum);
-        let next = self.placement.reload(&self.modules, budget);
-        self.apply(next)
+        self.partially_load_impl(budget, rt)
     }
 }
 impl Drop for StaticOffload {
     fn drop(&mut self) {
         let _ = self.native.synchronize_device(0);
         for t in self.pins.values() {
-            let _ = self.native.host_registration(t, false);
+            if let Some(pins) = &self.shared_pins {
+                let _ = pins.unpin(t);
+            } else {
+                let _ = self.native.host_registration(t, false);
+            }
         }
     }
 }

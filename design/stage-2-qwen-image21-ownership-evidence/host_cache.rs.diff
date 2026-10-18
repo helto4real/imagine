@@ -1,0 +1,87 @@
+--- design/stage-2-qwen-image21-ownership-evidence/before/inference/src/models/qwen_image21/host_cache.rs	2026-10-18 17:22:57.940455375 +0200
++++ inference/src/models/qwen_image21/host_cache.rs	2026-10-18 17:24:11.997467998 +0200
+@@ -12,6 +12,7 @@
+     resident: ResidentCacheServices,
+     pin_limit: f64,
+     other_pinned_bytes: usize,
++    shared_pins: Option<super::HostPins>,
+     pinned: BTreeMap<usize, Tensor>,
+     staging: BTreeMap<(Vec<i64>, String), [Tensor; 2]>,
+ }
+@@ -33,10 +34,16 @@
+             resident: ResidentCacheServices { native },
+             pin_limit: host_pin_limit()?,
+             other_pinned_bytes,
++            shared_pins: None,
+             pinned: BTreeMap::new(),
+             staging: BTreeMap::new(),
+         })
+     }
++    pub fn with_shared_pins(native: Kitchen, pins: super::HostPins) -> Result<Self, Error> {
++        let mut services = Self::new(native, 0)?;
++        services.shared_pins = Some(pins);
++        Ok(services)
++    }
+     pub fn pinned_bytes(&self) -> usize {
+         self.pinned
+             .values()
+@@ -62,26 +69,21 @@
+         // Original ensure_pin_budget is a RAM-pressure check, distinct from
+         // ensure_pin_registerable. No eligible inactive owners exist here.
+         let room = single_owner_pin_budget(bytes, host_available_memory()?);
+-        if !room && self.other_pinned_bytes > 0 {
+-            return Err(Error::BindingGap {
+-                backend: "static_host_cache".into(),
+-                operation: "RAM-pressure eviction with additional registered model pins".into(),
+-            });
+-        }
+         Ok(room)
+     }
+     fn pin(&mut self, t: &Tensor, _evict_active: bool) -> Result<bool, Error> {
++        if let Some(pins) = &self.shared_pins {
++            let registered = pins.pin(t)?;
++            if registered {
++                self.pinned.insert(t.data_ptr() as usize, t.shallow_clone());
++            }
++            return Ok(registered);
++        }
+         if self.pin_limit <= 0. || t.device() != Device::Cpu || !t.is_contiguous() {
+             return Ok(false);
+         }
+         let bytes = t.numel() * t.kind().elt_size_in_bytes();
+         if (self.other_pinned_bytes + self.pinned_bytes() + bytes) as f64 > self.pin_limit {
+-            if self.other_pinned_bytes > 0 {
+-                return Err(Error::BindingGap {
+-                    backend: "static_host_cache".into(),
+-                    operation: "Registration eviction with additional registered model pins".into(),
+-                });
+-            }
+             return Ok(false);
+         }
+         if self.resident.native.host_registration(t, true)? {
+@@ -96,7 +98,11 @@
+         if let Some(original) = self.pinned.get(&ptr)
+             && original.numel() * original.kind().elt_size_in_bytes()
+                 == t.numel() * t.kind().elt_size_in_bytes()
+-            && self.resident.native.host_registration(t, false)?
++            && if let Some(pins) = &self.shared_pins {
++                pins.unpin(t)?
++            } else {
++                self.resident.native.host_registration(t, false)?
++            }
+         {
+             self.pinned.remove(&ptr);
+         }
+@@ -140,7 +146,11 @@
+         if !self.pinned.is_empty() {
+             let _ = self.resident.native.synchronize_device(0);
+             for tensor in self.pinned.values() {
+-                let _ = self.resident.native.host_registration(tensor, false);
++                if let Some(pins) = &self.shared_pins {
++                    let _ = pins.unpin(tensor);
++                } else {
++                    let _ = self.resident.native.host_registration(tensor, false);
++                }
+             }
+         }
+     }

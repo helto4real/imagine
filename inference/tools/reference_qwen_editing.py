@@ -22,10 +22,11 @@ p.add_argument('--profile', type=Path, help='One of the registered development c
 a = p.parse_args()
 project = Path(__file__).resolve().parents[2]
 profile = json.loads((a.profile or project / 'inference/profiles/qwen21-first-int8.json').read_text())
-assert profile in [json.loads((project / 'inference/profiles' / n).read_text()) for n in ('qwen21-first-int8.json', 'qwen21-1600x896-int8.json', 'qwen21-1600x896-40steps-int8.json', 'qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8-seed3061383787.json')], 'Unregistered comparison profile'
+assert profile in [json.loads((project / 'inference/profiles' / n).read_text()) for n in ('qwen21-first-int8.json', 'qwen21-1600x896-int8.json', 'qwen21-1600x896-40steps-int8.json', 'qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8-seed3061383787.json','qwen21-lora-int8.json','qwen21-lora-bf16.json','qwen21-lora-turbo.json','qwen21-lora-text-int8.json','qwen21-lora-stack-int8.json','qwen21-lora-portrait-1600-int8.json')], 'Unregistered comparison profile'
 manifest = json.loads((project / 'design/reference-local/source-manifest.json').read_text())
 frozen = {str(a.comfy / x['path']): x['sha256'] for x in manifest if x['root'] == 'comfy'}
 paths = {k: a.model_root / v for k, v in profile['checkpoints'].items()}
+lora_paths=[project / spec['fixture_file'] if 'fixture_file' in spec else a.model_root / spec['path']for spec in profile['lora']]
 a.own_root.mkdir(parents=True, exist_ok=False)
 
 # Disallow production files even during lazy imports, and deny Python networking.
@@ -41,7 +42,7 @@ def audit(event, values):
                 name = str(path.parent.parent / (path.name.split('.')[0] + '.py'))
             if name not in frozen:
                 raise RuntimeError(f'Unfrozen/production ComfyUI read blocked: {path}')
-        elif path.is_relative_to(a.model_root) and path not in paths.values():
+        elif path.is_relative_to(a.model_root) and path not in paths.values() and path not in lora_paths:
             raise RuntimeError(f'Unselected model asset read blocked: {path}')
         elif str(path).startswith('/home/') and not any(path.is_relative_to(root) for root in (a.site, a.own_root, project, Path(sys.base_prefix) / 'lib')):
             raise RuntimeError(f'Unrelated home data read blocked: {path}')
@@ -109,12 +110,28 @@ sources = verify_imports()
 memory_records = []
 def memory_record(phase, model):
     if not profile['source_configuration']['force_full_load_per_component']:
-        memory_records.append(dict(phase=phase, loaded_bytes=model.loaded_size(), buffer_bytes=model.model.model_offload_buffer_memory, pinned_bytes=mm.TOTAL_PINNED_MEMORY, resident=sorted(n.removeprefix('diffusion_model.') for _,_,n,m,_ in model._load_list() if getattr(m,'comfy_patched_weights',False))))
+        modules=model._load_list()
+        lowvram={n.removeprefix('diffusion_model.'):max(1,len(getattr(m,'weight_function',[])),len(getattr(m,'bias_function',[])))for _,_,n,m,_ in modules if hasattr(m,'prev_comfy_cast_weights')}
+        sigmas=model.model.model_sampling.sigmas
+        save(f'sampler-{phase}',sigmas)
+        memory_records.append(dict(phase=phase, loaded_bytes=model.loaded_size(), buffer_bytes=model.model.model_offload_buffer_memory, pinned_bytes=mm.TOTAL_PINNED_MEMORY, resident=sorted(n.removeprefix('diffusion_model.') for _,_,n,m,_ in modules if getattr(m,'comfy_patched_weights',False)),lowvram_passes=lowvram,model_size=model.model_size(),model_lowvram=model.model.model_lowvram,
+            sampler_buffer=dict(device=str(sigmas.device),dtype=str(sigmas.dtype).removeprefix('torch.'),shape=list(sigmas.shape),bytes=sigmas.nbytes)))
 import ast
 import copy
 import math
 import types
 import node_helpers
+
+def record_lora(component,owner):
+    observations={key:[dict(strength=p[0],model_strength=p[2],offset=p[3])for p in patches]for key,patches in owner.patches.items()}
+    (a.own_root/f'lora-{component}.json').write_text(json.dumps(observations,indent=2)+'\n')
+
+def apply_loras(model=None,clip=None):
+    for spec,path in zip(profile['lora'],lora_paths):
+        assert hashlib.sha256(path.read_bytes()).hexdigest()==spec['sha256']
+        state=comfy.utils.load_torch_file(str(path),safe_load=True)
+        model,clip=sd.load_lora_for_models(model,clip,state,spec['strength_model'],spec['strength_clip'])
+    return model,clip
 
 def make_vae():
     state, metadata = comfy.utils.load_safetensors(str(paths['vae']))
@@ -147,6 +164,8 @@ class LazyClip:
                 model_options=dict(dtype=torch.bfloat16, load_device=dev, offload_device=torch.device('cpu')),
                 disable_dynamic=True)
             del state, metadata
+            _,self.clip=apply_loras(clip=self.clip)
+            record_lora('text',self.clip.patcher)
             mm.load_models_gpu([self.clip.patcher], force_full_load=profile['source_configuration']['force_full_load_per_component'])
             timings['text_load'] = elapsed(start)
         if not self.vision_saved:
@@ -208,6 +227,12 @@ with torch.no_grad():
         model_options=dict(dtype=torch.bfloat16, load_device=dev, offload_device=torch.device('cpu')),
         disable_dynamic=True)
     del state, metadata
+    model,_=apply_loras(model=model)
+    record_lora('dit',model)
+    from comfy.patcher_extension import CallbacksMP
+    def record_detach(owner,unpatch_all):
+        if unpatch_all: memory_record('dit_unloaded',owner)
+    model.add_callback(CallbacksMP.ON_DETACH,record_detach)
     mm.load_models_gpu([model], force_full_load=profile['source_configuration']['force_full_load_per_component'])
     timings['dit_load'] = elapsed(start)
     memory_record('dit_initial', model)
@@ -237,6 +262,8 @@ with torch.no_grad():
     memory_record('dit_sampling', model)
     save('latent', latent)
     (a.own_root/'prefix-cache.json').write_text(json.dumps(prefix_snapshot,indent=2)+'\n')
+    # Keep the owner alive until the original detach callback observes CPU unload.
+    release()
     del model
     release()
 

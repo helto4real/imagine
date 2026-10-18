@@ -1,0 +1,1 @@
+Historical source/report/checkpoint snapshot before the freed-memory corrections. Paths within saved manifests refer to that earlier capture. Current source identities and retained evidence hashes are in the root LoRA checkpoint; this snapshot does not claim validation of later source.

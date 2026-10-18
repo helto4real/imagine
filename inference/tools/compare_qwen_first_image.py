@@ -17,6 +17,14 @@ rust = json.loads((a.rust / 'result.json').read_text())
 reference = json.loads((a.python / 'result.json').read_text())
 if 'source_profile' in rust:
     assert rust['source_profile'] == reference['profile'], 'Profiles differ'
+if reference['profile'].get('lora'):
+    lora_observations={}
+    for component in ('text','dit'):
+        x=json.loads((a.rust/f'lora-{component}.json').read_text())
+        y=json.loads((a.python/f'lora-{component}.json').read_text())
+        assert x==y,f'LoRA targets/order/strengths/offsets differ: {component}'
+        lora_observations[component]=len(x)
+    assert sum(lora_observations.values())>0,'LoRA test must patch actual parameters'
 metrics = {}
 boundaries = [('context', rust['context_shape']), ('latent', rust['latent_shape']), ('image-rgba', rust['pixels_shape'])]
 if reference['profile'].get('custom_sigmas'):
@@ -44,9 +52,35 @@ images = [np.asarray(Image.open(root / 'image.png').convert('RGBA')) for root in
 delta = np.abs(images[0].astype(np.int16) - images[1].astype(np.int16))
 metrics['png_rgba8'] = dict(exact=bool(np.array_equal(*images)), unequal_channels=int(np.count_nonzero(delta)),
     unequal_pixels=int(np.count_nonzero(np.any(delta != 0, axis=-1))), max_abs=int(delta.max()), mean_abs=float(delta.mean()))
+memory_comparison=None
+memory_files=[root/'memory-policy.json'for root in (a.rust,a.python)]
+if all(path.is_file()for path in memory_files):
+    records=[json.loads(path.read_text())for path in memory_files]
+    if any('sampler_buffer'in record for group in records for record in group):
+        assert [r['phase']for r in records[0]]==[r['phase']for r in records[1]],'Sampler lifecycle phases differ'
+        assert all(phase in [r['phase']for r in records[0]]for phase in ('dit_initial','dit_sampling','dit_unloaded')),'Incomplete sampler lifecycle evidence'
+        phases=[]
+        for x,y in zip(*records):
+            phase=x['phase'];assert x['sampler_buffer']==y['sampler_buffer'],f'Sampler buffer placement/metadata differ: {phase}'
+            assert x['model_size']==y['model_size'],f'Cached full model size differs: {phase}'
+            assert x['model_lowvram']==y['model_lowvram'],f'Original low-VRAM state differs: {phase}'
+            loaded_equal=x['placement']['loaded_bytes']==y['loaded_bytes']
+            # Counters may reflect independent physical allocator decisions.
+            # Equal leaf residency/function state must have equal accounting.
+            same_placement=x['placement']['resident']==y['resident'] and x['placement']['lowvram_passes']==y['lowvram_passes']
+            if same_placement:assert loaded_equal,f'Loaded byte counter differs despite equal placement: {phase}'
+            paths=[root/f'sampler-{phase}-f32.bin'for root in (a.rust,a.python)]
+            assert paths[0].read_bytes()==paths[1].read_bytes(),f'Registered sampler values differ: {phase}'
+            phases.append(dict(phase=phase,sampler_buffer=x['sampler_buffer'],buffer_sha256=hashlib.sha256(paths[0].read_bytes()).hexdigest(),cached_model_size=x['model_size'],same_leaf_placement=same_placement,loaded_bytes_equal=loaded_equal,rust_loaded_bytes=x['placement']['loaded_bytes'],python_loaded_bytes=y['loaded_bytes']))
+        memory_comparison=dict(phases=phases,sampler_lifecycle_exact=True)
 report = dict(schema=1, metrics=metrics, timings_seconds=dict(rust=rust['timings_seconds'], python=reference['timings_seconds']),
     scope=f'One first-process {reference["profile"]["width"]}x{reference["profile"]["height"]} {reference["profile"]["steps"]}-step synthetic {reference["profile"]["variant"]} DiT sample; OS model cache already warm. Not a production quality or steady-state benchmark.',
     production_runtime_read=False)
+if reference['profile'].get('lora'):report['lora_patched_parameters']=lora_observations
+if memory_comparison is not None:report['sampler_lifecycle']=memory_comparison
+report['diagnostic_memory_plan']=bool(rust.get('diagnostic_memory_plan',False))
+if report['diagnostic_memory_plan']:
+    report['scope']='DIAGNOSTIC: Rust replays recorded original placements; automatic physical-memory decisions are not acceptance evidence here. '+report['scope']
 a.output.write_text(json.dumps(report, indent=2) + '\n')
 print(json.dumps(report, indent=2))
 if not a.allow_mismatch and not (all(metrics[n]['exact_bytes'] and metrics[n]['all_finite'] for n, _ in boundaries) and metrics['png_rgba8']['exact']):

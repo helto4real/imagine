@@ -1,0 +1,203 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "stage": 2,
+  "stage2_complete": false,
+  "status": "selected_qwen_sampler_buffer_lifecycle_complete",
+  "report": "stage-2-qwen-image21-sampler-buffer.md",
+  "source_revision": "ba994879b88d0ebd9950b1e5c1e923d928f216ba",
+  "prior_report": "stage-2-qwen-image21-lora-1600.md",
+  "registered_buffer_bytes": 40000,
+  "source_sequences": 6,
+  "source_transitions": 28,
+  "initial_states": 6,
+  "checked_buffer_states": 34,
+  "checked_step_schedules": 68,
+  "focused_tests_passed": 31,
+  "focused_tests_seconds": 171.94,
+  "new_python_free_test_passed": true,
+  "static_checks": {
+    "fmt": "passed",
+    "all_targets_clippy_deny_warnings": "passed",
+    "locked_offline_build": "passed",
+    "python_asts": 3,
+    "shell_syntax": "passed",
+    "focused_whitespace": "passed",
+    "historical_1600_evidence_hashes_verified": 51,
+    "historical_source_snapshots": {
+      "design/stage-2-qwen-image21-coverage.json": "before/design/stage-2-qwen-image21-coverage.json",
+      "design/stage-2-qwen-image21.md": "before/design/stage-2-qwen-image21.md",
+      "inference/README.md": "before/inference/README.md",
+      "inference/fixtures/README.md": "before/inference/fixtures/README.md",
+      "inference/src/bin/qwen21-first-image.rs": "before/inference/src/bin/qwen21-first-image.rs",
+      "inference/src/models/qwen_image21/offload.rs": "before/inference/src/models/qwen_image21/offload.rs",
+      "inference/tests/support/qwen_offload.rs": "before/inference/tests/support/qwen_offload.rs",
+      "inference/tools/check_qwen_image21.sh": "before/inference/tools/check_qwen_image21.sh",
+      "inference/tools/compare_qwen_first_image.py": "before/inference/tools/compare_qwen_first_image.py",
+      "inference/tools/reference_qwen_editing.py": "before/inference/tools/reference_qwen_editing.py"
+    },
+    "stage0_lock_hashes": {
+      "reference-lock.json": "4765e81dfe84ff32ee8352ba84c68e89f578876061fdbcd439a3a7ccac7674bb",
+      "source-manifest.json": "3e233cb602129a5e6bcb51aecd8e4215448551e176e8286df04fbf47ecd781c9",
+      "source-acquisition-lock.json": "b1148f2b24bb2fa66f69478cc1ec7960acfe4579f4aae18c63e88815ba220e77",
+      "native-linkage-lock.json": "37737a4525ec3db12f6314d2dd0e69a8fb4c5374d8ad04797ade0447e110bfa6"
+    }
+  },
+  "trained_rust_run": "qwen-sampler-buffer-1600-20261018-01-rust",
+  "trained_python_run": "qwen-sampler-buffer-1600-20261018-01-python-02",
+  "rust_rerun_after_observer_repair": false,
+  "trained_six_tensor_boundaries_exact": true,
+  "png_pixels_exact": true,
+  "trained_sampler_lifecycle": {
+    "phases": [
+      {
+        "phase": "dit_initial",
+        "sampler_buffer": {
+          "bytes": 40000,
+          "device": "cuda:0",
+          "dtype": "float32",
+          "shape": [
+            10000
+          ]
+        },
+        "buffer_sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+        "cached_model_size": 7256748608,
+        "same_leaf_placement": true,
+        "loaded_bytes_equal": true,
+        "rust_loaded_bytes": 7256748608,
+        "python_loaded_bytes": 7256748608
+      },
+      {
+        "phase": "dit_sampling",
+        "sampler_buffer": {
+          "bytes": 40000,
+          "device": "cuda:0",
+          "dtype": "float32",
+          "shape": [
+            10000
+          ]
+        },
+        "buffer_sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+        "cached_model_size": 7256748608,
+        "same_leaf_placement": true,
+        "loaded_bytes_equal": true,
+        "rust_loaded_bytes": 7256748608,
+        "python_loaded_bytes": 7256748608
+      },
+      {
+        "phase": "dit_unloaded",
+        "sampler_buffer": {
+          "bytes": 40000,
+          "device": "cpu",
+          "dtype": "float32",
+          "shape": [
+            10000
+          ]
+        },
+        "buffer_sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+        "cached_model_size": 7256748608,
+        "same_leaf_placement": true,
+        "loaded_bytes_equal": true,
+        "rust_loaded_bytes": 0,
+        "python_loaded_bytes": 0
+      }
+    ],
+    "sampler_lifecycle_exact": true
+  },
+  "timings_seconds": {
+    "rust": {
+      "dit_load": 1.269731664,
+      "pipeline_wall_including_unload_and_intermediate_export": 112.638885174,
+      "reference_vae_load_and_encode": 0.906474537,
+      "sampling": 94.69847822,
+      "text_encode": 9.330503619,
+      "text_load": 1.41303225,
+      "vae_decode": 1.142338174,
+      "vae_load": 1.325920926
+    },
+    "python": {
+      "reference_vae_load_and_encode": 1.2767723200377077,
+      "text_load": 1.591045955894515,
+      "text_encode": 9.040660199010745,
+      "dit_load": 1.2023727199994028,
+      "sampling": 90.44577607000247,
+      "vae_load": 0.20962184411473572,
+      "vae_decode": 1.0696829021908343,
+      "pipeline_wall_including_unload_and_intermediate_export": 105.9653476588428
+    }
+  },
+  "pre_change_image_unchanged": true,
+  "earlier_reference_unload_observation_missing": true,
+  "earlier_strict_gate_passed": false,
+  "earlier_bounded_test_failures_retained": 2,
+  "source_expected_values_relaxed": false,
+  "full_load_counter_delta_bytes": 0,
+  "autotuning_policy": "unchanged",
+  "new_parity_exceptions": [],
+  "approval_pending": false,
+  "production_runtime_read": false,
+  "sandbox_escalation": "approved local GPU and namespace validation",
+  "automatic_approval_rejection": false,
+  "committed": false,
+  "pushed": false,
+  "evidence_sha256": {
+    ".gitignore": "b39decba66e79d9a8ab7a89e6e3c7942c0c92f125e9ece55c45020b877170638",
+    "before/design/stage-2-qwen-image21-coverage.json": "57f4dd374d758a6a9bc2471b7fbd9ecbb3c97d192008768aa8aaaca1fd955ec8",
+    "before/design/stage-2-qwen-image21.md": "b6c111ec3951475d1fb98d946cb4f2301603fa9f611411eeb89d1141aee61046",
+    "before/inference/README.md": "02de9dd132bc4ad2e34c475f2fd93b5fe958bbb273b7d40efe4a14bf70d2fa1b",
+    "before/inference/fixtures/README.md": "cdc9e1bff99e85a768a4bb9e0f7146176bab0afcdafe77d37ccdd9895dd6f86f",
+    "before/inference/src/bin/qwen21-first-image.rs": "ae4c11269d8f04a69fd093c2f7b7fa781275208bc40347a61eb6de6045f3eb80",
+    "before/inference/src/models/qwen_image21/offload.rs": "e94b5d70989abf90a307a386c635b81dfa37ca94804aa63576a68e5896b34e54",
+    "before/inference/src/models/qwen_image21/sampling.rs": "2898ef604b7151b290776a23b5a90b84ddd7911a4c0b4feb201740508fc87d00",
+    "before/inference/tests/support/qwen_offload.rs": "61186dc974ca068bf7eb849e1792b5a3c360bc191d2d2e0c0e48cf6e296610e0",
+    "before/inference/tools/check_qwen_image21.sh": "891d53dd1b6b6383c37c69cc839bc943915e3ae5cccf412739d81ad3ff8e0593",
+    "before/inference/tools/compare_qwen_first_image.py": "672869ba48ccc9196d1350dfc87850c97d826cc7dd32c9e782574aa3055781c8",
+    "before/inference/tools/reference_qwen_editing.py": "2f61f4e44a135aa7164f327275cb7a233c1072e2f8a735ae6b2fd2951512d867",
+    "checks/all-qwen.log": "d5621069874c15dccdf308bcaf5e2970a2f49b311bbd41525c5b78e3fab7022f",
+    "checks/isolation.json": "558077fcc318576c75a8f3f9ef05904439979de53adee1c3c86b31e96f04595d",
+    "checks/run-all-qwen.sh": "38503e7f66d2ea735e5340605af22f1fea455bd109392d9fac16d3f1113b5ee8",
+    "checks/run-isolation.sh": "b6706ee32d119fcbe0cd3e7e3b007ada2d00720bc7969f019e090ec6e67c088d",
+    "checks/sampler-buffer-clippy-01.log": "cb9ec7eb43b279c0aa489ba3d020e7be832381b93c215eee1a173cb5457405a9",
+    "checks/sampler-buffer-isolation-01.log": "b4e65ece280fd07c120e9442f5e2d0fc10aa3c15f32a7a3bf6982e95bfd1f7b4",
+    "checks/sampler-buffer-oracle-01.log": "6cc9c02f9a25bfef02092d0be7db5333e1b54274c80f4a1632762b37442a12d9",
+    "checks/sampler-buffer-rust-01.log": "b465e46b0ef2f997f93ab9998a1b8deb03c4ec27622642f2d0c96132df791432",
+    "checks/sampler-buffer-rust-02.log": "49e9692a35914723424b029e15ca38cb87cbf91df4391f301aa54bfaafc173f4",
+    "checks/sampler-buffer-rust-03.log": "4661e5c48722fe72c1cb26e078361fcefc1acb797dbdc223c5fe2ba0118a6b9d",
+    "checks/static.json": "a01cfc9bae2b93cec07dbd49384300ecb08d38745d2f2edff4cb4daa26c5592e",
+    "comparison-02.json": "154ae1a2ec43963538a452fcc2844dc88d74dc1ba8c283b5737ef0d0713167a2",
+    "comparison-02.log": "154ae1a2ec43963538a452fcc2844dc88d74dc1ba8c283b5737ef0d0713167a2",
+    "failed-unload-observation/failure.json": "659b2515737ca04b33186f1c25ae55959239d7207d02c84bd9c1695d606ed87a",
+    "failed-unload-observation/memory-policy.json": "3b262709f23835a0b352c814cd328583f41df117c3983e342f83873426416bd3",
+    "failed-unload-observation/python.log": "5d5a9e45f76ffbff5e01d2206417a8d73c8d7801877dcfbb437cde5806bd2f0f",
+    "failed-unload-observation/reference_qwen_editing.py": "552c1b37d581f16d031b2f705179ea8c190e3b6d3f3b2d9a1adc36c82e5cad14",
+    "failed-unload-observation/result.json": "2486c932b997783f9e652b25372e5c82b9d134cfb350d8a71bef7df7c58712e9",
+    "historical-image-continuity.json": "885ae945c3b0b5113724d9767e2a363e99cd798e179bd2defbba592c427ff2cd",
+    "isolation.json": "d41e1dace63593232bca6dd8979abc780243cd4bb4a4b0c770cf4a4c5cda30ef",
+    "python/conditioning.json": "30c7955dd3dd4b31105ad182cb4552993e75bfdda6e0de6863661e6088e305b3",
+    "python/image.png": "9b1c141818e1003738918b089d7d10d5a70806e7fbed97e60dad489f4a7454b6",
+    "python/lora-dit.json": "284d11f3e4d6daabea412a22efbbe22d69d0bcb89fef530db453e4d5fd9d7be3",
+    "python/lora-text.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+    "python/memory-policy.json": "a84267f2d0944e6beb83f8934e5bbd16770fc884b4337474b6af89af977f6381",
+    "python/prefix-cache.json": "8282e492a93831bc168d63908d05aa0252354b86f74796b5d998c9e9a7eb0a2d",
+    "python/result.json": "c82f8d09f51d60890d8e274154f88aa56e46413522cd022427209050e6585a94",
+    "python/sampler-dit_initial-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "python/sampler-dit_sampling-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "python/sampler-dit_unloaded-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "python-02.log": "e965d1b5add32735764930897449ec92a39eecc9c6b59b9eeb56b9bf500a7a74",
+    "rust/conditioning.json": "914d0554fe83bc28db88c31e584a388e9a110533ded325001bf63808b73b6a66",
+    "rust/image.png": "d89ee3581d9404269965a63fbe8153b487aa2cfe0d32d08a7a6b90dc3fb8f84d",
+    "rust/lora-dit.json": "68ed8ab3a7b6f3102577bc6aa6607b1cfee50891854787215e8fbeab488b3a4e",
+    "rust/lora-text.json": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+    "rust/memory-policy.json": "a855868ac934955c60f8c9013410d18072a4cb257e321610754f5ed33b87d21a",
+    "rust/prefix-cache.json": "ce6a8f31ca72a184de6b04d37598b59d7133254c918aeae1fa2deaffa0349fb9",
+    "rust/preflight.json": "d1f18471c130c65a50dea774489b499613c0da772726cc94e46aa211f3fbc4c4",
+    "rust/result.json": "14ac72c8cf6812418b4c62a234a3835be704d130f26b835f2974a2d432edae86",
+    "rust/sampler-dit_initial-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "rust/sampler-dit_sampling-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "rust/sampler-dit_unloaded-f32.bin": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266",
+    "rust/step-seconds.json": "d2eb6171438fb6e5b08cb0a781ee238c2ec8ad21b0a9b29cbc3cd5ffb6f109e4",
+    "rust.log": "62efb4cb57b7b5fed9f8e927982a516680309b76c3a4cd7816556b59341ce36e",
+    "verified-inputs.json": "ceaaf981d79f660470875af64ca3829e8fbc07e692f13ad4b16b8ba0cb116534",
+    "verified-model-hashes.json": "4aed01392d88c3e5dd3b353c828cba99393e44c5b5bec1910ebc4af27c32e170"
+  }
+}

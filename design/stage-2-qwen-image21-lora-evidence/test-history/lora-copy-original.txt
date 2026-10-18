@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/home/thhel/ChatGPT/imagine/inference/tools/reference_lora.py", line 61, in <module>
+    w=data((8,8),device,dtype,5)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/thhel/ChatGPT/imagine/inference/tools/reference_qwen_image21_core.py", line 84, in data
+    return (((torch.arange(math.prod(shape),device=device,dtype=torch.float32)+offset)%29)*.03125-.40625).reshape(shape).to(dtype)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py", line 529, in _lazy_init
+    torch._C._cuda_init()
+RuntimeError: No CUDA GPUs are available

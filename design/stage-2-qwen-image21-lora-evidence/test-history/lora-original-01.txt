@@ -1,0 +1,1 @@
+Captured 276 original patch calculations, 8 loaders and Qwen/CLIP maps

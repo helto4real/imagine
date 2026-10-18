@@ -20,7 +20,7 @@ fn qwen_image21_original_static_offload_placements_unloads_and_budgets_match() {
                 serde_json::to_value(&p.resident).unwrap(),
                 expected["resident"]
             );
-            assert_eq!(p.loaded_bytes, expected["loaded_bytes"].as_u64().unwrap());
+            assert_eq!(p.loaded_bytes, expected["loaded_bytes"].as_i64().unwrap());
             assert_eq!(p.buffer_bytes, expected["buffer_bytes"].as_u64().unwrap());
         };
         verify(&initial, case);
@@ -206,4 +206,131 @@ fn qwen_image21_original_bf16_cpu_and_mixed_weights_preserve_cuda_forward_bytes(
         }
     }
     assert_eq!(count, 12);
+}
+
+#[test]
+fn qwen_image21_original_sampler_buffer_lifecycle_and_full_model_accounting_match() {
+    use super::{
+        binding_tests::{check, restore},
+        kitchen,
+    };
+    use imagine_inference::{checkpoint::PreparedParameters, execution_value::Value as V};
+    use tch::Device;
+    let _grad = tch::no_grad_guard();
+    let native = kitchen();
+    native.cuda_memory(0).unwrap();
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../fixtures/qwen-image21-sampler-buffer.json"
+    ))
+    .unwrap();
+    assert_eq!(fixture["safety"]["real_model_constructor"], false);
+    for c in fixture["cases"].as_array().unwrap() {
+        let state = PreparedParameters::plain(
+            c["base"]
+                .as_object()
+                .unwrap()
+                .iter()
+                .map(|(n, v)| (n.clone(), restore(v, Device::Cpu)))
+                .collect(),
+        );
+        let modules = serde_json::from_value(c["modules"].clone()).unwrap();
+        let mut owner = q::StaticOffload::from_modules(
+            state,
+            native.clone(),
+            modules,
+            q::FluxSampling::qwen21().unwrap(),
+        )
+        .unwrap();
+        let verify = |owner: &q::StaticOffload, expected: &Value| {
+            assert_eq!(
+                owner.model_size(),
+                expected["model_size"].as_u64().unwrap(),
+                "{} cached model_size",
+                c["name"]
+            );
+            assert_eq!(
+                owner.placement.loaded_bytes,
+                expected["loaded_bytes"].as_i64().unwrap(),
+                "{} {} loaded counter",
+                c["name"],
+                expected["label"]
+            );
+            assert_eq!(
+                owner.placement.buffer_bytes,
+                expected["buffer_bytes"].as_u64().unwrap()
+            );
+            assert_eq!(
+                owner.model_lowvram,
+                expected["model_lowvram"].as_bool().unwrap()
+            );
+            assert_eq!(
+                serde_json::to_value(&owner.placement.resident).unwrap(),
+                expected["resident"]
+            );
+            assert_eq!(
+                serde_json::to_value(&owner.placement.lowvram_passes).unwrap(),
+                expected["lowvram_passes"]
+            );
+            let dev = if expected["sampler"]["device"] == "cpu" {
+                Device::Cpu
+            } else {
+                Device::Cuda(0)
+            };
+            assert_eq!(owner.sampling.sigmas.device(), dev);
+            assert_eq!(owner.sampling.buffer_bytes(), 40000);
+            check(
+                &V::tensor(owner.sampling.sigmas.shallow_clone()),
+                &expected["sampler"],
+                dev,
+                "registered sampler buffer",
+            );
+            for steps in [4, 40] {
+                check(
+                    &V::tensor(owner.sampling.simple(steps).unwrap()),
+                    &expected["schedules"][steps.to_string()],
+                    Device::Cpu,
+                    "schedule from owned buffer",
+                );
+            }
+            for (name, device) in expected["weight_devices"].as_object().unwrap() {
+                let weight = owner.parameters[&format!("{name}.weight")]
+                    .as_tensor()
+                    .unwrap();
+                assert_eq!(
+                    weight.device(),
+                    if device == "cpu" {
+                        Device::Cpu
+                    } else {
+                        Device::Cuda(0)
+                    }
+                );
+                let mut expected_weight = c["base"][format!("{name}.weight")].clone();
+                expected_weight["device"] = device.clone();
+                check(
+                    &V::tensor(weight),
+                    &expected_weight,
+                    if device == "cpu" {
+                        Device::Cpu
+                    } else {
+                        Device::Cuda(0)
+                    },
+                    "unchanged tiny weights",
+                );
+            }
+        };
+        verify(&owner, &c["initial"]);
+        for step in c["steps"].as_array().unwrap() {
+            if step["command"] == "load" {
+                owner
+                    .partially_load(step["amount"].as_f64().unwrap())
+                    .unwrap();
+            } else {
+                owner.unload().unwrap();
+            }
+            verify(&owner, step);
+        }
+        assert_eq!(owner.placement.loaded_bytes, 0);
+        assert_eq!(owner.pinned_bytes, 0);
+        assert_eq!(owner.sampling.sigmas.device(), Device::Cpu);
+    }
 }
