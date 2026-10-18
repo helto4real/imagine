@@ -1,0 +1,133 @@
+// Generated from the locked NVFP4 source; no saved IR.
+// Source SHA256: fd7045ab8afaf7f92f6d7123a4483cdb6149ff1890defb709c6849af422e08ed
+pub const SCALAR_NAMES: [&str;7] = ["m", "n", "num_blocks", "scale_rows", "scale_cols", "padded_scale_rows", "padded_scale_cols"];
+fn lower_main(b:&mut Builder,s:&Specialization<'_>,pointers:&[Value],scalars:&[Value]){
+let x_ptr=pointers[0].clone();
+let packed_output_ptr=pointers[1].clone();
+let swizzled_scales_ptr=pointers[2].clone();
+let per_tensor_scale_ptr=pointers[3].clone();
+let _m=scalars[0].clone();
+let n=scalars[1].clone();
+let num_blocks=scalars[2].clone();
+let scale_rows=scalars[3].clone();
+let scale_cols=scalars[4].clone();
+let _padded_scale_rows=scalars[5].clone();
+let padded_scale_cols=scalars[6].clone();
+let block_size=Value::integer(i64::from(s.block_size));
+let blocks_per_program=Value::integer(i64::from(s.blocks_per_program));
+let t0=b.emit("tt.get_program_id x : i32".into(),Ty::I32,false,"pid_m",(241,26));
+let pid_m=b.tensor(t0,"pid_m",(241,12));
+let t1=b.emit("tt.get_program_id y : i32".into(),Ty::I32,false,"pid_n_base",(242,31));
+let t2=b.bin("mul",t1,blocks_per_program.clone(),"pid_n_base",(242,41));
+let pid_n_base=b.tensor(t2,"pid_n_base",(242,17));
+let t3=b.load_legacy(per_tensor_scale_ptr.clone(),None,None,"per_tensor_scale",(245,31));
+let per_tensor_scale=b.tensor(t3,"per_tensor_scale",(245,23));
+let t4=b.begin_for(i64::from(s.blocks_per_program),"block_offset",(248,30));
+{
+let block_offset=t4.1.clone();
+let t5=b.bin("add",pid_n_base.clone(),block_offset.clone(),"pid_n",(249,29));
+let pid_n=b.tensor(t5,"pid_n",(249,16));
+let t6=b.bin("lt",pid_n.clone(),num_blocks.clone(),"",(252,19));
+let t7=b.begin_if(t6,(252,11));
+{
+let t8=b.bin("mul",pid_n.clone(),block_size.clone(),"offs_n",(254,29));
+let t9=b.range(block_size.clone(),"offs_n",(254,55));
+let t10=b.bin("add",t8,t9,"offs_n",(254,42));
+let offs_n=b.tensor(t10,"offs_n",(254,21));
+let t11=b.bin("lt",offs_n.clone(),n.clone(),"mask",(255,28));
+let mask=b.tensor(t11,"mask",(255,19));
+let t12=b.bin("mul",pid_m.clone(),n.clone(),"x_offs",(256,29));
+let t13=b.bin("add",t12,offs_n.clone(),"x_offs",(256,33));
+let x_offs=b.tensor(t13,"x_offs",(256,21));
+let t14=b.bin("add",x_ptr.clone(),x_offs.clone(),"x",(259,32));
+let t15=b.load_legacy(t14,Some(mask.clone()),Some(Value::number(f64::from_bits(0))),"x",(259,24));
+let t16=b.cast(t15,Ty::Float(Element::F32),"x",(259,65));
+let x=b.tensor(t16,"x",(259,16));
+let t17=b.math("absf",x.clone(),"x_abs",(262,27));
+let x_abs=b.tensor(t17,"x_abs",(262,20));
+let t18=b.reduce_max(x_abs.clone(),s.standard_source_path,"max_abs",(263,29));
+let max_abs=b.tensor(t18,"max_abs",(263,22));
+let t19=b.bin("true_div",max_abs.clone(),Value::number(f64::from_bits(4618441417868443648)),"block_scale",(266,36));
+let block_scale=b.tensor(t19,"block_scale",(266,26));
+let t20=b.bin("true_div",block_scale.clone(),per_tensor_scale.clone(),"scaled_block_scale",(269,47));
+let scaled_block_scale=b.tensor(t20,"scaled_block_scale",(269,33));
+let t21=b.extreme("minimum",scaled_block_scale.clone(),Value::number(f64::from_bits(4646588915539509248)),"scaled_block_scale",(270,64));
+let scaled_block_scale=b.tensor(t21,"scaled_block_scale",(270,33));
+let t22=b.cast(scaled_block_scale.clone(),Ty::Float(Element::E4M3),"scaled_block_scale_fp8",(273,59));
+let scaled_block_scale_fp8=b.tensor(t22,"scaled_block_scale_fp8",(273,37));
+let t23=b.cdiv(scale_cols.clone(),Value::integer(4),s.standard_source_path,"n_col_blocks",(276,47));
+let n_col_blocks=b.tensor(t23,"n_col_blocks",(276,27));
+let t24=b.swizzle(vec![pid_m.clone(),pid_n.clone(),n_col_blocks.clone(),padded_scale_cols.clone()],s.source_path,"swizzled_offs",(278,44));
+let swizzled_offs=b.tensor(t24,"swizzled_offs",(277,28));
+let t25=b.bin("lt",pid_m.clone(),scale_rows.clone(),"",(280,23));
+let t26=b.bin("lt",pid_n.clone(),scale_cols.clone(),"",(280,46));
+let t27=b.bin("and",t25,t26,"",(280,38));
+let t28=b.begin_if(t27,(280,15));
+{
+let t29=b.bin("add",swizzled_scales_ptr.clone(),swizzled_offs.clone(),"",(281,47));
+b.store_optional(t29,scaled_block_scale_fp8.clone(),None,(281,62));
+}
+b.end_if(t28);
+let t30=b.cast(scaled_block_scale_fp8.clone(),Ty::Float(Element::F32),"scaled_block_scale_fp32",(284,64));
+let scaled_block_scale_fp32=b.tensor(t30,"scaled_block_scale_fp32",(284,38));
+let t31=b.bin("mul",per_tensor_scale.clone(),scaled_block_scale_fp32.clone(),"total_scale",(285,45));
+let total_scale=b.tensor(t31,"total_scale",(285,26));
+let t32=b.bin("lt",total_scale.clone(),Value::number(f64::from_bits(4457293557087583675)),"zero_scale_mask",(286,44));
+let zero_scale_mask=b.tensor(t32,"zero_scale_mask",(286,30));
+let t33=b.select(zero_scale_mask.clone(),Value::number(f64::from_bits(4607182418800017408)),total_scale.clone(),"total_scale",(287,57));
+let total_scale=b.tensor(t33,"total_scale",(287,26));
+let t34=b.bin("true_div",x.clone(),total_scale.clone(),"data_scaled",(290,30));
+let data_scaled=b.tensor(t34,"data_scaled",(290,26));
+let t35=b.select(zero_scale_mask.clone(),Value::number(f64::from_bits(0)),data_scaled.clone(),"data_scaled",(291,57));
+let data_scaled=b.tensor(t35,"data_scaled",(291,26));
+let t36=b.bin("div",block_size.clone(),Value::integer(2),"pair_idx",(294,50));
+let t37=b.range(t36,"pair_idx",(294,36));
+let pair_idx=b.tensor(t37,"pair_idx",(294,23));
+let t38=b.bin("mul",pair_idx.clone(),Value::integer(2),"even_idx",(295,34));
+let even_idx=b.tensor(t38,"even_idx",(295,23));
+let t39=b.bin("mul",pair_idx.clone(),Value::integer(2),"odd_idx",(296,33));
+let t40=b.bin("add",t39,Value::integer(1),"odd_idx",(296,37));
+let odd_idx=b.tensor(t40,"odd_idx",(296,22));
+let t41=b.range(block_size.clone(),"indices",(299,35));
+let indices=b.tensor(t41,"indices",(299,22));
+let t42=b.expand(even_idx.clone(),1,"f32_even",(300,59));
+let t43=b.bin("eq",indices.clone(),t42,"f32_even",(300,50));
+let t44=b.select(t43,data_scaled.clone(),Value::integer(0),"f32_even",(300,82));
+let t45=b.reduce_nv_sum(t44,s.standard_source_path,"f32_even",(300,30));
+let f32_even=b.tensor(t45,"f32_even",(300,23));
+let t46=b.expand(odd_idx.clone(),1,"f32_odd",(301,57));
+let t47=b.bin("eq",indices.clone(),t46,"f32_odd",(301,49));
+let t48=b.select(t47,data_scaled.clone(),Value::integer(0),"f32_odd",(301,80));
+let t49=b.reduce_nv_sum(t48,s.standard_source_path,"f32_odd",(301,29));
+let f32_odd=b.tensor(t49,"f32_odd",(301,22));
+let (asm_arg_hi,asm_arg_lo)=if s.hi_first{
+let asm_arg_hi=f32_even.clone();
+let asm_arg_lo=f32_odd.clone();
+(asm_arg_hi,asm_arg_lo)}else{
+let asm_arg_hi=f32_odd.clone();
+let asm_arg_lo=f32_even.clone();
+(asm_arg_hi,asm_arg_lo)};
+let t50=b.inline_asm("\n                {\n                    .reg .b8 fp4_byte;\n                    .reg .b16 result;\n                    cvt.rn.satfinite.e2m1x2.f32 fp4_byte, $1, $2;\n                    mov.b16 result, {fp4_byte, 0};\n                    mov.u16 $0, result;\n                }\n                ","=h,f,f",vec![asm_arg_hi.clone(),asm_arg_lo.clone()],Ty::U16,1,"packed_bytes_u16",(323,16));
+let packed_bytes_u16=b.tensor(t50,"packed_bytes_u16",(309,31));
+let t51=b.bin("and",packed_bytes_u16.clone(),Value::integer(255),"packed_bytes",(326,47));
+let t52=b.cast(t51,Ty::U8,"packed_bytes",(326,56));
+let packed_bytes=b.tensor(t52,"packed_bytes",(326,27));
+let t53=b.bin("div",n.clone(),Value::integer(2),"out_offs",(329,37));
+let t54=b.bin("mul",pid_m.clone(),t53,"out_offs",(329,32));
+let t55=b.bin("div",block_size.clone(),Value::integer(2),"out_offs",(329,65));
+let t56=b.bin("mul",pid_n.clone(),t55,"out_offs",(329,51));
+let t57=b.bin("add",t54,t56,"out_offs",(329,42));
+let t58=b.bin("add",t57,pair_idx.clone(),"out_offs",(329,70));
+let out_offs=b.tensor(t58,"out_offs",(329,23));
+let t59=b.bin("mul",pid_n.clone(),block_size.clone(),"out_mask",(330,32));
+let t60=b.bin("add",t59,even_idx.clone(),"out_mask",(330,45));
+let t61=b.bin("lt",t60,n.clone(),"out_mask",(330,57));
+let out_mask=b.tensor(t61,"out_mask",(330,23));
+let t62=b.bin("add",packed_output_ptr.clone(),out_offs.clone(),"",(331,41));
+b.store_optional(t62,packed_bytes.clone(),Some(out_mask.clone()),(331,51));
+}
+b.end_if(t7);
+}
+b.end_for(t4.0);
+b.line("tt.return".into(),"",(248,4));
+}

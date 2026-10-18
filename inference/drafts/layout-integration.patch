@@ -1,0 +1,70 @@
+--- a/inference/src/execution_bindings.rs
++++ b/inference/src/execution_bindings.rs
+@@ -11,6 +11,8 @@
+ use tch::{Kind, Tensor};
+ #[path = "backend_bindings.rs"]
+ mod backends;
++#[path = "layout_complete.rs"]
++mod complete;
+ fn dtype(v: Option<&Value>, default: Kind) -> Result<Kind, Error> {
+     match v {
+         None | Some(Value::None) => Ok(default),
+@@ -356,6 +358,7 @@
+             }),
+         );
+     }
++    complete::install(rt);
+ }
+ 
+ enum FpOperand {
+--- a/inference/src/execution.rs
++++ b/inference/src/execution.rs
+@@ -66,6 +66,25 @@
+             .write()
+             .unwrap()
+             .insert((backend.into(), op.into()), body);
++    }
++    pub(crate) unsafe fn call_bound(
++        &self,
++        rt: &Runtime,
++        backend: &str,
++        op: &str,
++        kwargs: &Kwargs,
++    ) -> Result<Value, Error> {
++        let f = self
++            .bodies
++            .read()
++            .unwrap()
++            .get(&(backend.into(), op.into()))
++            .cloned()
++            .ok_or_else(|| Error::BindingGap {
++                backend: backend.into(),
++                operation: op.into(),
++            })?;
++        f(rt, &[], kwargs)
+     }
+     pub fn resolve(
+         &self,
+--- a/inference/src/registry.rs
++++ b/inference/src/registry.rs
+@@ -521,6 +521,9 @@
+     pub fn is_available(&self, name: &str) -> bool {
+         self.state.lock().unwrap().available(name)
+     }
++    pub(crate) fn current_override(&self) -> Option<String> {
++        OVERRIDES.with(|overrides| overrides.borrow().get(&self.id).cloned())
++    }
+     pub fn get_constraints(&self, backend: &str, function: &str) -> Option<FunctionConstraints> {
+         self.state
+             .lock()
+--- a/inference/tests/primitives.rs
++++ b/inference/tests/primitives.rs
+@@ -14,6 +14,8 @@
+ mod binding_tests;
+ #[path = "support/conv_bindings.rs"]
+ mod conv_binding_tests;
++#[path = "support/layout_completion.rs"]
++mod layout_completion_tests;
+ #[path = "support/quant_bindings.rs"]
+ mod quant_binding_tests;
+ #[path = "support/rope_bindings.rs"]

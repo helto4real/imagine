@@ -1,0 +1,223 @@
+{
+  "schema": 1,
+  "inputs": "synthetic only; identical tensors reused for repeated reference calls",
+  "reference": "original Kitchen Triton int8_linear, unmodified configs and benchmark policy",
+  "cache_reset": "only newly created process-local autotuner cache; own isolated disk cache root",
+  "cases": [
+    {
+      "shape": {
+        "m": 1,
+        "n": 128,
+        "k": 128
+      },
+      "runs": [
+        {
+          "run": 0,
+          "config": {
+            "block_m": 128,
+            "block_n": 64,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "08fe1b77f466f8c6cfebe8206eeb24006ea8ddd22152380e8c381e9797d614d5"
+        },
+        {
+          "run": 1,
+          "config": {
+            "block_m": 64,
+            "block_n": 128,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "08fe1b77f466f8c6cfebe8206eeb24006ea8ddd22152380e8c381e9797d614d5"
+        },
+        {
+          "run": 2,
+          "config": {
+            "block_m": 64,
+            "block_n": 128,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "08fe1b77f466f8c6cfebe8206eeb24006ea8ddd22152380e8c381e9797d614d5"
+        },
+        {
+          "run": 3,
+          "config": {
+            "block_m": 64,
+            "block_n": 128,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "08fe1b77f466f8c6cfebe8206eeb24006ea8ddd22152380e8c381e9797d614d5"
+        },
+        {
+          "run": 4,
+          "config": {
+            "block_m": 128,
+            "block_n": 64,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "08fe1b77f466f8c6cfebe8206eeb24006ea8ddd22152380e8c381e9797d614d5"
+        }
+      ],
+      "distinct_configs": 2,
+      "distinct_outputs": 1
+    },
+    {
+      "shape": {
+        "m": 16,
+        "n": 128,
+        "k": 128
+      },
+      "runs": [
+        {
+          "run": 0,
+          "config": {
+            "block_m": 128,
+            "block_n": 32,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "a633beebf1e54d989996fc6ece789a6c267549b003cda79fda7320ec93f50604"
+        },
+        {
+          "run": 1,
+          "config": {
+            "block_m": 128,
+            "block_n": 64,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "a633beebf1e54d989996fc6ece789a6c267549b003cda79fda7320ec93f50604"
+        },
+        {
+          "run": 2,
+          "config": {
+            "block_m": 128,
+            "block_n": 32,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "a633beebf1e54d989996fc6ece789a6c267549b003cda79fda7320ec93f50604"
+        },
+        {
+          "run": 3,
+          "config": {
+            "block_m": 128,
+            "block_n": 32,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "a633beebf1e54d989996fc6ece789a6c267549b003cda79fda7320ec93f50604"
+        },
+        {
+          "run": 4,
+          "config": {
+            "block_m": 64,
+            "block_n": 128,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "a633beebf1e54d989996fc6ece789a6c267549b003cda79fda7320ec93f50604"
+        }
+      ],
+      "distinct_configs": 3,
+      "distinct_outputs": 1
+    },
+    {
+      "shape": {
+        "m": 32,
+        "n": 256,
+        "k": 128
+      },
+      "runs": [
+        {
+          "run": 0,
+          "config": {
+            "block_m": 128,
+            "block_n": 64,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "9ce422fb961c07189f52e395673feed64cf8971f4e4244c162d7962312295f35"
+        },
+        {
+          "run": 1,
+          "config": {
+            "block_m": 128,
+            "block_n": 64,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "9ce422fb961c07189f52e395673feed64cf8971f4e4244c162d7962312295f35"
+        },
+        {
+          "run": 2,
+          "config": {
+            "block_m": 128,
+            "block_n": 32,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "9ce422fb961c07189f52e395673feed64cf8971f4e4244c162d7962312295f35"
+        },
+        {
+          "run": 3,
+          "config": {
+            "block_m": 128,
+            "block_n": 32,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "9ce422fb961c07189f52e395673feed64cf8971f4e4244c162d7962312295f35"
+        },
+        {
+          "run": 4,
+          "config": {
+            "block_m": 128,
+            "block_n": 32,
+            "block_k": 32,
+            "group_size_m": 8,
+            "num_warps": 4,
+            "num_stages": 4
+          },
+          "output_sha256": "9ce422fb961c07189f52e395673feed64cf8971f4e4244c162d7962312295f35"
+        }
+      ],
+      "distinct_configs": 2,
+      "distinct_outputs": 1
+    }
+  ],
+  "source_artifact_sha256": "c31c533bd9971139d81fa1b181c4cd9f23e06e9fd282d5e7b81f6313f7e87e74",
+  "interpretation": "Observed reference configuration variability; output hashes identical per tested input; proposed D-05 acceptance criterion not approved"
+}

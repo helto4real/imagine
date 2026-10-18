@@ -1,0 +1,328 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "status": "Verified partial Stage 1; Sage checkpoint",
+  "crate_tests": 97,
+  "python_free_primitives": 89,
+  "physical_fixture_records": 24025,
+  "ordinary_records": 24002,
+  "approved_sol_records": 5,
+  "approved_null_export_records": 10,
+  "source_compatible_known_mask_padding_records": 8,
+  "earlier_controlled_unwritten_combinations": 3572,
+  "isolation": {
+    "schema": 1,
+    "result": "passed",
+    "interpreter_available": false,
+    "comfyui_tree_available": false,
+    "network_namespace": "isolated",
+    "test_filter": null,
+    "package_elf_files": [
+      {
+        "target": "/runtime/nvidia/cu13/lib/libcublas.so.13",
+        "sha256": "25cde432108543626df85d887c730bf2cab96803ca16f9654e4abc8d2b45833e"
+      },
+      {
+        "target": "/runtime/nvidia/cu13/lib/libcublasLt.so.13",
+        "sha256": "1489aeb75d55ee55782798343ac66f57771d561cc1fe1e0491568deefa0e6515"
+      },
+      {
+        "target": "/runtime/nvidia/cu13/lib/libcudart.so.13",
+        "sha256": "96c42e418cec19054186b9429c321603cc190bf26a18104e19408117a2a817b0"
+      },
+      {
+        "target": "/runtime/nvidia/cu13/lib/libcufft.so.12",
+        "sha256": "0933f68bb7e3bf90f86d70bc87cd2f69027f7757e89e5de5e19ec33a53fd8d3a"
+      },
+      {
+        "target": "/runtime/nvidia/cu13/lib/libcufile.so.0",
+        "sha256": "1ecaf17d38957a41473a7fc8f29d569579e2a9079a26c4d9b89d8da330051483"
+      },
+      {
+        "target": "/runtime/nvidia/cu13/lib/libcupti.so.13",
+        "sha256": "e2f9ed861fe27c492b8bb52b5e3220ef5120f3edcda36312e96b7fd8a186be3e"
+      },
+      {
+        "target": "/runtime/nvidia/cu13/lib/libcurand.so.10",
+        "sha256": "b53732a66b302b11926e00f762e2c2ba67058347ff93cf4ae709de45e93e06da"
+      },
+      {
+        "target": "/runtime/nvidia/cu13/lib/libcusparse.so.12",
+        "sha256": "09339f848f60bb1111a61ee0fe91ed0c25132b7ff63298244d7ac14e61b58466"
+      },
+      {
+        "target": "/runtime/nvidia/cu13/lib/libnvJitLink.so.13",
+        "sha256": "3ba1e744347cd68617b862eccfd98b125482e882b7a6319f42abc9a768513db8"
+      },
+      {
+        "target": "/runtime/nvidia/cu13/lib/libnvrtc.so.13",
+        "sha256": "a49e67e8e74590f1e98de55c39c6287efd3f59e3c3797464d7bbe0fe01349b11"
+      },
+      {
+        "target": "/runtime/nvidia/cudnn/lib/libcudnn.so.9",
+        "sha256": "b88025af76979b3f1af208790195093684fe01cb8d190528856058f988016660"
+      },
+      {
+        "target": "/runtime/nvidia/cusparselt/lib/libcusparseLt.so.0",
+        "sha256": "e2bcea98434bdfc6399b5e0d1db14178079df62f9527c183c835a7ae196d5685"
+      },
+      {
+        "target": "/runtime/nvidia/nccl/lib/libnccl.so.2",
+        "sha256": "aa957cdfb91b516eae0d54a28e9ee5db52730d02e0ab45580efc3c19a68327a4"
+      },
+      {
+        "target": "/runtime/nvidia/nvshmem/lib/libnvshmem_host.so.3",
+        "sha256": "c43004bb93053aa70603a204fe0c9052bdd29f38822d3048599183f8d5930d8f"
+      },
+      {
+        "target": "/runtime/torch/lib/libc10.so",
+        "sha256": "b83ea50e9171c7e3455c19f9ff2c7d21d457a7b8231e9c4ea1b6e032ae1156d5"
+      },
+      {
+        "target": "/runtime/torch/lib/libc10_cuda.so",
+        "sha256": "54da13d79545600a1822a72b179a58295c1915f8ea0194a89066437c3ac48c1a"
+      },
+      {
+        "target": "/runtime/torch/lib/libgomp.so.1",
+        "sha256": "e28fb2896a3d612b46a27d7f8ef840d34c9efbc29b70a044c42095fb94856890"
+      },
+      {
+        "target": "/runtime/torch/lib/libtorch.so",
+        "sha256": "29c72a63050601514ff9af6399bb027ee8b4030b97017579458d16ceac90d999"
+      },
+      {
+        "target": "/runtime/torch/lib/libtorch_cpu.so",
+        "sha256": "9b8ecee6ebc8419142714302c8a7b61b2e1e52a2882bce6ab1e1587ed39c07e9"
+      },
+      {
+        "target": "/runtime/torch/lib/libtorch_cuda.so",
+        "sha256": "181dfc4fe86bf8eb4726604ea13b18581b15cf4d5f6e52f538daa41016edc19a"
+      },
+      {
+        "target": "/runtime/torch/lib/libtorch_nvshmem.so",
+        "sha256": "badf5e3f9fbb9f7b13e198318ffb6ff019808aacf46488ec09843f90a310541a"
+      },
+      {
+        "target": "/runtime/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0",
+        "sha256": "1c26e0ff9a9eecdf1faae6a10f036b50641b1da8964e137001efc18b85e19d66"
+      },
+      {
+        "target": "/runtime/nvidia/cu13/lib/libnvrtc-builtins.so.13.0",
+        "sha256": "91dcd944d01da9c0f08fff5d779db136a47f6d62bdb63bae900d2f481e92c3a2"
+      },
+      {
+        "target": "/runtime/nvidia/cudnn/lib/libcudnn_adv.so.9",
+        "sha256": "7702094a50dbea5b8244df01af8e9d3565309d3996bbc8ca96b6c7a207d2d6bd"
+      },
+      {
+        "target": "/runtime/nvidia/cudnn/lib/libcudnn_cnn.so.9",
+        "sha256": "e830c5cba875ebeb8ed3cfde5cc038a2703692ce714a8a4ff28666ac8e2c5732"
+      },
+      {
+        "target": "/runtime/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9",
+        "sha256": "e5133109f710c215d72fdc8f1d9be187f4760f5f32e57cc8c57515ea9e91455e"
+      },
+      {
+        "target": "/runtime/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9",
+        "sha256": "28db2a6f433a184e264d927b183c47ecaf72dc65ed58245a6d2380f980e29cd3"
+      },
+      {
+        "target": "/runtime/nvidia/cudnn/lib/libcudnn_graph.so.9",
+        "sha256": "35c099d318433a88d292775676a51a07d2dd152c3ae799b1c21a75b40f78e456"
+      },
+      {
+        "target": "/runtime/nvidia/cudnn/lib/libcudnn_heuristic.so.9",
+        "sha256": "a41eb9baa9ccc9e2d6c9f2ca226021b54c8ee2df4abf3a91e41687847b481228"
+      },
+      {
+        "target": "/runtime/nvidia/cudnn/lib/libcudnn_ops.so.9",
+        "sha256": "705d3dcf9b209fdbeeecd8aaec5fcd0f6f55de5661e1c1388b5a4b8fd29db7c3"
+      }
+    ],
+    "system_elf_files": [
+      "/usr/lib/libc.so.6",
+      "/usr/lib/libdl.so.2",
+      "/usr/lib/libgcc_s.so.1",
+      "/usr/lib/libm.so.6",
+      "/usr/lib/libpthread.so.0",
+      "/usr/lib/librt.so.1",
+      "/usr/lib/libstdc++.so.6",
+      "/usr/lib/libutil.so.1",
+      "/usr/lib/libz.so.1",
+      "/usr/lib64/ld-linux-x86-64.so.2"
+    ],
+    "system_elf_hashes": {
+      "/usr/lib/libc.so.6": "02c8c3d06180beee9c7d0392aa85736c7d19f274a81e7f8f0b3d9e28e0641524",
+      "/usr/lib/libdl.so.2": "9b3812e7f6b766e2d0a1d9eeca1a58c1272392859e8b04f708b2f86b2256d03c",
+      "/usr/lib/libgcc_s.so.1": "e618cb9c90c2eb3a1dad1cfea5b6c1eebcf2e799ad805976f4ae47bdd61c716a",
+      "/usr/lib/libm.so.6": "965106704753eefe8c31ae7da6daba3ead3d18c52b19b5fcc41178bcc4aa999d",
+      "/usr/lib/libpthread.so.0": "839b91403f89fa4c6888d50deb2b59cd0612f8cfe3d57dd9d6314832b4cb31ab",
+      "/usr/lib/librt.so.1": "e06e12b8a78494908d08376838c380fb3817bfd7d54f6a86ef050016f7ade5f8",
+      "/usr/lib/libstdc++.so.6": "f5fc7380f2ae46fa4053a64be04e7b98109f1066a4bbfff3c37042488aa0be0e",
+      "/usr/lib/libutil.so.1": "8c2cbf01f52acb42478b9ab10506af9878b7e8d47aefacc8896bb5b37384c222",
+      "/usr/lib/libz.so.1": "9ba92a0b85dc9b659e8f5e596a69452cec801def6ece0883a8a2c1f032e52397",
+      "/usr/lib64/ld-linux-x86-64.so.2": "f5e11cc62f8f2c24dff532982559f4303dba3b17e7450551372a88c8e7ea8757"
+    },
+    "lazy_package_elf_files": [
+      "/runtime/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0",
+      "/runtime/nvidia/cu13/lib/libnvrtc-builtins.so.13.0",
+      "/runtime/nvidia/cudnn/lib/libcudnn.so.9",
+      "/runtime/nvidia/cudnn/lib/libcudnn_adv.so.9",
+      "/runtime/nvidia/cudnn/lib/libcudnn_cnn.so.9",
+      "/runtime/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9",
+      "/runtime/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9",
+      "/runtime/nvidia/cudnn/lib/libcudnn_graph.so.9",
+      "/runtime/nvidia/cudnn/lib/libcudnn_heuristic.so.9",
+      "/runtime/nvidia/cudnn/lib/libcudnn_ops.so.9"
+    ],
+    "bridge_sha256": "8e74590d01842df8fae7ec6a28bc5c7d07684600e694cc04a3304ebc9af53581",
+    "binary_sha256": "4a6caa03114e7bc99aa4024528fc135e345703fc33726995a9338eb5322cf4a3",
+    "aot_binary_sha256": "8171618ef9b69de5c5b9715fd060d851ee8f553065df3d62dd715f5f42eb8700",
+    "aot_fixture_sha256": "d36dd7f70f4eac38972f8156f7efbd5ae333d2cc109bd7c3370bc6caeabe643d",
+    "int8_binary_sha256": "89a7a0897236db557aa4ab20c0b0349cefa52f9573bee866d8430f71760e73f1",
+    "int8_fixture_sha256": "cef33289d156ee64aea6f1a9ca53d8000781432716302b0d662438552e6878e0",
+    "backend_fixture_sha256": "346b0d65f0f76d336bdc9045cda0eb8bf08a241e97e25f37c6b01130eff9ea78",
+    "fixture_sha256": "22b2564eebea8222c520a2ca9142590e53bb2f33e22c257190492e3be0c9ab41"
+  },
+  "full_log": "/tmp/imagine-rust-comfy-parity-20261017/runtime/stage1-sage-full.log",
+  "full_log_sha256": "51ca6a63e7e6a85cc4d21b0c6d66366a809f2f0164c3b3e313ebb46814d299f2",
+  "implementation_sha256": {
+    "inference/.gitignore": "306fd52e74fca6746e12acc750f232de15e71da917756a1270d74c91f5eb7368",
+    "inference/Cargo.lock": "d550d0d9df19d96e592ead83d5382ee790a7844ae4185929fc837e0290baa593",
+    "inference/Cargo.toml": "a902da906b4d8f56b203078b59a1c70d2163d5de6b2d44af56808136fb868f51",
+    "inference/README.md": "77fdc339b96a5e512eb819867c3f4de7b7189f8988383db34d59d42ae753fca9",
+    "inference/native/CMakeLists.txt": "f835d9ff576032238f60a03ade4f8d5164084ba0ee336f12c919f7f5cc6046f0",
+    "inference/native/bridge.cpp": "7e690b66ea8466d45a20503a2b574be6d5a733479405ee89ed870d0f94f9b5aa",
+    "inference/native/bridge.hpp": "4a5c58652fe1f708cb473f75feb4ffd7edac4c0fcecc6bc6ac5687140493b5d9",
+    "inference/native/tensor_view.hpp": "7971bbea28dd7936b6496d7d4fce96bc2dcfebf44950931320dadea1cd28b4c3",
+    "inference/native/triton_llvm_driver.cpp": "fe5eb96cb09f019ced0ba96044cc8cad210087813f73ae26990e0c74a5da8544",
+    "inference/src/autotuning.rs": "1eb53beb8faa65dd00c67c327ca3185f4092efd51ec72a2165b5cd34a8b741d1",
+    "inference/src/awq.rs": "63362a575c0e1734aabcebebc82709428f76fa643dc3c40490bdf7a0d8672df0",
+    "inference/src/awq_layout.rs": "420a091e03aaf4dcb713d519e3f9dd92e4e253d849451bcbcbfa86328480fd6c",
+    "inference/src/backend_bindings.rs": "2a651be2f73226c1206540a7806b6e7747963d3f0337017b82ab6bcd096d6841",
+    "inference/src/backend_contract/mod.rs": "6c727c6b8db3f0bb5f128821ebc5ad6a4d30ce83bba61039dd6e7ac6a5109a13",
+    "inference/src/backend_contract/rules.rs": "c42138165a3225f6f7259ba3b01c9db9dbb8021028e6e869ecd187c98c77d948",
+    "inference/src/backend_contract/tables.rs": "765a919413997197c77698ab12e55a8790231f7a529041ea44900c2e6ddab0ae",
+    "inference/src/backend_conv.rs": "e1b0f1a40b56dc2bc80d6ac09d9806898422256faeeb94ba6f0ed02f33b3f27d",
+    "inference/src/backend_eager.rs": "602513ff47981bc80750dd455c6814fb30898d258bf7095150c1dddc330e18ff",
+    "inference/src/backend_na.rs": "22e621cd9a178f868500cbf427804e7920b8b3701cc2697402d6f7614febdf16",
+    "inference/src/backend_nvfp4.rs": "4c5ebadadd9fd1656f12899527eb9f0fbf68896f4ad1ec5d848a9a2fc0b94faf",
+    "inference/src/backend_quant.rs": "1447c93c786e16ee0f7a0d51a9a15633de855be9533b7f9e539a900727bfa0d9",
+    "inference/src/backend_rope.rs": "8b9367c1cb3fe964d31a4a0d8df34debf18b929414abe970237d8282b5bd3ba9",
+    "inference/src/backend_sol.rs": "a01935f5be7eec18101a543ad6a6df96a95cda4e757270c159695f5d4f901cbc",
+    "inference/src/backend_sol_cuda.rs": "fc93c758392416a12ac910a7407aef2765934733cefb1ce1e598d49953443e24",
+    "inference/src/backend_w4a4_linear.rs": "2fe2e83192c55511316aa54947d296a397ccf240158de9314dced88c75a2dc84",
+    "inference/src/backend_w4a8.rs": "b7fe677c99d4fcffd4d8ea2edda778ad8f56757b83285a240df7421b925900ae",
+    "inference/src/backend_w4a8_quant.rs": "e6a003848c48dd1e9e0cea1a98c7fa6ca2f0bf5394c7332045738d89374cd8a8",
+    "inference/src/block_scales.rs": "e3b767b5ab30cbd5939070488e127e3ceba3fa8c40b20ea42d0ab0f975773441",
+    "inference/src/boxed_aten.rs": "8d7787ffad03bd13f887854e5dbb23a54a353eb0962cae25b9e1f8cc1bf4c459",
+    "inference/src/convrot.rs": "97f862ce59cb37b7bb7d333a82d6208ad742926f8b8e436d8ae34d4991bcb1f2",
+    "inference/src/convrot_w4a4.rs": "ee975ae807b132b4e4141ccab4a94d4ac2026a72f5617011e17ce19d2db01158",
+    "inference/src/cuda_linear.rs": "53848de84aa24e54ecac9b5226c0eca18725f2c2d0ea193f498d5b16f8707f57",
+    "inference/src/eager.rs": "9f8d1ec9a0d4c3fcf5b4e7d2c7d5713b655ccb10ef0ef70e140b56f505568450",
+    "inference/src/execution.rs": "2c66d4c2f79ffda0b47efd1a8e6ee3a7cf605c06655404eab00cb11ae7bdb986",
+    "inference/src/execution_bindings.rs": "75af3b70153bb7f240f1d355d913dbb7c9c06e125a7fc428d2cdd04a6ed1e7d7",
+    "inference/src/execution_value.rs": "24448e15be58e119d05ac86187f328fb74d5af4f504d80ab6662d9dd5f5f6ea3",
+    "inference/src/fp8_ops.rs": "c9f39a56343217c1afee42d2902140d7ce0e90e3b19786d55fcc24d50cc93d72",
+    "inference/src/int4_linear.rs": "fa6709f6c70cccc538e2425381e59bdc4fa6801e11139abb7b48823a36705ba6",
+    "inference/src/int8_eager_ops.rs": "edfb0501deb6cd07aa49f77ac48be4cedc71151ca2bdd6b9c98d2f3d14f68abb",
+    "inference/src/int8_linear.rs": "096aae1230e425e43fa295d290637e246bd5a49ad93f578f8cdb06e38cfe4925",
+    "inference/src/int8_utils.rs": "46cb79e9a93b9f6e64ea3d2f2736d4025f6c763a1fdf69520fc1eb4341ba1e18",
+    "inference/src/kitchen_direct.rs": "6b3e238ae907250bff1017a028e130ccf06dbe27d69c4c2435d528940a13f487",
+    "inference/src/kitchen_sage.rs": "fc9000410a2bb61b0a3d89ebc391a8aec64b57cf139fbe959eb2cd5bbe6cf101",
+    "inference/src/layout_complete.rs": "a98967128820f2c1ee19c14fe4dbfa945bf886da6db70eac15976bccd079a096",
+    "inference/src/layouts.rs": "c2ad855f9bc4c090df0e2cc4dbc67e7dbe91261b4d5ef027742eb9c149d8d025",
+    "inference/src/lib.rs": "6e37ebdc2490ac98b1d64205f355a4301b13a2ec36aa9a2c94beb94ac77623cf",
+    "inference/src/native.rs": "689b3547525cf21de8dc16b6df161275365b7b2b9a9d5140d0947fe7aded0f82",
+    "inference/src/packing.rs": "bb806a21058c6a6e0eb3f412062ccb25eb1c6eaa5379760e011fb1403d8decec",
+    "inference/src/quantization.rs": "49f0ca1c47c09a345efacde8825d6c888ba91ec1cba8fd20971ae8f7c20e55be",
+    "inference/src/registry.rs": "3844e8fc1ce96eece0af45c473252d8eccf870688b97c13a5305b1ee503ff761",
+    "inference/src/storage.rs": "a8f624971e0cd466f70b8a9f0a009df7753e32f5f62be0394b4ceb198db6226e",
+    "inference/src/svdquant.rs": "6b7f772c5ecdb3b7f6289a5dcdc3870d74712a9f03b2746c7290758fe3819a88",
+    "inference/tests/autotuning.rs": "40bbd91a70e72fc356b800409b188840763d2d0e125fb2bbe473ac81af92b807",
+    "inference/tests/primitives.rs": "8cd5722c4f4142a80eed920498db134b953873c9eb3c979ded579adb2483f628",
+    "inference/tests/registry.rs": "89ee079c600f4c399def1becc8b281b4cac1635cf2dc9fc889645883f93eb421",
+    "inference/tests/support/awq_layout.rs": "ff8a48e7e9fc9d261e9339022cd0771c0ca504bb76afd8afdf271509d9c0c04a",
+    "inference/tests/support/backend_bindings.rs": "038124e9f54e7f4d8c59387bcd014e0ed6e1b0f6e1dba003eb95f23323d3947b",
+    "inference/tests/support/binding.rs": "08a66cc6ef2340b596c8aced947a5dd46a002170ea0928cce97a79876b0962b2",
+    "inference/tests/support/conv_bindings.rs": "d1c31ab6c15c0d88759073f43b0c209608de801da9f0f78736d3dccf1467644b",
+    "inference/tests/support/kitchen_direct.rs": "6dc865b91230952d252328c528306384e3e67ddc64296368c098200ed7e854cd",
+    "inference/tests/support/layout_completion.rs": "169a3d1108b8a6b7114a8ac0faebcc21f4845b341e6727556bf852fc3a6d58be",
+    "inference/tests/support/quant_bindings.rs": "855883e5be8af69c7b84af024721bee753696ca53b897731fcbe1e81b965a4d2",
+    "inference/tests/support/rope_bindings.rs": "18c85b6ac1f6bf226af5efeb08c6dff9b36f29d1978c02d21a3181ee0d9101a9",
+    "inference/tests/support/sage.rs": "3c4f9458f7596b86017a646aae3fe3c93160c8079957d2542b1dad7011c6048d",
+    "inference/tests/support/sol_bindings.rs": "ec4940bd3edac06a934ed1de8032e2aa4e07f59cff59bc240596d2e87c7653c1",
+    "inference/tests/support/w4a4_cache.rs": "2a826ff79996203cde2876b3905a8356955f363031f52e74d19135ced8c31f1f",
+    "inference/tools/build_int8_aot.py": "7dbd2edff7ba723a85fe61bef3e881cd82ec697959e9fbc68abdc383dd16a276",
+    "inference/tools/build_native.sh": "16742a4ada94d3f9c2967be20231dcbf92e16ca63bd9df2aac980f45657a662b",
+    "inference/tools/build_triton.sh": "34c2078fc69689606d7cbc638e34f4162355268ec64dd74abd4fef22baf0fdf8",
+    "inference/tools/check.sh": "6a40640d78c77e1b1bb91694d4fb901d4ffbd881d4a087009e5062935ba09fa9",
+    "inference/tools/inspect_quantized_bias_dlpack.py": "d44cd7451ad5c47de5ac7fb20c13056f91b3176463aa27523f566ed63d24bb59",
+    "inference/tools/prepare_kitchen.py": "1ae622be815056e6c76912440837e1df951c32014739882d682d3211727c757b",
+    "inference/tools/prepare_triton.py": "c58cee47871cbf091145e951cb9463fc981db054f0b78dcd340842af952099db",
+    "inference/tools/prepare_triton_llvm.py": "60d18e4233da43694a0ae93fb3bbd878786589ce3e31b2661dedc6b70ed8545f",
+    "inference/tools/probe_autotuning.py": "7f5093f437d4bb117796cdaad4fcb897b10eb6dcb73d286af0405c8fb94d4002",
+    "inference/tools/probe_triton_aot.py": "92ed8026c00fae7aca94989f5f30a3db13d36013fa9e5c2cbda66462b236665b",
+    "inference/tools/reference_autotuning_policy.py": "9355a6997de6ba6351fd7082e581439acd919a3c294269311f654471af44ada1",
+    "inference/tools/reference_awq.py": "d7452b99483a810c75314206684737974627ded26d3e1eca1fe059cb48f7e241",
+    "inference/tools/reference_awq_layout.py": "a7200bc5880023e6336a0b59e54b1c7c339d240f586cd9c2c8d55e67881de9fd",
+    "inference/tools/reference_backend_bindings.py": "9ba671a7e67249bcf2a2045fc912362ca7ade5fbb5085f242363b786c1d2702e",
+    "inference/tools/reference_backend_contract.py": "378e386c5b7091b195da2cd8f216b919e381b922f049057294a499fff9578006",
+    "inference/tools/reference_binding.py": "54b9c764c97191ce68296e426d82093e34cd19e620aa340f13bd3da470d97085",
+    "inference/tools/reference_checks.py": "053739f2611414c08f7ddfb41af4d2b2411381e254b72830b6c1a53273068c61",
+    "inference/tools/reference_constraint_diagnostics.py": "6a9c53c81f72fcd18d09125393ac26ca9d0021d228d60b9d01b5651f170b1e24",
+    "inference/tools/reference_conv_bindings.py": "870d03f5bff8b1865a673676eff2df0040f891f55c8310e496d616650f4d3bb6",
+    "inference/tools/reference_convrot.py": "e94517917dec7c66823f8e62e364163fbbe164225e1fb70adefee1d2512a522f",
+    "inference/tools/reference_convrot_w4a4.py": "5b071dffbfa114507df915385c3a4d84dbd7e887b1c48a3d9ee27f6ba756ae6e",
+    "inference/tools/reference_convrot_weight.py": "f78863830bb648514953c6193362f8938cffac898fef8ee9da676e2c49786f0f",
+    "inference/tools/reference_cuda_int8_activation.py": "634a51958aec5e57a97ea8e0d23089f1a8527bf61c558f9a51fd0371f10b4109",
+    "inference/tools/reference_cuda_int8_gemm.py": "1f75722bd7a02bea49b5b70b0eecdd372dc856e160597f6c0c72c6a1606bf3af",
+    "inference/tools/reference_cuda_int8_gemv.py": "2323a9fe114306bac97c424219204d9d2a5cce59a54a88d67c09473b37fdc404",
+    "inference/tools/reference_cuda_int8_m1.py": "4d1c9b05274ea0229d6ce6b756674df6ed0a6104ecc0f88ab1b7f87dfb10fe0a",
+    "inference/tools/reference_cuda_int8_zero_k.py": "a58ee9688c0099877c5267f2acadb1b2dac2718d2069fb2899267751d2c93333",
+    "inference/tools/reference_cuda_linear.py": "a246fe75f66ab774e7018e8104302e312a82bef22b6cdbad742b25dc1d6dd332",
+    "inference/tools/reference_dlpack.py": "6307faee7179b1fc9f6b731825ce7cb2d4001026f0dd8383c73ea523020696aa",
+    "inference/tools/reference_empty_convrot.py": "92552622fdcae787c0c10c2828b9ba6a17b6f098905287b30c635e685bc99451",
+    "inference/tools/reference_empty_int8_cublas.py": "381171794d651517fe8cd72fc9002174da6a5183143d7b48bb36d14faeed26fe",
+    "inference/tools/reference_empty_int8_gemm.py": "c88e0f2fc7ecf0c0a9667b128cc48768a3fe65a52aef66a3a4a826483ea0f5b6",
+    "inference/tools/reference_empty_int8_gemv.py": "0dcec23a06f51c3666dd4e4cb633346bd8a3ac2a0f652e33703c6d8c9e2ce2dd",
+    "inference/tools/reference_empty_int8_m1.py": "2c061230413513feb332438920408233343e80e11704678110418ab6db695896",
+    "inference/tools/reference_fp8_ops.py": "b229c6943aa2825c63f67cb9309fb063beaf9dab9bf97c69968518514251a8cf",
+    "inference/tools/reference_int4_family.py": "44ce71e6fe8d9fd2f2c57a24d5c39fec5ae7db93d4be4660cd7fc16a4e52e423",
+    "inference/tools/reference_int4_forced.py": "9e24fd7e25658a83215e57f715c5104937ea88d1d2590860c95d02ba81c5bbc1",
+    "inference/tools/reference_int8_eager_ops.py": "cea12b711de19253c7058bd60cb9514a3ab8214dfa9d70612be8e5393de5d4ce",
+    "inference/tools/reference_int8_linear.py": "286b47481b7f60c204239d79f7d9db79503c9aaea74b59573f9610fcd5e432e4",
+    "inference/tools/reference_int8_utils.py": "a8e2de9c9e3dfa29c546c4da3f0439d48d11ec252bb2c5552a2cd2d5f2a72c06",
+    "inference/tools/reference_kitchen_direct.py": "2647bad3364b68516329470444f259dc705cde7e0d46a293815510955edbaa32",
+    "inference/tools/reference_layout_completion.py": "eb26c1930a07b5396e92f9f26da0dda4adf5686a7f05a6f0345bc90ba6eacb50",
+    "inference/tools/reference_na3d_bindings.py": "af8bbd80f715fe44cd26ab92d76c6bf03298bc354aef41d758cc28bd2b0e403e",
+    "inference/tools/reference_packing.py": "3e4aab9a9f6525c84fa03d5a7104f6f6c13ce4e0db4bf71f9b97a6031d12129f",
+    "inference/tools/reference_primitives.py": "5e1d2b267b766875920917579c6b2ace504bce91531e11d56dfadced0b33c9bc",
+    "inference/tools/reference_quant_bindings.py": "5366097c092be44d107474e0aeaff14b0571c61130f7ceefed9d55ec8b7e2ad6",
+    "inference/tools/reference_rope_bindings.py": "66c8a3d642e44159f012d96c9f0c84f3c3b97e712f8389256a547cc591048dd5",
+    "inference/tools/reference_sage.py": "d480cebae41fe3d4262aa97e94598f8e818e0edf88d233c0be7bc0cc3010729a",
+    "inference/tools/reference_sol_bindings.py": "7c4a2c6585080b4453b59815cd7b0aaf40cbd6a93d81827ef19838a590ecdac9",
+    "inference/tools/reference_sol_cuda_bindings.py": "8f5396618c0eda3f9f749d917d3349288f59c3f377aaa87021c9513c81337760",
+    "inference/tools/reference_svd_attributes.py": "0ebd016aefd0778e934d74fd16e677bae1a26d99800027ad66bdf3376339094a",
+    "inference/tools/reference_svd_layout.py": "11c925f630f82cd080dff52c8bb64883486e32eadeae29b068a8340676fe886b",
+    "inference/tools/reference_svdquant.py": "f6f55f4cd657a691dff04cb8f9e0ded928f2d11a04c71e8ea71c1526ac82b698",
+    "inference/tools/reference_svdquant_quantize.py": "3fb943bffbfb6feb09e3d138457abaa1a059f0a9782a998a38f83f36cd2ce91a",
+    "inference/tools/reference_triton_pipeline.py": "4b8cd3a29316600be8ddb0b68dac146e1fa8e5224b865db1742ff34c621ffb28",
+    "inference/tools/reference_w4a4_cache_bindings.py": "ff5447f048ebe758ed0659582a845488daa6a83f569d58627c66791457b53758",
+    "inference/tools/reference_w4a4_linear_bindings.py": "b1b96c2b162b5645d0ea6c28c6d85fee9a3f845563aa6ecd28bd792991454c3e",
+    "inference/tools/reference_w4a8_bindings.py": "eff8c8608d403e74b8d1e6adad9d9980b723bb28a4783bed5916cc8911b94c3e",
+    "inference/tools/test_isolation.py": "f5dc92c9d2d4a66b24aaa0a151f6b2a0de931f1929dc962c7edb636f43666ae5",
+    "inference/tools/test_reference_checks.py": "1bf5fa4a9344138f7dfeaa3d1da5cc1ab980724bd70296a8797f4a079bec22f9",
+    "inference/tools/test_triton_pipeline.py": "1bfde0339a28c072d18071c6b4f21dc938aedba536d4152f6840c00387681ec6"
+  },
+  "stage0_lock_hashes": {
+    "reference-lock.json": "4765e81dfe84ff32ee8352ba84c68e89f578876061fdbcd439a3a7ccac7674bb",
+    "source-manifest.json": "3e233cb602129a5e6bcb51aecd8e4215448551e176e8286df04fbf47ecd781c9",
+    "source-acquisition-lock.json": "b1148f2b24bb2fa66f69478cc1ec7960acfe4579f4aae18c63e88815ba220e77",
+    "native-linkage-lock.json": "37737a4525ec3db12f6314d2dd0e69a8fb4c5374d8ad04797ade0447e110bfa6"
+  },
+  "original_cuda_object_hashes_unchanged": 32,
+  "connected_registered_bodies": 107,
+  "remaining_triton_bodies": 28,
+  "new_approval_pending": false
+}

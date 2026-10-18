@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "scope": "Existing local subprocess dependency used by the frozen cuobjdump during original and Rust SASS dumps; no inference or compiler policy change",
+  "tool": {
+    "path": "/opt/cuda/bin/nvdisasm",
+    "sha256": "fa719d636e2dcebdbce466e07ab69f144feabc2fdb3eda52380fbd4a5c189faf",
+    "version": "nvdisasm: NVIDIA (R) CUDA disassembler\nCopyright (c) 2005-2026 NVIDIA Corporation\nBuilt on Tue_Sep_01_08:46:02_PDT_2026\nCuda compilation tools, release 13.4, V13.4.92\nBuild cuda_13.4.r13.4/compiler.38855100_0\n"
+  }
+}

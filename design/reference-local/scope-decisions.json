@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-17",
+  "authority": "Tomas explicit answers 1 yes, 2 yes, 3 no cloud services only local dependencies, 4 yes",
+  "synthetic_fixtures": "approved initial material",
+  "runtime_access": "new engine isolated development runtime data only; no existing production/Dreamchat data",
+  "optional_dependency_installation": "approved isolated environment; expanded test configuration separate from frozen reference",
+  "source_downloads": "matching Kitchen/AIMDO/LibTorch and build dependencies approved",
+  "cloud_inference": "excluded",
+  "parity_deviations": "none approved",
+  "implementation_stage": "Stage 0 source locking/inventory complete for review; no Stage 1 implementation started",
+  "development_root": "/tmp/imagine-rust-comfy-parity-20261017",
+  "reference_unchanged": "source-manifest.json and existing source archives unchanged",
+  "provider_inventory": "comfy_api_nodes hosted/cloud operations excluded; source retained as evidence only"
+}

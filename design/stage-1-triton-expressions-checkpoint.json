@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "status": "Compiler regression passed after mechanics extraction; no new backend bodies",
+  "scope": "Internal reuse for remaining block-quantization kernels; kernel flow, cache ownership and errors unchanged",
+  "source_sha256": {
+    "inference/src/triton_frontend.rs": "c4285460dec754ddd6cc3f832c01c63ae207f23307a76bedd621e925cdd1f51a",
+    "inference/src/triton_frontend_expr.rs": "77cb8bc82deb94074c7e22d9091b22b1d82d4799c79d37fcd4ec642196ca1f0d",
+    "inference/src/triton_frontend_rope.rs": "756e63b9c1837548d43057b0a2449fbf2cd20774af8f4250979a367264131c06",
+    "inference/src/triton_frontend_rms_rope.rs": "35bbc0c598d2262aa566474676aa98b0859e7b07eac2179309957133ec8a97ae"
+  },
+  "reports": {
+    "rope": {
+      "raw_and_optimized_cases": 2160,
+      "complete_byte_exact_cubins": 72,
+      "report_sha256": "e12ef287873cf1ea852407dcefeb356e4d9b21fc26dd566afbd72bb4426aa48e",
+      "log": "/tmp/imagine-rust-comfy-parity-20261017/runtime/stage1-triton-expressions-rope-regression.log"
+    },
+    "rms-rope": {
+      "raw_and_optimized_cases": 1296,
+      "complete_byte_exact_cubins": 54,
+      "report_sha256": "d9bc5e5bf6ebb3719dd6b4236fa2a382f88fd824dedb1c6d3256c0e7d46de2d4",
+      "log": "/tmp/imagine-rust-comfy-parity-20261017/runtime/stage1-triton-expressions-rms-rope-regression.log"
+    }
+  },
+  "full_unfiltered_baseline": "stage-1-triton-rms-rope-checkpoint.json",
+  "unfiltered_after_extraction_run": false,
+  "additional_scalar_and_quantization_lowering": "not yet implemented or verified"
+}
