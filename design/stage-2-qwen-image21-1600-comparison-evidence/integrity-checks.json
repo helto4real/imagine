@@ -1,0 +1,12 @@
+{
+  "format_and_all_target_clippy": "passed",
+  "shell_python_syntax": "passed",
+  "strict_large_pairs": 3,
+  "python_free_large_rust_images": 3,
+  "saved_512_comparator_replay": "passed",
+  "model_sha256": "all three unchanged, rehashed completely",
+  "stage0_locks": "four unchanged",
+  "original_cuda_objects": "32 unchanged",
+  "source_inputs": "363 implementation/profile/fixture/resource plus 275 original inputs verified; implementation inputs unchanged during measurements",
+  "component_tests": "unchanged implementations; historical successful suite retained, not rerun here"
+}

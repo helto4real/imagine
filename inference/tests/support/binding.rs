@@ -190,10 +190,19 @@ pub(super) fn check(value: &V, expected: &Value, dev: Device, note: &str) {
     match value {
         V::Tensor(_) => {
             let t = value.as_tensor().unwrap();
-            assert!(
-                bits(&t) == exact_hex(&expected["payload_hex"]),
-                "{note}: exact output bytes"
-            );
+            if let Some(expected_hash) = expected["payload_sha256"].as_str() {
+                use sha2::{Digest, Sha256};
+                assert_eq!(
+                    format!("{:x}", Sha256::digest(bits(&t))),
+                    expected_hash,
+                    "{note}: exact output bytes SHA256"
+                );
+            } else {
+                assert!(
+                    bits(&t) == exact_hex(&expected["payload_hex"]),
+                    "{note}: exact output bytes"
+                );
+            }
             assert_eq!(serde_json::json!(t.size()), expected["shape"], "{note}");
             assert_eq!(serde_json::json!(t.stride()), expected["strides"], "{note}");
             if expected["dtype"] == "torch.float8_e8m0fnu" {

@@ -1,0 +1,6 @@
+{
+  "design/stage-2-qwen-image21.md": "45d9259159a294980890a73395344eec96dd62cd03ac141ff630e1e333ca213f",
+  "profiles/quick-draft.yaml": "5f46a66837dfeb98388e94f83e7540035ff3afef9549f9fb14d061ec402b06f2",
+  "workers/comfy/runtime.py": "eec71667d5bd1e6051fa1d284bb5344857a21c70760feae6057370710ef728e7",
+  "workers/comfy/test_worker.py": "aad49095d3299fd3f6b6bb95810bce71976a83947543f3d3583e2bea235d27ec"
+}

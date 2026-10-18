@@ -1,0 +1,7 @@
+{
+  "all_parameters_remained_meta": true,
+  "real_allocation_guard_tested": true,
+  "hard_data_limit_bytes": 2147483648,
+  "hard_address_space_limit_bytes": 8589934592,
+  "peak_rss_kib": 799872
+}

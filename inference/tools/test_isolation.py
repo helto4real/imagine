@@ -2,7 +2,8 @@
 """Expose only selected ELF files and synthetic fixtures to a Python-free test.
 
 Host-side development launcher. No interpreter, ComfyUI tree, Python package,
-existing media, model weights or ordinary runtime directory is mounted.
+existing media or ordinary runtime directory is mounted. Primitive mode mounts
+no weights; explicit Qwen-driver mode adds only its three authorized model files.
 """
 import argparse
 import hashlib
@@ -23,8 +24,32 @@ parser.add_argument('--int8-library',type=Path,required=True)
 parser.add_argument('--int8-fixture',type=Path,required=True)
 parser.add_argument('--backend-fixture',type=Path,required=True)
 parser.add_argument('--test-filter',help='Run one exact test; require one executed success')
+parser.add_argument('--aimdo-library',type=Path,help='Explicit isolated copy of the frozen AIMDO ELF')
+parser.add_argument('--qwen-driver-profile',type=Path,help='Explicit frozen first-image development profile; switches from primitive tests to the standalone driver')
+parser.add_argument('--qwen-model-root',type=Path,help='Authorized local model root; mount only the three profile checkpoint files read-only')
+parser.add_argument('--qwen-mode',choices=['preflight','load-check','run'],default='preflight')
+parser.add_argument('--qwen-run-name',default='qwen21-first-image',help='Fresh isolated output directory name; no paths')
 args=parser.parse_args()
 project=Path(__file__).resolve().parents[2]
+driver_mounts=[];driver_args=None;model_files=[]
+if args.qwen_driver_profile is not None:
+    if args.test_filter or args.qwen_model_root is None or args.aimdo_library is None:
+        parser.error('Driver mode requires explicit model root/AIMDO and cannot use a primitive test filter')
+    profile=json.loads(args.qwen_driver_profile.read_text())
+    assert profile in [json.loads((project/'inference/profiles'/name).read_text())for name in ['qwen21-first-int8.json','qwen21-1600x896-int8.json','qwen21-1600x896-40steps-int8.json','qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json']],'Explicit registered comparison profile required'
+    for rel in profile['checkpoints'].values():
+        relative=Path(rel);assert not relative.is_absolute()and'..'not in relative.parts
+        source=args.qwen_model_root/relative;assert source.is_file(),source
+        target='/models/'+relative.as_posix();driver_mounts+=['--ro-bind',str(source),target]
+        model_files.append(dict(source=str(source),target=target,bytes=source.stat().st_size))
+    assert re.fullmatch(r'[a-zA-Z0-9_-]+',args.qwen_run_name)
+    work=args.root/'runtime'/args.qwen_run_name;work.mkdir(parents=True,exist_ok=True)
+    driver_mounts+=['--ro-bind',str(args.qwen_driver_profile),'/runtime/qwen21-profile.json','--bind',str(work),'/qwen-work']
+    driver_args=['--model-root','/models','--profile','/runtime/qwen21-profile.json','--own-root','/qwen-work']
+    if args.qwen_mode=='load-check':driver_args+=['--load-check']
+    if args.qwen_mode=='run':driver_args+=['--run']
+elif args.qwen_model_root is not None or args.qwen_mode!='preflight':
+    parser.error('Qwen root/mode require --qwen-driver-profile')
 lock=json.loads((project/'design/reference-local/native-linkage-lock.json').read_text())
 objects={Path(x['path']):x for x in lock['distribution_objects']}
 files=[Path(p) for p in lock['initial_target_linkage_audit']['package_object_closure'] if '/torch/lib/' in p or '/nvidia/' in p]
@@ -34,6 +59,9 @@ lazy_files=sorted(path for path in objects if path.parent==args.site/'nvidia/cud
                   or path.parent==args.site/'nvidia/cu13/lib' and path.name.startswith('libnvrtc-builtins'))
 files=list(dict.fromkeys([*files,*lazy_files]))
 bridge=args.root/'kitchen-manylinux/libimagine_kitchen.so'
+if args.aimdo_library is not None:
+    expected=objects[args.site/'comfy_aimdo/aimdo.so']['sha256']
+    assert hashlib.file_digest(args.aimdo_library.open('rb'),'sha256').hexdigest()==expected
 fixture=args.root/'runtime/primitives.json'
 triton_driver=args.root/'triton-driver/libimagine_triton_driver.so'
 triton_cubins=args.root/'triton-frontend/standalone'
@@ -85,7 +113,7 @@ triton_mounts+=['--ro-bind',str(compiler_profile_path),'/runtime/triton-compiler
 
 env=dict(os.environ,LD_LIBRARY_PATH=str(args.site/'torch/lib'))
 system=set()
-for binary in [args.binary,bridge,triton_driver,*compiler_binaries,Path('/usr/lib/libcuda.so.1'),*lazy_files]:
+for binary in [args.binary,bridge,triton_driver,*compiler_binaries,Path('/usr/lib/libcuda.so.1'),*lazy_files,*([args.aimdo_library]if args.aimdo_library else[])]:
     output=subprocess.check_output(['ldd',str(binary)],env=env,text=True)
     if 'not found' in output:raise RuntimeError(output)
     for path in re.findall(r'(?:=>\s*)?(/[^\s]+)',output):
@@ -93,6 +121,9 @@ for binary in [args.binary,bridge,triton_driver,*compiler_binaries,Path('/usr/li
         if str(path).startswith('/usr/lib'):system.add(path)
 mounts=[]
 records=[]
+if args.aimdo_library is not None:
+    mounts+=['--ro-bind',str(args.aimdo_library),'/runtime/aimdo.so','--setenv','IMAGINE_AIMDO_LIBRARY','/runtime/aimdo.so']
+    records.append(dict(target='/runtime/aimdo.so',sha256=expected))
 for path in files:
     if hashlib.file_digest(path.open('rb'),'sha256').hexdigest()!=objects[path]['sha256']:
         raise RuntimeError(f'Frozen native source changed: {path}')
@@ -131,7 +162,7 @@ command=['bwrap','--unshare-all','--die-with-parent','--new-session','--clearenv
     '--setenv','IMAGINE_INT8_PROBE_FIXTURE','/runtime/int8-probe.json',
     '--setenv','IMAGINE_BACKEND_CONTRACT_FIXTURE','/runtime/backend-contract.json',
     '--setenv','CUDA_CACHE_PATH','/tmp/cuda',
-    '--chdir','/tmp','/runtime/primitives','--test-threads=1']
+    *driver_mounts,'--chdir','/tmp','/runtime/primitives',*(driver_args if driver_args is not None else ['--test-threads=1'])]
 if args.test_filter:
     command += [args.test_filter,'--exact']
     completed=subprocess.run(command,capture_output=True,text=True)
@@ -144,6 +175,7 @@ else:
     subprocess.run(command,check=True)
 report={'schema':1,'result':'passed','interpreter_available':False,'comfyui_tree_available':False,'comfyui_installation_available':False,'compiler_only_files_at_reference_paths':comfy_files,'runtime_compiler_elf_files':compiler_files,'compiler_profile_sha256':hashlib.file_digest(compiler_profile_path.open('rb'),'sha256').hexdigest(),
     'network_namespace':'isolated','test_filter':args.test_filter,'package_elf_files':records,
+    'driver_mode':args.qwen_mode if driver_args is not None else None,'authorized_model_files':model_files,
     'system_elf_files':[str(p) for p in sorted(system)],
     'system_elf_hashes':{str(p):hashlib.file_digest(p.open('rb'),'sha256').hexdigest() for p in sorted(system)},
     'lazy_package_elf_files':['/runtime/'+str(p.relative_to(args.site)) for p in lazy_files],
@@ -158,4 +190,5 @@ report={'schema':1,'result':'passed','interpreter_available':False,'comfyui_tree
     'backend_fixture_sha256':hashlib.file_digest(args.backend_fixture.open('rb'),'sha256').hexdigest(),
     'fixture_sha256':hashlib.file_digest(fixture.open('rb'),'sha256').hexdigest()}
 report_name='isolation-filtered-result.json' if args.test_filter else 'isolation-result.json'
+if driver_args is not None:report_name='qwen21-'+args.qwen_mode+'-isolation.json'
 (args.root/'runtime'/report_name).write_text(json.dumps(report,indent=2)+'\n')

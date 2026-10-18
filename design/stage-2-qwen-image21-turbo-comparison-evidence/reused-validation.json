@@ -1,0 +1,11 @@
+{
+  "report": "stage-2-qwen-image21-bf16-offload.md",
+  "evidence": "stage-2-qwen-image21-bf16-offload-evidence",
+  "reason": "All model, loader, offload, sampler arithmetic, attention, VAE, native and fixture implementation inputs unchanged; only four registered-profile driver/host inputs differ",
+  "new_checks": [
+    "all-target Clippy with warnings denied",
+    "Rust format",
+    "Python AST and shell syntax",
+    "three fresh-process trained matched pairs with strict explicit sigma boundary"
+  ]
+}

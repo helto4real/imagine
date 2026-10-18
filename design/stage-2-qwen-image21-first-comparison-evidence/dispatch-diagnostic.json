@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "scope": "First language block: initial wrong Rust startup vs original no-opt-in ComfyUI startup; original operations observed without replacing their outputs",
+  "comparisons": [
+    {
+      "name": "embeddings",
+      "exact": true,
+      "values": 139264,
+      "max_abs": 0.0,
+      "unequal": 0
+    },
+    {
+      "name": "rope",
+      "exact": true,
+      "values": 8704,
+      "max_abs": 0.0,
+      "unequal": 0
+    },
+    {
+      "name": "input_norm",
+      "exact": true,
+      "values": 139264,
+      "max_abs": 0.0,
+      "unequal": 0
+    },
+    {
+      "name": "q_proj",
+      "exact": true,
+      "values": 139264,
+      "max_abs": 0.0,
+      "unequal": 0
+    },
+    {
+      "name": "k_proj",
+      "exact": true,
+      "values": 34816,
+      "max_abs": 0.0,
+      "unequal": 0
+    },
+    {
+      "name": "v_proj",
+      "exact": true,
+      "values": 34816,
+      "max_abs": 0.0,
+      "unequal": 0
+    },
+    {
+      "name": "q_norm",
+      "exact": true,
+      "values": 139264,
+      "max_abs": 0.0,
+      "unequal": 0
+    },
+    {
+      "name": "k_norm",
+      "exact": true,
+      "values": 34816,
+      "max_abs": 0.0,
+      "unequal": 0
+    },
+    {
+      "name": "q_rope",
+      "exact": false,
+      "values": 139264,
+      "max_abs": 9.5367431640625e-07,
+      "unequal": 14244
+    },
+    {
+      "name": "k_rope",
+      "exact": false,
+      "values": 34816,
+      "max_abs": 1.9073486328125e-06,
+      "unequal": 3373
+    },
+    {
+      "name": "attention",
+      "exact": false,
+      "values": 139264,
+      "max_abs": 9.685754776000977e-08,
+      "unequal": 63437
+    },
+    {
+      "name": "block-0",
+      "exact": false,
+      "values": 139264,
+      "max_abs": 3.814697265625e-06,
+      "unequal": 121968
+    },
+    {
+      "name": "block-1",
+      "exact": false,
+      "values": 139264,
+      "max_abs": 9.5367431640625e-06,
+      "unequal": 125181
+    }
+  ],
+  "first_difference": "q_rope",
+  "fix": "Apply original comfy.quant_ops default Triton-disabled startup; general Kitchen registry and kernel/tuning unchanged"
+}

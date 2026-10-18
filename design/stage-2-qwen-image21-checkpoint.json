@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "stage": 2,
+  "status": "initial_components_verified_complete_model_pending",
+  "preservation_commit": "059c875",
+  "new_parity_exceptions": [],
+  "required_variants": [
+    "INT8 ConvRot",
+    "BF16",
+    "Turbo"
+  ],
+  "torch_version": "2.13.0+cu130",
+  "fixture": {
+    "path": "inference/fixtures/qwen-image21-core.json",
+    "sha256": "9cc54259acce62ffda525ac96253fd7c90b2beb84405c7ec7d58ad8ea839309b",
+    "cases": 192,
+    "operation_counts": {
+      "zero_rms": 6,
+      "modulated_norm": 36,
+      "gated": 18,
+      "split": 18,
+      "timestep": 30,
+      "round_timestep": 6,
+      "process_in": 12,
+      "process_out": 12,
+      "rope": 12,
+      "projection_stages": 6,
+      "sequence": 24,
+      "detect": 12
+    }
+  },
+  "source_files": {
+    "comfy/ldm/qwen_image21/model.py": {
+      "sha256": "a69dff15ff6fa369fab5ca0d3261f8aaf19aaedd3fc66414e20a1cf7df0aa5ac",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/qwen_image21/model.py"
+    },
+    "comfy/model_management.py": {
+      "sha256": "045ab96003386a43e647c8ab96f22fbf3be6c577e2fc578ea31c6faa22facbd5",
+      "path": "/home/thhel/git/ComfyUI/comfy/model_management.py"
+    },
+    "comfy/rmsnorm.py": {
+      "sha256": "e8dfbebe9272587038f504538f72fe7e82261307f2c7fbd6f0b05cce28172fdd",
+      "path": "/home/thhel/git/ComfyUI/comfy/rmsnorm.py"
+    },
+    "comfy/latent_formats.py": {
+      "sha256": "8f012cea828736e9fe1ac1753f67dfdbeade79cfeba48d5bc26d4c58549ed759",
+      "path": "/home/thhel/git/ComfyUI/comfy/latent_formats.py"
+    },
+    "comfy/model_detection.py": {
+      "sha256": "4189c5df787a5d685ac1da86193321a32dda0b9f40a5395176d65a1c1e62a47d",
+      "path": "/home/thhel/git/ComfyUI/comfy/model_detection.py"
+    },
+    "comfy/ldm/flux/math.py": {
+      "sha256": "142d86d8e87792eaf06606ef86665874ce2476d155db678f2b0ee994549b4354",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/flux/math.py"
+    },
+    "comfy/ldm/flux/layers.py": {
+      "sha256": "d7ee59e51234766a03834471eee4adc2152cd39248fc39d4e70bb1b3ba8b6a5e",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/flux/layers.py"
+    },
+    "comfy_kitchen/tensor/base.py": {
+      "sha256": "1779b95ec16d2f3db1adcdbf448b931104ad6f609849afec7d03c999cfc819eb",
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/tensor/base.py"
+    },
+    "comfy_kitchen/tensor/int8.py": {
+      "sha256": "df5fea37f408a224060c7d89d5a074e4c59eda4937020fcc5693c465934cb3a0",
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/tensor/int8.py"
+    },
+    "comfy/text_encoders/qwen_image21.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/text_encoders/qwen_image21.py",
+      "sha256": "c64016aa703f913859c9afb7efe5d1e5120c8fa2820f9f7acc00792987d39136"
+    },
+    "comfy/supported_models.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/supported_models.py",
+      "sha256": "5943d81bc0257b9b72b065a4ecb2f57c51c826e91f86c333b98fbe8a830e0cef"
+    },
+    "comfy/model_base.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/model_base.py",
+      "sha256": "a1a1a7bb89a199710f996bf0bdf549d3e42484fe4dd91aa0a6361bb30c990508"
+    },
+    "comfy/ops.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/ops.py",
+      "sha256": "a0b8c7f32a146b383a795363bef35e480ffa84b5b3e9c9503f323b1446876f45"
+    }
+  },
+  "implementation_sha256": {
+    "inference/src/lib.rs": "40493db258b75427c6c686efa2f92351656864696d2a7ad2fd022b32285cdc6d",
+    "inference/tests/primitives.rs": "665a1aa11972c7af3cd82c7e6eaca6e0ef98ee975a271391cfae04e470a33705",
+    "inference/tests/support/qwen_image21.rs": "3ca848536821ee36ad9a634efe9b343856449edbc1d00cae7820b27743d4006c",
+    "inference/tools/reference_qwen_image21_core.py": "e108d1c400c824c753d223941ab6b81b60ba053f29a75c1dff3251ebfac7042b",
+    "inference/tools/generate_qwen_image21_constants.py": "0244c6bc2e216befcdb7a7f3f5bcfe509d1ad0e83831b34d5e22d98ce7686735",
+    "inference/tools/check_qwen_image21.sh": "748c805f4b69f0e1fdfd291739ab55a4f1d92d49deeccd389a5e4e4d86a29f60",
+    "inference/src/models/mod.rs": "28b6a699c0fee06065bb0541a43a80ea78b2ce8f58387d43e4ec8adb9d3d0697",
+    "inference/src/models/qwen_image21/detection.rs": "88f4c900bbdda1fa8b0bbef6637f17d74955df3cbc6a25ec3d05e75ffb8ec4b9",
+    "inference/src/models/qwen_image21/geometry.rs": "52b9258feb10406a9e25d5facdba5054055754ea07975fb960e4ab7d57c807ce",
+    "inference/src/models/qwen_image21/latent_constants.rs": "de95727e8a1fd1112b721721c9f083aeda992040034b932171d3d4b723158270",
+    "inference/src/models/qwen_image21/mod.rs": "dbf5f616195d0f333142bccab6a6e8dc86bb64c3daeb2f3c1523ed952f199247",
+    "inference/src/models/qwen_image21/numeric.rs": "2b26e3abcba16d6d6d7c1933c9d500fee781ba16127ff80b54b57df905841798"
+  },
+  "checks": {
+    "rustfmt": "passed",
+    "clippy_all_targets_deny_warnings": "passed",
+    "focused_tests": {
+      "passed": 2,
+      "failed": 0,
+      "primitive_tests_filtered_out": 146
+    },
+    "python_free_exact_tests": {
+      "components-isolation.json": {
+        "sha256": "8a3880a58e6ea4c233a04d3abfb69ace05147f7aa67445e39ce2cc9e3581dcd0",
+        "binary_sha256": "8915ee0623f665b98b3d8bf96cd7b9780d28fa555d82e32204507e88ce7adea8",
+        "test_filter": "qwen_image21_tests::qwen_image21_original_component_math_sequences_and_int8_bf16_turbo_projections_match",
+        "result": "passed"
+      },
+      "detection-isolation.json": {
+        "sha256": "8a60bb9273422d48a1bac223f4cf1bf6449560317417e5dc88cc087a49193903",
+        "binary_sha256": "8915ee0623f665b98b3d8bf96cd7b9780d28fa555d82e32204507e88ce7adea8",
+        "test_filter": "qwen_image21_tests::qwen_image21_original_logical_shape_detection_preserves_fused_split_and_prefix_rules",
+        "result": "passed"
+      }
+    },
+    "exact_latent_statistics_count": 128,
+    "complete_model_inference": "not_run",
+    "full_stage1_suite": "reused_unchanged_checkpoint_155_crate_146_isolated",
+    "shell_syntax": "passed"
+  },
+  "evidence_sha256": {
+    "design/stage-2-qwen-image21-evidence/components-isolation.json": "8a3880a58e6ea4c233a04d3abfb69ace05147f7aa67445e39ce2cc9e3581dcd0",
+    "design/stage-2-qwen-image21-evidence/detection-isolation.json": "8a60bb9273422d48a1bac223f4cf1bf6449560317417e5dc88cc087a49193903",
+    "design/stage-2-qwen-image21-evidence/reference-capture.log": "d5745b5d7d041c0c6a03f6413785412e41876f3112507d1a94ad2614762f7ca1",
+    "design/stage-2-qwen-image21-evidence/verification.log": "9d296a917a8779903066b1d41f6e543b7312e0e3340c61398112294ca3be4e0a"
+  },
+  "runtime_data": {
+    "owned_synthetic_only": true,
+    "model_weights_read": false,
+    "production_data_read": false
+  },
+  "sandbox_escalation": {
+    "gpu_and_bwrap": true,
+    "rejected": false
+  }
+}

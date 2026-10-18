@@ -2,6 +2,7 @@
 //!
 //! This crate is separate from Imagine's production engine selection.
 
+pub mod attention;
 pub mod autotuning;
 pub mod awq;
 pub mod awq_layout;
@@ -14,6 +15,7 @@ mod backend_triton_rope;
 mod backend_triton_rowwise;
 pub mod block_scales;
 pub mod boxed_aten;
+pub mod checkpoint;
 pub mod convrot;
 pub mod convrot_w4a4;
 pub mod cuda_linear;
@@ -30,6 +32,7 @@ pub mod kitchen_direct;
 pub mod kitchen_sage;
 pub mod kitchen_sol;
 pub mod layouts;
+pub mod models;
 pub mod native;
 pub mod packing;
 pub mod quantization;

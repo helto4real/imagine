@@ -1,0 +1,567 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "stage": 2,
+  "status": "1600x896_40steps_int8_exact_with_same_storage_control",
+  "stage2_complete": false,
+  "complete_model_support": false,
+  "preservation_commit": "059c875",
+  "stage2_committed": false,
+  "report": "stage-2-qwen-image21-1600-40steps-comparison.md",
+  "decision": "S2-12: user-requested forty-step profile with all other inference settings preserved",
+  "profile": "inference/profiles/qwen21-1600x896-40steps-int8.json",
+  "profile_delta": [
+    "purpose",
+    "steps"
+  ],
+  "required_variants": [
+    "INT8 ConvRot",
+    "BF16",
+    "Turbo"
+  ],
+  "new_parity_exceptions": [],
+  "autotuning_policy": "unchanged",
+  "model_implementation_changed": false,
+  "model_assets_read": true,
+  "models": {
+    "dit": {
+      "relative": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+      "bytes": 7256783064,
+      "sha256": "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d"
+    },
+    "text": {
+      "relative": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "bytes": 9350798360,
+      "sha256": "8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f"
+    },
+    "vae": {
+      "relative": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors",
+      "bytes": 675509688,
+      "sha256": "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9"
+    }
+  },
+  "trained_forward_executed": true,
+  "image_generation_executed": true,
+  "forty_step_pairs": 3,
+  "four_step_same_storage_control_pairs": 3,
+  "measured_images": 12,
+  "failed_initial_pair_excluded": true,
+  "all_float32_boundaries_exact_both_profiles": true,
+  "all_png_pixels_exact_both_profiles": true,
+  "same_results_all_six_within_each_profile": true,
+  "timings": {
+    "schema": 1,
+    "forty_steps": {
+      "samples_per_backend": 3,
+      "all_float32_boundaries_exact": true,
+      "all_png_pixels_exact": true,
+      "same_hash_all_six": {
+        "context": true,
+        "latent": true,
+        "image-rgba": true
+      },
+      "phase_seconds": {
+        "dit_load": {
+          "rust": {
+            "samples": [
+              0.994107089,
+              0.919471447,
+              1.022115779
+            ],
+            "median": 0.994107089,
+            "min": 0.919471447,
+            "max": 1.022115779
+          },
+          "python": {
+            "samples": [
+              0.9916539679979905,
+              0.955585123039782,
+              0.9958671720232815
+            ],
+            "median": 0.9916539679979905,
+            "min": 0.955585123039782,
+            "max": 0.9958671720232815
+          }
+        },
+        "pipeline_wall_including_unload_and_intermediate_export": {
+          "rust": {
+            "samples": [
+              27.804612778,
+              26.355409362,
+              27.080853509
+            ],
+            "median": 27.080853509,
+            "min": 26.355409362,
+            "max": 27.804612778
+          },
+          "python": {
+            "samples": [
+              27.250461993040517,
+              26.895613959990442,
+              27.828867802978493
+            ],
+            "median": 27.250461993040517,
+            "min": 26.895613959990442,
+            "max": 27.828867802978493
+          }
+        },
+        "sampling": {
+          "rust": {
+            "samples": [
+              22.555181946,
+              22.315739832,
+              22.34140457
+            ],
+            "median": 22.34140457,
+            "min": 22.315739832,
+            "max": 22.555181946
+          },
+          "python": {
+            "samples": [
+              22.764326649019495,
+              22.62850539397914,
+              22.611725728958845
+            ],
+            "median": 22.62850539397914,
+            "min": 22.611725728958845,
+            "max": 22.764326649019495
+          }
+        },
+        "text_encode": {
+          "rust": {
+            "samples": [
+              0.333787776,
+              0.308614595,
+              0.325442901
+            ],
+            "median": 0.325442901,
+            "min": 0.308614595,
+            "max": 0.333787776
+          },
+          "python": {
+            "samples": [
+              0.5143307329853997,
+              0.49921925691887736,
+              0.5091397889191285
+            ],
+            "median": 0.5091397889191285,
+            "min": 0.49921925691887736,
+            "max": 0.5143307329853997
+          }
+        },
+        "text_load": {
+          "rust": {
+            "samples": [
+              1.239362732,
+              1.157923008,
+              1.198748126
+            ],
+            "median": 1.198748126,
+            "min": 1.157923008,
+            "max": 1.239362732
+          },
+          "python": {
+            "samples": [
+              1.4774806490167975,
+              1.3898354970151559,
+              1.466150408028625
+            ],
+            "median": 1.466150408028625,
+            "min": 1.3898354970151559,
+            "max": 1.4774806490167975
+          }
+        },
+        "vae_decode": {
+          "rust": {
+            "samples": [
+              0.685411223,
+              0.662322232,
+              0.702528939
+            ],
+            "median": 0.685411223,
+            "min": 0.662322232,
+            "max": 0.702528939
+          },
+          "python": {
+            "samples": [
+              0.6438865070231259,
+              0.6541896549751982,
+              0.6538344828877598
+            ],
+            "median": 0.6538344828877598,
+            "min": 0.6438865070231259,
+            "max": 0.6541896549751982
+          }
+        },
+        "vae_load": {
+          "rust": {
+            "samples": [
+              1.413163722,
+              0.427586186,
+              0.919326485
+            ],
+            "median": 0.919326485,
+            "min": 0.427586186,
+            "max": 1.413163722
+          },
+          "python": {
+            "samples": [
+              0.25652541499584913,
+              0.19223380694165826,
+              0.9994092769920826
+            ],
+            "median": 0.25652541499584913,
+            "min": 0.19223380694165826,
+            "max": 0.9994092769920826
+          }
+        }
+      }
+    },
+    "four_steps_same_storage": {
+      "samples_per_backend": 3,
+      "all_float32_boundaries_exact": true,
+      "all_png_pixels_exact": true,
+      "same_hash_all_six": {
+        "context": true,
+        "latent": true,
+        "image-rgba": true
+      },
+      "phase_seconds": {
+        "dit_load": {
+          "rust": {
+            "samples": [
+              0.931428966,
+              0.954726945,
+              0.899213135
+            ],
+            "median": 0.931428966,
+            "min": 0.899213135,
+            "max": 0.954726945
+          },
+          "python": {
+            "samples": [
+              0.9617994299624115,
+              0.9890306029701605,
+              1.046393560944125
+            ],
+            "median": 0.9890306029701605,
+            "min": 0.9617994299624115,
+            "max": 1.046393560944125
+          }
+        },
+        "pipeline_wall_including_unload_and_intermediate_export": {
+          "rust": {
+            "samples": [
+              7.014524872,
+              6.645484022,
+              6.179683706
+            ],
+            "median": 6.645484022,
+            "min": 6.179683706,
+            "max": 7.014524872
+          },
+          "python": {
+            "samples": [
+              6.684352673008107,
+              7.557361815008335,
+              6.874215958989225
+            ],
+            "median": 6.874215958989225,
+            "min": 6.684352673008107,
+            "max": 7.557361815008335
+          }
+        },
+        "sampling": {
+          "rust": {
+            "samples": [
+              2.345254936,
+              2.4395526370000002,
+              2.33326564
+            ],
+            "median": 2.345254936,
+            "min": 2.33326564,
+            "max": 2.4395526370000002
+          },
+          "python": {
+            "samples": [
+              2.3502684970153496,
+              2.4048808770021424,
+              2.3999731480143964
+            ],
+            "median": 2.3999731480143964,
+            "min": 2.3502684970153496,
+            "max": 2.4048808770021424
+          }
+        },
+        "text_encode": {
+          "rust": {
+            "samples": [
+              0.310926501,
+              0.320734005,
+              0.316189355
+            ],
+            "median": 0.316189355,
+            "min": 0.310926501,
+            "max": 0.320734005
+          },
+          "python": {
+            "samples": [
+              0.497671669931151,
+              0.49522078898735344,
+              0.4998275099787861
+            ],
+            "median": 0.497671669931151,
+            "min": 0.49522078898735344,
+            "max": 0.4998275099787861
+          }
+        },
+        "text_load": {
+          "rust": {
+            "samples": [
+              1.193697619,
+              1.226141471,
+              1.173918767
+            ],
+            "median": 1.193697619,
+            "min": 1.173918767,
+            "max": 1.226141471
+          },
+          "python": {
+            "samples": [
+              1.4085374820278957,
+              1.4800985689507797,
+              1.4411378670483828
+            ],
+            "median": 1.4411378670483828,
+            "min": 1.4085374820278957,
+            "max": 1.4800985689507797
+          }
+        },
+        "vae_decode": {
+          "rust": {
+            "samples": [
+              0.660877693,
+              0.669763457,
+              0.660808551
+            ],
+            "median": 0.660877693,
+            "min": 0.660808551,
+            "max": 0.669763457
+          },
+          "python": {
+            "samples": [
+              0.6345323310233653,
+              0.6677405691007152,
+              0.6682118430035189
+            ],
+            "median": 0.6677405691007152,
+            "min": 0.6345323310233653,
+            "max": 0.6682118430035189
+          }
+        },
+        "vae_load": {
+          "rust": {
+            "samples": [
+              1.007231327,
+              0.469295994,
+              0.236322042
+            ],
+            "median": 0.469295994,
+            "min": 0.236322042,
+            "max": 1.007231327
+          },
+          "python": {
+            "samples": [
+              0.2819978289771825,
+              0.9416867659892887,
+              0.23085764900315553
+            ],
+            "median": 0.2819978289771825,
+            "min": 0.23085764900315553,
+            "max": 0.9416867659892887
+          }
+        }
+      }
+    },
+    "preserved_four_step_control_bytes_match": true,
+    "pre_migration_completed_python_bytes_match": true,
+    "initial_failed_pair_excluded": true,
+    "settings_delta": [
+      "steps",
+      "purpose"
+    ],
+    "source_run_prefixes": {
+      "forty": "qwen21-1600-40steps-comparison-02",
+      "four": "qwen21-1600-4steps-disk-control-01"
+    },
+    "storage": "Both measured datasets write to the same root-filesystem runtime through the preserved /tmp path alias",
+    "context_unchanged_by_step_count": true,
+    "different_final_pixels_between_step_counts": true
+  },
+  "phase_comparison": {
+    "four_steps_same_storage": {
+      "sampling": {
+        "rust_seconds": 2.345254936,
+        "python_seconds": 2.3999731480143964,
+        "rust_minus_python_seconds": -0.05471821201439653,
+        "rust_extra_percent": -2.2799510094380526
+      },
+      "pipeline_wall_including_unload_and_intermediate_export": {
+        "rust_seconds": 6.645484022,
+        "python_seconds": 6.874215958989225,
+        "rust_minus_python_seconds": -0.22873193698922556,
+        "rust_extra_percent": -3.327389455813057
+      }
+    },
+    "forty_steps": {
+      "sampling": {
+        "rust_seconds": 22.34140457,
+        "python_seconds": 22.62850539397914,
+        "rust_minus_python_seconds": -0.28710082397913794,
+        "rust_extra_percent": -1.2687573438037503
+      },
+      "pipeline_wall_including_unload_and_intermediate_export": {
+        "rust_seconds": 27.080853509,
+        "python_seconds": 27.250461993040517,
+        "rust_minus_python_seconds": -0.16960848404051632,
+        "rust_extra_percent": -0.6224059030038975
+      }
+    }
+  },
+  "checks": {
+    "format_all_target_clippy": "passed with warnings denied",
+    "python_shell_syntax": "passed",
+    "forty_step_exact_pairs": 3,
+    "four_step_same_storage_exact_pairs": 3,
+    "measured_python_free_rust_images": 6,
+    "callbacks": "Exactly 40 or 4 per requested profile",
+    "repeatability": "All six outputs exact within each profile; fresh four-step values equal preserved prior control; initial completed Python 40-step values equal restarted runs",
+    "source_inputs": {
+      "implementation": 364,
+      "original": 275,
+      "full_comfy_imports_per_reference": 273
+    },
+    "model_hashes": "All three complete files rehashed, unchanged",
+    "stage0_locks": "All four unchanged",
+    "native_cuda_objects": "All 32 unchanged",
+    "component_suite": "Original implementation unchanged; prior successful evidence retained, not rerun solely for registration"
+  },
+  "storage_recovery": {
+    "schema": 1,
+    "reason": "Temporary-storage quota during first forty-step output write; inference settings unchanged",
+    "source_alias": "/tmp/imagine-rust-comfy-parity-20261017/runtime",
+    "physical_destination": "/home/thhel/ChatGPT/imagine/.rust-comfy-runtime/runtime",
+    "entries": 16274,
+    "regular_files": 16230,
+    "symlinks": 44,
+    "regular_bytes": 2397617825,
+    "every_file_hash_and_link_target_verified": true,
+    "migration_manifest_sha256": "b3ae451571e1957e77448831492ff601bf3c379c4d49f2c136ab00a924e890df",
+    "initial_failed_prefix": "qwen21-1600-40steps-comparison-01",
+    "restarted_measured_prefix": "qwen21-1600-40steps-comparison-02",
+    "fresh_four_step_control_prefix": "qwen21-1600-4steps-disk-control-01",
+    "inference_settings_changed": false
+  },
+  "stage0_lock_hashes": {
+    "reference-lock.json": "4765e81dfe84ff32ee8352ba84c68e89f578876061fdbcd439a3a7ccac7674bb",
+    "source-manifest.json": "3e233cb602129a5e6bcb51aecd8e4215448551e176e8286df04fbf47ecd781c9",
+    "source-acquisition-lock.json": "b1148f2b24bb2fa66f69478cc1ec7960acfe4579f4aae18c63e88815ba220e77",
+    "native-linkage-lock.json": "37737a4525ec3db12f6314d2dd0e69a8fb4c5374d8ad04797ade0447e110bfa6"
+  },
+  "original_cuda_object_sha256": {
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/per_tensor_quantize.cu.o": "3d2d807ebe80171a1fc6be1bc21cde48dd653161d1ed48bedf20af4f7b1225ad",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_nvfp4.cu.o": "3e7e3d3abbd6a1768a4ec3c83d3ba5bad6cd05faa4416a29ef9d022ecc248193",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_mxfp8.cu.o": "32ce8fa25aff6472da966d4fac69dc24153069fe0000c0853a1826677a4ba5ed",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cublas_gemm_nvfp4.cu.o": "680a5a891a2ef7770c14ff42ecbfdb1d0c12c5d8dadf3851452fc110cc752452",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cublas_gemm_int8.cu.o": "2aed0b8e264fae2f1cf2d376d0ffcca60cf7eed293ece4bf5e4247b6f1728646",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_gemm_fp16.cu.o": "ebae11caf8503337e0b64079ec18586bba0137aa0d3d8cb09be1645eb2e60304",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_conv3d_fp16.cu.o": "7d5c96117eadfe3aa87e8bc8b3505d30d27bd463cf60d83ab0652ff159ae0f44",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/group_norm_pad3d.cu.o": "1f07b71230d4643d24b0b4a9332fdc2fa9b19fce51cf9977137fca378a7c7650",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_gemm_int8.cu.o": "69dbe305bb12285d30c0943de3782bf2137e7f51001152747801288b079ce7e3",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/turing_int8.cu.o": "da772d8e3d84e29f408c03da7a4ef4adb151e33a1d2b79a936e78d83093bfaef",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/int8_linear.cu.o": "6ec80066ac6196c2c3a056724645b92035481f5eaccb75c5c3c1708c0b452875",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/turing_int4.cu.o": "657fe848722204805c90b32361d08c1ad0c0d2db06cc214c48e3350f227e9288",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/rms_rope.cu.o": "f8496838d759ad41e028b131e7885c93b05f3d422089825b58f570b2e49b973d",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/na3d.cu.o": "f2266ff6d3d2ba5e4a95a4e3b5fefb747a5b6462bc78a65e019a09dda0f65e5b",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/convrot_w4a4.cu.o": "743568df8ff8c41d235989b74e668b9b03fc3eb3db5d43576a85c7daad41627a",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_svdquant_w4a4.cu.o": "725e27c684ea282639fe577a44a023b8d88c27c396ea9ee85198123a0445e962",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/awq_w4a16.cu.o": "e28c35d897ad392a75bee326fbf1ff6ee666b40b75bccc74d68816bd854cf3de",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/scaled_mm_svdquant_w4a4.cu.o": "b72f8def62109eb9eab4d43e49b5742edebcbf5c148e858b5d603dfc21ea33d2",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/adaln.cu.o": "9ef10f13e150a4513e0eafa40d5524adf166e4ed944e8676e07e6f1d8eaa65d4",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/w4a8_gemm.cu.o": "ccc1ed96fa2f670743a87a4ec3f86583229ce5f706b1efd980bd95a71f7df8f5",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/gated_delta.cu.o": "e804eac607960581ce3364461aa43bbdf701f9b5cd52aadc0c59e748afe608a8",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/flash_decode.cu.o": "d65051666247d33e010dbf6d3cf3edd1deb64818f666e27f6ad0fbe7cadbd0e8",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn.cu.o": "2b81ed45656686a5418a79437fa67f2bbd198552ef7958daf3f4c21e42267a6f",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_producer.cu.o": "a4c4cfa30b547f7ca14a12e7f0ee3a52209d41a7f33d74e92642b6af99f9c4cb",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_preprocess.cu.o": "9fc266112eb6d1feb128976766d024c37cc8eb89194b6d052ed92c8a0f3481ab",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_vtranspose.cu.o": "ca65ee8714b2e8bc6bf477847291b8b0e06458a9da9dd85cfeb75097f068101f",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_route.cu.o": "57c29cd3180182554e875f24975f07f81e82a48efecde301e862ff59e1fcb8ad",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_exact.cu.o": "3144f3ce9a2159f46c4911b72860d0a24060a4fa83d4575b2aaff83fcde2580b",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_token.cu.o": "a819a2c76af49c89f50c052beec76ba68d809511ca9633a4845b3b2a40af9788",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/quant_v_int8.cu.o": "9f29f714e161674dc3064b3e727bff00056d8b3a2d6d9a42037890d4a5db8169",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/quant_qk_int8.cu.o": "067b1215f24ff207d45a957f29f95d6dc2c3d083dcdaef30bdad69f09e58b128",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sage_attn_launcher.cu.o": "1e592f5c2a5e5a2feb97dce2d889523be50db6879cc271c646418da2fb7aaf39"
+  },
+  "source_snapshot_sha256": "08def6f99a2572d453203a0742e042eeefb3b7f5beb0a95cc0aec9d517e6c406",
+  "measurement_scope": "Three fresh processes per backend per step count on same migrated storage; warm OS caches; debug Rust; unlocked clocks. Pipeline excludes launcher/build/preflight/imports/final image serialization.",
+  "quality_scope": "Visual improvement for synthetic butterfly prompt with identical forty-step pixels from both backends; not a general perceptual benchmark",
+  "peak_vram_measured": false,
+  "kernel_profile_measured": false,
+  "production_runtime_read": false,
+  "cloud_services_used": false,
+  "process_inventory_requested": false,
+  "service_interruption": false,
+  "git": "No staging, commit or push; unrelated changes preserved",
+  "sandbox_escalation": "Approved; an environmental temporary-storage quota failure occurred and was recovered with verified data migration; no automatic approval rejection",
+  "evidence_sha256": {
+    ".gitignore": "d8ffaf4f48fc6a0b0f8adb56bb4e08f61224bb3396229b71af127479b5972abf",
+    "benchmark.txt": "df0760738435a02576889df1f0e55ac2341d45cd7b790d41455fc578dd786a52",
+    "clippy.txt": "9bfc91f861ecb4d4e308e80048f532659ce819589e609d62d1004ccbc0446264",
+    "comparison-1.json": "aa5f44263dd9260b013292cb6f01e485f26e6849c9ef8340c46bf4ac6a3c591e",
+    "comparison-2.json": "a8f12a15219a9e67607d6ed42e5b0a41a3a0cb12eca6c9a81cfae5962b14e0e4",
+    "comparison-3.json": "18bbab9d19952e65067ee4bc936c103e1f7040b57041b55bfd8788ff1e6863a2",
+    "four-step-control/benchmark.txt": "df0760738435a02576889df1f0e55ac2341d45cd7b790d41455fc578dd786a52",
+    "four-step-control/comparison-1.json": "dea8ae74ba83dc6e767c8c776e8f25a62314d2d6def4fdb4f08eab39d53f2b60",
+    "four-step-control/comparison-2.json": "e73e0e4b5706ceec61f4cd8658514f340efbeea20774b4d81311e39133f09088",
+    "four-step-control/comparison-3.json": "7c4aeb21583283b8613dea93def6222831fc7e589f2884ab99831ea4cfef499d",
+    "four-step-control/python-1.json": "d2d8a2aedad5d73aa0d6aeafad17a6a01fae54fd99e7e9f5b3d8028ce2e06f15",
+    "four-step-control/python-1.txt": "f992dfd72afe4aeb7dc48c3767080307e5a02cd1ed31e5dfadd1d246c3d5b86b",
+    "four-step-control/python-2.json": "65ee4b8d1493594ea632af7f0c741b702a9bcc6320e1056f124f1cdedaba6f87",
+    "four-step-control/python-2.txt": "45f64e0c70d7f8465175750fea89da3fba2a8e7b543f3a5d93d225ae82dedc13",
+    "four-step-control/python-3.json": "3d5f3f32430e7059fe77112b2f48d88892e384615954c9fce42687025a9d4439",
+    "four-step-control/python-3.txt": "cf484b1c6c96b99aa2b2db1dcf1bbd72cb0b36be6f127afa0c4a2804e17593d7",
+    "four-step-control/rust-1-isolation.json": "1563c29fad7265185f787ec384d07c9374f9b87d4cd7dc02ba4c3f111d483a94",
+    "four-step-control/rust-1.json": "7f0503ec5a1910ee5011267a8199b26e4c2dd637a5a1a23d538639aa02a08205",
+    "four-step-control/rust-1.txt": "498e0966a1506d7897051fcf4af88d1a8b6e82bdfdd1e581dbbe910b601d0d63",
+    "four-step-control/rust-2-isolation.json": "1563c29fad7265185f787ec384d07c9374f9b87d4cd7dc02ba4c3f111d483a94",
+    "four-step-control/rust-2.json": "49d60f1bdbf81da644f97ad2d3297708360936cf164fba5d92dcfe80699060e1",
+    "four-step-control/rust-2.txt": "498e0966a1506d7897051fcf4af88d1a8b6e82bdfdd1e581dbbe910b601d0d63",
+    "four-step-control/rust-3-isolation.json": "1563c29fad7265185f787ec384d07c9374f9b87d4cd7dc02ba4c3f111d483a94",
+    "four-step-control/rust-3.json": "d23590c9ee9288a13c260cff5949f47e6cf3d6e2814c82025835a1fca33efb3b",
+    "four-step-control/rust-3.txt": "7578d5db44977d1868b6de9969075a6083a6d87febccdaf906954a68eb22cbcd",
+    "initial-failed-attempt.json": "77974866aea6d744762cc05e53f0b030ff447cc39f932fb36f9e514aecc9452b",
+    "integrity-checks.json": "215e83e7bf2fd961cd0472a07d44ff092b02cf6a0040dbdc935f2f3299d0ff52",
+    "measured-inputs.json": "97e4299af6435147be28d6344edc2a28952eadf9c89c3346225bbb3fc74b9797",
+    "model-hashes.json": "a51c5f9f71e384d20c39d8000fde640cd1cc9135b05477ba1a3d582e877868b4",
+    "python-1.json": "2b99c1127885c2e755d572bec85caa43ce46d501debe087ca409841fcb302639",
+    "python-1.txt": "5b1a8de52d723db383e08a9fd57f8b64b50f97036b737381ebc1b6e9b55aafa3",
+    "python-2.json": "56b32157acaf1a59ada9e816f3d569d295d7acf816feee36ece525c34c47fe8f",
+    "python-2.txt": "60652d60615ec6cce2c1e4cd85e0b776cad7452e4c65debbd43dba50cd5a743d",
+    "python-3.json": "5110e49d1f1a9526ca4c7c73f16f44a7ca991042b37f6b204387b3e99227b012",
+    "python-3.txt": "ca145de03ebd997bf9e1047caaf42ea78151c0e7355fb3f1ee6d05d3de0e7d62",
+    "python-image.png": "df11603508a6a1dd214a6869c284d14fe844d1bd21f699d254e17569bc334396",
+    "rust-1-isolation.json": "1563c29fad7265185f787ec384d07c9374f9b87d4cd7dc02ba4c3f111d483a94",
+    "rust-1.json": "13eac0ca69b4b89d7cc395e14fc4b95e8e25ceda489070cce638de61cdbab456",
+    "rust-1.txt": "5979603979bbdfd89160cc550fb45d6189820d5bae59cc0fd376bf359435be50",
+    "rust-2-isolation.json": "1563c29fad7265185f787ec384d07c9374f9b87d4cd7dc02ba4c3f111d483a94",
+    "rust-2.json": "10a42a7ba37515f30def7271bb13b9340929313ddd8b992014e4968654898a67",
+    "rust-2.txt": "9706c6522a2b7b47ead954e276b08fd6e44f7d81a714c39e255899000f035986",
+    "rust-3-isolation.json": "1563c29fad7265185f787ec384d07c9374f9b87d4cd7dc02ba4c3f111d483a94",
+    "rust-3.json": "55891ed0dcd163578741464c9accbb6d46f334d163a106b8647f348d0f599648",
+    "rust-3.txt": "5979603979bbdfd89160cc550fb45d6189820d5bae59cc0fd376bf359435be50",
+    "rust-image.png": "ec9c7ad47c7d6206ff217b8108cfdef7cef6f164d65feeeec11e481556b4e2c1",
+    "storage-recovery.json": "3da172f0be60aac668241d031d78be8636f97e5c0aa1d8aef5b13079351f04f7",
+    "summary.json": "f43ae548fb76783dd75174063bc5ff67cb10044d66127c3c214a7a1629f7a8fa",
+    "verified-inputs.json": "08def6f99a2572d453203a0742e042eeefb3b7f5beb0a95cc0aec9d517e6c406"
+  }
+}

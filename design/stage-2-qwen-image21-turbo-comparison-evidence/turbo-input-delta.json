@@ -1,0 +1,7 @@
+{
+  "inference/profiles/qwen21-1600x896-8steps-turbo-offload.json": "added",
+  "inference/src/bin/qwen21-first-image.rs": "changed",
+  "inference/tools/compare_qwen_first_image.py": "changed",
+  "inference/tools/reference_qwen_first_image.py": "changed",
+  "inference/tools/test_isolation.py": "changed"
+}

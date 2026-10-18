@@ -1,0 +1,330 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "stage": 2,
+  "status": "first_int8_trained_comparison_exact",
+  "stage2_complete": false,
+  "complete_model_support": false,
+  "preservation_commit": "059c875",
+  "stage2_committed": false,
+  "report": "stage-2-qwen-image21-first-comparison.md",
+  "required_variants": [
+    "INT8 ConvRot",
+    "BF16",
+    "Turbo"
+  ],
+  "selected_first_variant": "int8_convrot",
+  "authorization": "User resumed first generation and explicitly requested timing and quality comparison against local ComfyUI Python.",
+  "decisions": [
+    "S2-09 first trained comparison authorized",
+    "S2-10 source application startup disables Kitchen Triton without opt-in"
+  ],
+  "new_parity_exceptions": [],
+  "autotuning_policy": "unchanged",
+  "trained_forward_executed": true,
+  "image_generation_executed": true,
+  "production_runtime_read": false,
+  "model_assets_read": true,
+  "authorized_model_root": "/mnt/media/gemensam/AI/ComfyUI/models",
+  "models": {
+    "dit": {
+      "relative": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+      "bytes": 7256783064,
+      "sha256": "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d"
+    },
+    "text": {
+      "relative": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "bytes": 9350798360,
+      "sha256": "8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f"
+    },
+    "vae": {
+      "relative": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors",
+      "bytes": 675509688,
+      "sha256": "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9"
+    }
+  },
+  "matched_pairs": 3,
+  "matched_images": 6,
+  "all_float32_boundaries_exact": true,
+  "all_png_rgba8_pixels_exact": true,
+  "repeatability_all_six_exact": {
+    "context": true,
+    "latent": true,
+    "image-rgba": true
+  },
+  "timings": {
+    "dit_load": {
+      "rust": {
+        "samples": [
+          1.149036211,
+          0.927671052,
+          0.894857411
+        ],
+        "median": 0.927671052,
+        "min": 0.894857411,
+        "max": 1.149036211
+      },
+      "python": {
+        "samples": [
+          0.9147761929780245,
+          0.9572992620524019,
+          0.9904274749569595
+        ],
+        "median": 0.9572992620524019,
+        "min": 0.9147761929780245,
+        "max": 0.9904274749569595
+      }
+    },
+    "pipeline_wall_including_unload_and_intermediate_export": {
+      "rust": {
+        "samples": [
+          4.901581417,
+          5.247797292,
+          4.244261148
+        ],
+        "median": 4.901581417,
+        "min": 4.244261148,
+        "max": 5.247797292
+      },
+      "python": {
+        "samples": [
+          4.142663839040324,
+          4.694205379928462,
+          4.5446908419253305
+        ],
+        "median": 4.5446908419253305,
+        "min": 4.142663839040324,
+        "max": 4.694205379928462
+      }
+    },
+    "sampling": {
+      "rust": {
+        "samples": [
+          0.762204786,
+          0.737225667,
+          0.730218807
+        ],
+        "median": 0.737225667,
+        "min": 0.730218807,
+        "max": 0.762204786
+      },
+      "python": {
+        "samples": [
+          0.48491821403149515,
+          0.47095862694550306,
+          0.49123519007116556
+        ],
+        "median": 0.48491821403149515,
+        "min": 0.47095862694550306,
+        "max": 0.49123519007116556
+      }
+    },
+    "text_encode": {
+      "rust": {
+        "samples": [
+          0.36226381,
+          0.325821015,
+          0.314551292
+        ],
+        "median": 0.325821015,
+        "min": 0.314551292,
+        "max": 0.36226381
+      },
+      "python": {
+        "samples": [
+          0.5086299040121958,
+          0.5098463740432635,
+          0.521091804956086
+        ],
+        "median": 0.5098463740432635,
+        "min": 0.5086299040121958,
+        "max": 0.521091804956086
+      }
+    },
+    "text_load": {
+      "rust": {
+        "samples": [
+          1.149397526,
+          1.246513098,
+          1.174986145
+        ],
+        "median": 1.174986145,
+        "min": 1.149397526,
+        "max": 1.246513098
+      },
+      "python": {
+        "samples": [
+          1.3117442999500781,
+          1.5367067510960624,
+          1.5907118889736012
+        ],
+        "median": 1.5367067510960624,
+        "min": 1.3117442999500781,
+        "max": 1.5907118889736012
+      }
+    },
+    "vae_decode": {
+      "rust": {
+        "samples": [
+          0.211986382,
+          0.176929129,
+          0.174952959
+        ],
+        "median": 0.176929129,
+        "min": 0.174952959,
+        "max": 0.211986382
+      },
+      "python": {
+        "samples": [
+          0.16004771401640028,
+          0.1474672950571403,
+          0.15776294691022485
+        ],
+        "median": 0.15776294691022485,
+        "min": 0.1474672950571403,
+        "max": 0.16004771401640028
+      }
+    },
+    "vae_load": {
+      "rust": {
+        "samples": [
+          0.674104828,
+          1.28668977,
+          0.42404446
+        ],
+        "median": 0.674104828,
+        "min": 0.42404446,
+        "max": 1.28668977
+      },
+      "python": {
+        "samples": [
+          0.20092132803983986,
+          0.5091335900360718,
+          0.1865693359868601
+        ],
+        "median": 0.20092132803983986,
+        "min": 0.1865693359868601,
+        "max": 0.5091335900360718
+      }
+    }
+  },
+  "timing_scope": "One first-process 512x512 four-step synthetic INT8 ConvRot sample; OS model cache already warm. Not a production quality or steady-state benchmark.",
+  "current_checks": {
+    "format_and_all_target_clippy": "passed",
+    "shell_and_python_syntax": "passed",
+    "language_normal": "passed, 53 complete conditioning and 30 core forwards",
+    "language_python_free": "passed, same 83 cases",
+    "resident_replay": "passed, existing 102 original calls including 66 cache calls",
+    "trained_rust_python_free": "passed for all three measured images",
+    "strict_comparator": "passed for three pairs, durable reference replay and expected rejection of initial mismatch",
+    "text_only_diagnostic": "passed after orderly diagnostic cleanup"
+  },
+  "historical_checks": "The earlier 15 normal + 15 separately isolated focused Stage 2 tests and Stage 1 155/146 suites are not claimed as newly rerun here.",
+  "reference_records": {
+    "prior_core_dit_control_cache_interrupt": 481,
+    "aimdo_safetensors": 50,
+    "quantized_modules": 76,
+    "embedding_loads": 32,
+    "whole_resident_loads": 10,
+    "tokenizer": 547,
+    "sdpa": 576,
+    "language": 83,
+    "vae": 23,
+    "sampling": 100
+  },
+  "total_distinct_reference_records": 1978,
+  "source_inputs_verified": {
+    "implementation": 362,
+    "original": 275,
+    "full_comfy_imports": 273
+  },
+  "stage0_lock_hashes": {
+    "reference-lock.json": "4765e81dfe84ff32ee8352ba84c68e89f578876061fdbcd439a3a7ccac7674bb",
+    "source-manifest.json": "3e233cb602129a5e6bcb51aecd8e4215448551e176e8286df04fbf47ecd781c9",
+    "source-acquisition-lock.json": "b1148f2b24bb2fa66f69478cc1ec7960acfe4579f4aae18c63e88815ba220e77",
+    "native-linkage-lock.json": "37737a4525ec3db12f6314d2dd0e69a8fb4c5374d8ad04797ade0447e110bfa6"
+  },
+  "original_cuda_object_sha256": {
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/per_tensor_quantize.cu.o": "3d2d807ebe80171a1fc6be1bc21cde48dd653161d1ed48bedf20af4f7b1225ad",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_nvfp4.cu.o": "3e7e3d3abbd6a1768a4ec3c83d3ba5bad6cd05faa4416a29ef9d022ecc248193",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_mxfp8.cu.o": "32ce8fa25aff6472da966d4fac69dc24153069fe0000c0853a1826677a4ba5ed",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cublas_gemm_nvfp4.cu.o": "680a5a891a2ef7770c14ff42ecbfdb1d0c12c5d8dadf3851452fc110cc752452",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cublas_gemm_int8.cu.o": "2aed0b8e264fae2f1cf2d376d0ffcca60cf7eed293ece4bf5e4247b6f1728646",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_gemm_fp16.cu.o": "ebae11caf8503337e0b64079ec18586bba0137aa0d3d8cb09be1645eb2e60304",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_conv3d_fp16.cu.o": "7d5c96117eadfe3aa87e8bc8b3505d30d27bd463cf60d83ab0652ff159ae0f44",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/group_norm_pad3d.cu.o": "1f07b71230d4643d24b0b4a9332fdc2fa9b19fce51cf9977137fca378a7c7650",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_gemm_int8.cu.o": "69dbe305bb12285d30c0943de3782bf2137e7f51001152747801288b079ce7e3",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/turing_int8.cu.o": "da772d8e3d84e29f408c03da7a4ef4adb151e33a1d2b79a936e78d83093bfaef",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/int8_linear.cu.o": "6ec80066ac6196c2c3a056724645b92035481f5eaccb75c5c3c1708c0b452875",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/turing_int4.cu.o": "657fe848722204805c90b32361d08c1ad0c0d2db06cc214c48e3350f227e9288",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/rms_rope.cu.o": "f8496838d759ad41e028b131e7885c93b05f3d422089825b58f570b2e49b973d",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/na3d.cu.o": "f2266ff6d3d2ba5e4a95a4e3b5fefb747a5b6462bc78a65e019a09dda0f65e5b",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/convrot_w4a4.cu.o": "743568df8ff8c41d235989b74e668b9b03fc3eb3db5d43576a85c7daad41627a",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_svdquant_w4a4.cu.o": "725e27c684ea282639fe577a44a023b8d88c27c396ea9ee85198123a0445e962",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/awq_w4a16.cu.o": "e28c35d897ad392a75bee326fbf1ff6ee666b40b75bccc74d68816bd854cf3de",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/scaled_mm_svdquant_w4a4.cu.o": "b72f8def62109eb9eab4d43e49b5742edebcbf5c148e858b5d603dfc21ea33d2",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/adaln.cu.o": "9ef10f13e150a4513e0eafa40d5524adf166e4ed944e8676e07e6f1d8eaa65d4",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/w4a8_gemm.cu.o": "ccc1ed96fa2f670743a87a4ec3f86583229ce5f706b1efd980bd95a71f7df8f5",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/gated_delta.cu.o": "e804eac607960581ce3364461aa43bbdf701f9b5cd52aadc0c59e748afe608a8",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/flash_decode.cu.o": "d65051666247d33e010dbf6d3cf3edd1deb64818f666e27f6ad0fbe7cadbd0e8",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn.cu.o": "2b81ed45656686a5418a79437fa67f2bbd198552ef7958daf3f4c21e42267a6f",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_producer.cu.o": "a4c4cfa30b547f7ca14a12e7f0ee3a52209d41a7f33d74e92642b6af99f9c4cb",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_preprocess.cu.o": "9fc266112eb6d1feb128976766d024c37cc8eb89194b6d052ed92c8a0f3481ab",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_vtranspose.cu.o": "ca65ee8714b2e8bc6bf477847291b8b0e06458a9da9dd85cfeb75097f068101f",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_route.cu.o": "57c29cd3180182554e875f24975f07f81e82a48efecde301e862ff59e1fcb8ad",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_exact.cu.o": "3144f3ce9a2159f46c4911b72860d0a24060a4fa83d4575b2aaff83fcde2580b",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_token.cu.o": "a819a2c76af49c89f50c052beec76ba68d809511ca9633a4845b3b2a40af9788",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/quant_v_int8.cu.o": "9f29f714e161674dc3064b3e727bff00056d8b3a2d6d9a42037890d4a5db8169",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/quant_qk_int8.cu.o": "067b1215f24ff207d45a957f29f95d6dc2c3d083dcdaef30bdad69f09e58b128",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sage_attn_launcher.cu.o": "1e592f5c2a5e5a2feb97dce2d889523be50db6879cc271c646418da2fb7aaf39"
+  },
+  "original_cuda_objects_rehashed_unchanged": 32,
+  "sandbox_escalation": "approved for isolated CUDA/bwrap execution; no auto-review rejection",
+  "git": "No staging, commit or push; unrelated dirty work preserved",
+  "evidence_sha256": {
+    ".gitignore": "502586c5ac4c10af3153a72dc8a288b305f5968a3748f96c8dbbae8a98719cb5",
+    "benchmark.txt": "df0760738435a02576889df1f0e55ac2341d45cd7b790d41455fc578dd786a52",
+    "clippy.txt": "64a233212d054df5b993e3c9bf906797d1507d066fb682cca6dc8265a181de90",
+    "comparison-1.json": "0ff8363e09f14375441068c880aa0c2d409770a444507af4c04ea69a32e61250",
+    "comparison-2.json": "7a7bc91af0e6d40efbddb8ec08d3426b2edbbe3567a7393623ba65a43f81ff89",
+    "comparison-3.json": "2ead585ccdcdf31896f7af9d7f3f2c3a13cade3c4f7989f5da3cbe04670ac112",
+    "dispatch-diagnostic.json": "14d32fc4b0e51b274e1bf30e933066cdd252e2f432ea577801db63228cd0efa9",
+    "initial-failed-comparison.json": "6018bd0c74ad54816b8ac13ab3ea807c195b569baede7a6e6b738c2f3a98c1e3",
+    "language-isolation.json": "eb41b6f606477faaf5ad2465deae5cad0af638f28b8cdc1c94c5294789310438",
+    "language-isolation.txt": "6aa23904fdf8f4a1cb47f39f70368ea41f099d2b2ac67bdd2f57513702961784",
+    "language-test.txt": "956684a7f42ab107e42977a6ad9bc2f07b3af0b7fd16ad329f121c46801d1111",
+    "measured-inputs-after.json": "aec154997aefb6b9d1da0bdbfcdc0e96b20964910df5d7d10a5b5899be5b1327",
+    "measured-inputs-before.json": "c6add46c7d5582fdfd98661417bd5c800caf79c0004f665fcaccf0adabeee22d",
+    "model-hashes.json": "a51c5f9f71e384d20c39d8000fde640cd1cc9135b05477ba1a3d582e877868b4",
+    "negative-gate-check.json": "3cdde84c8e8669b37da1fbea1aff4e4ee700449939fc5d94f35186a0600f6c88",
+    "python-1.json": "1ee5d1c16788112747a523e22cc0e367ed98acbe5e03824dd32b9a72c051d5c4",
+    "python-1.txt": "2c285900d134dc2c12c3e97b19a2c5f72186f35bcd6cf40a8b01fdb1bd70c960",
+    "python-2.json": "5c55bc6235d94088251f9db921bab67ad8ef184693803869297e3e63e0ec022b",
+    "python-2.txt": "22849afa289f47793b047f7a0faa8535d6b58fcb64b08428cd3ea69ab2bf5651",
+    "python-3.json": "5246ae569c890ade121deced32e3029eab9582b84c2b9000abf48316334b1b44",
+    "python-3.txt": "bc0c216566c9aa7649909b529c7ce0df8361832c81bfb7a668ba7ffb1c861db2",
+    "reference/context-f32.bin": "225d3169d4ac5dbd1ae7c2f19d4645e81c41766b6548d3194b0f47b41862ed23",
+    "reference/image-rgba-f32.bin": "7484ee00bd51be9a7905aa7c9c745be06cb838c1f124dda11cecc5917365450c",
+    "reference/image.png": "40b6a5061f0dd8f447c1d3037951282613f47d4b981b864faa3a22fbcf6ac43d",
+    "reference/latent-f32.bin": "90f66912ac43b59735de81c67b7d2b6e4cb6b59ff10b244883a41b986d13fbda",
+    "reference/result.json": "1ee5d1c16788112747a523e22cc0e367ed98acbe5e03824dd32b9a72c051d5c4",
+    "reference-capture.txt": "f98869290d6c680546bbd75c2f66da1e33617f2e38cfb7d07e4ed20b691e2151",
+    "reference-driver-measured.py.txt": "e7351b2295d0027593a47f8a3f7067bc596a6ae862abbc8cb9f4355fc2fdf5d1",
+    "resident-test.txt": "9614db378c8a192747d614112d2477fa0189d260d05cdbf887cbeaea9c504db8",
+    "rust-1-isolation.json": "e618c886dc56fb9c22130f3f429a3d4760822ffb619ff22b50a9e300238de2de",
+    "rust-1.json": "a0dee54440920f404fad587e71ad35f5a5c87e2264248826acde0ce15bb7bcba",
+    "rust-1.txt": "7e47f4e9fd381bf1c85baca79c4284d8d802a5108e017289b57442a69dba84f5",
+    "rust-2-isolation.json": "e618c886dc56fb9c22130f3f429a3d4760822ffb619ff22b50a9e300238de2de",
+    "rust-2.json": "642ebecdad86d7c5dac56268858c3edcecfb069aeeb158ac18ccf6e2ab510380",
+    "rust-2.txt": "7578d5db44977d1868b6de9969075a6083a6d87febccdaf906954a68eb22cbcd",
+    "rust-3-isolation.json": "e618c886dc56fb9c22130f3f429a3d4760822ffb619ff22b50a9e300238de2de",
+    "rust-3.json": "75eafbbe6d799342a1b3a9c719c07e1ddc0a5f621c26deb9ba8e320a124d477d",
+    "rust-3.txt": "7578d5db44977d1868b6de9969075a6083a6d87febccdaf906954a68eb22cbcd",
+    "rust-image.png": "abba66a81e148a57549c95b3db9513a8dcebc785037f416c98c87b7094608907",
+    "saved-oracle-check.json": "0ff8363e09f14375441068c880aa0c2d409770a444507af4c04ea69a32e61250",
+    "startup-corrected-first-comparison.json": "63e711c8226efeb5ed38b8fc146316fc656cb2204d30e31143c1e9481766f4f3",
+    "summary.json": "7f211d62bb910ad1b38c7930730857f4357bfe2ebe48415417bb2472bf9b0bf0",
+    "text-only-diagnostic.txt": "4ec81f1afad77bc182af4624be08b64529b868037f1434acbe75a320a22c2d25",
+    "verified-inputs.json": "5ef93be389c8563d2cbdf664b201644f7f3c5e5d79702ac9b0d2452e3410e07c"
+  }
+}

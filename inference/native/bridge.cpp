@@ -5,6 +5,8 @@
 #include <ATen/cuda/CUDAGeneratorImpl.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <ATen/ops/_scaled_mm_v2.h>
+#include <ATen/ops/scaled_dot_product_attention.h>
+#include <ATen/native/transformers/cuda/sdp_utils.h>
 #include <ATen/ops/embedding.h>
 #include <ATen/ops/amax.h>
 #include <ATen/ops/cat.h>
@@ -18,6 +20,11 @@
 #include <c10/cuda/CUDAGuard.h>
 #include <c10/cuda/CUDAStream.h>
 #include <c10/cuda/CUDAEvent.h>
+#include <c10/cuda/CUDACachingAllocator.h>
+// LibTorch declares this exported entrypoint only under its build's USE_CUDA.
+// This bridge already links the pinned CUDA build; keep upstream compile flags.
+namespace torch { bool CudaIPCCollect(); }
+
 #include <cstring>
 #include <string>
 #include <sstream>
@@ -116,6 +123,20 @@ extern "C" int imagine_rms_metadata_end(RmsTemporaryMetadata* output) {
         rms_temporary = {};
     });
 }
+extern "C" int imagine_host_registration(const void* input,int64_t pin,int64_t* success) {
+    return protect([&] {
+    const auto& t=*static_cast<const at::Tensor*>(input);
+    *success=0;
+    if (!t.device().is_cpu() || !t.is_contiguous() || t.data_ptr()==nullptr) return;
+    if (pin && t.is_pinned()) return;
+    const auto status=pin ? cudaHostRegister(t.data_ptr(),t.nbytes(),1) : cudaHostUnregister(t.data_ptr());
+    *success=status==cudaSuccess;
+    if (status!=cudaSuccess) {
+        // Original discard_cuda_async_error; failure is a nonfatal pin refusal.
+        try {auto a=at::ones({1},at::TensorOptions().device(at::kCUDA).dtype(at::kByte));auto b=at::ones_like(a);auto c=a+b;cudaDeviceSynchronize();} catch (...) {}
+    }
+    });
+}
 extern "C" const char* imagine_last_error() { return last_error.c_str(); }
 extern "C" const char* imagine_last_metadata() { return last_metadata.c_str(); }
 extern "C" int imagine_aten_boxed(const char* name,const char* overload,
@@ -195,6 +216,114 @@ template<class F> int aten_tensor_result(F&& fn,void** output) noexcept {
 extern "C" int imagine_embedding(const void* weight,const void* indices,void** output) {
     return aten_tensor_result([&]{return at::embedding(*static_cast<const at::Tensor*>(weight),
         *static_cast<const at::Tensor*>(indices),-1,false,false);},output);
+}
+namespace {
+std::array<bool,5> sdpa_flags() {
+    auto& c=at::globalContext();
+    return {c.userEnabledMathSDP(),c.userEnabledFlashSDP(),c.userEnabledMemEfficientSDP(),c.userEnabledCuDNNSDP(),c.userEnabledOverrideableSDP()};
+}
+void sdpa_set_flags(const std::array<bool,5>& flags) {
+    auto& c=at::globalContext();c.setSDPUseMath(flags[0]);c.setSDPUseFlash(flags[1]);
+    c.setSDPUseMemEfficient(flags[2]);c.setSDPUseCuDNN(flags[3]);c.setSDPUseOverrideable(flags[4]);
+}
+void sdpa_kernel(const std::vector<int64_t>& backends) {
+    auto& c=at::globalContext();std::array<bool,5> flags{};
+    auto priority=backends;
+    for(auto b:backends) flags.at(b)=true;
+    sdpa_set_flags(flags);
+    for(auto b:c.sDPPriorityOrder()) {
+        auto value=static_cast<int64_t>(b);
+        if(std::find(priority.begin(),priority.end(),value)==priority.end()) priority.push_back(value);
+    }
+    c.setSDPPriorityOrder(priority);
+}
+struct SdpaKernelContext {
+    std::vector<int64_t> previous;
+    SdpaKernelContext() {
+        auto flags=sdpa_flags();
+        for(auto b:at::globalContext().sDPPriorityOrder()) if(flags.at(static_cast<size_t>(b))) previous.push_back(static_cast<int64_t>(b));
+        // Original SDPA_BACKEND_PRIORITY: flash, cuDNN, efficient, math.
+        sdpa_kernel({1,3,2,0});
+    }
+    ~SdpaKernelContext() { sdpa_kernel(previous); }
+};
+void repeat_gqa(const at::Tensor& q,at::Tensor& k,at::Tensor& v) {
+    const auto qh=q.size(-3),kh=k.size(-3),vh=v.size(-3);
+    TORCH_CHECK_VALUE(kh==vh,"Key/value head count mismatch for GQA: ",kh," != ",vh);
+    if(qh==kh) return;
+    TORCH_CHECK_VALUE(kh!=0 && qh%kh==0,"Query heads must be divisible by key/value heads for GQA: ",qh," vs ",kh);
+    const auto repeats=qh/kh;
+    if(repeats>1) { k=k.repeat_interleave(repeats,-3);v=v.repeat_interleave(repeats,-3); }
+}
+}
+extern "C" int imagine_sdpa_state(int64_t* state,int64_t write) {
+    return protect([&] {
+        auto& c=at::globalContext();
+        if(write) {
+            std::array<bool,5> flags{};for(size_t i=0;i<5;++i)flags[i]=state[i]!=0;
+            sdpa_set_flags(flags);c.setSDPPriorityOrder(std::vector<int64_t>(state+5,state+10));
+        } else {
+            auto flags=sdpa_flags();auto priority=c.sDPPriorityOrder();
+            for(size_t i=0;i<5;++i) { state[i]=flags[i];state[i+5]=static_cast<int64_t>(priority[i]); }
+        }
+    });
+}
+extern "C" int imagine_cuda_memory(int64_t index,uint64_t* result) {
+    return protect([&] {
+        // Python's CUDA startup/mem_get_info performs _lazy_init first. Device
+        // properties alone do not initialize the CUDACachingAllocator in C++.
+        at::globalContext().lazyInitDevice(c10::DeviceType::CUDA);
+        c10::cuda::CUDAGuard guard(static_cast<c10::DeviceIndex>(index));
+        auto stats=c10::cuda::CUDACachingAllocator::getDeviceStats(index);
+        size_t free=0,total=0;C10_CUDA_CHECK(cudaMemGetInfo(&free,&total));
+        result[0]=free;result[1]=total;
+        result[2]=stats.active_bytes[0].current;result[3]=stats.reserved_bytes[0].current;
+    });
+}
+extern "C" int imagine_comfy_math_state(int64_t* state,int64_t write) {
+    return protect([&] {
+        auto& c=at::globalContext();
+        if(write) {
+            c.setAllowFP16BF16ReductionMathSDP(state[0]!=0);
+            c.setBenchmarkCuDNN(state[1]!=0);c.setAllowFP16AccumulationCuBLAS(state[2]!=0);
+        } else {
+            state[0]=c.allowFP16BF16ReductionMathSDP();state[1]=c.benchmarkCuDNN();
+            state[2]=c.allowFP16AccumulationCuBLAS();
+        }
+    });
+}
+extern "C" int imagine_cuda_soft_empty_cache(int64_t index) {
+    return protect([&] {
+        at::globalContext().lazyInitDevice(c10::DeviceType::CUDA);
+        c10::cuda::CUDAGuard guard(static_cast<c10::DeviceIndex>(index));
+        C10_CUDA_CHECK(cudaDeviceSynchronize());
+        c10::cuda::CUDACachingAllocator::emptyCache();torch::CudaIPCCollect();
+    });
+}
+extern "C" int imagine_comfy_sdpa(const void* query,const void* key,const void* value,const void* mask,
+                                  int64_t has_scale,double scale,int64_t gqa,int64_t priority_wrapper,void** output) {
+    return aten_tensor_result([&] {
+        const auto& q=*static_cast<const at::Tensor*>(query);
+        auto k=*static_cast<const at::Tensor*>(key),v=*static_cast<const at::Tensor*>(value);
+        const auto m=mask ? std::optional<at::Tensor>(*static_cast<const at::Tensor*>(mask)) : std::nullopt;
+        const auto s=has_scale ? std::optional<double>(scale) : std::nullopt;
+        bool grouped=gqa!=0;
+        if(!priority_wrapper) {
+            if(grouped && m) { repeat_gqa(q,k,v);grouped=false; }
+            return at::scaled_dot_product_attention(q,k,v,m,0.,false,s,grouped);
+        }
+        if(q.numel()<1024*128) return at::scaled_dot_product_attention(q,k,v,m,0.,false,s,grouped);
+        // Frozen platform is NVIDIA: AMD-only contiguous/L2 and pre-context GQA
+        // branches are deliberately outside this Linux/SM89 binding.
+        SdpaKernelContext context;
+        if(grouped && m && q.size(-3)!=k.size(-3)) {
+            sdp::sdp_params params{q,k,v,m,0.,false,true};
+            if(!(sdp::can_use_flash_attention(params,false)||sdp::can_use_cudnn_attention(params,false)||sdp::can_use_mem_efficient_attention(params,false))) {
+                repeat_gqa(q,k,v);grouped=false;
+            }
+        }
+        return at::scaled_dot_product_attention(q,k,v,m,0.,false,s,grouped);
+    },output);
 }
 extern "C" int imagine_cat(const void* const* inputs,size_t count,int64_t dim,void** output) {
     return aten_tensor_result([&]{
@@ -297,6 +426,29 @@ extern "C" int imagine_device_synchronize(int64_t device) {
 }
 extern "C" int imagine_tensor_clone(const void* input,void** output) {
     return protect([&]{ *output=new at::Tensor(static_cast<const at::Tensor*>(input)->clone(at::MemoryFormat::Preserve)); });
+}
+extern "C" int imagine_tensor_empty_scalar(const int64_t* shape,size_t rank,int64_t kind,void** output) {
+    return protect([&] { *output=new at::Tensor(at::empty(at::IntArrayRef(shape,rank),
+        at::TensorOptions().device(at::kCPU).dtype(static_cast<at::ScalarType>(kind)))); });
+}
+// Buffer ownership is transferred on every call, including error returns.
+// ATen views retain the original Storage's deleter and its mmap owner.
+extern "C" int imagine_tensor_owned_buffer(void* data,const int64_t* shape,size_t rank,int64_t kind,
+                                           void* owner,void(*release)(void*),void** output) {
+    auto buffer=at::for_blob(data,at::IntArrayRef(shape,rank));
+    buffer.context(owner,release);
+    return protect([&] {
+        // ATen holds a plain Rust context/deleter directly, so Storage views
+        // remain valid after dlclose of this bridge. No DSO pin or global map.
+        *output=new at::Tensor(buffer.options(at::TensorOptions().device(at::kCPU)
+            .dtype(static_cast<at::ScalarType>(kind))).make_tensor());
+    });
+}
+extern "C" int imagine_tensor_buffer_context(const void* tensor,void(*release)(void*),void** output) {
+    return protect([&] {
+        const auto& data=static_cast<const at::Tensor*>(tensor)->storage().data_ptr();
+        *output=data.get_deleter()==release ? data.get_context() : nullptr;
+    });
 }
 extern "C" int imagine_tensor_empty_like(const void* input,int64_t device,void** output) {
     return protect([&] {

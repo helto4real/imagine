@@ -5,6 +5,20 @@ The [final report](../design/stage-1-final-validation.md) and
 all 135 registered backend bodies. Model execution and product integration
 remain later stages. Earlier checkpoint counts below are historical.
 
+Stage 2 is in progress: [Qwen Image 2.1](../design/stage-2-qwen-image21.md),
+with INT8 ConvRot, BF16 and Turbo required. The [complete resident DiT
+computation](../design/stage-2-qwen-image21-dit.md) is implemented; complete
+trained-model acceptance and general shared runtime integration remain pending.
+[First-image preparation](../design/stage-2-qwen-image21-first-image.md) records
+the tokenizer/language, checkpoint, VAE and selected sampler continuation.
+The focused regression entrypoint is `tools/check_qwen_image21.sh`; the isolated
+development driver is `tools/launch_qwen21.sh`, defaulting to preflight. The
+earlier preparation stopped before generation. Tomas then authorized generation
+and a Python timing/quality comparison; see the
+[first trained comparison](../design/stage-2-qwen-image21-first-comparison.md).
+`tools/benchmark_qwen_first_image.sh` explicitly runs three matched pairs in
+fresh processes; ordinary tests never invoke trained image generation.
+
 # Rust / LibTorch inference foundation
 
 Stage 1 development workspace for the approved [parity design](../design/rust-comfy-parity-engine.md).

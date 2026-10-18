@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "kind": "artifact_write_failure",
+  "os_error": 122,
+  "message": "Disk quota exceeded",
+  "completed_sampling_steps": 40,
+  "partial_pixel_file_bytes": 937984,
+  "expected_complete_pixel_file_bytes": 22937600,
+  "completed_result_json_exists": false,
+  "included_in_success_or_timing_counts": false,
+  "initial_python_output_retained_and_matches_later_complete_runs": true
+}

@@ -1,0 +1,175 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "stage": 2,
+  "status": "resident_dit_computation_verified_shared_runtime_and_trained_model_acceptance_pending",
+  "preservation_commit": "059c875",
+  "required_variants": [
+    "INT8 ConvRot",
+    "BF16",
+    "Turbo"
+  ],
+  "new_parity_exceptions": [],
+  "autotuning_policy": "unchanged",
+  "source_files": {
+    "comfy/ldm/qwen_image21/model.py": {
+      "sha256": "a69dff15ff6fa369fab5ca0d3261f8aaf19aaedd3fc66414e20a1cf7df0aa5ac",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/qwen_image21/model.py"
+    },
+    "comfy/model_management.py": {
+      "sha256": "045ab96003386a43e647c8ab96f22fbf3be6c577e2fc578ea31c6faa22facbd5",
+      "path": "/home/thhel/git/ComfyUI/comfy/model_management.py"
+    },
+    "comfy/rmsnorm.py": {
+      "sha256": "e8dfbebe9272587038f504538f72fe7e82261307f2c7fbd6f0b05cce28172fdd",
+      "path": "/home/thhel/git/ComfyUI/comfy/rmsnorm.py"
+    },
+    "comfy/latent_formats.py": {
+      "sha256": "8f012cea828736e9fe1ac1753f67dfdbeade79cfeba48d5bc26d4c58549ed759",
+      "path": "/home/thhel/git/ComfyUI/comfy/latent_formats.py"
+    },
+    "comfy/model_detection.py": {
+      "sha256": "4189c5df787a5d685ac1da86193321a32dda0b9f40a5395176d65a1c1e62a47d",
+      "path": "/home/thhel/git/ComfyUI/comfy/model_detection.py"
+    },
+    "comfy/ldm/flux/math.py": {
+      "sha256": "142d86d8e87792eaf06606ef86665874ce2476d155db678f2b0ee994549b4354",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/flux/math.py"
+    },
+    "comfy/ldm/flux/layers.py": {
+      "sha256": "d7ee59e51234766a03834471eee4adc2152cd39248fc39d4e70bb1b3ba8b6a5e",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/flux/layers.py"
+    },
+    "comfy_kitchen/tensor/base.py": {
+      "sha256": "1779b95ec16d2f3db1adcdbf448b931104ad6f609849afec7d03c999cfc819eb",
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/tensor/base.py"
+    },
+    "comfy_kitchen/tensor/int8.py": {
+      "sha256": "df5fea37f408a224060c7d89d5a074e4c59eda4937020fcc5693c465934cb3a0",
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/tensor/int8.py"
+    },
+    "comfy/ops.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/ops.py",
+      "sha256": "a0b8c7f32a146b383a795363bef35e480ffa84b5b3e9c9503f323b1446876f45"
+    },
+    "comfy/configurable.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/configurable.py",
+      "sha256": "2fc422fb176a6a2ac7bb59d4bd1e214f3bf6d3220821c15e65063d7d8c3ecd24"
+    },
+    "comfy/utils.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/utils.py",
+      "sha256": "9320cf5c624e96acc1d9ec92ff120ed6387a2142707f3194cb21dd0d11ac2500"
+    },
+    "comfy/patcher_extension.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/patcher_extension.py",
+      "sha256": "1c7b3b855278d0b95d1c1a705fa0b3c91a265f320e2f97bdeb9d15469d6d4ac7"
+    },
+    "comfy/ldm/modules/attention.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/modules/attention.py",
+      "sha256": "26ae302355066b7fe5363840268c73d937e33ec40341a0458ca8aa97493b5274"
+    },
+    "comfy/ldm/wan/model_animate2.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/wan/model_animate2.py",
+      "sha256": "a36fb24ece6d706f38cd038d980b80440c6f2ac818e7daf338be6ae5f7902e85"
+    },
+    "comfy/ldm/lightricks/model.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/lightricks/model.py",
+      "sha256": "61e18e08ea83cc098973d7e957ae9088f95a34e600ae27b2c4b36ab587de6b69"
+    }
+  },
+  "implementation_sha256": {
+    "inference/src/models/mod.rs": "28b6a699c0fee06065bb0541a43a80ea78b2ce8f58387d43e4ec8adb9d3d0697",
+    "inference/src/models/qwen_image21/cache.rs": "c2439e03c2167cba8279d06c44f18e20adf10badbf66af7c50729f28e1dc4b17",
+    "inference/src/models/qwen_image21/detection.rs": "88f4c900bbdda1fa8b0bbef6637f17d74955df3cbc6a25ec3d05e75ffb8ec4b9",
+    "inference/src/models/qwen_image21/dit.rs": "53905ef0d34c03dcd86b94314b21b18384e105b207a182ab97cbfaad5ac87428",
+    "inference/src/models/qwen_image21/geometry.rs": "96476696d9cb593c387c504da32d31fd6f5904d02b620c2c0baa643a914d3832",
+    "inference/src/models/qwen_image21/latent_constants.rs": "de95727e8a1fd1112b721721c9f083aeda992040034b932171d3d4b723158270",
+    "inference/src/models/qwen_image21/layers.rs": "2ae9ecbc761af373469b325bfaa3270c5d903a816ae755aea6d08d71fc4e9887",
+    "inference/src/models/qwen_image21/mod.rs": "86ba1134c4ec8360fcc65a638b8a4d37e01abb575e368a2909078e180e97f2f5",
+    "inference/src/models/qwen_image21/numeric.rs": "2b26e3abcba16d6d6d7c1933c9d500fee781ba16127ff80b54b57df905841798",
+    "inference/src/lib.rs": "40493db258b75427c6c686efa2f92351656864696d2a7ad2fd022b32285cdc6d",
+    "inference/tests/primitives.rs": "5b11a9add5fa116baee3bae64f122351cf232b17499ae7d489c5baf9c728a8a1",
+    "inference/tests/support/qwen_image21.rs": "3ca848536821ee36ad9a634efe9b343856449edbc1d00cae7820b27743d4006c",
+    "inference/tests/support/qwen_image21_dit.rs": "b2245eaa0314afac3f4487b7389cfe6ef4356743b1d64df561df09a6d06079da",
+    "inference/tools/check_qwen_image21.sh": "aad729c83eeb48f24788a4ea7cf7e3e2b9100eabc24df943f717c894020fc03d",
+    "inference/tools/reference_qwen_image21_core.py": "e108d1c400c824c753d223941ab6b81b60ba053f29a75c1dff3251ebfac7042b",
+    "inference/tools/reference_qwen_image21_dit.py": "19073bb4941d3839043fd26d6ee342d183eb7449c1d5e51c2a8d25bc873e8701",
+    "inference/tools/generate_qwen_image21_constants.py": "0244c6bc2e216befcdb7a7f3f5bcfe509d1ad0e83831b34d5e22d98ce7686735"
+  },
+  "fixtures": [
+    {
+      "path": "inference/fixtures/qwen-image21-dit.json",
+      "sha256": "1becf04fab777c338b2b2dbbc72b132ae166376bbb7c54642cb510f6886fcaf4",
+      "groups": 18,
+      "complete_forwards": 209,
+      "interrupted_forwards": 20,
+      "control_results": 12,
+      "cache_policy_cases": 48
+    },
+    {
+      "path": "inference/fixtures/qwen-image21-core.json",
+      "sha256": "9cc54259acce62ffda525ac96253fd7c90b2beb84405c7ec7d58ad8ea839309b",
+      "cases": 192
+    }
+  ],
+  "total_reference_results_and_decisions": 481,
+  "checks": {
+    "rustfmt": "passed",
+    "clippy_tests_deny_warnings": "passed",
+    "clippy_all_targets_deny_warnings": "passed_before_final_fixture_refresh_unchanged_rust_inputs",
+    "focused_tests": {
+      "passed": 4,
+      "failed": 0,
+      "filtered_out": 146
+    },
+    "python_free_isolated_tests": {
+      "components-isolation.json": {
+        "test_filter": "qwen_image21_tests::qwen_image21_original_component_math_sequences_and_int8_bf16_turbo_projections_match",
+        "binary_sha256": "1760f60ce76aa9b0b111d5d9b1522fcfa321f17497030b8306933bcaf4f07192",
+        "result": "passed"
+      },
+      "detection-isolation.json": {
+        "test_filter": "qwen_image21_tests::qwen_image21_original_logical_shape_detection_preserves_fused_split_and_prefix_rules",
+        "binary_sha256": "1760f60ce76aa9b0b111d5d9b1522fcfa321f17497030b8306933bcaf4f07192",
+        "result": "passed"
+      },
+      "dit-isolation.json": {
+        "test_filter": "qwen_image21_dit_tests::qwen_image21_original_complete_dit_bf16_int8_turbo_hooks_cache_and_attention_match",
+        "binary_sha256": "1760f60ce76aa9b0b111d5d9b1522fcfa321f17497030b8306933bcaf4f07192",
+        "result": "passed"
+      },
+      "cache-policy-isolation.json": {
+        "test_filter": "qwen_image21_dit_tests::qwen_image21_original_prefix_cache_selection_preserves_memory_thresholds_and_policy",
+        "binary_sha256": "1760f60ce76aa9b0b111d5d9b1522fcfa321f17497030b8306933bcaf4f07192",
+        "result": "passed"
+      }
+    },
+    "shell_syntax": "passed",
+    "exact_latent_statistics": 128,
+    "complete_stage1_suite": "unchanged_implementation_reuses_prior_155_crate_146_isolated_checkpoint",
+    "trained_checkpoint_inference": "not_run",
+    "image_generation": "not_run",
+    "host_gpu_offload_transfer_integration": "pending"
+  },
+  "evidence_sha256": {
+    "design/stage-2-qwen-image21-dit-evidence/cache-policy-isolation.json": "327a158d6680eb8568448802c6805b7e45108207828d60ba77e89521674660e0",
+    "design/stage-2-qwen-image21-dit-evidence/clippy-all-targets.log": "dc69be6c384c818d51107633203fda7284c8cfbf4cea4c60594b6374dee2a548",
+    "design/stage-2-qwen-image21-dit-evidence/components-isolation.json": "768de32a1eec360727bb93367e533916c50e67bf8f16fe0abc66d5c0291b4544",
+    "design/stage-2-qwen-image21-dit-evidence/detection-isolation.json": "5c4206ce5192a04ac6605a237c4a9fcd73f36062daed41839876051505f259da",
+    "design/stage-2-qwen-image21-dit-evidence/dit-isolation.json": "cd8ac81ce2ac5236a0f54b54957d687956eadac2eaa9bdc9719de97d5cb50bb0",
+    "design/stage-2-qwen-image21-dit-evidence/reference-capture.log": "160e740cb9a1242e87e0e1bc6b1329d7383d63f0ffc68ad28ba5d43f27c20cbf",
+    "design/stage-2-qwen-image21-dit-evidence/verification.log": "8644c162a0d609f413f460a13db0bc45396f77ab0bbe03b8a71425366b872d67"
+  },
+  "boundaries": {
+    "source_operations": "original resident mixed-precision Linear and manual-cast norms",
+    "attention": "original small-input SDPA and Kitchen INT8; metadata preference and explicit override",
+    "memory": "same-device resident transfer, source slot policy and synthetic memory decisions",
+    "shared_services": "explicit DiTExecution, PrefixKv, CacheServices and PendingCacheTensor contracts",
+    "weights": "own initialized synthetic matrices only; 32-block tests have inner dimension 64"
+  },
+  "sandbox_escalation": {
+    "gpu_and_bwrap": true,
+    "rejected": false
+  },
+  "production_data_read": false
+}

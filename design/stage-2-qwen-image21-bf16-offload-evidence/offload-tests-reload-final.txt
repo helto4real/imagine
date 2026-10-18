@@ -1,0 +1,14 @@
+   Compiling imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.52s
+     Running tests/primitives.rs (/tmp/imagine-rust-comfy-parity-20261017/target/debug/deps/primitives-117aa4f84f921881)
+
+running 3 tests
+test qwen_offload_tests::qwen_image21_original_bf16_cpu_and_mixed_weights_preserve_cuda_forward_bytes ... ok
+test qwen_offload_tests::qwen_image21_original_static_host_registration_copy_and_release_match ... [W1018 14:05:55.349203390 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 14:05:55.349440063 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 14:05:55.349600547 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+ok
+test qwen_offload_tests::qwen_image21_original_static_offload_placements_unloads_and_budgets_match ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 7.19s
+

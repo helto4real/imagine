@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "metrics": {
+    "context": {
+      "shape": [
+        1,
+        20,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "225d3169d4ac5dbd1ae7c2f19d4645e81c41766b6548d3194b0f47b41862ed23",
+        "225d3169d4ac5dbd1ae7c2f19d4645e81c41766b6548d3194b0f47b41862ed23"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 81920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "latent": {
+      "shape": [
+        1,
+        64,
+        56,
+        100
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "a2aabcf88eab55e9d8d60679e3547d6aa5408f49d719849e32faa2960936a5fb",
+        "a2aabcf88eab55e9d8d60679e3547d6aa5408f49d719849e32faa2960936a5fb"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 358400,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "image-rgba": {
+      "shape": [
+        1,
+        896,
+        1600,
+        4
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "b5ebe8ea58ad1c064a3878a3777fb2ef251ec22609bf240a52bbae655ada9792",
+        "b5ebe8ea58ad1c064a3878a3777fb2ef251ec22609bf240a52bbae655ada9792"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 5734400,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "png_rgba8": {
+      "exact": true,
+      "unequal_channels": 0,
+      "unequal_pixels": 0,
+      "max_abs": 0,
+      "mean_abs": 0.0
+    }
+  },
+  "timings_seconds": {
+    "rust": {
+      "dit_load": 0.956267585,
+      "pipeline_wall_including_unload_and_intermediate_export": 6.24098761,
+      "sampling": 2.335574469,
+      "text_encode": 0.311582548,
+      "text_load": 1.17091951,
+      "vae_decode": 0.663168708,
+      "vae_load": 0.24084483
+    },
+    "python": {
+      "text_load": 1.484447419992648,
+      "text_encode": 0.499556811992079,
+      "dit_load": 0.95545971498359,
+      "sampling": 2.348833025083877,
+      "vae_load": 0.22844489803537726,
+      "vae_decode": 0.6376685949508101,
+      "pipeline_wall_including_unload_and_intermediate_export": 6.726047268952243
+    }
+  },
+  "scope": "One first-process 1600x896 4-step synthetic INT8 ConvRot sample; OS model cache already warm. Not a production quality or steady-state benchmark.",
+  "production_runtime_read": false
+}

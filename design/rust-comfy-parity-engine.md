@@ -8,6 +8,13 @@ bodies, 155 crate tests and 146 unfiltered Python-free primitive tests. The full
 model, algorithm and integration parity target remains assigned to later stages.
 No new deviation or approval was needed for the final continuation.
 
+Stage 2 has started with Qwen Image 2.1 **INT8 ConvRot, BF16 and Turbo** as
+required variants. See [the Stage 2 report](stage-2-qwen-image21.md) for verified
+component coverage and remaining complete-model acceptance gates. The
+[first trained INT8 comparison](stage-2-qwen-image21-first-comparison.md)
+records the separately authorized first image and Python comparison; it does
+not complete Stage 2 or establish BF16/Turbo/editing/LoRA acceptance.
+
 Historical implementation checkpoints (their incomplete-status statements apply
 to the checkpoint described):
 

@@ -1,0 +1,2842 @@
+[
+  {
+    "name": "time_text_embed.timestep_embedder.linear_1",
+    "module_bytes": 2097152,
+    "offload_bytes": 2097152,
+    "cast_weights": true,
+    "parameters": [
+      "time_text_embed.timestep_embedder.linear_1.weight"
+    ]
+  },
+  {
+    "name": "time_text_embed.timestep_embedder.linear_2",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "time_text_embed.timestep_embedder.linear_2.weight"
+    ]
+  },
+  {
+    "name": "txt_in.text_norm",
+    "module_bytes": 8192,
+    "offload_bytes": 8192,
+    "cast_weights": false,
+    "parameters": [
+      "txt_in.text_norm.weight"
+    ]
+  },
+  {
+    "name": "txt_in.in_layer",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "txt_in.in_layer.weight"
+    ]
+  },
+  {
+    "name": "txt_in.out_layer",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "txt_in.out_layer.weight"
+    ]
+  },
+  {
+    "name": "img_in",
+    "module_bytes": 524288,
+    "offload_bytes": 524288,
+    "cast_weights": true,
+    "parameters": [
+      "img_in.weight"
+    ]
+  },
+  {
+    "name": "modulation.1",
+    "module_bytes": 134217728,
+    "offload_bytes": 134217728,
+    "cast_weights": true,
+    "parameters": [
+      "modulation.1.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.0.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.0.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.0.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.0.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.0.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.0.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.0.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.0.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.0.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.0.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.0.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.0.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.0.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.0.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.0.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.0.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.0.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.0.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.1.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.1.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.1.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.1.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.1.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.1.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.1.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.1.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.1.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.1.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.1.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.1.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.1.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.1.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.1.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.1.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.1.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.1.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.2.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.2.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.2.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.2.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.2.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.2.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.2.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.2.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.2.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.2.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.2.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.2.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.2.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.2.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.2.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.2.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.2.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.2.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.3.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.3.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.3.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.3.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.3.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.3.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.3.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.3.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.3.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.3.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.3.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.3.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.3.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.3.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.3.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.3.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.3.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.3.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.4.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.4.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.4.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.4.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.4.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.4.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.4.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.4.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.4.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.4.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.4.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.4.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.4.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.4.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.4.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.4.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.4.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.4.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.5.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.5.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.5.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.5.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.5.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.5.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.5.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.5.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.5.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.5.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.5.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.5.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.5.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.5.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.5.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.5.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.5.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.5.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.6.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.6.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.6.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.6.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.6.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.6.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.6.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.6.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.6.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.6.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.6.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.6.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.6.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.6.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.6.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.6.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.6.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.6.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.7.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.7.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.7.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.7.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.7.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.7.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.7.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.7.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.7.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.7.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.7.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.7.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.7.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.7.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.7.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.7.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.7.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.7.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.8.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.8.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.8.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.8.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.8.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.8.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.8.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.8.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.8.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.8.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.8.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.8.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.8.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.8.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.8.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.8.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.8.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.8.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.9.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.9.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.9.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.9.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.9.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.9.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.9.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.9.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.9.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.9.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.9.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.9.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.9.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.9.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.9.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.9.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.9.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.9.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.10.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.10.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.10.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.10.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.10.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.10.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.10.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.10.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.10.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.10.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.10.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.10.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.10.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.10.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.10.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.10.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.10.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.10.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.11.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.11.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.11.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.11.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.11.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.11.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.11.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.11.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.11.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.11.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.11.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.11.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.11.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.11.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.11.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.11.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.11.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.11.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.12.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.12.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.12.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.12.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.12.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.12.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.12.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.12.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.12.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.12.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.12.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.12.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.12.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.12.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.12.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.12.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.12.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.12.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.13.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.13.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.13.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.13.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.13.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.13.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.13.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.13.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.13.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.13.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.13.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.13.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.13.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.13.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.13.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.13.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.13.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.13.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.14.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.14.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.14.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.14.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.14.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.14.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.14.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.14.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.14.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.14.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.14.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.14.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.14.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.14.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.14.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.14.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.14.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.14.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.15.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.15.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.15.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.15.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.15.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.15.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.15.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.15.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.15.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.15.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.15.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.15.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.15.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.15.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.15.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.15.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.15.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.15.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.16.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.16.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.16.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.16.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.16.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.16.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.16.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.16.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.16.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.16.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.16.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.16.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.16.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.16.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.16.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.16.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.16.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.16.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.17.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.17.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.17.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.17.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.17.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.17.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.17.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.17.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.17.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.17.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.17.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.17.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.17.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.17.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.17.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.17.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.17.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.17.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.18.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.18.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.18.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.18.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.18.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.18.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.18.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.18.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.18.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.18.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.18.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.18.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.18.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.18.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.18.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.18.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.18.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.18.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.19.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.19.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.19.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.19.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.19.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.19.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.19.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.19.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.19.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.19.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.19.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.19.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.19.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.19.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.19.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.19.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.19.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.19.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.20.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.20.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.20.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.20.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.20.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.20.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.20.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.20.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.20.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.20.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.20.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.20.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.20.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.20.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.20.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.20.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.20.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.20.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.21.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.21.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.21.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.21.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.21.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.21.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.21.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.21.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.21.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.21.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.21.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.21.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.21.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.21.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.21.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.21.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.21.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.21.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.22.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.22.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.22.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.22.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.22.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.22.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.22.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.22.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.22.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.22.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.22.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.22.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.22.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.22.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.22.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.22.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.22.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.22.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.23.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.23.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.23.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.23.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.23.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.23.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.23.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.23.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.23.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.23.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.23.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.23.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.23.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.23.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.23.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.23.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.23.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.23.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.24.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.24.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.24.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.24.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.24.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.24.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.24.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.24.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.24.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.24.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.24.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.24.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.24.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.24.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.24.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.24.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.24.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.24.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.25.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.25.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.25.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.25.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.25.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.25.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.25.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.25.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.25.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.25.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.25.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.25.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.25.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.25.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.25.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.25.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.25.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.25.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.26.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.26.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.26.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.26.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.26.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.26.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.26.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.26.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.26.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.26.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.26.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.26.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.26.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.26.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.26.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.26.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.26.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.26.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.27.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.27.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.27.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.27.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.27.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.27.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.27.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.27.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.27.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.27.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.27.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.27.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.27.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.27.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.27.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.27.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.27.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.27.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.28.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.28.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.28.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.28.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.28.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.28.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.28.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.28.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.28.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.28.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.28.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.28.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.28.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.28.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.28.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.28.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.28.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.28.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.29.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.29.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.29.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.29.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.29.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.29.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.29.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.29.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.29.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.29.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.29.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.29.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.29.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.29.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.29.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.29.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.29.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.29.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.30.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.30.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.30.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.30.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.30.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.30.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.30.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.30.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.30.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.30.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.30.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.30.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.30.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.30.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.30.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.30.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.30.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.30.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.31.img_norm1",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.31.attn.to_q",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.31.attn.to_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.31.attn.to_k",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.31.attn.to_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.31.attn.to_v",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.31.attn.to_v.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.31.attn.to_out.0",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.31.attn.to_out.0.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.31.attn.norm_q",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.31.attn.norm_q.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.31.attn.norm_k",
+    "module_bytes": 256,
+    "offload_bytes": 256,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.31.attn.norm_k.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.31.img_norm2",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "transformer_blocks.31.img_mlp.gate_up",
+    "module_bytes": 201326592,
+    "offload_bytes": 201326592,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.31.img_mlp.gate_up.weight"
+    ]
+  },
+  {
+    "name": "transformer_blocks.31.img_mlp.out",
+    "module_bytes": 100663296,
+    "offload_bytes": 100663296,
+    "cast_weights": true,
+    "parameters": [
+      "transformer_blocks.31.img_mlp.out.weight"
+    ]
+  },
+  {
+    "name": "norm_out.linear",
+    "module_bytes": 33554432,
+    "offload_bytes": 33554432,
+    "cast_weights": true,
+    "parameters": [
+      "norm_out.linear.weight"
+    ]
+  },
+  {
+    "name": "norm_out.norm",
+    "module_bytes": 0,
+    "offload_bytes": 0,
+    "cast_weights": true,
+    "parameters": []
+  },
+  {
+    "name": "proj_out",
+    "module_bytes": 524288,
+    "offload_bytes": 524288,
+    "cast_weights": true,
+    "parameters": [
+      "proj_out.weight"
+    ]
+  }
+]

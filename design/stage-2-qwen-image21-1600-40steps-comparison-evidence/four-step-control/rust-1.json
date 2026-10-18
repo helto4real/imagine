@@ -1,0 +1,71 @@
+{
+  "channels": "RGBA",
+  "context_shape": [
+    1,
+    20,
+    4096
+  ],
+  "cpu_threads": 23,
+  "diagnostic_trace": false,
+  "dtype": "float32",
+  "kitchen_triton_disabled": true,
+  "latent_shape": [
+    1,
+    64,
+    56,
+    100
+  ],
+  "pixels_shape": [
+    1,
+    896,
+    1600,
+    4
+  ],
+  "production_runtime_read": false,
+  "profile": "qwen21-1600x896-int8",
+  "schema": 1,
+  "source_profile": {
+    "batch": 1,
+    "cfg": 1.0,
+    "checkpoints": {
+      "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+      "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "height": 896,
+    "lora": [],
+    "purpose": "isolated 1600x896 geometry comparison against the preserved 512x512 smoke control; not engine defaults or full Stage 2 acceptance",
+    "references": [],
+    "sampler": "euler",
+    "scheduler": "simple",
+    "schema": 1,
+    "seed": 17,
+    "shift": 0.69,
+    "source_configuration": {
+      "attention": "pytorch",
+      "compute_dtype": "bfloat16",
+      "disable_async_offload": true,
+      "disable_comfy_compiler": true,
+      "force_full_load_per_component": true,
+      "kitchen_triton": false,
+      "prefix_cache_device": "auto",
+      "prefix_cache_dtype": "default",
+      "static_patcher": true,
+      "unload_between_components": true
+    },
+    "steps": 4,
+    "synthetic_prompt": "A blue butterfly resting on a red flower, soft daylight.",
+    "variant": "int8_convrot",
+    "width": 1600
+  },
+  "timing_method": "monotonic wall clock, CUDA synchronized at phase boundaries; per-step callbacks before Euler update",
+  "timings_seconds": {
+    "dit_load": 0.931428966,
+    "pipeline_wall_including_unload_and_intermediate_export": 7.014524872,
+    "sampling": 2.345254936,
+    "text_encode": 0.310926501,
+    "text_load": 1.193697619,
+    "vae_decode": 0.660877693,
+    "vae_load": 1.007231327
+  }
+}

@@ -1,0 +1,1172 @@
+{
+  "schema": 1,
+  "provenance": "Frozen original functions; own synthetic files only",
+  "sources": {
+    "comfy/comfy/utils.py": "9320cf5c624e96acc1d9ec92ff120ed6387a2142707f3194cb21dd0d11ac2500",
+    "comfy/comfy/ops.py": "a0b8c7f32a146b383a795363bef35e480ffa84b5b3e9c9503f323b1446876f45",
+    "comfy/comfy/quant_ops.py": "37f0054dfbd8430524ac2c73dafd25b8ad4eabc490a2b7490eeebde8dffbc749",
+    "comfy/comfy/memory_management.py": "f624823cbee835506377134cd0e576fdf5c22fa474afab3de6c5ae165f835df5",
+    "site/comfy_aimdo/aimdo.so": "8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59",
+    "site/comfy_aimdo/model_mmap.py": "477c97442e5edb236d9cf57ef00f94d5c6d53e400b23fa71ebe6b39ee17e7859"
+  },
+  "cases": [
+    {
+      "label": "dtype/F64",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a22463634222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c34385d7d7d0000000000000000000000000000f03f0000000000000040000000000000084000000000000010400000000000001440",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.float64",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "0000000000000000000000000000f03f0000000000000040000000000000084000000000000010400000000000001440",
+            "requires_grad": false
+          },
+          "file_slice": [
+            65,
+            48
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/F64",
+      "file_hex": "3a000000000000007b2277223a7b226474797065223a22463634222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.float64",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/F32",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a22463332222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c32345d7d7d000000000000803f0000004000004040000080400000a040",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.float32",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "000000000000803f0000004000004040000080400000a040",
+            "requires_grad": false
+          },
+          "file_slice": [
+            65,
+            24
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/F32",
+      "file_hex": "3a000000000000007b2277223a7b226474797065223a22463332222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.float32",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/F16",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a22463136222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c31325d7d7d0000003c0040004200440045",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.float16",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "0000003c0040004200440045",
+            "requires_grad": false
+          },
+          "file_slice": [
+            65,
+            12
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/F16",
+      "file_hex": "3a000000000000007b2277223a7b226474797065223a22463136222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.float16",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/BF16",
+      "file_hex": "3a000000000000007b2277223a7b226474797065223a2242463136222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c31325d7d7d0000803f004040408040a040",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.bfloat16",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "0000803f004040408040a040",
+            "requires_grad": false
+          },
+          "file_slice": [
+            66,
+            12
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/BF16",
+      "file_hex": "3b000000000000007b2277223a7b226474797065223a2242463136222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.bfloat16",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/I64",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a22493634222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c34385d7d7d000000000000000001000000000000000200000000000000030000000000000004000000000000000500000000000000",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int64",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "000000000000000001000000000000000200000000000000030000000000000004000000000000000500000000000000",
+            "requires_grad": false
+          },
+          "file_slice": [
+            65,
+            48
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/I64",
+      "file_hex": "3a000000000000007b2277223a7b226474797065223a22493634222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int64",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/I32",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a22493332222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c32345d7d7d000000000100000002000000030000000400000005000000",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int32",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "000000000100000002000000030000000400000005000000",
+            "requires_grad": false
+          },
+          "file_slice": [
+            65,
+            24
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/I32",
+      "file_hex": "3a000000000000007b2277223a7b226474797065223a22493332222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int32",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/I16",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a22493136222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c31325d7d7d000001000200030004000500",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int16",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "000001000200030004000500",
+            "requires_grad": false
+          },
+          "file_slice": [
+            65,
+            12
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/I16",
+      "file_hex": "3a000000000000007b2277223a7b226474797065223a22493136222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int16",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/I8",
+      "file_hex": "37000000000000007b2277223a7b226474797065223a224938222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c365d7d7d000102030405",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int8",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "000102030405",
+            "requires_grad": false
+          },
+          "file_slice": [
+            63,
+            6
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/I8",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a224938222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int8",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/U8",
+      "file_hex": "37000000000000007b2277223a7b226474797065223a225538222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c365d7d7d000102030405",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.uint8",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "000102030405",
+            "requires_grad": false
+          },
+          "file_slice": [
+            63,
+            6
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/U8",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a225538222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.uint8",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/BOOL",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a22424f4f4c222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c365d7d7d000101010101",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.bool",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "000101010101",
+            "requires_grad": false
+          },
+          "file_slice": [
+            65,
+            6
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/BOOL",
+      "file_hex": "3b000000000000007b2277223a7b226474797065223a22424f4f4c222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.bool",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/F8_E4M3",
+      "file_hex": "3c000000000000007b2277223a7b226474797065223a2246385f45344d33222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c365d7d7d00384044484a",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.float8_e4m3fn",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "00384044484a",
+            "requires_grad": false
+          },
+          "file_slice": [
+            68,
+            6
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/F8_E4M3",
+      "file_hex": "3e000000000000007b2277223a7b226474797065223a2246385f45344d33222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.float8_e4m3fn",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/F8_E5M2",
+      "file_hex": "3c000000000000007b2277223a7b226474797065223a2246385f45354d32222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c365d7d7d003c40424445",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.float8_e5m2",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "003c40424445",
+            "requires_grad": false
+          },
+          "file_slice": [
+            68,
+            6
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/F8_E5M2",
+      "file_hex": "3e000000000000007b2277223a7b226474797065223a2246385f45354d32222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.float8_e5m2",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/C64",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a22433634222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c34385d7d7d00000000000000000000803f000000000000004000000000000040400000000000008040000000000000a04000000000",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.complex64",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "00000000000000000000803f000000000000004000000000000040400000000000008040000000000000a04000000000",
+            "requires_grad": false
+          },
+          "file_slice": [
+            65,
+            48
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/C64",
+      "file_hex": "3a000000000000007b2277223a7b226474797065223a22433634222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.complex64",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/U64",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a22553634222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c34385d7d7d000000000000000001000000000000000200000000000000030000000000000004000000000000000500000000000000",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.uint64",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "000000000000000001000000000000000200000000000000030000000000000004000000000000000500000000000000",
+            "requires_grad": false
+          },
+          "file_slice": [
+            65,
+            48
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/U64",
+      "file_hex": "3a000000000000007b2277223a7b226474797065223a22553634222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.uint64",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/U32",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a22553332222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c32345d7d7d000000000100000002000000030000000400000005000000",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.uint32",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "000000000100000002000000030000000400000005000000",
+            "requires_grad": false
+          },
+          "file_slice": [
+            65,
+            24
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/U32",
+      "file_hex": "3a000000000000007b2277223a7b226474797065223a22553332222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.uint32",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "dtype/U16",
+      "file_hex": "39000000000000007b2277223a7b226474797065223a22553136222c227368617065223a5b322c335d2c22646174615f6f666673657473223a5b302c31325d7d7d000001000200030004000500",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.uint16",
+            "shape": [
+              2,
+              3
+            ],
+            "strides": [
+              3,
+              1
+            ],
+            "payload_hex": "000001000200030004000500",
+            "requires_grad": false
+          },
+          "file_slice": [
+            65,
+            12
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "empty/U16",
+      "file_hex": "3a000000000000007b2277223a7b226474797065223a22553136222c227368617065223a5b322c302c335d2c22646174615f6f666673657473223a5b302c305d7d7d",
+      "tensors": [
+        {
+          "name": "w",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.uint16",
+            "shape": [
+              2,
+              0,
+              3
+            ],
+            "strides": [
+              3,
+              3,
+              1
+            ],
+            "payload_hex": "",
+            "requires_grad": false
+          },
+          "file_slice": null,
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "metadata-and-order",
+      "file_hex": "d5000000000000007b227a223a7b226474797065223a224938222c227368617065223a5b335d2c22646174615f6f666673657473223a5b342c375d7d2c225f5f6d657461646174615f5f223a7b226e6f7465223a2273796e74686574696320cea9222c22666f726d6174223a227074227d2c2261223a7b226474797065223a225538222c227368617065223a5b5d2c22646174615f6f666673657473223a5b302c315d7d2c22616c696173223a7b226474797065223a224938222c227368617065223a5b335d2c22646174615f6f666673657473223a5b342c375d7d7d61626364656667",
+      "tensors": [
+        {
+          "name": "z",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int8",
+            "shape": [
+              3
+            ],
+            "strides": [
+              1
+            ],
+            "payload_hex": "656667",
+            "requires_grad": false
+          },
+          "file_slice": [
+            225,
+            3
+          ],
+          "requires_grad": false
+        },
+        {
+          "name": "a",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.uint8",
+            "shape": [],
+            "strides": [],
+            "payload_hex": "61",
+            "requires_grad": false
+          },
+          "file_slice": [
+            221,
+            1
+          ],
+          "requires_grad": false
+        },
+        {
+          "name": "alias",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int8",
+            "shape": [
+              3
+            ],
+            "strides": [
+              1
+            ],
+            "payload_hex": "656667",
+            "requires_grad": false
+          },
+          "file_slice": [
+            225,
+            3
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {
+        "note": "synthetic \u03a9",
+        "format": "pt"
+      }
+    },
+    {
+      "label": "duplicate-key-update-order",
+      "file_hex": "9d000000000000007b227a223a7b226474797065223a224938222c227368617065223a5b315d2c22646174615f6f666673657473223a5b302c315d7d2c2261223a7b226474797065223a224938222c227368617065223a5b315d2c22646174615f6f666673657473223a5b312c325d7d2c227a223a7b226474797065223a224938222c227368617065223a5b315d2c22646174615f6f666673657473223a5b322c335d7d7d616263",
+      "tensors": [
+        {
+          "name": "z",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int8",
+            "shape": [
+              1
+            ],
+            "strides": [
+              1
+            ],
+            "payload_hex": "63",
+            "requires_grad": false
+          },
+          "file_slice": [
+            167,
+            1
+          ],
+          "requires_grad": false
+        },
+        {
+          "name": "a",
+          "output": {
+            "type": "tensor",
+            "device": "cpu",
+            "dtype": "torch.int8",
+            "shape": [
+              1
+            ],
+            "strides": [
+              1
+            ],
+            "payload_hex": "62",
+            "requires_grad": false
+          },
+          "file_slice": [
+            166,
+            1
+          ],
+          "requires_grad": false
+        }
+      ],
+      "metadata": {}
+    },
+    {
+      "label": "zero-byte",
+      "file_hex": "",
+      "error": "ValueError",
+      "message": "The safetensors header is incomplete.\n\nFile path: {file}\n\nThe safetensors file is corrupt/incomplete. Check the file size and make sure you have copied/downloaded it correctly."
+    },
+    {
+      "label": "seven-byte",
+      "file_hex": "31323334353637",
+      "error": "ValueError",
+      "message": "The safetensors header is incomplete.\n\nFile path: {file}\n\nThe safetensors file is corrupt/incomplete. Check the file size and make sure you have copied/downloaded it correctly."
+    },
+    {
+      "label": "large-header",
+      "file_hex": "01e1f50500000000",
+      "error": "ValueError",
+      "message": "The safetensors header is too large.\n\nFile path: {file}\n\nThe safetensors file is corrupt or invalid. Make sure this is actually a safetensors file and not a ckpt or pt or other filetype."
+    },
+    {
+      "label": "header-incomplete",
+      "file_hex": "0c000000000000007b7d",
+      "error": "ValueError",
+      "message": "The safetensors header is incomplete.\n\nFile path: {file}\n\nThe safetensors file is corrupt/incomplete. Check the file size and make sure you have copied/downloaded it correctly."
+    },
+    {
+      "label": "nonobject-list",
+      "file_hex": "02000000000000005b5d",
+      "error": "ValueError",
+      "message": "The safetensors header is invalid.\n\nFile path: {file}\n\nThe safetensors file is corrupt or invalid. Make sure this is actually a safetensors file and not a ckpt or pt or other filetype."
+    },
+    {
+      "label": "nonobject-null",
+      "file_hex": "04000000000000006e756c6c",
+      "error": "ValueError",
+      "message": "The safetensors header is invalid.\n\nFile path: {file}\n\nThe safetensors file is corrupt or invalid. Make sure this is actually a safetensors file and not a ckpt or pt or other filetype."
+    },
+    {
+      "label": "negative-offset",
+      "file_hex": "36000000000000007b2277223a7b226474797065223a224938222c227368617065223a5b315d2c22646174615f6f666673657473223a5b2d312c305d7d7d61",
+      "error": "ValueError",
+      "message": "Tensor 'w' has invalid data offsets.\n\nFile path: {file}\n\nThe safetensors file is corrupt or invalid. Make sure this is actually a safetensors file and not a ckpt or pt or other filetype."
+    },
+    {
+      "label": "reversed-offset",
+      "file_hex": "35000000000000007b2277223a7b226474797065223a224938222c227368617065223a5b315d2c22646174615f6f666673657473223a5b312c305d7d7d61",
+      "error": "ValueError",
+      "message": "Tensor 'w' has invalid data offsets.\n\nFile path: {file}\n\nThe safetensors file is corrupt or invalid. Make sure this is actually a safetensors file and not a ckpt or pt or other filetype."
+    },
+    {
+      "label": "data-incomplete",
+      "file_hex": "36000000000000007b2277223a7b226474797065223a22463332222c227368617065223a5b315d2c22646174615f6f666673657473223a5b302c345d7d7d61",
+      "error": "ValueError",
+      "message": "Tensor 'w' extends past the end of the file.\n\nFile path: {file}\n\nThe safetensors file is corrupt/incomplete. Check the file size and make sure you have copied/downloaded it correctly."
+    },
+    {
+      "label": "wrong-numel",
+      "file_hex": "36000000000000007b2277223a7b226474797065223a22463332222c227368617065223a5b325d2c22646174615f6f666673657473223a5b302c345d7d7d61626364",
+      "error": "ValueError",
+      "message": "Tensor 'w' does not match its declared shape and dtype.\n\nFile path: {file}\n\nThe safetensors file is corrupt or invalid. Make sure this is actually a safetensors file and not a ckpt or pt or other filetype."
+    },
+    {
+      "label": "unknown-dtype",
+      "file_hex": "37000000000000007b2277223a7b226474797065223a2246313238222c227368617065223a5b315d2c22646174615f6f666673657473223a5b302c315d7d7d61",
+      "error": "KeyError",
+      "message": "'F128'"
+    },
+    {
+      "label": "missing-offset",
+      "file_hex": "20000000000000007b2277223a7b226474797065223a224938222c227368617065223a5b315d7d7d61",
+      "error": "KeyError",
+      "message": "'data_offsets'"
+    },
+    {
+      "label": "missing-dtype",
+      "file_hex": "28000000000000007b2277223a7b227368617065223a5b315d2c22646174615f6f666673657473223a5b302c315d7d7d61",
+      "error": "KeyError",
+      "message": "'dtype'"
+    },
+    {
+      "label": "missing-shape",
+      "file_hex": "29000000000000007b2277223a7b226474797065223a224938222c22646174615f6f666673657473223a5b302c315d7d7d61",
+      "error": "KeyError",
+      "message": "'shape'"
+    },
+    {
+      "label": "too-few-offsets",
+      "file_hex": "33000000000000007b2277223a7b226474797065223a224938222c227368617065223a5b315d2c22646174615f6f666673657473223a5b305d7d7d61",
+      "error": "ValueError",
+      "message": "not enough values to unpack (expected 2, got 1)"
+    },
+    {
+      "label": "too-many-offsets",
+      "file_hex": "37000000000000007b2277223a7b226474797065223a224938222c227368617065223a5b315d2c22646174615f6f666673657473223a5b302c312c325d7d7d61",
+      "error": "ValueError",
+      "message": "too many values to unpack (expected 2)"
+    }
+  ]
+}

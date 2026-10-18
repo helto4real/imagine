@@ -1,0 +1,62 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+preflight: native library
+preflight: compiler profile
+preflight: frozen runtime
+preflight: source math policy
+preflight: AIMDO
+preflight: CUDA memory
+loading text component
+loading diffusion component
+sampling step 1
+sampling step 2
+sampling step 3
+sampling step 4
+sampling step 5
+sampling step 6
+sampling step 7
+sampling step 8
+sampling step 9
+sampling step 10
+sampling step 11
+sampling step 12
+sampling step 13
+sampling step 14
+sampling step 15
+sampling step 16
+sampling step 17
+sampling step 18
+sampling step 19
+sampling step 20
+sampling step 21
+sampling step 22
+sampling step 23
+sampling step 24
+sampling step 25
+sampling step 26
+sampling step 27
+sampling step 28
+sampling step 29
+sampling step 30
+sampling step 31
+sampling step 32
+sampling step 33
+sampling step 34
+sampling step 35
+sampling step 36
+sampling step 37
+sampling step 38
+sampling step 39
+sampling step 40
+loading VAE component

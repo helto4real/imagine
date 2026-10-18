@@ -1,0 +1,17 @@
+memory oracle: importing frozen CPU-only constructor environment
+memory oracle: imports finished
+memory oracle: configuring single CPU thread
+memory oracle: installing meta guard
+memory oracle: real allocation guard and hard process limits enabled
+memory oracle: original full meta constructor ready
+memory oracle: placement budget 0.1
+memory oracle: placement budget 16384.0
+memory oracle: placement budget 419430400.0
+memory oracle: placement budget 1073741824
+memory oracle: placement budget 8589934592
+memory oracle: placement budget 11811160064
+memory oracle: placement budget 13958643712
+memory oracle: placement budget 14230249472.0
+memory oracle: placement budget 14230249473.0
+memory oracle: placement budget 1e+32
+Captured 330 modules, 10 placements, 40 partial unloads, 24 budgets, 60 reloads

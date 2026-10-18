@@ -1,0 +1,18 @@
+{
+  "format_all_target_clippy": "passed with warnings denied",
+  "python_shell_syntax": "passed",
+  "forty_step_exact_pairs": 3,
+  "four_step_same_storage_exact_pairs": 3,
+  "measured_python_free_rust_images": 6,
+  "callbacks": "Exactly 40 or 4 per requested profile",
+  "repeatability": "All six outputs exact within each profile; fresh four-step values equal preserved prior control; initial completed Python 40-step values equal restarted runs",
+  "source_inputs": {
+    "implementation": 364,
+    "original": 275,
+    "full_comfy_imports_per_reference": 273
+  },
+  "model_hashes": "All three complete files rehashed, unchanged",
+  "stage0_locks": "All four unchanged",
+  "native_cuda_objects": "All 32 unchanged",
+  "component_suite": "Original implementation unchanged; prior successful evidence retained, not rerun solely for registration"
+}

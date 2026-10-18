@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "implementation_inputs": 365,
+  "original_source_inputs": 275,
+  "original_stage0_locks_verified": 4,
+  "original_cuda_objects_verified": 32,
+  "changed_implementation_inputs": [
+    "inference/profiles/qwen21-1600x896-40steps-bf16.json",
+    "inference/src/bin/qwen21-first-image.rs",
+    "inference/tools/compare_qwen_first_image.py",
+    "inference/tools/reference_qwen_first_image.py",
+    "inference/tools/test_isolation.py"
+  ],
+  "arithmetic_or_memory_implementation_changed": false,
+  "previous_profiles_unchanged": true,
+  "full_focused_suite_rerun": false,
+  "syntax_checks": "AST parse of three changed Python tools; bash -n of launch/benchmark scripts; formatting and all-target Clippy with -D warnings passed"
+}

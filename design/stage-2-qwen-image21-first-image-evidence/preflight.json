@@ -1,0 +1,90 @@
+{
+  "checkpoints": {
+    "dit": {
+      "cuda_memory_while_resident": [
+        6066601984,
+        16769744896,
+        7256711168,
+        7260340224
+      ],
+      "file_bytes": 7256783064,
+      "header_sha256": "64ac1c737e46bf4f181d302e4836591306e26e4f62d547b2bef08270c9c97567",
+      "parameters": 265,
+      "path": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+      "resident_parameters": 265,
+      "sha256": "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d"
+    },
+    "text": {
+      "cuda_memory_while_resident": [
+        3707764736,
+        16769744896,
+        9363591680,
+        9388949504
+      ],
+      "file_bytes": 9350798360,
+      "header_sha256": "b55c03ca5443ee1514738dbf69dceddf9074ae5e745bce5a2310754e0b37078d",
+      "parameters": 750,
+      "path": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "resident_parameters": 751,
+      "sha256": "8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f"
+    },
+    "vae": {
+      "cuda_memory_while_resident": [
+        12547457024,
+        16769744896,
+        677514240,
+        727711744
+      ],
+      "file_bytes": 675509688,
+      "header_sha256": "c091c3d231f352db5fb44840e22388d2abe9c2c37b4daf97bdc6cc3448387759",
+      "parameters": 238,
+      "path": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors",
+      "resident_parameters": 238,
+      "sha256": "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9"
+    }
+  },
+  "cuda_memory_before": [
+    13038845952,
+    16769744896,
+    0,
+    0
+  ],
+  "image_generation_executed": false,
+  "production_runtime_read": false,
+  "schema": 1,
+  "source_profile": {
+    "batch": 1,
+    "cfg": 1.0,
+    "checkpoints": {
+      "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+      "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "height": 512,
+    "lora": [],
+    "purpose": "isolated first-image smoke test; not engine defaults or full Stage 2 acceptance",
+    "references": [],
+    "sampler": "euler",
+    "scheduler": "simple",
+    "schema": 1,
+    "seed": 17,
+    "shift": 0.69,
+    "source_configuration": {
+      "attention": "pytorch",
+      "compute_dtype": "bfloat16",
+      "disable_async_offload": true,
+      "disable_comfy_compiler": true,
+      "force_full_load_per_component": true,
+      "prefix_cache_device": "auto",
+      "prefix_cache_dtype": "default",
+      "static_patcher": true,
+      "unload_between_components": true
+    },
+    "steps": 4,
+    "synthetic_prompt": "A blue butterfly resting on a red flower, soft daylight.",
+    "variant": "int8_convrot",
+    "width": 512
+  },
+  "status": "load_only_preflight_passed",
+  "trained_forward_executed": false
+}

@@ -12,6 +12,15 @@ struct RmsTemporaryMetadata { uint64_t start; uint64_t bytes; int64_t count; };
 extern "C" {
 const char* imagine_last_error();
 const char* imagine_last_metadata();
+int imagine_tensor_owned_buffer(void*,const int64_t*,size_t,int64_t,void*,void(*)(void*),void**);
+int imagine_tensor_empty_scalar(const int64_t*,size_t,int64_t,void**);
+int imagine_tensor_buffer_context(const void*,void(*)(void*),void**);
+int imagine_comfy_sdpa(const void*,const void*,const void*,const void*,int64_t,double,int64_t,int64_t,void**);
+int imagine_sdpa_state(int64_t*,int64_t);
+int imagine_cuda_memory(int64_t,uint64_t*);
+int imagine_host_registration(const void*,int64_t,int64_t*);
+int imagine_cuda_soft_empty_cache(int64_t);
+int imagine_comfy_math_state(int64_t*,int64_t);
 int imagine_kitchen_call(const char*,const KitchenArg*,size_t,int64_t*);
 // Borrowed c10::IValue handles from the pinned torch-sys ABI; owned result.
 int imagine_aten_boxed(const char*,const char*,const void* const*,size_t,const char* const*,const void* const*,size_t,void**);

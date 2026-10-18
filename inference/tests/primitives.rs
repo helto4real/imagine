@@ -69,6 +69,27 @@ mod triton_wrapper_tests;
 #[path = "support/w4a4_cache.rs"]
 mod w4a4_cache_tests;
 
+#[path = "support/checkpoint.rs"]
+mod checkpoint_tests;
+#[path = "support/comfy_sdpa.rs"]
+mod comfy_sdpa_tests;
+#[path = "support/qwen_image21_dit.rs"]
+mod qwen_image21_dit_tests;
+#[path = "support/qwen_image21.rs"]
+mod qwen_image21_tests;
+#[path = "support/qwen_offload.rs"]
+mod qwen_offload_tests;
+#[path = "support/qwen_resident.rs"]
+mod qwen_resident_tests;
+#[path = "support/qwen_sampling.rs"]
+mod qwen_sampling_tests;
+#[path = "support/qwen_text_encoder.rs"]
+mod qwen_text_encoder_tests;
+#[path = "support/qwen_tokenizer.rs"]
+mod qwen_tokenizer_tests;
+#[path = "support/qwen_vae.rs"]
+mod qwen_vae_tests;
+
 fn bits(tensor: &Tensor) -> Vec<u8> {
     let cpu = tensor
         .detach()

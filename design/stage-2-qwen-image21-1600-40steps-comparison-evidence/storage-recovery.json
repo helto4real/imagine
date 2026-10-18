@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "reason": "Temporary-storage quota during first forty-step output write; inference settings unchanged",
+  "source_alias": "/tmp/imagine-rust-comfy-parity-20261017/runtime",
+  "physical_destination": "/home/thhel/ChatGPT/imagine/.rust-comfy-runtime/runtime",
+  "entries": 16274,
+  "regular_files": 16230,
+  "symlinks": 44,
+  "regular_bytes": 2397617825,
+  "every_file_hash_and_link_target_verified": true,
+  "migration_manifest_sha256": "b3ae451571e1957e77448831492ff601bf3c379c4d49f2c136ab00a924e890df",
+  "initial_failed_prefix": "qwen21-1600-40steps-comparison-01",
+  "restarted_measured_prefix": "qwen21-1600-40steps-comparison-02",
+  "fresh_four_step_control_prefix": "qwen21-1600-4steps-disk-control-01",
+  "inference_settings_changed": false
+}

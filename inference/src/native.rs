@@ -1,4 +1,5 @@
 //! Audited ownership boundary to the standalone Kitchen/ATen C ABI.
+use std::any::Any;
 use std::os::unix::ffi::OsStrExt;
 use std::{
     ffi::{CStr, CString, c_char, c_void},
@@ -137,6 +138,9 @@ type GenNormal = unsafe extern "C" fn(*mut c_void, *const i64, usize, i64, *mut 
 type GenBytes = unsafe extern "C" fn(*mut c_void, *const i64, usize, *mut *mut c_void) -> i32;
 type GenInt = unsafe extern "C" fn(*mut c_void, i64, *const i64, usize, *mut *mut c_void) -> i32;
 type TensorClone = unsafe extern "C" fn(*const c_void, *mut *mut c_void) -> i32;
+unsafe extern "C" fn release_buffer_owner(ptr: *mut c_void) {
+    drop(unsafe { Box::from_raw(ptr.cast::<Arc<dyn Any + Send + Sync>>()) });
+}
 type TensorEmpty = unsafe extern "C" fn(*const c_void, i64, *mut *mut c_void) -> i32;
 type TensorCopy = unsafe extern "C" fn(*mut c_void, *const c_void, i64) -> i32;
 type TensorType = unsafe extern "C" fn(*const c_void, *mut TensorTypeInfo) -> i32;
@@ -297,6 +301,13 @@ pub struct ScaledMm<'a> {
     pub bias: Option<&'a Tensor>,
     pub output_kind: Option<Kind>,
 }
+pub struct SdpaOptions<'a> {
+    pub mask: Option<&'a Tensor>,
+    pub scale: Option<f64>,
+    pub enable_gqa: bool,
+    /// The frozen ops.py CUDA/priority wrapper is global even for CPU inputs.
+    pub priority_wrapper: bool,
+}
 #[derive(Debug)]
 pub enum ScaledMmFailure {
     Runtime(Error),
@@ -319,6 +330,291 @@ impl DeviceSpec {
     }
 }
 impl Kitchen {
+    pub(crate) fn buffer_owner(
+        &self,
+        tensor: &Tensor,
+    ) -> Result<Option<Arc<dyn Any + Send + Sync>>> {
+        type Context = unsafe extern "C" fn(
+            *const c_void,
+            unsafe extern "C" fn(*mut c_void),
+            *mut *mut c_void,
+        ) -> i32;
+        let symbol = unsafe {
+            libc::dlsym(
+                self.library.handle.as_ptr(),
+                c"imagine_tensor_buffer_context".as_ptr(),
+            )
+        };
+        if symbol.is_null() {
+            return Err(Error::BindingGap {
+                backend: "ATen".into(),
+                operation: "imagine_tensor_buffer_context".into(),
+            });
+        }
+        let call: Context = unsafe { std::mem::transmute(symbol) };
+        let mut owner = std::ptr::null_mut();
+        self.library
+            .check(unsafe { call(tensor.as_ptr().cast(), release_buffer_owner, &mut owner) })?;
+        Ok(if owner.is_null() {
+            None
+        } else {
+            Some(unsafe { (&*owner.cast::<Arc<dyn Any + Send + Sync>>()).clone() })
+        })
+    }
+    /// Frozen NVIDIA `comfy.ops.scaled_dot_product_attention`, including the
+    /// source's small-input branch, capability probes and context restoration.
+    pub fn comfy_sdpa(
+        &self,
+        q: &Tensor,
+        k: &Tensor,
+        v: &Tensor,
+        options: SdpaOptions<'_>,
+    ) -> Result<Tensor> {
+        type Sdpa = unsafe extern "C" fn(
+            *const c_void,
+            *const c_void,
+            *const c_void,
+            *const c_void,
+            i64,
+            f64,
+            i64,
+            i64,
+            *mut *mut c_void,
+        ) -> i32;
+        let symbol =
+            unsafe { libc::dlsym(self.library.handle.as_ptr(), c"imagine_comfy_sdpa".as_ptr()) };
+        if symbol.is_null() {
+            return Err(Error::BindingGap {
+                backend: "ATen".into(),
+                operation: "imagine_comfy_sdpa".into(),
+            });
+        }
+        let call: Sdpa = unsafe { std::mem::transmute(symbol) };
+        let mut out = std::ptr::null_mut();
+        let code = unsafe {
+            call(
+                q.as_ptr().cast(),
+                k.as_ptr().cast(),
+                v.as_ptr().cast(),
+                options.mask.map_or(std::ptr::null(), |m| m.as_ptr().cast()),
+                i64::from(options.scale.is_some()),
+                options.scale.unwrap_or(0.),
+                i64::from(options.enable_gqa),
+                i64::from(options.priority_wrapper),
+                &mut out,
+            )
+        };
+        if code != 0 {
+            return Err(Error::ReferenceException {
+                class: match code {
+                    -2 => "ValueError",
+                    -3 => "IndexError",
+                    -4 => "BufferError",
+                    -5 => "SyntaxError",
+                    -7 => "TypeError",
+                    -8 => "NotImplementedError",
+                    -9 => "OutOfMemoryError",
+                    -10 => "AcceleratorError",
+                    _ => "RuntimeError",
+                },
+                message: unsafe { CStr::from_ptr((self.library.error)()) }
+                    .to_string_lossy()
+                    .into_owned(),
+            });
+        }
+        if out.is_null() {
+            return Err(Error::Native("Null SDPA result".into()));
+        }
+        Ok(unsafe { Tensor::from_ptr(out.cast()) })
+    }
+    /// The five source-visible flags and complete priority order. Used to
+    /// preserve caller state and verify finally behavior, not to tune kernels.
+    pub fn sdpa_state(&self) -> Result<[i64; 10]> {
+        let mut state = [0; 10];
+        self.sdpa_state_raw(&mut state, false)?;
+        Ok(state)
+    }
+    /// Original cuda.mem_get_info plus active/reserved allocator counters.
+    /// No process inventory or production data is queried.
+    pub fn cuda_memory(&self, index: usize) -> Result<[u64; 4]> {
+        type Query = unsafe extern "C" fn(i64, *mut u64) -> i32;
+        let sym = unsafe {
+            libc::dlsym(
+                self.library.handle.as_ptr(),
+                c"imagine_cuda_memory".as_ptr(),
+            )
+        };
+        if sym.is_null() {
+            return Err(Error::BindingGap {
+                backend: "ATen".into(),
+                operation: "imagine_cuda_memory".into(),
+            });
+        }
+        let call: Query = unsafe { std::mem::transmute(sym) };
+        let mut values = [0; 4];
+        self.library
+            .check(unsafe { call(index as i64, values.as_mut_ptr()) })?;
+        Ok(values)
+    }
+    pub fn host_registration(&self, tensor: &Tensor, pin: bool) -> Result<bool> {
+        type Call = unsafe extern "C" fn(*const c_void, i64, *mut i64) -> i32;
+        let sym = unsafe {
+            libc::dlsym(
+                self.library.handle.as_ptr(),
+                c"imagine_host_registration".as_ptr(),
+            )
+        };
+        if sym.is_null() {
+            return Err(Error::BindingGap {
+                backend: "CUDA".into(),
+                operation: "imagine_host_registration".into(),
+            });
+        }
+        let call: Call = unsafe { std::mem::transmute(sym) };
+        let mut success = 0;
+        self.library
+            .check(unsafe { call(tensor.as_ptr().cast(), i64::from(pin), &mut success) })?;
+        Ok(success != 0)
+    }
+    pub fn comfy_math_state(&self) -> Result<[i64; 3]> {
+        let mut state = [0; 3];
+        self.comfy_math_state_raw(&mut state, false)?;
+        Ok(state)
+    }
+    pub fn set_comfy_math_state(&self, mut state: [i64; 3]) -> Result<()> {
+        self.comfy_math_state_raw(&mut state, true)
+    }
+    fn comfy_math_state_raw(&self, state: &mut [i64; 3], write: bool) -> Result<()> {
+        type State = unsafe extern "C" fn(*mut i64, i64) -> i32;
+        let sym = unsafe {
+            libc::dlsym(
+                self.library.handle.as_ptr(),
+                c"imagine_comfy_math_state".as_ptr(),
+            )
+        };
+        if sym.is_null() {
+            return Err(Error::BindingGap {
+                backend: "ATen".into(),
+                operation: "imagine_comfy_math_state".into(),
+            });
+        }
+        let call: State = unsafe { std::mem::transmute(sym) };
+        self.library
+            .check(unsafe { call(state.as_mut_ptr(), i64::from(write)) })
+    }
+    pub fn cuda_soft_empty_cache(&self, index: usize) -> Result<()> {
+        type Empty = unsafe extern "C" fn(i64) -> i32;
+        let sym = unsafe {
+            libc::dlsym(
+                self.library.handle.as_ptr(),
+                c"imagine_cuda_soft_empty_cache".as_ptr(),
+            )
+        };
+        if sym.is_null() {
+            return Err(Error::BindingGap {
+                backend: "ATen".into(),
+                operation: "imagine_cuda_soft_empty_cache".into(),
+            });
+        }
+        let call: Empty = unsafe { std::mem::transmute(sym) };
+        self.library.check(unsafe { call(index as i64) })
+    }
+    pub fn set_sdpa_state(&self, mut state: [i64; 10]) -> Result<()> {
+        self.sdpa_state_raw(&mut state, true)
+    }
+    fn sdpa_state_raw(&self, state: &mut [i64; 10], write: bool) -> Result<()> {
+        type State = unsafe extern "C" fn(*mut i64, i64) -> i32;
+        let symbol =
+            unsafe { libc::dlsym(self.library.handle.as_ptr(), c"imagine_sdpa_state".as_ptr()) };
+        if symbol.is_null() {
+            return Err(Error::BindingGap {
+                backend: "ATen".into(),
+                operation: "imagine_sdpa_state".into(),
+            });
+        }
+        let call: State = unsafe { std::mem::transmute(symbol) };
+        self.library
+            .check(unsafe { call(state.as_mut_ptr(), i64::from(write)) })
+    }
+    /// ATen empty including the wider unsigned dtypes not exposed by tch::Kind.
+    pub(crate) fn empty_scalar(&self, shape: &[i64], scalar: i64) -> Result<Tensor> {
+        type EmptyScalar = unsafe extern "C" fn(*const i64, usize, i64, *mut *mut c_void) -> i32;
+        let symbol = unsafe {
+            libc::dlsym(
+                self.library.handle.as_ptr(),
+                c"imagine_tensor_empty_scalar".as_ptr(),
+            )
+        };
+        if symbol.is_null() {
+            return Err(Error::BindingGap {
+                backend: "ATen".into(),
+                operation: "imagine_tensor_empty_scalar".into(),
+            });
+        }
+        let call: EmptyScalar = unsafe { std::mem::transmute(symbol) };
+        let mut output = std::ptr::null_mut();
+        self.library
+            .check(unsafe { call(shape.as_ptr(), shape.len(), scalar, &mut output) })?;
+        if output.is_null() {
+            return Err(Error::Native("Null scalar empty tensor".into()));
+        }
+        Ok(unsafe { Tensor::from_ptr(output.cast()) })
+    }
+    /// Attach a source-owned read-only model buffer to an ATen Storage.
+    /// Views keep `owner` alive, including after the loader and Kitchen drop.
+    /// # Safety
+    /// The buffer must contain the initialized, validated contiguous tensor
+    /// described by `shape`/`scalar`, and remain valid until `owner` drops.
+    pub(crate) unsafe fn tensor_from_owned_buffer<T: Send + Sync + 'static>(
+        &self,
+        data: *const u8,
+        shape: &[i64],
+        scalar: i64,
+        owner: Arc<T>,
+    ) -> Result<Tensor> {
+        type OwnedBuffer = unsafe extern "C" fn(
+            *const u8,
+            *const i64,
+            usize,
+            i64,
+            *mut c_void,
+            unsafe extern "C" fn(*mut c_void),
+            *mut *mut c_void,
+        ) -> i32;
+        let symbol = unsafe {
+            libc::dlsym(
+                self.library.handle.as_ptr(),
+                c"imagine_tensor_owned_buffer".as_ptr(),
+            )
+        };
+        if symbol.is_null() {
+            return Err(Error::BindingGap {
+                backend: "ATen".into(),
+                operation: "imagine_tensor_owned_buffer".into(),
+            });
+        }
+        let call: OwnedBuffer = unsafe { std::mem::transmute(symbol) };
+        let mut output = std::ptr::null_mut();
+        let owner: Arc<dyn Any + Send + Sync> = owner;
+        let owner = Box::into_raw(Box::new(owner)).cast();
+        // The bridge consumes the owner even when ATen rejects the geometry.
+        let code = unsafe {
+            call(
+                data,
+                shape.as_ptr(),
+                shape.len(),
+                scalar,
+                owner,
+                release_buffer_owner,
+                &mut output,
+            )
+        };
+        self.library.check(code)?;
+        if output.is_null() {
+            return Err(Error::Native("Null owned-buffer tensor".into()));
+        }
+        Ok(unsafe { Tensor::from_ptr(output.cast()) })
+    }
     /// Original Tensor.grad_fn accessor, including the repr Invalid fallback.
     pub(crate) fn grad_fn_name(&self, tensor: &Tensor) -> Result<Option<String>> {
         let mut name = std::ptr::null();

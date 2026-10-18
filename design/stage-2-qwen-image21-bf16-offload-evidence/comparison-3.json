@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "metrics": {
+    "context": {
+      "shape": [
+        1,
+        20,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "225d3169d4ac5dbd1ae7c2f19d4645e81c41766b6548d3194b0f47b41862ed23",
+        "225d3169d4ac5dbd1ae7c2f19d4645e81c41766b6548d3194b0f47b41862ed23"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 81920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "latent": {
+      "shape": [
+        1,
+        64,
+        56,
+        100
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "dc9fa33a1ba6e969d17b48aaac85ccacce4429c4ace2d3d7d0a7ed1340e2fae4",
+        "dc9fa33a1ba6e969d17b48aaac85ccacce4429c4ace2d3d7d0a7ed1340e2fae4"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 358400,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "image-rgba": {
+      "shape": [
+        1,
+        896,
+        1600,
+        4
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "577c175fbf9775754e992e5a6ddfdfc38a97a33aeb592d6b0596fb77c1c615e5",
+        "577c175fbf9775754e992e5a6ddfdfc38a97a33aeb592d6b0596fb77c1c615e5"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 5734400,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "png_rgba8": {
+      "exact": true,
+      "unequal_channels": 0,
+      "unequal_pixels": 0,
+      "max_abs": 0,
+      "mean_abs": 0.0
+    }
+  },
+  "timings_seconds": {
+    "rust": {
+      "dit_load": 2.5271196590000002,
+      "pipeline_wall_including_unload_and_intermediate_export": 56.336148576,
+      "sampling": 50.73818214,
+      "text_encode": 0.321122594,
+      "text_load": 0.983037318,
+      "vae_decode": 0.806516761,
+      "vae_load": 0.332642684
+    },
+    "python": {
+      "text_load": 1.2479044508654624,
+      "text_encode": 0.4889472690410912,
+      "dit_load": 2.548959402134642,
+      "sampling": 51.421893301885575,
+      "vae_load": 1.057622818974778,
+      "vae_decode": 0.6664360901340842,
+      "pipeline_wall_including_unload_and_intermediate_export": 58.08207251597196
+    }
+  },
+  "scope": "One first-process 1600x896 40-step synthetic bf16 DiT sample; OS model cache already warm. Not a production quality or steady-state benchmark.",
+  "production_runtime_read": false
+}

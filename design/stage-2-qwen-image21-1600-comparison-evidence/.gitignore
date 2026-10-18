@@ -1,0 +1,3 @@
+# Only the explicitly synthetic comparison images are retained.
+!rust-image.png
+!python-image.png

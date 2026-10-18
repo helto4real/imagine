@@ -1,0 +1,54 @@
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+
+running 1 test
+test qwen_offload_tests::qwen_image21_original_static_offload_placements_unloads_and_budgets_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 163 filtered out; finished in 0.03s
+
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+[W1018 12:06:19.482491918 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 12:06:19.482633859 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 12:06:19.482904925 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+
+running 1 test
+test qwen_offload_tests::qwen_image21_original_static_host_registration_copy_and_release_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 163 filtered out; finished in 0.58s
+
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+
+running 1 test
+test qwen_offload_tests::qwen_image21_original_bf16_cpu_and_mixed_weights_preserve_cuda_forward_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 163 filtered out; finished in 7.76s
+

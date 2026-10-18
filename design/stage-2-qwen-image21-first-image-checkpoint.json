@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "stage": 2,
+  "status": "ready_for_first_isolated_int8_smoke_run_stopped_before_generation",
+  "stage2_complete": false,
+  "complete_model_support": false,
+  "preservation_commit": "059c875",
+  "stage2_committed": false,
+  "required_variants": [
+    "INT8 ConvRot",
+    "BF16",
+    "Turbo"
+  ],
+  "selected_first_variant": "INT8 ConvRot",
+  "new_parity_exceptions": [],
+  "autotuning_policy": "unchanged",
+  "checks": {
+    "fmt_check": "passed",
+    "clippy_all_targets_D_warnings": "passed",
+    "focused_tests": 15,
+    "separate_python_free_tests": 15,
+    "trained_component_load_only_preflight": "passed",
+    "verified_implementation_inputs": 359,
+    "verified_original_source_inputs": 48,
+    "frozen_stage0_locks": 4,
+    "original_cuda_objects_unchanged": 32,
+    "latest_unfiltered_stage1_tests": "historical 155 crate / 146 Python-free; not rerun as an unfiltered suite in this continuation"
+  },
+  "reference_records": {
+    "prior_core_dit_control_cache_interrupt": 481,
+    "aimdo_safetensors": 50,
+    "quantized_modules": 76,
+    "embedding_loads": 32,
+    "whole_resident_loads": 10,
+    "tokenizer": 547,
+    "sdpa": 576,
+    "language": 75,
+    "vae": 23,
+    "sampling": 100
+  },
+  "total_distinct_reference_records": 1970,
+  "unicode_aggregate_checks": {
+    "NFC_scalars": 1112064,
+    "contextual_regex_scalars": 1112064,
+    "counted_as_model_forwards": false
+  },
+  "resident_original_replay": {
+    "forwards": 102,
+    "cache_forwards": 66,
+    "additional_reference_records": false
+  },
+  "model_assets_read": true,
+  "authorized_model_root": "/mnt/media/gemensam/AI/ComfyUI/models",
+  "models": {
+    "dit": {
+      "cuda_memory_while_resident": [
+        6066601984,
+        16769744896,
+        7256711168,
+        7260340224
+      ],
+      "file_bytes": 7256783064,
+      "header_sha256": "64ac1c737e46bf4f181d302e4836591306e26e4f62d547b2bef08270c9c97567",
+      "parameters": 265,
+      "path": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+      "resident_parameters": 265,
+      "sha256": "cb74113cb03faecd79611b01fd7fd642f0aa60d6f0b95086abee214d75eaa57d"
+    },
+    "text": {
+      "cuda_memory_while_resident": [
+        3707764736,
+        16769744896,
+        9363591680,
+        9388949504
+      ],
+      "file_bytes": 9350798360,
+      "header_sha256": "b55c03ca5443ee1514738dbf69dceddf9074ae5e745bce5a2310754e0b37078d",
+      "parameters": 750,
+      "path": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "resident_parameters": 751,
+      "sha256": "8bfd0f6e12abf2d2d697ecc888e5e90b0d6741d6708f05799f53afa560452e8f"
+    },
+    "vae": {
+      "cuda_memory_while_resident": [
+        12547457024,
+        16769744896,
+        677514240,
+        727711744
+      ],
+      "file_bytes": 675509688,
+      "header_sha256": "c091c3d231f352db5fb44840e22388d2abe9c2c37b4daf97bdc6cc3448387759",
+      "parameters": 238,
+      "path": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors",
+      "resident_parameters": 238,
+      "sha256": "bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9"
+    }
+  },
+  "trained_forward_executed": false,
+  "image_generation_executed": false,
+  "first_image_directory_exists": false,
+  "production_runtime_read": false,
+  "gpu_process_inventory_read": false,
+  "sandbox_escalation": {
+    "used": true,
+    "rejected": false
+  },
+  "input_manifest_sha256": "f03b0dce807262b819b56726aad9200316dc540933b604380f421766fec998ab",
+  "evidence_sha256": {
+    "load-check-isolation.json": "9e1c8a84c7bb0171c5ec63ab11975d09c9207d8ea5267e7908ebf8ca3c5b5c96",
+    "load-check.log": "915639d8cfb473fcacac4c93a6ee13dc191128fcda7a86974abd33fb8cc34b4c",
+    "native-build.log": "8dd4d3bd9131f185a84fc3c0321e5ecc43e003e0175d57cd5182869223a43fcd",
+    "preflight.json": "02a57a3871405be6b39cef077f6177e3bdd76f09bb3662b7872194bbc24cd0c4",
+    "qwen_image21_original_all_unicode_scalar_nfc_and_contextual_regex_hashes_match-isolation.json": "36c1744a941c0c43b7d3167ad7809e2b357116ee5a45a5690263be1120929fd0",
+    "qwen_image21_original_checkpoint_aimdo_types_offsets_errors_and_storage_lifetime_match-isolation.json": "256a454ac86264fdb3cda4851ad1da138d173a462c1ecc3fa0639b3648e45c70",
+    "qwen_image21_original_comfy_sdpa_small_large_gqa_and_backend_state_match-isolation.json": "d7016dfa46f8aab65dd194fc05e272ab56138c8154924bef28f44f43cd777893",
+    "qwen_image21_original_complete_dit_bf16_int8_turbo_hooks_cache_and_attention_match-isolation.json": "1f91cf8f464ce0277ac17e350fb554866a47568ec99731de76e65a415f09e3eb",
+    "qwen_image21_original_complete_resident_parameter_loading_matches-isolation.json": "ac64a445cd1ef73d553b70a317f20cb5629eb0a82105f3660bf2f4b55f20e291",
+    "qwen_image21_original_component_math_sequences_and_int8_bf16_turbo_projections_match-isolation.json": "f40c2ba5a18a3b5fb07e29055f9980d8571cb67cf6aa334868ce9e59a9ad6e3d",
+    "qwen_image21_original_embedding_checkpoint_scales_convrot_and_aliases_match-isolation.json": "23f7b85082a5acd1e9bb85959cba8712f6412f45be9fb311df9cd49922c41683",
+    "qwen_image21_original_flux_const_schedules_noise_rng_and_euler_histories_match-isolation.json": "a08798eca8979532c6f55f56a1e19c7f9fe8e5648208a4dc329c3230770daf07",
+    "qwen_image21_original_logical_shape_detection_preserves_fused_split_and_prefix_rules-isolation.json": "5822f4c86b918b7f664ef62d82dc61c7ff9ab0532b2bdf0e4785e0ada4bdee95",
+    "qwen_image21_original_prefix_cache_selection_preserves_memory_thresholds_and_policy-isolation.json": "6c49bad53fef2c16fe00b2f6b3317a890d14769641fc64355af7ae20891a0ce6",
+    "qwen_image21_original_quantized_checkpoint_module_parameters_and_policy_match-isolation.json": "5a55997dac71f63b89b84ca3716940cce2094eb0c6558aa6804584b877406cd3",
+    "qwen_image21_original_qwen3vl_language_prefill_conditioning_and_prefinal_norm_match-isolation.json": "1eacc5f685233ecfd988559a6e41062e2a746ee31c70f96b17f2860c3513a0e4",
+    "qwen_image21_original_resident_attention_cache_services_and_cancellation_match-isolation.json": "f2c74e302fcc0ab197cdb20712ad0d4f4ec7b3d3c85bfa387eb93a6197623a27",
+    "qwen_image21_original_tokenizer_ids_templates_padding_images_and_unicode_match-isolation.json": "b48c9cc8e3b502e7739b0aee3e2b168207655157352c7ac7ac632d5743835057",
+    "qwen_image21_original_wan22_image_encode_decode_rgba_and_strips_match-isolation.json": "68167cbb1c9e09628408ad785563b2b516227d6eb50ab2ffe9761db33033c886",
+    "validation.log": "6ae4e688714d95bec6888f5c374db0bee94239d2f560751eed2f2a83af9efa15",
+    "verified-inputs.json": "f03b0dce807262b819b56726aad9200316dc540933b604380f421766fec998ab"
+  },
+  "report": "stage-2-qwen-image21-first-image.md",
+  "stage0_lock_hashes": {
+    "reference-lock.json": "4765e81dfe84ff32ee8352ba84c68e89f578876061fdbcd439a3a7ccac7674bb",
+    "source-manifest.json": "3e233cb602129a5e6bcb51aecd8e4215448551e176e8286df04fbf47ecd781c9",
+    "source-acquisition-lock.json": "b1148f2b24bb2fa66f69478cc1ec7960acfe4579f4aae18c63e88815ba220e77",
+    "native-linkage-lock.json": "37737a4525ec3db12f6314d2dd0e69a8fb4c5374d8ad04797ade0447e110bfa6"
+  },
+  "original_cuda_object_sha256": {
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/per_tensor_quantize.cu.o": "3d2d807ebe80171a1fc6be1bc21cde48dd653161d1ed48bedf20af4f7b1225ad",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_nvfp4.cu.o": "3e7e3d3abbd6a1768a4ec3c83d3ba5bad6cd05faa4416a29ef9d022ecc248193",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_mxfp8.cu.o": "32ce8fa25aff6472da966d4fac69dc24153069fe0000c0853a1826677a4ba5ed",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cublas_gemm_nvfp4.cu.o": "680a5a891a2ef7770c14ff42ecbfdb1d0c12c5d8dadf3851452fc110cc752452",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cublas_gemm_int8.cu.o": "2aed0b8e264fae2f1cf2d376d0ffcca60cf7eed293ece4bf5e4247b6f1728646",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_gemm_fp16.cu.o": "ebae11caf8503337e0b64079ec18586bba0137aa0d3d8cb09be1645eb2e60304",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_conv3d_fp16.cu.o": "7d5c96117eadfe3aa87e8bc8b3505d30d27bd463cf60d83ab0652ff159ae0f44",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/group_norm_pad3d.cu.o": "1f07b71230d4643d24b0b4a9332fdc2fa9b19fce51cf9977137fca378a7c7650",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_gemm_int8.cu.o": "69dbe305bb12285d30c0943de3782bf2137e7f51001152747801288b079ce7e3",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/turing_int8.cu.o": "da772d8e3d84e29f408c03da7a4ef4adb151e33a1d2b79a936e78d83093bfaef",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/int8_linear.cu.o": "6ec80066ac6196c2c3a056724645b92035481f5eaccb75c5c3c1708c0b452875",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/turing_int4.cu.o": "657fe848722204805c90b32361d08c1ad0c0d2db06cc214c48e3350f227e9288",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/rms_rope.cu.o": "f8496838d759ad41e028b131e7885c93b05f3d422089825b58f570b2e49b973d",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/na3d.cu.o": "f2266ff6d3d2ba5e4a95a4e3b5fefb747a5b6462bc78a65e019a09dda0f65e5b",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/convrot_w4a4.cu.o": "743568df8ff8c41d235989b74e668b9b03fc3eb3db5d43576a85c7daad41627a",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_svdquant_w4a4.cu.o": "725e27c684ea282639fe577a44a023b8d88c27c396ea9ee85198123a0445e962",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/awq_w4a16.cu.o": "e28c35d897ad392a75bee326fbf1ff6ee666b40b75bccc74d68816bd854cf3de",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/scaled_mm_svdquant_w4a4.cu.o": "b72f8def62109eb9eab4d43e49b5742edebcbf5c148e858b5d603dfc21ea33d2",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/adaln.cu.o": "9ef10f13e150a4513e0eafa40d5524adf166e4ed944e8676e07e6f1d8eaa65d4",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/w4a8_gemm.cu.o": "ccc1ed96fa2f670743a87a4ec3f86583229ce5f706b1efd980bd95a71f7df8f5",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/gated_delta.cu.o": "e804eac607960581ce3364461aa43bbdf701f9b5cd52aadc0c59e748afe608a8",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/flash_decode.cu.o": "d65051666247d33e010dbf6d3cf3edd1deb64818f666e27f6ad0fbe7cadbd0e8",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn.cu.o": "2b81ed45656686a5418a79437fa67f2bbd198552ef7958daf3f4c21e42267a6f",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_producer.cu.o": "a4c4cfa30b547f7ca14a12e7f0ee3a52209d41a7f33d74e92642b6af99f9c4cb",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_preprocess.cu.o": "9fc266112eb6d1feb128976766d024c37cc8eb89194b6d052ed92c8a0f3481ab",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_vtranspose.cu.o": "ca65ee8714b2e8bc6bf477847291b8b0e06458a9da9dd85cfeb75097f068101f",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_route.cu.o": "57c29cd3180182554e875f24975f07f81e82a48efecde301e862ff59e1fcb8ad",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_exact.cu.o": "3144f3ce9a2159f46c4911b72860d0a24060a4fa83d4575b2aaff83fcde2580b",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_token.cu.o": "a819a2c76af49c89f50c052beec76ba68d809511ca9633a4845b3b2a40af9788",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/quant_v_int8.cu.o": "9f29f714e161674dc3064b3e727bff00056d8b3a2d6d9a42037890d4a5db8169",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/quant_qk_int8.cu.o": "067b1215f24ff207d45a957f29f95d6dc2c3d083dcdaef30bdad69f09e58b128",
+    "CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sage_attn_launcher.cu.o": "1e592f5c2a5e5a2feb97dce2d889523be50db6879cc271c646418da2fb7aaf39"
+  }
+}

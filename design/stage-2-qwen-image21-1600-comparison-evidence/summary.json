@@ -1,0 +1,204 @@
+{
+  "schema": 1,
+  "samples_per_backend": 3,
+  "order": [
+    "python-rust",
+    "rust-python",
+    "python-rust"
+  ],
+  "all_float32_boundaries_exact": true,
+  "all_png_rgba8_exact": true,
+  "same_hash_all_six": {
+    "context": true,
+    "latent": true,
+    "image-rgba": true
+  },
+  "phase_seconds": {
+    "dit_load": {
+      "rust": {
+        "samples": [
+          0.923858645,
+          0.956267585,
+          0.918606473
+        ],
+        "median": 0.923858645,
+        "min": 0.918606473,
+        "max": 0.956267585
+      },
+      "python": {
+        "samples": [
+          1.2265882940264419,
+          0.95545971498359,
+          0.9430351699702442
+        ],
+        "median": 0.95545971498359,
+        "min": 0.9430351699702442,
+        "max": 1.2265882940264419
+      }
+    },
+    "pipeline_wall_including_unload_and_intermediate_export": {
+      "rust": {
+        "samples": [
+          6.933195887,
+          6.24098761,
+          7.052630927
+        ],
+        "median": 6.933195887,
+        "min": 6.24098761,
+        "max": 7.052630927
+      },
+      "python": {
+        "samples": [
+          7.303645764943212,
+          6.726047268952243,
+          6.640174566069618
+        ],
+        "median": 6.726047268952243,
+        "min": 6.640174566069618,
+        "max": 7.303645764943212
+      }
+    },
+    "sampling": {
+      "rust": {
+        "samples": [
+          2.360814185,
+          2.335574469,
+          2.351009698
+        ],
+        "median": 2.351009698,
+        "min": 2.335574469,
+        "max": 2.360814185
+      },
+      "python": {
+        "samples": [
+          2.5950245540589094,
+          2.348833025083877,
+          2.3545433009276167
+        ],
+        "median": 2.3545433009276167,
+        "min": 2.348833025083877,
+        "max": 2.5950245540589094
+      }
+    },
+    "text_encode": {
+      "rust": {
+        "samples": [
+          0.332494302,
+          0.311582548,
+          0.336559153
+        ],
+        "median": 0.332494302,
+        "min": 0.311582548,
+        "max": 0.336559153
+      },
+      "python": {
+        "samples": [
+          0.5425485030282289,
+          0.499556811992079,
+          0.5017766329692677
+        ],
+        "median": 0.5017766329692677,
+        "min": 0.499556811992079,
+        "max": 0.5425485030282289
+      }
+    },
+    "text_load": {
+      "rust": {
+        "samples": [
+          1.19015759,
+          1.17091951,
+          1.2188921719999999
+        ],
+        "median": 1.19015759,
+        "min": 1.17091951,
+        "max": 1.2188921719999999
+      },
+      "python": {
+        "samples": [
+          1.3959130580769852,
+          1.484447419992648,
+          1.4684737869538367
+        ],
+        "median": 1.4684737869538367,
+        "min": 1.3959130580769852,
+        "max": 1.484447419992648
+      }
+    },
+    "vae_decode": {
+      "rust": {
+        "samples": [
+          0.673609789,
+          0.663168708,
+          0.656009769
+        ],
+        "median": 0.663168708,
+        "min": 0.656009769,
+        "max": 0.673609789
+      },
+      "python": {
+        "samples": [
+          0.6380690169753507,
+          0.6376685949508101,
+          0.6338936340762302
+        ],
+        "median": 0.6376685949508101,
+        "min": 0.6338936340762302,
+        "max": 0.6380690169753507
+      }
+    },
+    "vae_load": {
+      "rust": {
+        "samples": [
+          0.874936879,
+          0.24084483,
+          0.993120471
+        ],
+        "median": 0.874936879,
+        "min": 0.24084483,
+        "max": 0.993120471
+      },
+      "python": {
+        "samples": [
+          0.264021210023202,
+          0.22844489803537726,
+          0.19215440994594246
+        ],
+        "median": 0.22844489803537726,
+        "min": 0.19215440994594246,
+        "max": 0.264021210023202
+      }
+    }
+  },
+  "scope": "One first-process 1600x896 4-step synthetic INT8 ConvRot sample; OS model cache already warm. Not a production quality or steady-state benchmark.",
+  "comparison_with_prior_512": {
+    "512x512": {
+      "sampling": {
+        "rust_median": 0.737225667,
+        "python_median": 0.48491821403149515,
+        "rust_minus_python_seconds": 0.2523074529685049,
+        "rust_extra_percent": 52.030929271738515
+      },
+      "pipeline_wall_including_unload_and_intermediate_export": {
+        "rust_median": 4.901581417,
+        "python_median": 4.5446908419253305,
+        "rust_minus_python_seconds": 0.3568905750746696,
+        "rust_extra_percent": 7.8529120569062805
+      }
+    },
+    "1600x896": {
+      "sampling": {
+        "rust_median": 2.351009698,
+        "python_median": 2.3545433009276167,
+        "rust_minus_python_seconds": -0.0035336029276167302,
+        "rust_extra_percent": -0.15007593728365576
+      },
+      "pipeline_wall_including_unload_and_intermediate_export": {
+        "rust_median": 6.933195887,
+        "python_median": 6.726047268952243,
+        "rust_minus_python_seconds": 0.20714861804775708,
+        "rust_extra_percent": 3.0797972384756456
+      }
+    }
+  },
+  "pixel_ratio": 5.46875
+}

@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "status": "reference_cuda_oom_before_sampling",
+  "prefix": "qwen21-1600-40steps-bf16-comparison-01",
+  "operation": "comfy.model_management.load_models_gpu([model], force_full_load=True)",
+  "exception": "torch.OutOfMemoryError",
+  "requested_allocation_bytes": 33554432,
+  "allocator_reported_free_bytes": 81068032,
+  "device_total_bytes": 16769744896,
+  "sampling_callbacks": 0,
+  "matched_pairs": 0,
+  "rust_generation_started": false,
+  "image_generation_completed": false,
+  "valid_timing_result": false,
+  "context_sha256": "225d3169d4ac5dbd1ae7c2f19d4645e81c41766b6548d3194b0f47b41862ed23",
+  "context_matches_preserved_int8_control": true,
+  "raw_task_log_sha256": "a9866eef0a60d403c632f8215c81b1280bf5f0df77626f6e0438bc77e9297f8d",
+  "note": "No GPU process inventory queried. Raw framework OOM diagnostics remain only in the isolated task runtime; durable evidence stores no process details. First attempted pair is excluded from timing results, including cold start/concurrent model-hash I/O."
+}

@@ -1,0 +1,4 @@
+{
+  "prefix": "qwen21-1600-40steps-bf16-offload-comparison-01",
+  "reason": "Source-faithful clone registration and retained-object accounting corrected after initial exact pair; all initial times excluded"
+}
