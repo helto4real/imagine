@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "upstream": {
+    "version": "12.3.0",
+    "archive_sha256": "3b8182a766685eaa002637e28b4ec8d6b18819a0c71f579bf0dbaa5830297cce",
+    "source_sha256": {
+      "LICENSE": "15181e7363dca9aed78b79bebebc7fde7f1814b8bd311ea3b87ae8ccadfc185b",
+      "src/libImaging/Arrow.h": "8b052f9ca70793657c47ec15dc4993eaf3591fac4985b76d4d0df30a58e9d5a4",
+      "src/libImaging/Bcn.h": "8a9e5e2775e5d6d90aee3cbb9b52d2db9c997ecbcdb1891dbe9026afcbeda52f",
+      "src/libImaging/Bit.h": "35d3900694f48fd4b18bd2f22537af2838411c35d61e3c6cc844b108f9366f2c",
+      "src/libImaging/Convert.c": "2befb53f832dd8a780a33b6ba417f63cbb44e3dbcdbbdc6b908c720a64ac03b9",
+      "src/libImaging/Convert.h": "f1e4b515926d04ac6f0212fb0ce3ef47d7b83378b7653b6236e9995815eca2bc",
+      "src/libImaging/ConvertYCbCr.c": "bdb41620d63c0ec108d130aee572a8496064900a17887018bb50ae4a78a5382a",
+      "src/libImaging/Copy.c": "e888b1bc87e55afe68f257f1f49d7f33bb3f8fe2fcf948072eadb46d61d89363",
+      "src/libImaging/Gif.h": "f7f2ac1536d34445be4b9fc4329ed5330ba8ec74e1ae70237ca4283e4c205bfc",
+      "src/libImaging/ImDib.h": "c86f8d8b790b41a8b4cc267ec1f52613e7de05b36600d648f66fb6c45d05fa2b",
+      "src/libImaging/ImPlatform.h": "534cb6d80167e013efdcb72bb6ded75facac61413b847381747fc7b8e8ac196c",
+      "src/libImaging/Imaging.h": "95909de733446fccf4a613efd8b708231d4497356b1f44671fd110206aa68a23",
+      "src/libImaging/ImagingUtils.h": "3309f7beaa812dddbec474e9e12d4c5b22590a889e68d9ef5d56d99cbb6dc59c",
+      "src/libImaging/Jpeg.h": "6c8e541d259afb406418d1af3bbc3dda437274e60012bee23dd136ed91211850",
+      "src/libImaging/Jpeg2K.h": "7d8bea9ef90b8a0c9aad9f4ca8ae262037e4511cc8425fb7536d607090a0f9bf",
+      "src/libImaging/Mode.c": "40b44d8f37c5ca1f1a20b84176f1e431b1fc625c77036a4eb616b03560408209",
+      "src/libImaging/Mode.h": "c5f66f9fe8d0d66070be5314fd80b93359b7b7a79286198b058035b6f94b48eb",
+      "src/libImaging/Palette.c": "55fbb990c0b0529b73f0330071d45bcf6931c36411c66e656985c698b23670ee",
+      "src/libImaging/QuantHash.h": "d3801625f19231c900266b9287503a3aaf1f09a74733e76282d4675d9e27e551",
+      "src/libImaging/QuantHeap.h": "82defd43870fb01d8d60fbfdea1a6569d3bff66a1fee1fe91626a2f2aca474aa",
+      "src/libImaging/QuantOctree.h": "9f86dfb036c98ef7b97ad1708b6c293ef9b37994a4b7b4dbb635d19a1ee8fbef",
+      "src/libImaging/QuantPngQuant.h": "1de96837819012f1edc6da33660ccd5e99322caaa7a321306a511d43c933ad60",
+      "src/libImaging/QuantTypes.h": "477ea5f087dfe3716f549414cacdd58afde51862724a9f4ea2afa299afe1e695",
+      "src/libImaging/Raw.h": "435ab00d69e97f8054d7ab736478178d4a5892c663f0cb30ccc279abc059a69d",
+      "src/libImaging/Resample.c": "808c212d03289b9ab70fad67168da1b14ed8dd74f1607c7a7278c50cbc1ae0ab",
+      "src/libImaging/Sgi.h": "fed49951ad0089ac601610296d49d5f7cd7b1f5eed579f61b8ec16d56daa7c95",
+      "src/libImaging/Storage.c": "1b0abfe035ce27d1ec6f4006bf94bf00cdf0baa541b9ea3c716a3f4c247a4a9d",
+      "src/libImaging/TiffDecode.h": "3af180513969d592cbc547655dcbcd57b179612622254f3ea09ec6dd2210ee0f",
+      "src/libImaging/ZipCodecs.h": "0fcc4cf8f2d4e3017a85947e5069d266b97d768950616a0a0dd82084ed2ffdef"
+    }
+  },
+  "source_root": "/home/thhel/ChatGPT/imagine/inference/resources/pillow-12.3.0",
+  "library_sha256": "095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3",
+  "adapter_sha256": {
+    "inference/native/pillow/CMakeLists.txt": "087e7ea1bf7f70fd354b6f69b5a57c213141ee2222f301e9f5a35483d26d4318",
+    "inference/native/pillow/README.md": "b1e5c0627dd7bd5c610451df4faaa170b83318c0eb034155cd41f0138a1cc019",
+    "inference/native/pillow/bridge.c": "68247526e0565d7da9e75a6f4bdf46c4e968b0a34b69dc8b0d8276ed8d222299",
+    "inference/native/pillow/shim/Python.h": "bac7bff1fdb744681810e6d1ad97aa8100cb8f3a988f9b18e2d310eacd31b71b"
+  },
+  "undefined_symbols": "                 w _ITM_deregisterTMCloneTable\n                 w _ITM_registerTMCloneTable\n                 U __assert_fail@GLIBC_2.2.5\n                 w __cxa_finalize@GLIBC_2.2.5\n                 w __gmon_start__\n                 U __stack_chk_fail@GLIBC_2.4\n                 U __tls_get_addr@GLIBC_2.3\n                 U calloc@GLIBC_2.2.5\n                 U ceil@GLIBC_2.2.5\n                 U cos@GLIBC_2.2.5\n                 U floor@GLIBC_2.2.5\n                 U fmod@GLIBC_2.38\n                 U free@GLIBC_2.2.5\n                 U malloc@GLIBC_2.2.5\n                 U memcpy@GLIBC_2.14\n                 U memset@GLIBC_2.2.5\n                 U pthread_mutex_lock@GLIBC_2.2.5\n                 U pthread_mutex_unlock@GLIBC_2.2.5\n                 U realloc@GLIBC_2.2.5\n                 U round@GLIBC_2.2.5\n                 U sin@GLIBC_2.2.5\n                 U snprintf@GLIBC_2.2.5\n",
+  "linked_libraries": "\tlinux-vdso.so.1 (0x00007f8ada1ef000)\n\tlibm.so.6 => /usr/lib/libm.so.6 (0x00007f8ada06f000)\n\tlibc.so.6 => /usr/lib/libc.so.6 (0x00007f8ad9e00000)\n\t/usr/lib64/ld-linux-x86-64.so.2 (0x00007f8ada1f1000)\n",
+  "python_runtime_required": false,
+  "transformation": "Original core C/header files unchanged; buffer ownership, allocator gate/GIL-section and error hooks supplied by standalone C ABI"
+}

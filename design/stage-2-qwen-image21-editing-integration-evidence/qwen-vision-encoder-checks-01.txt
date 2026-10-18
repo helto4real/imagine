@@ -1,0 +1,15 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+    Checking imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+error: the borrowed expression implements the required traits
+   --> src/models/qwen_image21/vision_encoder.rs:275:36
+    |
+275 |             pos.f_split_with_sizes(&grid.iter().map(|g| g[1] * g[2]).collect::<Vec<_>>(), 0)?;
+    |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `grid.iter().map(|g| g[1] * g[2]).collect::<Vec<_>>()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#needless_borrows_for_generic_args
+    = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrows_for_generic_args)]`
+
+error: could not compile `imagine-inference` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `imagine-inference` (lib) due to 1 previous error

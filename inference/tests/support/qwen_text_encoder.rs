@@ -17,10 +17,10 @@ impl Drop for Threads {
         tch::set_num_threads(self.0);
     }
 }
-struct Exec {
-    events: Vec<Value>,
-    operations: usize,
-    attention: Attention,
+pub(super) struct Exec {
+    pub(super) events: Vec<Value>,
+    pub(super) operations: usize,
+    pub(super) attention: Attention,
 }
 impl q::TextEncoderExecution for Exec {
     fn check_interrupt(&mut self) -> Result<(), Error> {
@@ -71,7 +71,7 @@ impl q::TextEncoderExecution for Exec {
         }
     }
 }
-fn data(shape: &[i64], device: Device, kind: Kind, offset: i64) -> Tensor {
+pub(super) fn data(shape: &[i64], device: Device, kind: Kind, offset: i64) -> Tensor {
     Tensor::f_arange(shape.iter().product::<i64>(), (Kind::Float, device))
         .unwrap()
         .f_add_scalar(offset)
@@ -87,7 +87,7 @@ fn data(shape: &[i64], device: Device, kind: Kind, offset: i64) -> Tensor {
         .f_to_kind(kind)
         .unwrap()
 }
-fn config(c: &Value) -> q::TextEncoderConfig {
+pub(super) fn config(c: &Value) -> q::TextEncoderConfig {
     let n = |k: &str| c[k].as_i64().unwrap();
     q::TextEncoderConfig {
         vocab_size: n("vocab_size"),

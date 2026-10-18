@@ -1,0 +1,21 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/imagine-rust-comfy-parity-20261017/pillow
+[100%] Built target imagine_pillow
+Prepared original Pillow core without Python: 095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3
+    Checking imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+error[E0277]: `imagine_inference::models::qwen_image21::CacheSelection` doesn't implement `std::fmt::Debug`
+  --> tests/support/qwen_host_cache.rs:77:9
+   |
+77 | /         assert_eq!(
+78 | |             q::PrefixKv::select(
+79 | |                 &mut cache,
+80 | |                 &Tensor::from_slice(&[1_f32]).to_device(dev),
+...  |
+86 | |             q::CacheSelection::Fill
+87 | |         );
+   | |_________^ the trait `std::fmt::Debug` is not implemented for `imagine_inference::models::qwen_image21::CacheSelection`
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `imagine-inference` (test "primitives") due to 2 previous errors

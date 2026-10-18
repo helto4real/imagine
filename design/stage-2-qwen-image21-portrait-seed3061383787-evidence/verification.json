@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "profile_seed_only_check": "passed",
+  "build_locked_offline": "passed",
+  "cargo_fmt_check": "passed",
+  "cargo_clippy_all_targets_deny_warnings": "passed",
+  "python_ast": "passed",
+  "shell_syntax": "passed",
+  "full_25_regression_tests_rerun": false,
+  "reason": "Only frozen profile registration and optional test-script profile argument changed; no inference math or memory implementation changed. Fresh trained pair exercises selected path.",
+  "stage0_lock_hashes": {
+    "reference-lock.json": "4765e81dfe84ff32ee8352ba84c68e89f578876061fdbcd439a3a7ccac7674bb",
+    "source-manifest.json": "3e233cb602129a5e6bcb51aecd8e4215448551e176e8286df04fbf47ecd781c9",
+    "source-acquisition-lock.json": "b1148f2b24bb2fa66f69478cc1ec7960acfe4579f4aae18c63e88815ba220e77",
+    "native-linkage-lock.json": "37737a4525ec3db12f6314d2dd0e69a8fb4c5374d8ad04797ade0447e110bfa6"
+  },
+  "unchanged_original_cuda_objects": 32,
+  "source_sha256": {
+    "inference/src/bin/qwen21-first-image.rs": "c1a65f7f8721b1b5a132fdf9dc5b3f5e9833b549cf1c2d578a62db146660947a",
+    "inference/tools/test_isolation.py": "7d0570f604cdf8cd3c11853db76e0b9410db8504b9ccf35ce1b6f47957f12fa6",
+    "inference/tools/reference_qwen_editing.py": "b1424fd02ffaf20d7d1a36b64517061907364d36864b41fd582bf7bd344dc6df",
+    "inference/tools/check_qwen_portrait_editing.sh": "9200bdd1d8dd22bf2767092601965e5f5cb2c1dc26e2790cd68511be86001ee2",
+    "inference/profiles/qwen21-editing-portrait-1mpx-int8-seed3061383787.json": "903816226083c10a83b6c4faf9546c90d606f4defd940ae1176d7174673be9a7",
+    "inference/tools/compare_qwen_first_image.py": "86e2aec74599d144fd98f296af733874dbbc95aafde0bc4e8de23921fdb7c6a9"
+  }
+}

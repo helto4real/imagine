@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/home/thhel/ChatGPT/imagine/inference/tools/reference_qwen_host_cache.py", line 54, in <module>
+    value=cache.take(i,torch.device('cuda:0'),target,1);values.append(value)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/thhel/git/ComfyUI/comfy/ldm/wan/model_animate2.py", line 226, in take
+    return comfy.utils.repeat_to_batch_size(t, batch_size)
+           ^^^^^^^^^^^
+AttributeError: 'types.SimpleNamespace' object has no attribute 'utils'

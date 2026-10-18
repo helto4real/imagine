@@ -1,0 +1,164 @@
+{
+  "schema": 1,
+  "metrics": {
+    "context": {
+      "shape": [
+        1,
+        31,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26",
+        "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 126976,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "latent": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "6252a3b5cc9e0ab305f279ced92edff740c451180204898cf5a721ce2eb6c78a",
+        "6252a3b5cc9e0ab305f279ced92edff740c451180204898cf5a721ce2eb6c78a"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 17920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "image-rgba": {
+      "shape": [
+        1,
+        224,
+        320,
+        4
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "81318f34523db7c924c94fd4581e3fecbeb48867b04699833e2ec3e4e50e55a1",
+        "81318f34523db7c924c94fd4581e3fecbeb48867b04699833e2ec3e4e50e55a1"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 286720,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "sigmas": {
+      "shape": [
+        9
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "fe5385494537d4b785034e9728ce82a163e0123ffba1f2d4b476688321a6e098",
+        "fe5385494537d4b785034e9728ce82a163e0123ffba1f2d4b476688321a6e098"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 9,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "negative-context": {
+      "shape": [
+        1,
+        15,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660",
+        "13810cce53266ddac7dc2ed5d7299da80133a43b19d65c4dbfaca1a8f5598660"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 61440,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-vision-0": {
+      "shape": [
+        1,
+        224,
+        320,
+        3
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8",
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 215040,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-latent-0": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206",
+        "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 17920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "png_rgba8": {
+      "exact": true,
+      "unequal_channels": 0,
+      "unequal_pixels": 0,
+      "max_abs": 0,
+      "mean_abs": 0.0
+    }
+  },
+  "timings_seconds": {
+    "rust": {
+      "dit_load": 16.539470573,
+      "pipeline_wall_including_unload_and_intermediate_export": 24.537714369,
+      "reference_vae_load_and_encode": 0.480962442,
+      "sampling": 1.412949735,
+      "text_encode": 0.341316827,
+      "text_load": 4.012089319,
+      "vae_decode": 0.075088973,
+      "vae_load": 0.829209642
+    },
+    "python": {
+      "reference_vae_load_and_encode": 0.5413839598186314,
+      "text_load": 4.153254478937015,
+      "text_encode": 0.8438698968384415,
+      "dit_load": 2.5512289779726416,
+      "sampling": 1.6675542169250548,
+      "vae_load": 0.22091917088255286,
+      "vae_decode": 0.06870904006063938,
+      "pipeline_wall_including_unload_and_intermediate_export": 10.741762249032035
+    }
+  },
+  "scope": "One first-process 320x224 8-step synthetic turbo_bf16 DiT sample; OS model cache already warm. Not a production quality or steady-state benchmark.",
+  "production_runtime_read": false
+}

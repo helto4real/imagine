@@ -34,6 +34,24 @@ pub fn static_load_budget(free: f64, loaded: f64, minimum: Option<f64>) -> f64 {
 pub fn qwen_sampling_memory(batch: i64, height: i64, width: i64) -> f64 {
     ((batch * height * width) as f64 * 2. * 0.01 * 6.) * (1024 * 1024) as f64
 }
+/// Original estimate_memory + QwenImage.extra_conds_shapes. Each entry is one
+/// conditioning's ordered reference tensor shapes, including positive/negative.
+/// CFG=1's later denoising shortcut does not remove them from this estimate.
+pub fn qwen_sampling_memory_with_references(
+    noise_shape: &[i64],
+    conditions: &[Vec<Vec<i64>>],
+) -> (f64, f64) {
+    let area = noise_shape[0] * noise_shape[2..].iter().product::<i64>();
+    let reference_areas = conditions
+        .iter()
+        .map(|refs| refs.iter().map(|s| s.iter().product::<i64>()).sum::<i64>() / 64)
+        .collect::<Vec<_>>();
+    let bytes = |a: i64| (a as f64 * 2. * 0.01 * 6.) * (1024 * 1024) as f64;
+    (
+        bytes(area * 2 + reference_areas.iter().sum::<i64>()),
+        bytes(area + reference_areas.iter().copied().max().unwrap_or(0)),
+    )
+}
 #[derive(Clone, Deserialize, Serialize)]
 pub struct OffloadModule {
     pub name: String,
@@ -123,21 +141,7 @@ pub fn bf16_dit_modules() -> Result<Vec<OffloadModule>, Error> {
     ))
     .map_err(|e| Error::Native(e.to_string()))
 }
-/// Linux host/cgroup totals used for static cudaHostRegister's original cap.
-/// Only aggregate memory files and this process's cgroup ancestry are read.
-pub fn host_pin_limit() -> Result<f64, Error> {
-    let raw = fs::read_to_string("/proc/meminfo").map_err(|e| Error::Native(e.to_string()))?;
-    let total = raw
-        .lines()
-        .find_map(|line| {
-            line.strip_prefix("MemTotal:")
-                .and_then(|v| v.split_whitespace().next())
-                .and_then(|v| v.parse::<u64>().ok())
-        })
-        .ok_or_else(|| gap("MemTotal unavailable"))?
-        * 1024;
-    let mut ram = total;
-    let mut limited = false;
+fn host_cgroup_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
     if let Ok(raw) = fs::read_to_string("/proc/self/cgroup") {
         for line in raw.lines() {
@@ -166,6 +170,98 @@ pub fn host_pin_limit() -> Result<f64, Error> {
             PathBuf::from("/sys/fs/cgroup/memory"),
         ]);
     }
+    dirs
+}
+/// Original available aggregation over observed cgroups, excluding inactive files.
+pub fn host_available_from_cgroups(
+    total: u64,
+    available: u64,
+    groups: &[(i128, Option<(i128, i128)>)],
+) -> u64 {
+    let mut available = available as i128;
+    for &(limit, usage) in groups {
+        if limit > 0 && limit < (total as i128) {
+            let used = usage
+                .map(|(bytes, inactive)| (bytes - inactive).max(0))
+                .unwrap_or(0);
+            available = available.min(limit - used);
+        }
+    }
+    available.max(0) as u64
+}
+/// Original graph-free ensure_pin_budget with no eligible inactive owners.
+pub fn single_owner_pin_budget(size: usize, available: u64) -> bool {
+    size as u128 + 2048 * 1024 * 1024 <= available as u128
+}
+/// Selected Linux system_memory.virtual_memory_available branch: MemAvailable
+/// and the current process's complete cgroup lineage, no process inventory.
+pub fn host_available_memory() -> Result<u64, Error> {
+    let raw = fs::read_to_string("/proc/meminfo").map_err(|e| Error::Native(e.to_string()))?;
+    let mem = raw
+        .lines()
+        .filter_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            Some((
+                name,
+                value.split_whitespace().next()?.parse::<u64>().ok()? * 1024,
+            ))
+        })
+        .collect::<BTreeMap<_, _>>();
+    let total = *mem
+        .get("MemTotal")
+        .ok_or_else(|| gap("MemTotal unavailable"))?;
+    let available = *mem
+        .get("MemAvailable")
+        .ok_or_else(|| gap("Legacy Linux psutil MemAvailable fallback"))?;
+    let mut groups = Vec::new();
+    let read = |path: PathBuf| fs::read_to_string(path).ok()?.trim().parse::<i128>().ok();
+    for dir in host_cgroup_dirs() {
+        let limit = ["memory.max", "memory.limit_in_bytes"]
+            .iter()
+            .find_map(|n| read(dir.join(n)).filter(|n| *n > 0));
+        if let Some(limit) = limit.filter(|n| *n > 0 && *n < total as i128) {
+            let usage = read(dir.join("memory.current"))
+                .map(|n| (n, "inactive_file"))
+                .or_else(|| {
+                    read(dir.join("memory.usage_in_bytes")).map(|n| (n, "total_inactive_file"))
+                });
+            let usage = usage.map(|(usage, key)| {
+                let stat = fs::read_to_string(dir.join("memory.stat")).unwrap_or_default();
+                let inactive = stat
+                    .lines()
+                    .find_map(|l| {
+                        let p = l.split_whitespace().collect::<Vec<_>>();
+                        if p.len() == 2 && p[0] == key {
+                            p[1].parse::<i128>().ok()
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(0);
+                (usage, inactive)
+            });
+            groups.push((limit, usage));
+        }
+    }
+    Ok(host_available_from_cgroups(total, available, &groups))
+}
+
+/// Linux host/cgroup totals used for static cudaHostRegister's original cap.
+/// Only aggregate memory files and this process's cgroup ancestry are read.
+pub fn host_pin_limit() -> Result<f64, Error> {
+    let raw = fs::read_to_string("/proc/meminfo").map_err(|e| Error::Native(e.to_string()))?;
+    let total = raw
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("MemTotal:")
+                .and_then(|v| v.split_whitespace().next())
+                .and_then(|v| v.parse::<u64>().ok())
+        })
+        .ok_or_else(|| gap("MemTotal unavailable"))?
+        * 1024;
+    let mut ram = total;
+    let mut limited = false;
+    let dirs = host_cgroup_dirs();
     for dir in dirs {
         for name in ["memory.max", "memory.limit_in_bytes"] {
             if let Ok(n) = fs::read_to_string(dir.join(name))

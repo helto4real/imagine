@@ -1,0 +1,10 @@
+{
+  "inference/fixtures/qwen-image21-vision-geometry.json": "added",
+  "inference/src/models/qwen_image21/mod.rs": "changed",
+  "inference/src/models/qwen_image21/text_encoder.rs": "changed",
+  "inference/src/models/qwen_image21/vision.rs": "added",
+  "inference/tests/primitives.rs": "changed",
+  "inference/tests/support/qwen_vision_geometry.rs": "added",
+  "inference/tools/check_qwen_image21.sh": "changed",
+  "inference/tools/reference_qwen_vision_geometry.py": "added"
+}

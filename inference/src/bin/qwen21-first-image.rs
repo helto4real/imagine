@@ -108,6 +108,14 @@ fn validate_profile(p: &Value) -> Result<()> {
         include_str!("../../profiles/qwen21-1600x896-40steps-bf16.json"),
         include_str!("../../profiles/qwen21-1600x896-40steps-bf16-offload.json"),
         include_str!("../../profiles/qwen21-1600x896-8steps-turbo-offload.json"),
+        include_str!("../../profiles/qwen21-editing-int8.json"),
+        include_str!("../../profiles/qwen21-editing-bf16.json"),
+        include_str!("../../profiles/qwen21-editing-turbo.json"),
+        include_str!("../../profiles/qwen21-editing-int8-two-references.json"),
+        include_str!("../../profiles/qwen21-editing-int8-keep-vision.json"),
+        include_str!("../../profiles/qwen21-portrait-1mpx-int8.json"),
+        include_str!("../../profiles/qwen21-editing-portrait-1mpx-int8.json"),
+        include_str!("../../profiles/qwen21-editing-portrait-1mpx-int8-seed3061383787.json"),
     ];
     if !registered
         .iter()
@@ -121,7 +129,9 @@ struct Denoiser<'a> {
     rt: &'a Runtime,
     model: &'a q::DiT,
     context: Tensor,
-    cache: q::PrefixCache<'a, q::ResidentCacheServices>,
+    reference_latents: Vec<Tensor>,
+    image_slots: Vec<i64>,
+    cache: q::PrefixCache<'a, q::StaticCacheServices>,
     exec: q::ResidentExecution,
     generator: Generator,
     step_start: Instant,
@@ -138,8 +148,8 @@ impl q::EulerExecution for Denoiser<'_> {
                 &input.f_to_kind(Kind::BFloat16)?,
                 &time,
                 &self.context,
-                &[],
-                &[],
+                &self.reference_latents,
+                &self.image_slots,
                 Some(&mut self.cache),
                 &mut self.exec,
             )
@@ -175,18 +185,132 @@ fn generate(
     let offload = p["source_configuration"]["force_full_load_per_component"] == false;
     let mut memory_records = Vec::new();
     let dev = Device::Cuda(0);
+    let editing = p.get("reference_resolution").is_some();
+    let mut references = None;
+    if editing {
+        let pillow = unsafe { q::Pillow::open(&required("IMAGINE_PILLOW_LIBRARY")?) }?;
+        let images = p["references"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+            .map(|(index, spec)| {
+                let shape = spec["shape"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|n| n.as_i64().unwrap())
+                    .collect::<Vec<_>>();
+                let values = if let Some(hash) = spec.get("tensor_sha256") {
+                    // The host prepares a selected NHWC Float32 fixture, just as
+                    // the inference API receives image tensors. Only this file
+                    // is mounted; image codecs and production paths are absent.
+                    let bytes = fs::read(required(&format!("IMAGINE_QWEN_REFERENCE_{index}"))?)?;
+                    if bytes.len() != shape.iter().product::<i64>() as usize * 4
+                        || format!("{:x}", Sha256::digest(&bytes)) != hash.as_str().unwrap()
+                    {
+                        return Err("Registered reference tensor size/hash mismatch".into());
+                    }
+                    bytes
+                        .chunks_exact(4)
+                        .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
+                        .collect::<Vec<_>>()
+                } else {
+                    let multiplier = spec["byte_multiplier"].as_i64().unwrap();
+                    let offset = spec["byte_offset"].as_i64().unwrap();
+                    (0..shape.iter().product::<i64>())
+                        .map(|i| ((i * multiplier + offset) % 256) as f32 / 255_f32)
+                        .collect::<Vec<_>>()
+                };
+                Ok(Tensor::f_from_slice(&values)?.f_view(shape.as_slice())?)
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut reference_vae = None;
+        let mut encode = |pixels: &Tensor| -> std::result::Result<Tensor, Error> {
+            let start = Instant::now();
+            if reference_vae.is_none() {
+                let params = load(rt, aimdo, "vae", &paths["vae"], dev)
+                    .map_err(|e| Error::Native(e.to_string()))?;
+                let schema = q::constructor_schema()?;
+                reference_vae = Some(q::ImageVae::new(
+                    q::ImageVaeConfig {
+                        dim: schema.vae_config.dim,
+                        dec_dim: schema.vae_config.dec_dim,
+                        ..Default::default()
+                    },
+                    params,
+                ));
+            }
+            let vae = reference_vae.as_ref().unwrap();
+            let mut exec =
+                q::ResidentExecution::bind(rt, &PreparedParameters::default(), 0, attention(dev))?;
+            let out = vae
+                .encode(rt, &q::vae_encode_pixels(pixels, dev)?, &mut exec)?
+                .f_to_device(Device::Cpu)?
+                .f_to_kind(Kind::Float)?;
+            let mut samples = Tensor::f_empty(out.size(), (Kind::Float, Device::Cpu))?;
+            samples.f_copy_(&out)?;
+            rt.native.synchronize_device(0)?;
+            *timings.entry("reference_vae_load_and_encode").or_insert(0.) +=
+                start.elapsed().as_secs_f64();
+            Ok(samples)
+        };
+        let prepared = q::prepare_reference_images(
+            &pillow,
+            &images,
+            p["reference_resolution"].as_i64().unwrap(),
+            if p["reference_vae"] == true {
+                Some(&mut encode)
+            } else {
+                None
+            },
+        )?;
+        drop(reference_vae);
+        if (prepared.width, prepared.height)
+            != (p["width"].as_i64().unwrap(), p["height"].as_i64().unwrap())
+        {
+            return Err("Source-derived reference geometry differs from registered profile".into());
+        }
+        for (i, image) in prepared.vision.iter().enumerate() {
+            save_f32(image, &output.join(format!("reference-vision-{i}-f32.bin")))?;
+        }
+        for (i, latent) in prepared.reference_latents.iter().enumerate() {
+            save_f32(
+                latent,
+                &output.join(format!("reference-latent-{i}-f32.bin")),
+            )?;
+        }
+        references = Some(prepared);
+        rt.native.cuda_soft_empty_cache(0)?;
+    }
     let mut tokenizer = q::QwenTokenizer::frozen()?;
+    let token_options = q::TokenizerOptions {
+        images: references.as_ref().map_or(0, |r| r.vision.len()),
+        prevent_empty_text: editing,
+        keep_vision: references
+            .as_ref()
+            .is_some_and(|r| r.reference_latents.is_empty()),
+        ..Default::default()
+    };
     let prompt = tokenizer.tokenize_prompt(
         p["synthetic_prompt"]
             .as_str()
             .ok_or("Missing synthetic prompt")?,
-        &q::TokenizerOptions::default(),
+        &token_options,
     )?;
     let conditioning = {
         eprintln!("loading text component");
         let start = Instant::now();
         let params = load(rt, aimdo, "text", &paths["text"], dev)?;
         let encoder = q::QwenTextEncoder::from_parameters(Default::default(), &params)?;
+        let vision = if editing {
+            Some(q::QwenVisionEncoder::from_parameters(
+                Default::default(),
+                &params,
+            )?)
+        } else {
+            None
+        };
         let mut exec = q::ResidentExecution::bind(rt, &params, 0, attention(dev))?;
         if own.join("trace-enabled").is_file() {
             let directory = output.join("text-trace");
@@ -203,18 +327,56 @@ fn generate(
         timings.insert("text_load", elapsed(rt, start)?);
         let start = Instant::now();
         let conditioning = unsafe {
-            encoder.encode_prompt(
+            encoder.encode_prompt_with_images(
                 rt,
                 &prompt,
                 q::TextConditioningOptions {
                     execution_device: dev,
                     intermediate_device: Device::Cpu,
                 },
+                vision
+                    .as_ref()
+                    .zip(references.as_ref())
+                    .map(|(v, r)| (v, r.vision.as_slice())),
                 &mut exec,
             )
         }?;
         timings.insert("text_encode", elapsed(rt, start)?);
-        if conditioning.attention_mask.is_some() || !conditioning.image_slots.is_empty() {
+        if editing {
+            let negative = tokenizer
+                .tokenize_prompt(p["negative_prompt"].as_str().unwrap(), &token_options)?;
+            let negative = unsafe {
+                encoder.encode_prompt_with_images(
+                    rt,
+                    &negative,
+                    q::TextConditioningOptions {
+                        execution_device: dev,
+                        intermediate_device: Device::Cpu,
+                    },
+                    vision
+                        .as_ref()
+                        .zip(references.as_ref())
+                        .map(|(v, r)| (v, r.vision.as_slice())),
+                    &mut exec,
+                )
+            }?;
+            save_f32(&negative.context, &output.join("negative-context-f32.bin"))?;
+            fs::write(
+                output.join("conditioning.json"),
+                serde_json::to_vec_pretty(
+                    &json!({"positive_slots":conditioning.image_slots,"negative_slots":negative.image_slots,"positive_shape":conditioning.context.size(),"negative_shape":negative.context.size(),"negative_attention_mask":negative.attention_mask.is_some()}),
+                )?,
+            )?;
+            if negative.attention_mask.is_some() {
+                return Err("Unexpected negative mask in registered editing profile".into());
+            }
+        }
+        if editing {
+            timings.insert("text_encode", elapsed(rt, start)?);
+        }
+        if conditioning.attention_mask.is_some()
+            || (!editing && !conditioning.image_slots.is_empty())
+        {
             return Err(
                 "Nontrivial mask/image conditioning has a separate initial-driver binding".into(),
             );
@@ -251,8 +413,21 @@ fn generate(
         timings.insert("dit_load", elapsed(rt, start)?);
         let start = Instant::now();
         if let Some(owner) = &mut managed {
-            let required = q::qwen_sampling_memory(2, shape[2], shape[3]);
-            let minimum = q::qwen_sampling_memory(1, shape[2], shape[3]);
+            let refs = references
+                .as_ref()
+                .map(|r| {
+                    r.reference_latents
+                        .iter()
+                        .map(Tensor::size)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            let groups = if editing {
+                vec![refs.clone(), refs]
+            } else {
+                vec![]
+            };
+            let (required, minimum) = q::qwen_sampling_memory_with_references(&shape, &groups);
             owner.load_for(Some(minimum), required)?;
             memory_records.push(json!({"phase":"dit_sampling", "placement":owner.placement,"pinned_bytes":owner.pinned_bytes}));
         }
@@ -265,9 +440,10 @@ fn generate(
         let mut cache = q::PrefixCache::new(
             rt,
             Default::default(),
-            q::ResidentCacheServices {
-                native: rt.native.clone(),
-            },
+            q::StaticCacheServices::new(
+                rt.native.clone(),
+                managed.as_ref().map_or(0, |m| m.pinned_bytes as usize),
+            )?,
         );
         model.reset_prefix_cache(true, &mut cache)?;
         let exec = q::ResidentExecution::bind(rt, params, model.config.num_layers, attention(dev))?;
@@ -303,6 +479,22 @@ fn generate(
             context: conditioning
                 .context
                 .f_to_device_(dev, Kind::BFloat16, false, false)?,
+            reference_latents: references
+                .as_ref()
+                .map(|r| {
+                    r.reference_latents
+                        .iter()
+                        .map(|latent| {
+                            q::LatentNormalization::new(rt)?
+                                .process_in(latent)?
+                                .f_to_device_(dev, Kind::BFloat16, false, false)
+                                .map_err(Error::from)
+                        })
+                        .collect::<std::result::Result<Vec<_>, Error>>()
+                })
+                .transpose()?
+                .unwrap_or_default(),
+            image_slots: conditioning.image_slots.clone(),
             cache,
             exec,
             generator: rt.native.generator(dev, p["seed"].as_u64().unwrap())?,
@@ -319,6 +511,15 @@ fn generate(
         let latent = q::LatentNormalization::new(rt)?
             .process_out(&sampled.f_to_kind(Kind::Float)?)?
             .f_to_device(Device::Cpu)?;
+        fs::write(
+            output.join("prefix-cache.json"),
+            serde_json::to_vec_pretty(&json!({
+                "store_device":denoiser.cache.store_device().map(|d|if d==Device::Cpu {"cpu"}else{"cuda:0"}),
+                "memory_bytes":denoiser.cache.memory_bytes(),
+                "pinned_bytes":denoiser.cache.services.pinned_bytes(),
+                "staging_buffers":denoiser.cache.services.staging_buffers()
+            }))?,
+        )?;
         q::PrefixKv::free(&mut denoiser.cache)?;
         timings.insert("sampling", elapsed(rt, start)?);
         latent
@@ -378,7 +579,7 @@ fn generate(
     fs::write(
         output.join("result.json"),
         serde_json::to_vec_pretty(
-            &json!({"schema":1,"pixels_shape":pixels.size(),"context_shape":context_shape,"latent_shape":latent_shape,"timings_seconds":timings,"timing_method":"monotonic wall clock, CUDA synchronized at phase boundaries; per-step callbacks before Euler update","dtype":"float32","channels":"RGBA","profile":if p["variant"]=="turbo_bf16" {"qwen21-1600x896-8steps-turbo-offload"} else if offload {"qwen21-1600x896-40steps-bf16-offload"} else if p["variant"]=="bf16" {"qwen21-1600x896-40steps-bf16"} else if p["steps"]==40 {"qwen21-1600x896-40steps-int8"} else if p["width"]==1600 {"qwen21-1600x896-int8"} else {"qwen21-first-int8"},"source_profile":p,"cpu_threads":tch::get_num_threads(),"kitchen_triton_disabled":rt.backends.policy.list_backends()["triton"].disabled,"diagnostic_trace":own.join("trace-enabled").is_file(),"production_runtime_read":false}),
+            &json!({"schema":1,"pixels_shape":pixels.size(),"context_shape":context_shape,"latent_shape":latent_shape,"timings_seconds":timings,"timing_method":"monotonic wall clock, CUDA synchronized at phase boundaries; per-step callbacks before Euler update","dtype":"float32","channels":"RGBA","profile":if editing {"qwen21-editing"} else if p["variant"]=="turbo_bf16" {"qwen21-1600x896-8steps-turbo-offload"} else if offload {"qwen21-1600x896-40steps-bf16-offload"} else if p["variant"]=="bf16" {"qwen21-1600x896-40steps-bf16"} else if p["steps"]==40 {"qwen21-1600x896-40steps-int8"} else if p["width"]==1600 {"qwen21-1600x896-int8"} else {"qwen21-first-int8"},"source_profile":p,"cpu_threads":tch::get_num_threads(),"kitchen_triton_disabled":rt.backends.policy.list_backends()["triton"].disabled,"diagnostic_trace":own.join("trace-enabled").is_file(),"production_runtime_read":false}),
         )?,
     )?;
     Ok(())

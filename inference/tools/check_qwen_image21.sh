@@ -25,6 +25,8 @@ export IMAGINE_BACKEND_CONTRACT_FIXTURE="$parity_root/runtime/backend-contract.j
 export IMAGINE_TRITON_DRIVER_LIBRARY="$parity_root/triton-driver/libimagine_triton_driver.so"
 export IMAGINE_TRITON_FRONTEND_CUBINS="$parity_root/triton-frontend/standalone"
 export IMAGINE_TRITON_COMPILER_PROFILE="$parity_root/runtime/triton-compiler-profile.json"
+python3 -B inference/tools/prepare_pillow.py --output "$parity_root/pillow"
+export IMAGINE_PILLOW_LIBRARY="$parity_root/pillow/libimagine_pillow.so"
 cargo fmt --manifest-path inference/Cargo.toml --check
 cargo clippy --locked --offline --manifest-path inference/Cargo.toml --all-targets -- -D warnings
 cargo test --locked --offline --manifest-path inference/Cargo.toml --test primitives -- --test-threads=1 qwen_image21_original
@@ -50,8 +52,15 @@ for test_name in \
     comfy_sdpa_tests::qwen_image21_original_comfy_sdpa_small_large_gqa_and_backend_state_match \
     qwen_text_encoder_tests::qwen_image21_original_qwen3vl_language_prefill_conditioning_and_prefinal_norm_match \
     qwen_vae_tests::qwen_image21_original_wan22_image_encode_decode_rgba_and_strips_match \
+    qwen_vision_geometry_tests::qwen_image21_original_vision_patching_resize_normalization_and_first_image_match \
+    qwen_vision_geometry_tests::qwen_image21_original_multimodal_positions_sorted_deepstack_and_mask_match \
+    qwen_vision_geometry_tests::qwen_image21_original_image_spans_system_filter_keep_vision_and_slots_match \
+    qwen_vision_encoder_tests::qwen_image21_original_qwen3vl_vision_transformer_positions_mergers_and_deepstack_match \
+    qwen_multimodal_tests::qwen_image21_original_qwen3vl_complete_multimodal_expansion_language_and_filter_match \
+    qwen_image_preprocess_tests::qwen_image21_original_pillow_lanczos_alpha_reference_geometry_and_vae_inputs_match \
     qwen_sampling_tests::qwen_image21_original_flux_const_schedules_noise_rng_and_euler_histories_match \
     qwen_resident_tests::qwen_image21_original_resident_attention_cache_services_and_cancellation_match \
+    qwen_host_cache_tests::qwen_image21_original_static_host_prefix_pinning_staging_and_budget_match \
     qwen_offload_tests::qwen_image21_original_static_offload_placements_unloads_and_budgets_match \
     qwen_offload_tests::qwen_image21_original_static_host_registration_copy_and_release_match \
     qwen_offload_tests::qwen_image21_original_bf16_cpu_and_mixed_weights_preserve_cuda_forward_bytes; do
@@ -60,7 +69,7 @@ for test_name in \
         --aot-fixture "$IMAGINE_TRITON_PROBE_FIXTURE" \
         --backend-fixture "$IMAGINE_BACKEND_CONTRACT_FIXTURE" \
         --int8-library "$IMAGINE_INT8_PROBE_LIBRARY" --int8-fixture "$IMAGINE_INT8_PROBE_FIXTURE" \
-        --aimdo-library "$IMAGINE_AIMDO_LIBRARY" \
+        --aimdo-library "$IMAGINE_AIMDO_LIBRARY" --pillow-library "$IMAGINE_PILLOW_LIBRARY" \
         --test-filter "$test_name"
     cp "$parity_root/runtime/isolation-filtered-result.json" "$parity_root/runtime/${test_name##*::}-isolation.json"
 done

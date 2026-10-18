@@ -1,0 +1,129 @@
+{
+  "schema": 1,
+  "fresh": [
+    {
+      "path": "stage-2-qwen-image21-editing-integration-evidence/qwen_image21_original_qwen3vl_language_prefill_conditioning_and_prefinal_norm_match-isolation.json",
+      "test": "qwen_text_encoder_tests::qwen_image21_original_qwen3vl_language_prefill_conditioning_and_prefinal_norm_match",
+      "binary_sha256": "e4b2fed7fbf35ac5763466a007f6826bf1f5d726ef442ec246e557ec6fef3c88"
+    },
+    {
+      "path": "stage-2-qwen-image21-editing-integration-evidence/qwen_image21_original_qwen3vl_vision_transformer_positions_mergers_and_deepstack_match-isolation.json",
+      "test": "qwen_vision_encoder_tests::qwen_image21_original_qwen3vl_vision_transformer_positions_mergers_and_deepstack_match",
+      "binary_sha256": "e4b2fed7fbf35ac5763466a007f6826bf1f5d726ef442ec246e557ec6fef3c88"
+    },
+    {
+      "path": "stage-2-qwen-image21-editing-integration-evidence/qwen_image21_original_qwen3vl_complete_multimodal_expansion_language_and_filter_match-isolation.json",
+      "test": "qwen_multimodal_tests::qwen_image21_original_qwen3vl_complete_multimodal_expansion_language_and_filter_match",
+      "binary_sha256": "e4b2fed7fbf35ac5763466a007f6826bf1f5d726ef442ec246e557ec6fef3c88"
+    },
+    {
+      "path": "stage-2-qwen-image21-editing-integration-evidence/qwen_image21_original_pillow_lanczos_alpha_reference_geometry_and_vae_inputs_match-isolation.json",
+      "test": "qwen_image_preprocess_tests::qwen_image21_original_pillow_lanczos_alpha_reference_geometry_and_vae_inputs_match",
+      "binary_sha256": "e4b2fed7fbf35ac5763466a007f6826bf1f5d726ef442ec246e557ec6fef3c88"
+    }
+  ],
+  "reused": [
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_component_math_sequences_and_int8_bf16_turbo_projections_match-isolation.json",
+      "test": "qwen_image21_tests::qwen_image21_original_component_math_sequences_and_int8_bf16_turbo_projections_match",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_logical_shape_detection_preserves_fused_split_and_prefix_rules-isolation.json",
+      "test": "qwen_image21_tests::qwen_image21_original_logical_shape_detection_preserves_fused_split_and_prefix_rules",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_complete_dit_bf16_int8_turbo_hooks_cache_and_attention_match-isolation.json",
+      "test": "qwen_image21_dit_tests::qwen_image21_original_complete_dit_bf16_int8_turbo_hooks_cache_and_attention_match",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_prefix_cache_selection_preserves_memory_thresholds_and_policy-isolation.json",
+      "test": "qwen_image21_dit_tests::qwen_image21_original_prefix_cache_selection_preserves_memory_thresholds_and_policy",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_checkpoint_aimdo_types_offsets_errors_and_storage_lifetime_match-isolation.json",
+      "test": "checkpoint_tests::qwen_image21_original_checkpoint_aimdo_types_offsets_errors_and_storage_lifetime_match",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_quantized_checkpoint_module_parameters_and_policy_match-isolation.json",
+      "test": "checkpoint_tests::qwen_image21_original_quantized_checkpoint_module_parameters_and_policy_match",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_embedding_checkpoint_scales_convrot_and_aliases_match-isolation.json",
+      "test": "checkpoint_tests::qwen_image21_original_embedding_checkpoint_scales_convrot_and_aliases_match",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_complete_resident_parameter_loading_matches-isolation.json",
+      "test": "checkpoint_tests::qwen_image21_original_complete_resident_parameter_loading_matches",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_tokenizer_ids_templates_padding_images_and_unicode_match-isolation.json",
+      "test": "qwen_tokenizer_tests::qwen_image21_original_tokenizer_ids_templates_padding_images_and_unicode_match",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_all_unicode_scalar_nfc_and_contextual_regex_hashes_match-isolation.json",
+      "test": "qwen_tokenizer_tests::qwen_image21_original_all_unicode_scalar_nfc_and_contextual_regex_hashes_match",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_comfy_sdpa_small_large_gqa_and_backend_state_match-isolation.json",
+      "test": "comfy_sdpa_tests::qwen_image21_original_comfy_sdpa_small_large_gqa_and_backend_state_match",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_wan22_image_encode_decode_rgba_and_strips_match-isolation.json",
+      "test": "qwen_vae_tests::qwen_image21_original_wan22_image_encode_decode_rgba_and_strips_match",
+      "binary_sha256": "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_vision_patching_resize_normalization_and_first_image_match-isolation.json",
+      "test": "qwen_vision_geometry_tests::qwen_image21_original_vision_patching_resize_normalization_and_first_image_match",
+      "binary_sha256": "8d9dee74ea3ddcb6ffd336c8e3a8d5088f524a417c935eebdb7cb46f151a3eff"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_multimodal_positions_sorted_deepstack_and_mask_match-isolation.json",
+      "test": "qwen_vision_geometry_tests::qwen_image21_original_multimodal_positions_sorted_deepstack_and_mask_match",
+      "binary_sha256": "8d9dee74ea3ddcb6ffd336c8e3a8d5088f524a417c935eebdb7cb46f151a3eff"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_image_spans_system_filter_keep_vision_and_slots_match-isolation.json",
+      "test": "qwen_vision_geometry_tests::qwen_image21_original_image_spans_system_filter_keep_vision_and_slots_match",
+      "binary_sha256": "8d9dee74ea3ddcb6ffd336c8e3a8d5088f524a417c935eebdb7cb46f151a3eff"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_flux_const_schedules_noise_rng_and_euler_histories_match-isolation.json",
+      "test": "qwen_sampling_tests::qwen_image21_original_flux_const_schedules_noise_rng_and_euler_histories_match",
+      "binary_sha256": "8d9dee74ea3ddcb6ffd336c8e3a8d5088f524a417c935eebdb7cb46f151a3eff"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_resident_attention_cache_services_and_cancellation_match-isolation.json",
+      "test": "qwen_resident_tests::qwen_image21_original_resident_attention_cache_services_and_cancellation_match",
+      "binary_sha256": "8d9dee74ea3ddcb6ffd336c8e3a8d5088f524a417c935eebdb7cb46f151a3eff"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_static_offload_placements_unloads_and_budgets_match-isolation.json",
+      "test": "qwen_offload_tests::qwen_image21_original_static_offload_placements_unloads_and_budgets_match",
+      "binary_sha256": "8d9dee74ea3ddcb6ffd336c8e3a8d5088f524a417c935eebdb7cb46f151a3eff"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_static_host_registration_copy_and_release_match-isolation.json",
+      "test": "qwen_offload_tests::qwen_image21_original_static_host_registration_copy_and_release_match",
+      "binary_sha256": "8d9dee74ea3ddcb6ffd336c8e3a8d5088f524a417c935eebdb7cb46f151a3eff"
+    },
+    {
+      "path": "stage-2-qwen-image21-reference-editing-evidence/qwen_image21_original_bf16_cpu_and_mixed_weights_preserve_cuda_forward_bytes-isolation.json",
+      "test": "qwen_offload_tests::qwen_image21_original_bf16_cpu_and_mixed_weights_preserve_cuda_forward_bytes",
+      "binary_sha256": "8d9dee74ea3ddcb6ffd336c8e3a8d5088f524a417c935eebdb7cb46f151a3eff"
+    }
+  ],
+  "unique_qwen_checks": 24,
+  "scope": "All 24 math checks rerun on final source; four affected paths freshly isolated, 20 previous Python-free proofs reused. Not a new 24-test independent-isolation rerun."
+}

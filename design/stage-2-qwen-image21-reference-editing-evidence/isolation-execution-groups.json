@@ -1,0 +1,7 @@
+{
+  "counts_by_executable_sha256": {
+    "88ba4916204d22921afd140cadf278dcfb539597ffb21d4f82ecfd4f8394ae85": 13,
+    "8d9dee74ea3ddcb6ffd336c8e3a8d5088f524a417c935eebdb7cb46f151a3eff": 8
+  },
+  "explanation": "13 successful isolations retained before a test-only native-initialization correction; three new and five remaining checks pass with the corrected test executable. Numerical implementation/fixtures unchanged by that correction."
+}

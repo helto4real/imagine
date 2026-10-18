@@ -1,0 +1,31 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.02s
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/imagine-rust-comfy-parity-20261017/pillow
+[100%] Built target imagine_pillow
+Prepared original Pillow core without Python: 095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+preflight: native library
+preflight: compiler profile
+preflight: frozen runtime
+preflight: source math policy
+preflight: AIMDO
+preflight: CUDA memory
+loading text component
+loading diffusion component
+sampling step 1
+sampling step 2
+sampling step 3
+sampling step 4
+loading VAE component

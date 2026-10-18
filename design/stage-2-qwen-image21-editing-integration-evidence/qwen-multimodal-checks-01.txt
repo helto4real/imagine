@@ -1,0 +1,14 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+    Checking imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.88s
+   Compiling imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.72s
+     Running tests/primitives.rs (/tmp/imagine-rust-comfy-parity-20261017/target/debug/deps/primitives-117aa4f84f921881)
+
+running 3 tests
+test qwen_multimodal_tests::qwen_image21_original_qwen3vl_complete_multimodal_expansion_language_and_filter_match ... ok
+test qwen_text_encoder_tests::qwen_image21_original_qwen3vl_language_prefill_conditioning_and_prefinal_norm_match ... ok
+test qwen_vision_encoder_tests::qwen_image21_original_qwen3vl_vision_transformer_positions_mergers_and_deepstack_match ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 39.00s
+

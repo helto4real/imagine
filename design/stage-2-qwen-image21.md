@@ -33,6 +33,26 @@ pipeline medians are 19.394 / 18.552 s with substantial load-time variation.
 All three selected DiT variants now have isolated trained T2I evidence; general
 family/encoder/editing/LoRA/memory acceptance remains incomplete.
 
+The [vision/editing integration](stage-2-qwen-image21-editing-integration.md)
+adds the complete vision tower, multimodal conditioning, original Pillow C
+binding, VAE reference inputs and reference-conditioned sampling. Five selected
+320×224 functional pairs match exactly, followed by final shared-VAE two-reference
+revalidation. Twenty-four focused regressions pass; this remains bounded
+acceptance, with general editing/memory/precision and LoRA work still pending.
+
+A subsequent [1MP portrait/reference test](stage-2-qwen-image21-portrait-1mpx.md)
+uses the full newly generated 1024×1024 input and 40 editing steps. All six tensor
+boundaries and PNG pixels match, with identical original CPU cache selection.
+It adds the selected static pinned-host/two-buffer binding and 31 source cases;
+25 focused checks pass. Both engines share the observed excessive contrast in
+this image; general editing-quality acceptance remains open.
+
+The [seed-only rerun](stage-2-qwen-image21-portrait-seed3061383787.md) at
+seed 3061383787 removes the severe artifacts to the same extent in both exact
+outputs. Tomas accepted it as a new [development baseline](stage-2-qwen-image21-editing-baseline.md)
+on 2026-10-18 and requested preservation in Git. This is selected-workload
+acceptance, not complete editing coverage or a demonstrated seed-handling bug.
+
 Tomas first requested a stop before generation; that gate was reached. He then
 authorized: “Ja gör det, spännande, jämför tider och kvalitet mot comfyui
 pythonversionen”. This permits the isolated first trained runs and matching

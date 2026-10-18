@@ -2,8 +2,9 @@
 """Expose only selected ELF files and synthetic fixtures to a Python-free test.
 
 Host-side development launcher. No interpreter, ComfyUI tree, Python package,
-existing media or ordinary runtime directory is mounted. Primitive mode mounts
-no weights; explicit Qwen-driver mode adds only its three authorized model files.
+ordinary runtime directory is mounted. Primitive mode mounts no weights;
+explicit Qwen-driver mode adds its three authorized models and selected,
+hash-checked reference tensor fixtures when the registered profile requests them.
 """
 import argparse
 import hashlib
@@ -24,6 +25,7 @@ parser.add_argument('--int8-library',type=Path,required=True)
 parser.add_argument('--int8-fixture',type=Path,required=True)
 parser.add_argument('--backend-fixture',type=Path,required=True)
 parser.add_argument('--test-filter',help='Run one exact test; require one executed success')
+parser.add_argument('--pillow-library',type=Path,help='Verified original-source Pillow buffer ABI; no interpreter')
 parser.add_argument('--aimdo-library',type=Path,help='Explicit isolated copy of the frozen AIMDO ELF')
 parser.add_argument('--qwen-driver-profile',type=Path,help='Explicit frozen first-image development profile; switches from primitive tests to the standalone driver')
 parser.add_argument('--qwen-model-root',type=Path,help='Authorized local model root; mount only the three profile checkpoint files read-only')
@@ -31,17 +33,26 @@ parser.add_argument('--qwen-mode',choices=['preflight','load-check','run'],defau
 parser.add_argument('--qwen-run-name',default='qwen21-first-image',help='Fresh isolated output directory name; no paths')
 args=parser.parse_args()
 project=Path(__file__).resolve().parents[2]
-driver_mounts=[];driver_args=None;model_files=[]
+driver_mounts=[];driver_args=None;model_files=[];reference_files=[]
 if args.qwen_driver_profile is not None:
     if args.test_filter or args.qwen_model_root is None or args.aimdo_library is None:
         parser.error('Driver mode requires explicit model root/AIMDO and cannot use a primitive test filter')
     profile=json.loads(args.qwen_driver_profile.read_text())
-    assert profile in [json.loads((project/'inference/profiles'/name).read_text())for name in ['qwen21-first-int8.json','qwen21-1600x896-int8.json','qwen21-1600x896-40steps-int8.json','qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json']],'Explicit registered comparison profile required'
+    assert profile in [json.loads((project/'inference/profiles'/name).read_text())for name in ['qwen21-first-int8.json','qwen21-1600x896-int8.json','qwen21-1600x896-40steps-int8.json','qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8-seed3061383787.json']],'Explicit registered comparison profile required'
     for rel in profile['checkpoints'].values():
         relative=Path(rel);assert not relative.is_absolute()and'..'not in relative.parts
         source=args.qwen_model_root/relative;assert source.is_file(),source
         target='/models/'+relative.as_posix();driver_mounts+=['--ro-bind',str(source),target]
         model_files.append(dict(source=str(source),target=target,bytes=source.stat().st_size))
+    for index,spec in enumerate(profile.get('references',[])):
+        if 'tensor_file' not in spec:continue
+        relative=Path(spec['tensor_file']);assert not relative.is_absolute() and '..' not in relative.parts
+        source=project/relative
+        assert source.resolve().is_relative_to((project/'inference/fixtures').resolve())
+        assert hashlib.file_digest(source.open('rb'),'sha256').hexdigest()==spec['tensor_sha256']
+        target=f'/runtime/qwen-reference-{index}.f32'
+        driver_mounts+=['--ro-bind',str(source),target,'--setenv',f'IMAGINE_QWEN_REFERENCE_{index}',target]
+        reference_files.append(dict(source=str(source),target=target,bytes=source.stat().st_size,sha256=spec['tensor_sha256']))
     assert re.fullmatch(r'[a-zA-Z0-9_-]+',args.qwen_run_name)
     work=args.root/'runtime'/args.qwen_run_name;work.mkdir(parents=True,exist_ok=True)
     driver_mounts+=['--ro-bind',str(args.qwen_driver_profile),'/runtime/qwen21-profile.json','--bind',str(work),'/qwen-work']
@@ -113,7 +124,7 @@ triton_mounts+=['--ro-bind',str(compiler_profile_path),'/runtime/triton-compiler
 
 env=dict(os.environ,LD_LIBRARY_PATH=str(args.site/'torch/lib'))
 system=set()
-for binary in [args.binary,bridge,triton_driver,*compiler_binaries,Path('/usr/lib/libcuda.so.1'),*lazy_files,*([args.aimdo_library]if args.aimdo_library else[])]:
+for binary in [args.binary,bridge,triton_driver,*compiler_binaries,Path('/usr/lib/libcuda.so.1'),*lazy_files,*([args.aimdo_library]if args.aimdo_library else[]),*([args.pillow_library]if args.pillow_library else[])]:
     output=subprocess.check_output(['ldd',str(binary)],env=env,text=True)
     if 'not found' in output:raise RuntimeError(output)
     for path in re.findall(r'(?:=>\s*)?(/[^\s]+)',output):
@@ -124,6 +135,14 @@ records=[]
 if args.aimdo_library is not None:
     mounts+=['--ro-bind',str(args.aimdo_library),'/runtime/aimdo.so','--setenv','IMAGINE_AIMDO_LIBRARY','/runtime/aimdo.so']
     records.append(dict(target='/runtime/aimdo.so',sha256=expected))
+if args.pillow_library is not None:
+    provenance=json.loads((args.pillow_library.parent/'provenance.json').read_text())
+    assert provenance['upstream']==json.loads((project/'inference/resources/pillow-source-lock.json').read_text())
+    assert not provenance['python_runtime_required']
+    assert hashlib.sha256(args.pillow_library.read_bytes()).hexdigest()==provenance['library_sha256']
+    for name,h in provenance['adapter_sha256'].items():assert hashlib.sha256((project/name).read_bytes()).hexdigest()==h,name
+    mounts+=['--ro-bind',str(args.pillow_library),'/runtime/libimagine_pillow.so','--setenv','IMAGINE_PILLOW_LIBRARY','/runtime/libimagine_pillow.so']
+    records.append(dict(target='/runtime/libimagine_pillow.so',sha256=provenance['library_sha256']))
 for path in files:
     if hashlib.file_digest(path.open('rb'),'sha256').hexdigest()!=objects[path]['sha256']:
         raise RuntimeError(f'Frozen native source changed: {path}')
@@ -175,7 +194,7 @@ else:
     subprocess.run(command,check=True)
 report={'schema':1,'result':'passed','interpreter_available':False,'comfyui_tree_available':False,'comfyui_installation_available':False,'compiler_only_files_at_reference_paths':comfy_files,'runtime_compiler_elf_files':compiler_files,'compiler_profile_sha256':hashlib.file_digest(compiler_profile_path.open('rb'),'sha256').hexdigest(),
     'network_namespace':'isolated','test_filter':args.test_filter,'package_elf_files':records,
-    'driver_mode':args.qwen_mode if driver_args is not None else None,'authorized_model_files':model_files,
+    'driver_mode':args.qwen_mode if driver_args is not None else None,'authorized_model_files':model_files,'authorized_reference_files':reference_files,
     'system_elf_files':[str(p) for p in sorted(system)],
     'system_elf_hashes':{str(p):hashlib.file_digest(p.open('rb'),'sha256').hexdigest() for p in sorted(system)},
     'lazy_package_elf_files':['/runtime/'+str(p.relative_to(args.site)) for p in lazy_files],

@@ -2,6 +2,8 @@
 //! Complete resident DiT computation; shared runtime integration, checkpoint
 //! loading, encoder/VAE execution and sampling have separate acceptance gates.
 mod cache;
+mod host_cache;
+pub use host_cache::*;
 mod checkpoint;
 pub use checkpoint::*;
 mod detection;
@@ -21,6 +23,7 @@ mod tokenizer;
 pub use text_encoder::*;
 mod unicode;
 mod vae;
+mod vision;
 pub use detection::{DetectedConfig, detect};
 pub use dit::*;
 pub use geometry::{
@@ -34,3 +37,10 @@ pub use numeric::{
 pub use tokenizer::*;
 pub use unicode::Unicode;
 pub use vae::*;
+pub use vision::*;
+
+mod vision_encoder;
+pub use vision_encoder::*;
+
+mod image_preprocess;
+pub use image_preprocess::*;

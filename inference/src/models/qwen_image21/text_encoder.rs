@@ -4,7 +4,6 @@
 use super::{Linear, PromptToken, TokenizedPrompt, WeightedToken};
 use crate::{
     checkpoint::PreparedParameters, execution::Runtime, execution_value::Value, native::Error,
-    storage::ScalarField,
 };
 use tch::{Device, Kind, Tensor};
 
@@ -247,6 +246,20 @@ impl QwenTextEncoder {
         options: TextConditioningOptions,
         exec: &mut E,
     ) -> Result<TextConditioning, Error> {
+        unsafe { self.encode_prompt_with_images(rt, prompt, options, None, exec) }
+    }
+    /// Original SDClip image expansion followed by Qwen3-VL multimodal prefill.
+    /// # Safety
+    /// Active language/vision weights, image tensors and original kernels satisfy
+    /// their selected device/layout contracts.
+    pub unsafe fn encode_prompt_with_images<E: TextEncoderExecution>(
+        &self,
+        rt: &Runtime,
+        prompt: &TokenizedPrompt,
+        options: TextConditioningOptions,
+        vision: Option<(&super::QwenVisionEncoder, &[Tensor])>,
+        exec: &mut E,
+    ) -> Result<TextConditioning, Error> {
         let sections = prompt.batches.len();
         let has_weights = prompt
             .batches
@@ -267,17 +280,19 @@ impl QwenTextEncoder {
         }
         let mut embeddings = vec![];
         let mut masks = vec![];
+        let mut image_info = vec![];
         for batch in &batches {
+            let mut other = vec![];
             let mut ids = vec![];
             let mut mask = vec![];
             let mut eos = false;
             let mut left_pad = false;
             for (i, token) in batch.iter().enumerate() {
                 let PromptToken::Id(id) = token.token else {
-                    return Err(Error::BindingGap {
-                        backend: "qwen3vl".into(),
-                        operation: "Vision preprocessing and expanded image tokens".into(),
-                    });
+                    if let PromptToken::Image(image) = token.token {
+                        other.push((i as i64, image));
+                    }
+                    continue;
                 };
                 if i == 0 && id == 151643 {
                     left_pad = true;
@@ -297,7 +312,74 @@ impl QwenTextEncoder {
             let ids = Tensor::f_from_slice(&ids)?
                 .f_unsqueeze(0)?
                 .f_to_device(options.execution_device)?;
-            embeddings.push(unsafe { self.embed(rt, &ids, exec)? });
+            let mut embedded = unsafe { self.embed(rt, &ids, exec)? };
+            let mut offset = 0;
+            let mut pad_extra = 0;
+            image_info.clear(); // original process_tokens returns the last section's info
+            for (index, image) in other {
+                let (vision, images) = vision.ok_or_else(|| Error::BindingGap {
+                    backend: "qwen3vl".into(),
+                    operation: "Vision owner required for image tokens".into(),
+                })?;
+                let image = images.get(image).ok_or_else(|| Error::ReferenceException {
+                    class: "IndexError",
+                    message: "list index out of range".into(),
+                })?;
+                let (patches, grid) = super::VisionPreprocess::default().patches(image)?;
+                let patches =
+                    patches.f_to_device_(options.execution_device, Kind::Float, false, false)?;
+                let rows = grid
+                    .f_to_device(Device::Cpu)?
+                    .f_to_kind(Kind::Int64)?
+                    .f_view([-1])?;
+                let mut grid = vec![0_i64; rows.numel()];
+                let len = grid.len();
+                rows.f_copy_data(&mut grid, len)?;
+                let grid = grid
+                    .chunks_exact(3)
+                    .map(|r| [r[0], r[1], r[2]])
+                    .collect::<Vec<_>>();
+                let (merged, deepstack) = unsafe { vision.forward(rt, &patches, &grid, exec)? };
+                let emb = merged
+                    .f_view([1, -1, merged.size()[merged.dim() - 1]])?
+                    .f_to_device_(options.execution_device, Kind::Float, false, false)?;
+                let size = emb.size()[1];
+                if emb.size()[2] == embedded.size()[2] {
+                    let start = index + offset;
+                    embedded = Tensor::f_cat(
+                        &[
+                            embedded.f_slice(1, 0, start, 1)?,
+                            emb,
+                            embedded.f_slice(1, start, i64::MAX, 1)?,
+                        ],
+                        1,
+                    )?;
+                    mask.splice(
+                        start as usize..start as usize,
+                        std::iter::repeat_n(1_i64, size as usize),
+                    );
+                    offset += size - 1;
+                    image_info.push(super::ImageEmbeddingInfo {
+                        index: start,
+                        size,
+                        grid,
+                        deepstack,
+                    });
+                } else {
+                    offset -= 1;
+                    pad_extra += size;
+                }
+            }
+            if pad_extra > 0 {
+                let pad = Tensor::f_full(
+                    [1, pad_extra],
+                    151643,
+                    (Kind::Int64, options.execution_device),
+                )?;
+                embedded = Tensor::f_cat(&[embedded, unsafe { self.embed(rt, &pad, exec)? }], 1)?;
+                mask.extend(std::iter::repeat_n(0_i64, pad_extra as usize));
+            }
+            embeddings.push(embedded);
             masks.push(mask);
         }
         let embeds = Tensor::f_cat(&embeddings, 0)?;
@@ -312,12 +394,17 @@ impl QwenTextEncoder {
                 .f_reshape([masks.len() as i64, width as i64])?
                 .f_to_device(options.execution_device)?
         };
+        let image_inputs =
+            super::build_image_inputs(&image_info, embeds.size()[1], options.execution_device)?;
         let result = unsafe {
             self.forward(
                 rt,
                 &embeds,
                 TextForwardOptions {
                     attention_mask: Some(&mask),
+                    position_ids: image_inputs.position_ids.as_ref(),
+                    deepstack: image_inputs.deepstack.as_deref().unwrap_or(&[]),
+                    visual_mask: image_inputs.visual_mask.as_ref(),
                     ..TextForwardOptions::default()
                 },
                 exec,
@@ -367,41 +454,18 @@ impl QwenTextEncoder {
                 class: "IndexError",
                 message: "list index out of range".into(),
             })?;
-        let starts = first
-            .iter()
-            .enumerate()
-            .filter_map(|(i, t)| {
-                if t.token == PromptToken::Id(151644) {
-                    Some(i)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-        let keep = Tensor::f_ones([context.size()[1]], (Kind::Bool, Device::Cpu))?;
-        if let Some(&start) = starts.get(1) {
-            let _ = keep.f_slice(0, 0, start as i64, 1)?.f_fill_(0)?;
-        }
-        // With no image spans, keep_vision and the image-slot pass are no-ops in
-        // the original. The eventual vision owner supplies those spans explicitly.
-        let context = context.f_index(&[None, Some(&keep.f_to_device(context.device())?)])?;
-        let mask = mask.f_index(&[None, Some(&keep.f_to_device(mask.device())?)])?;
-        let attention_mask = if mask
-            .f_sum(Kind::Int64)?
-            .f_eq(mask.numel() as i64)?
-            .f_is_nonzero()?
-        {
-            None
-        } else {
-            Some(mask)
-        };
-        Ok(TextConditioning {
-            context,
-            pooled: None,
-            attention_mask,
-            image_slots: vec![],
-        })
+        super::filter_image_conditioning(
+            &context,
+            &mask,
+            &first.iter().map(|t| t.token.clone()).collect::<Vec<_>>(),
+            &image_info
+                .iter()
+                .map(|e| (e.index, e.size))
+                .collect::<Vec<_>>(),
+            prompt.keep_vision,
+        )
     }
+
     pub fn from_parameters(
         config: TextEncoderConfig,
         state: &PreparedParameters,
@@ -471,75 +535,9 @@ impl QwenTextEncoder {
         exec: &mut E,
     ) -> Result<Tensor, Error> {
         exec.check_interrupt()?;
-        match &self.embedding {
-            Value::Quantized(_) => {
-                let q = self.embedding.as_quantized()?;
-                if q.layout == "TensorWiseINT8Layout" {
-                    let group = if q.params.fields.get("convrot") == Some(&ScalarField::Bool(true))
-                    {
-                        match q.params.fields.get("convrot_groupsize") {
-                            Some(ScalarField::Integer(n)) => *n,
-                            _ => 256,
-                        }
-                    } else {
-                        0
-                    };
-                    let code = match q.params.original_kind {
-                        Kind::Half => 1,
-                        Kind::BFloat16 => 2,
-                        _ => 0,
-                    };
-                    let out = unsafe {
-                        rt.call_kitchen(
-                            "dequantize_int8_embedding",
-                            &vec![
-                                (
-                                    "q".into(),
-                                    Value::tensor(q.payload.f_to_device(ids.device())?),
-                                ),
-                                (
-                                    "scale".into(),
-                                    Value::tensor(
-                                        q.params.tensors["scale"].f_to_device(ids.device())?,
-                                    ),
-                                ),
-                                ("indices".into(), Value::tensor(ids.shallow_clone())),
-                                ("group_size".into(), Value::Int(group)),
-                                ("output_dtype_code".into(), Value::Int(code)),
-                            ],
-                        )?
-                    }
-                    .as_tensor()?;
-                    Ok(out
-                        .f_to_kind(q.params.original_kind)?
-                        .f_to_kind(Kind::Float)?)
-                } else if matches!(
-                    q.layout.as_str(),
-                    "TensorCoreFP8E4M3Layout" | "TensorCoreFP8E5M2Layout"
-                ) {
-                    let x = rt
-                        .native
-                        .embedding(&q.payload.f_to_device(ids.device())?, ids)?
-                        .f_to_kind(Kind::Float)?;
-                    Ok(x.f_mul(&q.params.tensors["scale"].f_to_device_(
-                        ids.device(),
-                        Kind::Float,
-                        false,
-                        false,
-                    )?)?)
-                } else {
-                    Err(Error::BindingGap {
-                        backend: "qwen3vl".into(),
-                        operation: format!("Embedding module fallback for {}", q.layout),
-                    })
-                }
-            }
-            _ => Ok(rt
-                .native
-                .embedding(&self.embedding.as_tensor()?.f_to_device(ids.device())?, ids)?
-                .f_to_kind(Kind::Float)?),
-        }
+        unsafe { super::layers::embedding_rows(rt, &self.embedding, ids, Some(Kind::Float)) }
     }
+
     /// # Safety
     /// Source model, operation and supplied shared execution contracts must hold.
     pub unsafe fn forward<E: TextEncoderExecution>(

@@ -73,6 +73,8 @@ mod w4a4_cache_tests;
 mod checkpoint_tests;
 #[path = "support/comfy_sdpa.rs"]
 mod comfy_sdpa_tests;
+#[path = "support/qwen_host_cache.rs"]
+mod qwen_host_cache_tests;
 #[path = "support/qwen_image21_dit.rs"]
 mod qwen_image21_dit_tests;
 #[path = "support/qwen_image21.rs"]
@@ -89,6 +91,8 @@ mod qwen_text_encoder_tests;
 mod qwen_tokenizer_tests;
 #[path = "support/qwen_vae.rs"]
 mod qwen_vae_tests;
+#[path = "support/qwen_vision_geometry.rs"]
+mod qwen_vision_geometry_tests;
 
 fn bits(tensor: &Tensor) -> Vec<u8> {
     let cpu = tensor
@@ -4717,3 +4721,12 @@ mod structured_metadata_tests;
 
 #[path = "support/kitchen_configuration.rs"]
 mod kitchen_configuration_tests;
+
+#[path = "support/qwen_vision_encoder.rs"]
+mod qwen_vision_encoder_tests;
+
+#[path = "support/qwen_multimodal.rs"]
+mod qwen_multimodal_tests;
+
+#[path = "support/qwen_image_preprocess.rs"]
+mod qwen_image_preprocess_tests;

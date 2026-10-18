@@ -1,0 +1,154 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+    Checking imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.84s
+   Compiling imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.49s
+     Running tests/primitives.rs (/tmp/imagine-rust-comfy-parity-20261017/target/debug/deps/primitives-117aa4f84f921881)
+
+running 3 tests
+test qwen_vision_geometry_tests::qwen_image21_original_image_spans_system_filter_keep_vision_and_slots_match ... ok
+test qwen_vision_geometry_tests::qwen_image21_original_multimodal_positions_sorted_deepstack_and_mask_match ... ok
+test qwen_vision_geometry_tests::qwen_image21_original_vision_patching_resize_normalization_and_first_image_match ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 164 filtered out; finished in 0.34s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+
+running 1 test
+test qwen_vision_geometry_tests::qwen_image21_original_vision_patching_resize_normalization_and_first_image_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.69s
+
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+
+running 1 test
+test qwen_vision_geometry_tests::qwen_image21_original_multimodal_positions_sorted_deepstack_and_mask_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.64s
+
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+
+running 1 test
+test qwen_vision_geometry_tests::qwen_image21_original_image_spans_system_filter_keep_vision_and_slots_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.67s
+
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+
+running 1 test
+test qwen_sampling_tests::qwen_image21_original_flux_const_schedules_noise_rng_and_euler_histories_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.69s
+
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+
+running 1 test
+test qwen_resident_tests::qwen_image21_original_resident_attention_cache_services_and_cancellation_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 9.44s
+
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+
+running 1 test
+test qwen_offload_tests::qwen_image21_original_static_offload_placements_unloads_and_budgets_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.03s
+
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+[W1018 12:34:01.109511549 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 12:34:01.109709160 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 12:34:01.110083902 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+
+running 1 test
+test qwen_offload_tests::qwen_image21_original_static_host_registration_copy_and_release_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.59s
+
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib/libnvrtc-builtins.so.13.0'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_adv.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_cnn.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_graph.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_heuristic.so.9'
+ldd: warning: you do not have execution permission for `/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_ops.so.9'
+ldd: warning: you do not have execution permission for `/tmp/imagine-rust-comfy-parity-20261017/aimdo/aimdo.so'
+
+running 1 test
+test qwen_offload_tests::qwen_image21_original_bf16_cpu_and_mixed_weights_preserve_cuda_forward_bytes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 7.73s
+

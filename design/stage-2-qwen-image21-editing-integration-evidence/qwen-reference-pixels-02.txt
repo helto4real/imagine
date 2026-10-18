@@ -1,0 +1,61 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/imagine-rust-comfy-parity-20261017/pillow
+[100%] Built target imagine_pillow
+Prepared original Pillow core without Python: 7cccc2c9e0d6c89ae8e41c6d3f0201479e642fc2b42ddaad099ea8320c89e7a9
+Diff in /home/thhel/ChatGPT/imagine/inference/tests/support/qwen_image_preprocess.rs:27:
+     assert_eq!(f["memory"].as_array().unwrap().len(), 12);
+     for c in f["vae_pixels"].as_array().unwrap() {
+         let dev = device(c["device"].as_str().unwrap());
+-        let x = data(&numbers(&c["shape"]), dev, kind(c["dtype"].as_str().unwrap()), 9)
+-            .g_add_scalar(0.5);
+-        check(&V::tensor(q::vae_crop_pixels(&x).unwrap()), &c["cropped"], dev, "VAE crop/pad");
+-        check(&V::tensor(q::vae_encode_pixels(&x, Device::Cuda(0)).unwrap()), &c["processed"], dev, "VAE transform/cast order");
++        let x = data(
++            &numbers(&c["shape"]),
++            dev,
++            kind(c["dtype"].as_str().unwrap()),
++            9,
++        )
++        .g_add_scalar(0.5);
++        check(
++            &V::tensor(q::vae_crop_pixels(&x).unwrap()),
++            &c["cropped"],
++            dev,
++            "VAE crop/pad",
++        );
++        check(
++            &V::tensor(q::vae_encode_pixels(&x, Device::Cuda(0)).unwrap()),
++            &c["processed"],
++            dev,
++            "VAE transform/cast order",
++        );
+     }
+     for c in f["memory"].as_array().unwrap() {
+-        let conditions = c["conditions"].as_array().unwrap().iter().map(|refs| {
+-            refs.as_array().unwrap().iter().map(numbers).collect::<Vec<_>>()
+-        }).collect::<Vec<_>>();
+-        let (required, minimum) = q::qwen_sampling_memory_with_references(&numbers(&c["shape"]), &conditions);
+-        assert_eq!(required.to_bits(), c["required"].as_f64().unwrap().to_bits());
++        let conditions = c["conditions"]
++            .as_array()
++            .unwrap()
++            .iter()
++            .map(|refs| {
++                refs.as_array()
++                    .unwrap()
++                    .iter()
++                    .map(numbers)
++                    .collect::<Vec<_>>()
++            })
++            .collect::<Vec<_>>();
++        let (required, minimum) =
++            q::qwen_sampling_memory_with_references(&numbers(&c["shape"]), &conditions);
++        assert_eq!(
++            required.to_bits(),
++            c["required"].as_f64().unwrap().to_bits()
++        );
+         assert_eq!(minimum.to_bits(), c["minimum"].as_f64().unwrap().to_bits());
+     }
+     for c in f["resize"].as_array().unwrap() {

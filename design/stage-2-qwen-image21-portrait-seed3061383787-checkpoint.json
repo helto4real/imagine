@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "stage": 2,
+  "stage2_complete": false,
+  "status": "seed_only_1mpx_edit_exact_pair",
+  "report": "stage-2-qwen-image21-portrait-seed3061383787.md",
+  "old_seed": 17,
+  "new_seed": 3061383787,
+  "profile": "inference/profiles/qwen21-editing-portrait-1mpx-int8-seed3061383787.json",
+  "profile_only_changed_fields": [
+    "seed"
+  ],
+  "reference_unchanged": true,
+  "model_hashes_match_preserved_baseline": true,
+  "all_six_tensor_boundaries_exact": true,
+  "png_rgba8_exact": true,
+  "all_finite": true,
+  "pipeline_seconds": {
+    "rust": 31.543246652,
+    "python": 32.38283307105303
+  },
+  "sampling_seconds": {
+    "rust": 23.505926347,
+    "python": 23.782338703982532
+  },
+  "quality_observation": "Substantially more natural skin/hair and garden; strong crunchy/high-contrast artifacts of seed 17 absent to the same extent. Visual assessment only, no general quality acceptance or root-cause proof.",
+  "production_runtime_read": false,
+  "new_parity_exceptions": [],
+  "autotuning_policy": "unchanged",
+  "sandbox_escalation": "approved for selected local GPU and Python-free namespace runs",
+  "automatic_approval_rejection": false,
+  "committed": false,
+  "evidence_sha256": {
+    ".gitignore": "d58f2fb59f10fe5b4a6ddc8201d4bd6baa431bebb83b3c993ceca270c2ad2f43",
+    "comparison.json": "b725bca10f70096bfa619025cc6d3c6bfe70d9f8a4cfdfdeaf545f331ad076eb",
+    "comparison.txt": "b725bca10f70096bfa619025cc6d3c6bfe70d9f8a4cfdfdeaf545f331ad076eb",
+    "python-conditioning.json": "30c7955dd3dd4b31105ad182cb4552993e75bfdda6e0de6863661e6088e305b3",
+    "python-prefix-cache.json": "5162d49c73844859c5e16ccba660cf329b07a7fe527e682d086f316138aa477c",
+    "python-result.json": "84b12a0cefbdd555164b86b413adf8b0daa430f8ecddd6f64b6cefd632247e0f",
+    "python.png": "83b3885b4b97fea0e48469e39305cb589163cb7bff912fbc9c1493d98bfc575a",
+    "python.txt": "6fb51b09cc9054f8ff063bd4be5bf4120912684800a75fdd554470431e19f6bc",
+    "rust-conditioning.json": "914d0554fe83bc28db88c31e584a388e9a110533ded325001bf63808b73b6a66",
+    "rust-isolation.json": "2e0d530ab0389523329611f9d79fc92fd4f33ae342f145569c5c76825f28c799",
+    "rust-prefix-cache.json": "7d811aec5cee88567aa2180b9b2d1c6b8894e0f2ca99073b444cd673f481e3ab",
+    "rust-result.json": "2ae3fc5a898427a9f6b8f0877bceb5189c3e0f2e8cfd5ec47d4a743a4b57c561",
+    "rust.png": "c3282d587c6061c427a5c9e81ee1b0dd5a81fb6769f2045c8f0c31f5e0de4d6a",
+    "rust.txt": "2ac9c35c9c37d88849f542023270db9a521dc710ce5ad37c0e37059f2acf6b96",
+    "seed-only-check.json": "31583761e42a6cae6ad6dda97bd66fecb202bf80a8be7448035e1582e0bff014",
+    "verification.json": "28758a29da3114597b511f06709f0ca2de8678730b1b032d12373a7a163e87fa",
+    "verified-model-hashes.json": "1aee58b8c62d9f5a9c373612ec517bcaf1276461eff4eaa95bb910214ccf5005"
+  }
+}

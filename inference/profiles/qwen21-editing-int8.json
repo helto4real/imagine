@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "purpose": "isolated synthetic reference/editing parity; original Qwen21 preprocessing, multimodal encoder, reference VAE and sampling; functional validation, not a timing benchmark",
+  "variant": "int8_convrot",
+  "checkpoints": {
+    "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+    "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+    "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+  },
+  "source_configuration": {
+    "static_patcher": true,
+    "disable_comfy_compiler": true,
+    "disable_async_offload": true,
+    "force_full_load_per_component": true,
+    "unload_between_components": true,
+    "attention": "pytorch",
+    "kitchen_triton": false,
+    "compute_dtype": "bfloat16",
+    "prefix_cache_device": "auto",
+    "prefix_cache_dtype": "default"
+  },
+  "synthetic_prompt": "Change the reference image to a blue butterfly resting on a yellow flower, soft daylight.",
+  "width": 320,
+  "height": 224,
+  "batch": 1,
+  "seed": 17,
+  "steps": 4,
+  "sampler": "euler",
+  "scheduler": "simple",
+  "shift": 0.69,
+  "cfg": 1.0,
+  "lora": [],
+  "references": [
+    {
+      "shape": [
+        1,
+        64,
+        96,
+        4
+      ],
+      "byte_multiplier": 37,
+      "byte_offset": 19
+    }
+  ],
+  "negative_prompt": "",
+  "reference_resolution": 256,
+  "reference_vae": true
+}

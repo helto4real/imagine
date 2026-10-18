@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "metrics": {
+    "context": {
+      "shape": [
+        1,
+        101,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "6cfce23dce8346ef64be0014ea20d8a1d8d4f4ced9fbddb8d5f8e32d842d36c2",
+        "6cfce23dce8346ef64be0014ea20d8a1d8d4f4ced9fbddb8d5f8e32d842d36c2"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 413696,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "latent": {
+      "shape": [
+        1,
+        64,
+        14,
+        20
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "adb5f5b4b4a02be13a860748afcd7dcf41cd2d4a0425208cbc7b3536c585fa5f",
+        "adb5f5b4b4a02be13a860748afcd7dcf41cd2d4a0425208cbc7b3536c585fa5f"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 17920,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "image-rgba": {
+      "shape": [
+        1,
+        224,
+        320,
+        4
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "d0203c36ac3135587a6db68244f283534adc3cb886b0e4735df2a8b6c3bcd3fb",
+        "d0203c36ac3135587a6db68244f283534adc3cb886b0e4735df2a8b6c3bcd3fb"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 286720,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "negative-context": {
+      "shape": [
+        1,
+        85,
+        4096
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "786d6b163864895a80c9d7ca20090d29bdae2380ea594b5c22685eca34d8ebf7",
+        "786d6b163864895a80c9d7ca20090d29bdae2380ea594b5c22685eca34d8ebf7"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 348160,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "reference-vision-0": {
+      "shape": [
+        1,
+        224,
+        320,
+        3
+      ],
+      "exact_bytes": true,
+      "hashes": [
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8",
+        "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+      ],
+      "all_finite": true,
+      "unequal_values": 0,
+      "values": 215040,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "rmse": 0.0
+    },
+    "png_rgba8": {
+      "exact": true,
+      "unequal_channels": 0,
+      "unequal_pixels": 0,
+      "max_abs": 0,
+      "mean_abs": 0.0
+    }
+  },
+  "timings_seconds": {
+    "rust": {
+      "dit_load": 0.886496521,
+      "pipeline_wall_including_unload_and_intermediate_export": 4.679023376,
+      "sampling": 0.978192632,
+      "text_encode": 0.427503861,
+      "text_load": 1.205126926,
+      "vae_decode": 0.08788541,
+      "vae_load": 0.32577257
+    },
+    "python": {
+      "text_load": 1.433612679829821,
+      "text_encode": 0.8519066690932959,
+      "dit_load": 0.9267985699698329,
+      "sampling": 0.5656264328863472,
+      "vae_load": 0.193345412844792,
+      "vae_decode": 0.053237661020830274,
+      "pipeline_wall_including_unload_and_intermediate_export": 4.609533446840942
+    }
+  },
+  "scope": "One first-process 320x224 4-step synthetic int8_convrot DiT sample; OS model cache already warm. Not a production quality or steady-state benchmark.",
+  "production_runtime_read": false
+}

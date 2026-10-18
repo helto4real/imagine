@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "random_source": "Python secrets.randbelow(2**32), sampled once and frozen before either run",
+  "profile_differences": {
+    "seed": {
+      "old": 17,
+      "new": 3061383787
+    }
+  },
+  "boundary_unchanged_between_seeds": {
+    "context": true,
+    "negative-context": true,
+    "reference-vision-0": true,
+    "reference-latent-0": true,
+    "latent": false,
+    "image-rgba": false
+  },
+  "changed_rgba8_pixels_between_seeds": 1047842,
+  "pixels": 1048576,
+  "interpretation": "Image changed with only seed changed; visual improvement is specific to this pair, not a general seed-selection fix."
+}

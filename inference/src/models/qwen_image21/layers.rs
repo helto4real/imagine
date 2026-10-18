@@ -310,3 +310,78 @@ pub fn clamp_fp16(x: Tensor) -> Result<Tensor, Error> {
     }
     Ok(x)
 }
+
+/// Original MixedPrecisionOps.Embedding row lookup; text requests Float32 while
+/// vision position lookup retains the original weight dtype when unspecified.
+/// # Safety
+/// Indices, layout, storage and stream/device capacities satisfy original kernels.
+pub(super) unsafe fn embedding_rows(
+    rt: &Runtime,
+    weight: &Value,
+    ids: &Tensor,
+    out_dtype: Option<Kind>,
+) -> Result<Tensor, Error> {
+    match weight {
+        Value::Quantized(_) => {
+            let q = weight.as_quantized()?;
+            if q.layout == "TensorWiseINT8Layout" {
+                let group = if q.params.fields.get("convrot") == Some(&ScalarField::Bool(true)) {
+                    match q.params.fields.get("convrot_groupsize") {
+                        Some(ScalarField::Integer(n)) => *n,
+                        _ => 256,
+                    }
+                } else {
+                    0
+                };
+                let code = match q.params.original_kind {
+                    Kind::Half => 1,
+                    Kind::BFloat16 => 2,
+                    _ => 0,
+                };
+                let out = unsafe {
+                    rt.call_kitchen(
+                        "dequantize_int8_embedding",
+                        &vec![
+                            (
+                                "q".into(),
+                                Value::tensor(q.payload.f_to_device(ids.device())?),
+                            ),
+                            (
+                                "scale".into(),
+                                Value::tensor(q.params.tensors["scale"].f_to_device(ids.device())?),
+                            ),
+                            ("indices".into(), Value::tensor(ids.shallow_clone())),
+                            ("group_size".into(), Value::Int(group)),
+                            ("output_dtype_code".into(), Value::Int(code)),
+                        ],
+                    )?
+                }
+                .as_tensor()?;
+                Ok(out.f_to_kind(out_dtype.unwrap_or(q.params.original_kind))?)
+            } else if matches!(
+                q.layout.as_str(),
+                "TensorCoreFP8E4M3Layout" | "TensorCoreFP8E5M2Layout"
+            ) {
+                let x = rt
+                    .native
+                    .embedding(&q.payload.f_to_device(ids.device())?, ids)?
+                    .f_to_kind(out_dtype.unwrap_or(q.params.original_kind))?;
+                Ok(x.f_mul(&q.params.tensors["scale"].f_to_device_(
+                    ids.device(),
+                    out_dtype.unwrap_or(q.params.original_kind),
+                    false,
+                    false,
+                )?)?)
+            } else {
+                Err(Error::BindingGap {
+                    backend: "qwen3vl".into(),
+                    operation: format!("Embedding module fallback for {}", q.layout),
+                })
+            }
+        }
+        _ => Ok(rt
+            .native
+            .embedding(&weight.as_tensor()?.f_to_device(ids.device())?, ids)?
+            .f_to_kind(out_dtype.unwrap_or(weight.as_tensor()?.kind()))?),
+    }
+}

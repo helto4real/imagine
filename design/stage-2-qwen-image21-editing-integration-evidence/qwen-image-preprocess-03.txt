@@ -1,0 +1,1 @@
+Captured 24 Lanczos, 28 outer image, 32 VAE input and 12 memory cases

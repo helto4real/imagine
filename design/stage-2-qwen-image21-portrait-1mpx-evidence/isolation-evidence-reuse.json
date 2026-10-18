@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "fresh": "qwen_image21_original_static_host_prefix_pinning_staging_and_budget_match-isolation.json",
+  "prior_24": "stage-2-qwen-image21-editing-integration-checkpoint.json",
+  "prior_scopes": "Four fresh and 20 reused proofs identified by previous execution-group manifest",
+  "not_a_new_25_independent_isolation_rerun": true
+}

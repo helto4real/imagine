@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "purpose": "isolated user-requested generated adult portrait, 1024x1024 reference asset for the one-megapixel editing comparison; not engine defaults",
+  "variant": "int8_convrot",
+  "checkpoints": {
+    "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+    "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+    "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+  },
+  "source_configuration": {
+    "static_patcher": true,
+    "disable_comfy_compiler": true,
+    "disable_async_offload": true,
+    "force_full_load_per_component": true,
+    "unload_between_components": true,
+    "attention": "pytorch",
+    "kitchen_triton": false,
+    "compute_dtype": "bfloat16",
+    "prefix_cache_device": "auto",
+    "prefix_cache_dtype": "default"
+  },
+  "synthetic_prompt": "A photographic head-and-shoulders portrait of a 25-year-old adult woman, brown hair, hazel eyes, wearing a blue blouse, soft natural window light, simple neutral gray background, realistic skin texture.",
+  "width": 1024,
+  "height": 1024,
+  "batch": 1,
+  "seed": 17,
+  "steps": 40,
+  "sampler": "euler",
+  "scheduler": "simple",
+  "shift": 0.69,
+  "cfg": 1.0,
+  "lora": [],
+  "references": []
+}

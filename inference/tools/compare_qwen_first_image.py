@@ -21,6 +21,15 @@ metrics = {}
 boundaries = [('context', rust['context_shape']), ('latent', rust['latent_shape']), ('image-rgba', rust['pixels_shape'])]
 if reference['profile'].get('custom_sigmas'):
     boundaries.append(('sigmas', [reference['profile']['steps']+1]))
+if 'reference_resolution' in reference['profile']:
+    native_conditioning=json.loads((a.rust/'conditioning.json').read_text())
+    original_conditioning=json.loads((a.python/'conditioning.json').read_text())
+    assert native_conditioning==original_conditioning,'Editing slots/context metadata differ'
+    boundaries.append(('negative-context',native_conditioning['negative_shape']))
+    for i,_ in enumerate(reference['profile']['references']):
+        boundaries.append((f'reference-vision-{i}',reference['shapes'][f'reference-vision-{i}']))
+        if reference['profile']['reference_vae']:
+            boundaries.append((f'reference-latent-{i}',reference['shapes'][f'reference-latent-{i}']))
 for name, shape in boundaries:
     assert shape == reference['shapes'][name], name
     paths = [root / (name + '-f32.bin') for root in (a.rust, a.python)]

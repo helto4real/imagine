@@ -1,0 +1,30 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/imagine-rust-comfy-parity-20261017/pillow
+[100%] Built target imagine_pillow
+Prepared original Pillow core without Python: 095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3
+error: mismatched closing delimiter: `}`
+  --> /home/thhel/ChatGPT/imagine/inference/tests/support/qwen_host_cache.rs:29:16
+   |
+28 |     for c in fixture["budget"].as_array().unwrap() {
+   |                                                    - closing delimiter possibly meant for this
+29 |         assert!(matches!(
+   |                ^ unclosed delimiter
+...
+36 |     }
+   |     ^ mismatched closing delimiter
+
+error: unexpected closing delimiter: `}`
+   --> /home/thhel/ChatGPT/imagine/inference/tests/support/qwen_host_cache.rs:140:1
+    |
+ 65 |     for route in fixture["routes"].as_array().unwrap() {
+    |                                                        - the nearest open delimiter
+...
+ 87 |         ));
+    |          - missing open `(` for this delimiter
+...
+140 | }
+    | ^ unexpected closing delimiter
+
+Error writing files: failed to resolve mod `qwen_host_cache_tests`: cannot parse /home/thhel/ChatGPT/imagine/inference/tests/support/qwen_host_cache.rs

@@ -1,0 +1,17 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/imagine-rust-comfy-parity-20261017/pillow
+[100%] Built target imagine_pillow
+Prepared original Pillow core without Python: 7cccc2c9e0d6c89ae8e41c6d3f0201479e642fc2b42ddaad099ea8320c89e7a9
+    Checking imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.98s
+   Compiling imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.69s
+     Running tests/primitives.rs (/tmp/imagine-rust-comfy-parity-20261017/target/debug/deps/primitives-117aa4f84f921881)
+
+running 1 test
+test qwen_image_preprocess_tests::qwen_image21_original_pillow_lanczos_alpha_reference_geometry_and_vae_inputs_match ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 169 filtered out; finished in 0.36s
+

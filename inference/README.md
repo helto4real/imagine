@@ -234,3 +234,38 @@ Python-free isolation. `tools/launch_reference.sh` runs a reference script with
 the isolated interpreter/offline cache configuration. Both require explicit
 `IMAGINE_PARITY_ROOT` and `IMAGINE_REFERENCE_SITE` values. See the bundle guide
 before upgrading ComfyUI or recapturing expected values.
+
+## Qwen21 reference/editing continuation
+
+The reference path binds original Qwen3-VL image patching, the full vision
+transformer/DeepStack mergers, multimodal token expansion, image-slot filtering,
+original Pillow Lanczos/alpha handling and Qwen21 VAE reference inputs. The
+selected development driver passes reference latents and slots to the existing
+DiT/cache path. This remains separate from product API/service activation.
+
+`tools/check_qwen_image21.sh` runs the saved synthetic Qwen regressions and
+Python-free checks. Its matching Pillow source subset is preserved in the repository; see [the C-only dependency](native/pillow/README.md).
+The model-free fixtures use explicitly bounded constructors, never allocate
+full uninitialized model weights, and retain exact original outputs.
+
+`tools/check_qwen_editing.sh COMFY_SOURCE MODEL_ROOT FRESH_PREFIX` explicitly
+executes trained functional comparisons: INT8 ConvRot, BF16, Turbo, two ordered
+references and no-reference-VAE/keep-vision. It uses registered synthetic
+320×224 editing profiles and serial fresh processes, with original BF16 static
+offload where selected. It is never launched by ordinary tests. Every saved
+boundary and PNG pixel must be exact; timings are observations from single
+functional pairs, not a comparative performance/quality benchmark. The prior
+1600×896 T2I controls and their executable evidence remain preserved.
+
+The explicit `tools/check_qwen_portrait_editing.sh` adds a pinned, generated
+1024×1024 adult portrait and a 40-step full-reference edit. Its registered
+tensor input is hash-checked and individually mounted. The selected static
+host-cache service preserves original RAM budget, pin/unpin and two current-
+stream staging buffers; broader model-pin eviction remains an explicit gap.
+See [the 1MP report](../design/stage-2-qwen-image21-portrait-1mpx.md) for exact
+comparison, single-pair timings and the shared image-quality limitation.
+
+Tomas accepted the [seed-3061383787 editing baseline](../design/stage-2-qwen-image21-editing-baseline.md)
+on 2026-10-18. Its image is visibly more natural while Rust and ComfyUI remain
+exact; only seed differs from the preserved seed-17 control. The acceptance is
+for this selected workload, with complete Stage 2/product support still pending.

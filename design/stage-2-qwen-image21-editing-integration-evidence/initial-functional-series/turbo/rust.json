@@ -1,0 +1,97 @@
+{
+  "channels": "RGBA",
+  "context_shape": [
+    1,
+    31,
+    4096
+  ],
+  "cpu_threads": 23,
+  "diagnostic_trace": false,
+  "dtype": "float32",
+  "kitchen_triton_disabled": true,
+  "latent_shape": [
+    1,
+    64,
+    14,
+    20
+  ],
+  "pixels_shape": [
+    1,
+    224,
+    320,
+    4
+  ],
+  "production_runtime_read": false,
+  "profile": "qwen21-1600x896-8steps-turbo-offload",
+  "schema": 1,
+  "source_profile": {
+    "batch": 1,
+    "cfg": 1.0,
+    "checkpoints": {
+      "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_turbo_bf16.safetensors",
+      "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "custom_sigmas": [
+      1,
+      0.978453,
+      0.95418,
+      0.926626,
+      0.89508,
+      0.845148,
+      0.704534,
+      0.414568,
+      0
+    ],
+    "height": 224,
+    "lora": [],
+    "negative_prompt": "",
+    "purpose": "isolated synthetic reference/editing parity; original Qwen21 preprocessing, multimodal encoder, reference VAE and sampling; functional validation, not a timing benchmark",
+    "reference_resolution": 256,
+    "reference_vae": true,
+    "references": [
+      {
+        "byte_multiplier": 37,
+        "byte_offset": 19,
+        "shape": [
+          1,
+          64,
+          96,
+          4
+        ]
+      }
+    ],
+    "sampler": "euler",
+    "scheduler": "simple",
+    "schema": 1,
+    "seed": 17,
+    "shift": 0.69,
+    "source_configuration": {
+      "attention": "pytorch",
+      "compute_dtype": "bfloat16",
+      "disable_async_offload": true,
+      "disable_comfy_compiler": true,
+      "force_full_load_per_component": false,
+      "kitchen_triton": false,
+      "prefix_cache_device": "auto",
+      "prefix_cache_dtype": "default",
+      "static_patcher": true,
+      "unload_between_components": true
+    },
+    "steps": 8,
+    "synthetic_prompt": "Change the reference image to a blue butterfly resting on a yellow flower, soft daylight.",
+    "variant": "turbo_bf16",
+    "width": 320
+  },
+  "timing_method": "monotonic wall clock, CUDA synchronized at phase boundaries; per-step callbacks before Euler update",
+  "timings_seconds": {
+    "dit_load": 16.539470573,
+    "pipeline_wall_including_unload_and_intermediate_export": 24.537714369,
+    "reference_vae_load_and_encode": 0.480962442,
+    "sampling": 1.412949735,
+    "text_encode": 0.341316827,
+    "text_load": 4.012089319,
+    "vae_decode": 0.075088973,
+    "vae_load": 0.829209642
+  }
+}
