@@ -217,6 +217,23 @@ impl q::DiTExecution for Exec {
 }
 #[test]
 fn qwen_image21_original_complete_dit_bf16_int8_turbo_hooks_cache_and_attention_match() {
+    complete_dit_fixture(
+        include_str!("../../fixtures/qwen-image21-dit.json"),
+        209,
+        20,
+        4,
+    );
+}
+#[test]
+fn qwen_image21_original_complete_dit_fp16_fp32_hooks_cache_and_attention_match() {
+    complete_dit_fixture(
+        include_str!("../../fixtures/qwen-image21-dit-precision.json"),
+        82,
+        0,
+        0,
+    );
+}
+fn complete_dit_fixture(source: &str, forwards: usize, interruptions: usize, control_count: usize) {
     let _directory = super::triton_file_cache_tests::OwnDirectory::create();
     let own = std::env::current_dir().unwrap();
     let native = kitchen();
@@ -232,8 +249,7 @@ fn qwen_image21_original_complete_dit_bf16_int8_turbo_hooks_cache_and_attention_
     });
     let rt = Runtime::frozen(native, compiler).unwrap();
     let _grad = tch::no_grad_guard();
-    let fixture: Value =
-        serde_json::from_str(include_str!("../../fixtures/qwen-image21-dit.json")).unwrap();
+    let fixture: Value = serde_json::from_str(source).unwrap();
     let mut count = 0;
     let mut interrupted = 0;
     for group in fixture["models"].as_array().unwrap() {
@@ -428,7 +444,7 @@ fn qwen_image21_original_complete_dit_bf16_int8_turbo_hooks_cache_and_attention_
         }
     }
     let controls = fixture["controls"].as_array().unwrap();
-    assert_eq!(controls.len(), 4);
+    assert_eq!(controls.len(), control_count);
     for group in controls {
         let state = group["state"]
             .as_object()
@@ -523,8 +539,8 @@ fn qwen_image21_original_complete_dit_bf16_int8_turbo_hooks_cache_and_attention_
             );
         }
     }
-    assert_eq!(count, 209);
-    assert_eq!(interrupted, 20);
+    assert_eq!(count, forwards);
+    assert_eq!(interrupted, interruptions);
 }
 
 struct PolicyIo {

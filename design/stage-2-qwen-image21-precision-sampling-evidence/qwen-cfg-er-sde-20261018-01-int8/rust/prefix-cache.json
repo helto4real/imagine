@@ -1,0 +1,6 @@
+{
+  "memory_bytes": 326107136,
+  "pinned_bytes": 0,
+  "staging_buffers": 0,
+  "store_device": "cuda:0"
+}

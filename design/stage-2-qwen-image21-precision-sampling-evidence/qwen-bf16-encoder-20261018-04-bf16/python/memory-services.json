@@ -1,0 +1,60 @@
+[
+  {
+    "phase": "text_initial",
+    "event": "free",
+    "total": 14071431168,
+    "torch": 0
+  },
+  {
+    "phase": "text_initial",
+    "event": "free",
+    "total": 14071431168,
+    "torch": null
+  },
+  {
+    "phase": "text_initial",
+    "event": "free",
+    "total": 14071431168,
+    "torch": null
+  },
+  {
+    "phase": "text_positive",
+    "event": "free",
+    "total": 1569336320,
+    "torch": 1125376
+  },
+  {
+    "phase": "text_positive",
+    "event": "free",
+    "total": 1569336320,
+    "torch": null
+  },
+  {
+    "phase": "text_positive",
+    "event": "free",
+    "total": 1569336320,
+    "torch": null
+  },
+  {
+    "phase": "text_negative",
+    "event": "free",
+    "total": 1526939136,
+    "torch": 594165248
+  },
+  {
+    "phase": "text_negative",
+    "event": "empty_cache"
+  },
+  {
+    "phase": "text_negative",
+    "event": "free",
+    "total": 1526939136,
+    "torch": null
+  },
+  {
+    "phase": "text_negative",
+    "event": "free",
+    "total": 1526939136,
+    "torch": null
+  }
+]

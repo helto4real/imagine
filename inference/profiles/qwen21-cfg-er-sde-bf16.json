@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "purpose": "Selected Qwen full-area CFG 2.5 with original ER-SDE, beta scheduler, equal-length different positive/negative text, LoRA and automatic Rust offload",
+  "variant": "bf16",
+  "checkpoints": {
+    "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_bf16.safetensors",
+    "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+    "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+  },
+  "source_configuration": {
+    "static_patcher": true,
+    "disable_comfy_compiler": true,
+    "disable_async_offload": true,
+    "force_full_load_per_component": false,
+    "unload_between_components": true,
+    "attention": "pytorch",
+    "kitchen_triton": false,
+    "compute_dtype": "bfloat16",
+    "prefix_cache_device": "auto",
+    "prefix_cache_dtype": "default"
+  },
+  "synthetic_prompt": "Change the reference image to a blue butterfly resting on a yellow flower, soft daylight.",
+  "width": 320,
+  "height": 224,
+  "batch": 1,
+  "seed": 3061383787,
+  "steps": 4,
+  "sampler": "er_sde",
+  "scheduler": "beta",
+  "shift": 0.69,
+  "cfg": 2.5,
+  "lora": [
+    {
+      "path": "loras/qwen-image-21/lenovo_qwen21.safetensors",
+      "sha256": "7f1e95c3ec1e9c7cea197f7b6f80f601af8e6b479f6ead78ab16df542f447c0e",
+      "strength_model": 1.0,
+      "strength_clip": 0.0
+    }
+  ],
+  "references": [
+    {
+      "shape": [
+        1,
+        64,
+        96,
+        4
+      ],
+      "byte_multiplier": 37,
+      "byte_offset": 19
+    }
+  ],
+  "negative_prompt": "Change the reference image to a red butterfly resting on a yellow flower, soft daylight.",
+  "reference_resolution": 256,
+  "reference_vae": true
+}

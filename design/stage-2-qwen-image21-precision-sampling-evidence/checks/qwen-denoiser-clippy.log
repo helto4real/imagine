@@ -1,0 +1,8 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/imagine-rust-comfy-parity-20261017/pillow
+[100%] Built target imagine_pillow
+Prepared original Pillow core without Python: 095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3
+    Checking imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.46s

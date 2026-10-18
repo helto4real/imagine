@@ -16,7 +16,7 @@ pub struct LinearPolicy {
     pub pre_quant_scale: Option<Value>,
     pub input_scale: Option<Value>,
 }
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct PreparedParameters {
     pub values: BTreeMap<String, Value>,
     pub linear_policies: BTreeMap<String, LinearPolicy>,

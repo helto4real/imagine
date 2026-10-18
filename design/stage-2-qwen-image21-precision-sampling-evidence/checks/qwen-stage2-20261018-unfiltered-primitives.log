@@ -1,0 +1,235 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/imagine-rust-comfy-parity-20261017/pillow
+[100%] Built target imagine_pillow
+Prepared original Pillow core without Python: 095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3
+   Compiling imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.97s
+     Running tests/primitives.rs (/tmp/imagine-rust-comfy-parity-20261017/target/debug/deps/primitives-c10569cd83430b75)
+
+running 191 tests
+test all_int8_triton_candidates_and_default_autotuning_match_reference ... ok
+test awq_layout_tests::awq_layout_dequantization_dtype_order_cropping_and_exact_errors_match_reference ... ok
+test awq_layout_tests::awq_layout_linear_mm_addmm_mixed_operands_bias_and_fallback_match_reference ... ok
+test awq_layout_tests::awq_layout_storage_aliases_transpose_export_clone_and_detach_match_reference ... ok
+test awq_w4a16_preserves_each_backend_math_bias_and_m_boundaries ... ok
+test backend_binding_tests::backend_bindings_execute_original_registered_functions_with_exact_outputs_mutations_and_aliases ... ok
+test backend_binding_tests::backend_bindings_runtime_chain_and_automatic_selection_never_substitute ... ok
+test binding_tests::binding_callable_handles_survive_reregistration_and_gaps_never_change_selection ... ok
+test binding_tests::binding_full_tables_mro_first_argument_and_generic_precedence_match_source ... ok
+test binding_tests::binding_general_operators_reach_original_backend_and_exact_aten_fallback ... ok
+test binding_tests::binding_recursive_arguments_preserve_order_shapes_and_dequantized_values ... ok
+test binding_tests::ordinary_aten_preserves_original_object_identity_separately_from_storage_aliases ... ok
+test checkpoint_tests::qwen_image21_original_checkpoint_aimdo_types_offsets_errors_and_storage_lifetime_match ... ok
+test checkpoint_tests::qwen_image21_original_complete_resident_parameter_loading_matches ... ok
+test checkpoint_tests::qwen_image21_original_embedding_checkpoint_scales_convrot_and_aliases_match ... ok
+test checkpoint_tests::qwen_image21_original_quantized_checkpoint_module_parameters_and_policy_match ... ok
+test comfy_sdpa_tests::qwen_image21_original_comfy_sdpa_small_large_gqa_and_backend_state_match ... ok
+test conv_binding_tests::conv_bindings_preserve_native_fallback_layout_outbuffer_and_errors ... ok
+test conv_binding_tests::group_norm_bindings_preserve_native_fallback_padding_affine_outbuffer_and_errors ... ok
+test convrot_empty_width_preserves_own_controlled_scale_storage ... ok
+test convrot_rotation_and_dtype_empty_like_match_reference ... ok
+test convrot_rowwise_staged_and_fused_activation_match_reference ... ok
+test convrot_w4a4_weight_dequantization_fused_fallback_and_errors_match_reference ... ok
+test convrot_w4a4_weight_quantization_fused_fallback_and_validation_match_reference ... ok
+test convrot_weight_dequantization_native_and_fallback_match_reference ... ok
+test convrot_weight_selection_hardware_queries_and_quantization_match_reference ... ok
+test cuda_fp16_linear_preserves_cutlass_residual_alignment_and_fallback ... ok
+test cuda_int4_forced_small_m_preserves_original_results_and_errors ... ok
+test cuda_int4_forced_zero_k_preserves_only_guarded_own_output ... ok
+test cuda_int4_native_chunked_routes_and_legacy_controls_match_reference ... ok
+test cuda_int4_remaining_zero_k_guards_both_original_no_write_routes ... ok
+test cuda_int8_cublas_empty_intermediates_are_guarded_before_consumption ... ok
+test cuda_int8_full_activation_and_route_selection_match_reference ... ok
+test cuda_int8_gemm_empty_output_preserves_only_own_guarded_bytes ... ok
+test cuda_int8_gemv_empty_output_preserves_only_own_guarded_bytes ... ok
+test cuda_int8_m1_empty_output_preserves_only_own_guarded_bytes ... ok
+test cuda_int8_noactivation_linear_routes_and_errors_match_reference ... ok
+test cuda_int8_zero_k_family_guards_all_consumers_and_matches_reference ... ok
+test cuda_svdquant_nongroup_output_preserves_only_guarded_own_state ... ok
+test cuda_svdquant_quantize_preserves_payload_scales_lora_and_workspace ... ok
+test cuda_svdquant_scaled_mm_preserves_flags_layouts_and_exact_results ... ok
+test dynamic_argument_tests::original_constexpr_state_preserves_signed_zero_warm_aliases_cold_failures_and_hash_before_repr ... ok
+test dynamic_argument_tests::original_cuda_na_values_preserve_indexing_conversion_order_native_ranges_and_outputs ... ok
+test dynamic_argument_tests::original_dynamic_arguments_preserve_constexpr_types_scalar_keys_and_none_decode_paths ... ok
+test dynamic_argument_tests::original_dynamic_seeds_preserve_comparison_generator_native_binding_and_rope_state ... ok
+test dynamic_argument_tests::original_eager_na_values_preserve_tensor_geometry_dtype_scalar_scale_grad_and_source_errors ... ok
+test dynamic_argument_tests::original_input_activation_values_preserve_lazy_weights_fused_hashing_and_scalar_error_order ... ok
+test dynamic_argument_tests::original_int8_rms_epsilon_preserves_optional_defaults_scalar_tensors_grad_and_parser_errors ... ok
+test dynamic_argument_tests::original_na_host_arithmetic_preserves_negative_windows_tensor_sweeps_and_cold_literal_errors ... ok
+test dynamic_argument_tests::original_nvfp4_dynamic_literals_preserve_three_distinct_backends_and_native_bool_errors ... ok
+test dynamic_argument_tests::original_uint64_stochastic_seeds_preserve_enablement_and_complete_unsigned_bits ... ok
+test dynamic_argument_tests::original_weight_seed_values_preserve_delayed_integer_conversion_branch_enablement_and_native_diagnostics ... ok
+test eager_and_upstream_native_fp8_match_python_exactly ... ok
+test eager_fp16_linear_bias_residual_and_batch_shapes_match_reference ... ok
+test eager_input_activations_preserve_original_bytes_aliases_and_errors ... ok
+test eager_int8_linear_scaling_activation_convrot_and_residual_match_reference ... ok
+test eager_int8_mm_padding_empty_cases_and_validation_match_reference ... ok
+test eager_int8_scales_payloads_and_stochastic_rounding_match_python ... ok
+test eager_mxfp8_quantization_scales_and_dequantization_match_reference ... ok
+test eager_nvfp4_unpack_scale_order_and_lookup_cache_match_reference ... ok
+test eager_residual_addcmul_preserves_dtype_order_and_none_aliasing ... ok
+test exact_source_triton_aot_probe_matches_reference_backend ... ok
+test fp8_layout_math_fast_paths_mixed_operands_and_fallback_match_reference ... ok
+test full_backend_registration_constraints_and_dispatch_match_reference ... ok
+test independent_generator_state_and_draws_match_python ... ok
+test int4_row_quantizers_preserve_packing_convrot_seed_and_validation ... ok
+test int8_cuda_dequantization_modes_contiguity_and_eager_fallback_match_reference ... ok
+test int8_eager_rotations_conversion_order_shapes_and_errors_match_reference ... ok
+test int8_embedding_gathers_before_scaling_rotation_and_preserves_error_classes ... ok
+test int8_hadamard_bytes_and_cached_alias_match_reference ... ok
+test kitchen_configuration_tests::original_configuration_parsing_preserves_python_digits_unbounded_consumed_bounds_flags_and_import_failures ... ok
+test kitchen_direct_tests::public_flash_decode_and_deltanet_helpers_preserve_outputs_mutations_and_errors ... ok
+test layout_completion_tests::approved_raw_cuda_export_preserves_plain_storage_and_rejects_nonempty_wrappers ... ok
+test layout_completion_tests::layout_preparation_requantization_export_decode_and_dispatch_match_original ... ok
+test layout_completion_tests::svd_layout_parameter_attributes_follow_original_tensor_identity_and_clone_lifetime ... ok
+test layout_completion_tests::svd_layout_shared_quantization_grouping_and_fusion_match_original ... ok
+test layout_dequantization_crops_before_logical_transpose_like_reference ... ok
+test layout_shape_aliasing_export_and_requantization_metadata_match_reference ... ok
+test model_management_tests::qwen_image21_original_shared_host_registration_cap_alias_and_owner_release_match ... [W1018 19:25:16.641605180 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:16.641819861 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:16.641832810 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:16.641929340 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:16.641997282 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:16.642052609 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+ok
+test model_management_tests::qwen_image21_original_shared_model_manager_order_pressure_weak_owners_and_failures_match ... ok
+test model_management_tests::qwen_image21_original_shared_static_clones_patch_switches_and_forced_cpu_patches_match ... [W1018 19:25:23.066304732 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.066516023 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.066589582 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.070321584 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.070421588 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.070475103 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.088360399 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.088469448 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.088525822 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.088567738 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.088615193 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.088651395 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.094495229 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.094578685 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.094630434 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.094663741 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.094707191 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:23.094743919 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+ok
+test model_management_tests::qwen_image21_original_shared_static_multiple_models_partial_eviction_and_reloads_match ... [W1018 19:25:29.474112583 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:25:29.474359325 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+ok
+test native_boundary_rejects_unrepresentable_cuda_indices ... ok
+test native_launches_follow_active_stream_and_explicit_events ... ok
+test native_quantizers_match_python_packing_padding_and_scales ... ok
+test native_registration_feature_probes_match_reference ... ok
+test packed_int4_preparation_preserves_all_signed_nibbles_and_errors ... ok
+test packed_layout_scales_logical_transpose_and_export_match_reference ... ok
+test portable_and_cuda_convrot_quantization_preserve_backend_specific_results ... ok
+test portable_convrot_decode_preserves_scale_promotion_and_rotation_order ... ok
+test portable_convrot_weight_rotation_matches_original_eager_backend ... ok
+test quant_binding_tests::cuda_sol_bindings_preserve_original_threshold_workspace_coarse_and_native_paths ... ok
+test quant_binding_tests::eager_convrot_w4a4_linear_preserves_original_rotation_int4_math_and_validation ... ok
+test quant_binding_tests::eager_quant_bindings_preserve_fp4_bits_svdquant_layout_lora_padding_and_errors ... ok
+test quant_binding_tests::na3d_bindings_preserve_original_tiling_mask_sdpa_and_fused_cuda_paths ... ok
+test quant_binding_tests::scaled_mm_bindings_preserve_original_operator_hardware_rejections_and_no_substitution ... ok
+test quant_binding_tests::w4a8_bindings_preserve_original_grid_decode_rotation_correction_and_linear_paths ... ok
+test quantized_storage_handlers_match_python_aliasing_and_metadata ... ok
+test qwen_cfg_tests::qwen_image21_original_full_area_cfg_condition_batches_memory_and_order_match ... ok
+test qwen_component_tests::qwen_image21_original_boxed_aten_preserves_oom_and_accelerator_recovery_types ... ok
+test qwen_component_tests::qwen_image21_original_component_nonleaf_parameters_buffers_and_dtype_policies_match ... ok
+test qwen_component_tests::qwen_image21_original_independent_component_dtypes_and_constructor_grad_flags_match ... ok
+test qwen_host_cache_tests::qwen_image21_original_static_host_prefix_pinning_staging_and_budget_match ... ok
+test qwen_image21_dit_tests::qwen_image21_original_complete_dit_bf16_int8_turbo_hooks_cache_and_attention_match ... ok
+test qwen_image21_dit_tests::qwen_image21_original_complete_dit_fp16_fp32_hooks_cache_and_attention_match ... ok
+test qwen_image21_dit_tests::qwen_image21_original_prefix_cache_selection_preserves_memory_thresholds_and_policy ... ok
+test qwen_image21_tests::qwen_image21_original_component_math_sequences_and_int8_bf16_turbo_projections_match ... ok
+test qwen_image21_tests::qwen_image21_original_logical_shape_detection_preserves_fused_split_and_prefix_rules ... ok
+test qwen_image_preprocess_tests::qwen_image21_original_pillow_lanczos_alpha_reference_geometry_and_vae_inputs_match ... ok
+test qwen_lora_tests::qwen_image21_original_int8_offload_inventory_and_lazy_linear_match ... ok
+test qwen_lora_tests::qwen_image21_original_lora_loading_aliases_override_precedence_and_key_seeds_match ... ok
+test qwen_lora_tests::qwen_image21_original_lora_patch_owner_restores_backup_values_between_selections ... ok
+test qwen_lora_tests::qwen_image21_original_lora_registry_patch_math_dora_offsets_and_rounding_match ... ok
+test qwen_lora_tests::qwen_image21_original_lora_static_fp16_patch_int8_convrot_requantization_matches ... ok
+test qwen_multimodal_tests::qwen_image21_original_qwen3vl_complete_multimodal_expansion_language_and_filter_match ... ok
+test qwen_offload_tests::qwen_image21_original_bf16_cpu_and_mixed_weights_preserve_cuda_forward_bytes ... ok
+test qwen_offload_tests::qwen_image21_original_sampler_buffer_lifecycle_and_full_model_accounting_match ... ok
+test qwen_offload_tests::qwen_image21_original_static_host_registration_copy_and_release_match ... [W1018 19:27:32.786828239 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:27:32.786945224 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+[W1018 19:27:32.787066431 Memory.cpp:31] Warning: The argument 'device' of Tensor.is_pinned() is deprecated. Please do not pass this argument. (function is_pinned)
+ok
+test qwen_offload_tests::qwen_image21_original_static_offload_placements_unloads_and_budgets_match ... ok
+test qwen_resident_tests::qwen_image21_original_resident_attention_cache_services_and_cancellation_match ... ok
+test qwen_sampling_tests::qwen_image21_original_beta_schedules_quantiles_duplicates_and_errors_match ... ok
+test qwen_sampling_tests::qwen_image21_original_er_sde_const_stages_noise_and_full_histories_match ... ok
+test qwen_sampling_tests::qwen_image21_original_flux_const_schedules_noise_rng_and_euler_histories_match ... ok
+test qwen_text_encoder_tests::qwen_image21_original_qwen3vl_language_prefill_conditioning_and_prefinal_norm_match ... ok
+test qwen_tokenizer_tests::qwen_image21_original_all_unicode_scalar_nfc_and_contextual_regex_hashes_match ... ok
+test qwen_tokenizer_tests::qwen_image21_original_tokenizer_ids_templates_padding_images_and_unicode_match ... ok
+test qwen_vae_policy_tests::qwen_image21_original_c10_oom_type_accelerator_code_and_plain_errors_remain_distinct ... ok
+test qwen_vae_policy_tests::qwen_image21_original_image_vae_memory_batches_oom_retry_and_failure_classes_match ... ok
+test qwen_vae_policy_tests::qwen_image21_original_tiled_scale_feather_order_default_dtype_and_batch_match ... ok
+test qwen_vae_tests::qwen_image21_original_wan22_image_encode_decode_rgba_and_strips_match ... ok
+test qwen_vision_encoder_tests::qwen_image21_original_qwen3vl_vision_transformer_positions_mergers_and_deepstack_match ... ok
+test qwen_vision_geometry_tests::qwen_image21_original_image_spans_system_filter_keep_vision_and_slots_match ... ok
+test qwen_vision_geometry_tests::qwen_image21_original_multimodal_positions_sorted_deepstack_and_mask_match ... ok
+test qwen_vision_geometry_tests::qwen_image21_original_vision_patching_resize_normalization_and_first_image_match ... ok
+test registry_choices_and_failure_classes_match_python ... ok
+test rope_binding_tests::rope_bindings_preserve_original_eager_cuda_math_inplace_grad_flags_and_backend_errors ... ok
+test rope_binding_tests::rope_bindings_preserve_shared_storage_bounds_qkv_disjointness_and_prelaunch_rejections ... ok
+test sage_tests::sage_attention_preserves_original_quantized_payloads_scales_masks_outputs_and_errors ... ok
+test sage_tests::sage_prequantized_public_state_preserves_original_crop_dtype_validation_and_errors ... ok
+test scale_tiling_and_all_e8m0_byte_patterns_match_reference ... ok
+test shell_dtype_views_preserve_packing_and_dlpack_metadata ... ok
+test signature_tests::all_original_registered_callables_preserve_950_argument_binding_failures_before_body_execution ... ok
+test signed_and_unsigned_int4_row_major_codecs_match_reference ... ok
+test sol_binding_tests::original_eager_sol_attn_approved_scatter_and_exact_downstream ... ok
+test sol_binding_tests::original_eager_sol_attn_ordinary_block_lengths_masks_dtype_and_coarse_branches ... ok
+test sol_chunked_tests::sol_chunked_producer_preserves_bootstrap_streaming_statistics_routing_and_errors ... ok
+test sol_chunked_tests::sol_rope_cache_preserves_tensor_identity_weak_lifetime_context_callbacks_and_quantized_inputs ... ok
+test structured_metadata_tests::original_default_tensor_representations_preserve_scalar_vector_nd_complex_summarization_and_autograd ... ok
+test structured_metadata_tests::original_sol_values_preserve_range_iteration_python_comparisons_truthiness_and_diagnostics ... ok
+test structured_metadata_tests::original_structured_values_preserve_hashability_lazy_diagnostics_and_na_tensor_validation ... ok
+test triton_adaln_tests::original_adaln_specialization_keys_preserve_all_scalar_types_and_constexpr_positions ... ok
+test triton_adaln_tests::registered_adaln_triton_bindings_preserve_broadcast_two_pass_precision_empty_shapes_strides_and_errors ... ok
+test triton_compiler_mode_tests::original_compiler_modes_preserve_cache_layers_assemblies_metadata_overrides_and_sass_dumps ... nvdisasm warning : Disassembling Std Elf to Old format or Old Elf to Std format not supported yet, switching to Old format
+ok
+test triton_default_dtype_tests::none_output_dtype_preserves_all_original_floating_defaults_including_double ... ok
+test triton_environment_tests::named_environment_values_and_boolean_knobs_preserve_the_two_original_normalizations ... ok
+test triton_environment_tests::original_environment_changes_preserve_warm_jit_identity_then_cold_disk_hash_metadata_and_restore ... ok
+test triton_file_cache_tests::local_triton_file_cache_preserves_modes_groups_missing_corrupt_records_and_atomic_file_state ... ok
+test triton_frontend_tests::rust_frontend_cubins_and_original_driver_preserve_fp8_bytes_resources_and_pointer_errors ... ok
+test triton_frontend_tests::triton_specialization_keys_preserve_original_ast_compiler_base32_and_unicode_environment_repr ... ok
+test triton_hook_tests::original_kernel_hooks_preserve_order_metadata_repeated_failures_and_pointer_validation ... ok
+test triton_int8_tests::original_int8_specialization_keys_preserve_both_scale_paths_all_configs_and_scalar_attributes ... ok
+test triton_int8_tests::registered_int8_wrapper_preserves_original_boundaries_outputs_and_two_autotuner_states ... ok
+test triton_int8_tests::runtime_int8_compiler_preserves_all_216_original_candidate_outputs_binaries_options_and_cache_restoration ... ok
+test triton_jit_key_tests::all_7740_original_explicit_and_jit_binder_attribute_keys_preserve_distinct_hashes ... ok
+test triton_mxfp8_tests::original_mxfp8_known_tail_storage_and_large_complete_outputs_preserve_all_source_bytes ... ok
+test triton_mxfp8_tests::original_mxfp8_specialization_keys_preserve_all_scalar_types_and_constexpr_positions ... ok
+test triton_mxfp8_tests::registered_mxfp8_triton_bindings_preserve_paired_layout_precision_empty_shapes_strides_identity_and_errors ... ok
+test triton_na_tests::original_na3d_keys_complete_images_cache_restoration_and_source_failures_preserve_all_signatures ... ok
+test triton_na_tests::registered_na3d_preserves_original_windows_precision_empty_cases_scale_signatures_strides_and_errors ... ok
+test triton_nvfp4_tests::original_nvfp4_literal_ast_keys_preserve_none_numeric_container_and_tensor_identity_text ... ok
+test triton_nvfp4_tests::original_nvfp4_specialization_keys_preserve_both_nibble_orders_scalar_types_and_constexpr_positions ... ok
+test triton_nvfp4_tests::registered_nvfp4_wrappers_preserve_original_early_errors_generated_ptx_and_repeated_assembler_failures ... ok
+test triton_nvfp4_tests::registered_nvfp4_wrappers_preserve_original_pre_run_layout_dtype_aliases_strides_and_early_errors ... ok
+test triton_object_argument_tests::original_hook_storage_changes_preserve_late_pointer_extraction_views_and_stateful_tensor_ownership ... ok
+test triton_rms_rope_tests::original_rms_rope_specialization_keys_preserve_all_scalar_types_and_constexpr_positions ... ok
+test triton_rms_rope_tests::registered_rms_rope_triton_bindings_preserve_paired_layout_precision_empty_shapes_strides_identity_and_errors ... ok
+test triton_rope_tests::original_rope_odd_tail_and_zero_pair_no_write_contract_preserves_initialized_test_storage ... ok
+test triton_rope_tests::original_rope_specialization_keys_preserve_all_scalar_types_and_constexpr_positions ... ok
+test triton_rope_tests::registered_rope_triton_bindings_preserve_paired_layout_precision_empty_shapes_strides_identity_and_errors ... ok
+test triton_runtime_tests::registered_rowwise_triton_bindings_preserve_original_quantization_rotation_seed_strides_and_errors ... ok
+test triton_runtime_tests::registered_triton_fp8_wrappers_preserve_shapes_views_defaults_argument_errors_and_all_block_thresholds ... ok
+test triton_runtime_tests::rowwise_specialization_keys_preserve_original_types_alignment_count_and_both_constants ... ok
+test triton_runtime_tests::runtime_compiler_preserves_original_cold_and_warm_module_failures_resource_errors_and_handle_state ... ok
+test triton_runtime_tests::runtime_rust_frontend_compiles_cold_reuses_warm_and_restores_original_disk_cache_for_all_fp8_types ... ok
+test triton_scalar_tests::original_numeric_and_structured_epsilon_wrappers_preserve_outputs_errors_and_cold_cache_keys ... ok
+test triton_stream_order_tests::original_jit_captures_device_and_stream_before_pre_run_hooks ... ok
+test triton_w4a8_tests::original_w4a8_unpack_keys_complete_binaries_and_cache_restoration ... ok
+test triton_w4a8_tests::registered_w4a8_wrapper_preserves_original_unpack_gemm_boundaries_outputs_errors_and_shared_autotuners ... ok
+test w4a4_cache_tests::w4a4_and_int8_hadamard_caches_preserve_original_separation_mutability_and_routing ... ok
+test w4a8_w6a8_code_planes_and_noncontiguous_views_match_reference ... ok
+test wxa8_geometry_and_six_bit_failures_match_reference ... ok
+
+test result: ok. 191 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1265.01s
+

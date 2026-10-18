@@ -1,0 +1,7 @@
+loading diffusion component
+sampling step 1
+sampling step 2
+sampling step 3
+sampling step 4
+loading VAE component
+{"timings_seconds": {"reference_vae_load_and_encode": 0.45725413016043603, "text_load": 1.2805301770567894, "text_encode": 0.8922732232604176, "dit_load": 0.7716203411109746, "sampling": 0.2420748439617455, "vae_load": 0.1456128100398928, "vae_decode": 0.038884368957951665, "pipeline_wall_including_unload_and_intermediate_export": 7.22530832211487}, "shapes": {"reference-latent-0": [1, 64, 14, 20], "reference-latent-1": [1, 64, 20, 14], "reference-vision-0": [1, 224, 320, 3], "reference-vision-1": [1, 320, 224, 3], "context": [1, 37, 4096], "negative-context": [1, 21, 4096], "latent": [1, 64, 14, 20], "image-rgba": [1, 224, 320, 4]}}

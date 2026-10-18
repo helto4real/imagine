@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "sources": {
+    "comfy/ldm/qwen_image21/model.py": {
+      "sha256": "a69dff15ff6fa369fab5ca0d3261f8aaf19aaedd3fc66414e20a1cf7df0aa5ac",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/qwen_image21/model.py"
+    },
+    "comfy/model_management.py": {
+      "sha256": "045ab96003386a43e647c8ab96f22fbf3be6c577e2fc578ea31c6faa22facbd5",
+      "path": "/home/thhel/git/ComfyUI/comfy/model_management.py"
+    },
+    "comfy/rmsnorm.py": {
+      "sha256": "e8dfbebe9272587038f504538f72fe7e82261307f2c7fbd6f0b05cce28172fdd",
+      "path": "/home/thhel/git/ComfyUI/comfy/rmsnorm.py"
+    },
+    "comfy/latent_formats.py": {
+      "sha256": "8f012cea828736e9fe1ac1753f67dfdbeade79cfeba48d5bc26d4c58549ed759",
+      "path": "/home/thhel/git/ComfyUI/comfy/latent_formats.py"
+    },
+    "comfy/model_detection.py": {
+      "sha256": "4189c5df787a5d685ac1da86193321a32dda0b9f40a5395176d65a1c1e62a47d",
+      "path": "/home/thhel/git/ComfyUI/comfy/model_detection.py"
+    },
+    "comfy/ldm/flux/math.py": {
+      "sha256": "142d86d8e87792eaf06606ef86665874ce2476d155db678f2b0ee994549b4354",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/flux/math.py"
+    },
+    "comfy/ldm/flux/layers.py": {
+      "sha256": "d7ee59e51234766a03834471eee4adc2152cd39248fc39d4e70bb1b3ba8b6a5e",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/flux/layers.py"
+    },
+    "comfy_kitchen/tensor/base.py": {
+      "sha256": "1779b95ec16d2f3db1adcdbf448b931104ad6f609849afec7d03c999cfc819eb",
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/tensor/base.py"
+    },
+    "comfy_kitchen/tensor/int8.py": {
+      "sha256": "df5fea37f408a224060c7d89d5a074e4c59eda4937020fcc5693c465934cb3a0",
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/tensor/int8.py"
+    }
+  },
+  "safety": "No tensor allocations or actual OOM; source classification and exception identity only",
+  "cases": [
+    {
+      "kind": 0,
+      "code": 0,
+      "message": "bounded allocation failure",
+      "oom": true,
+      "discard_calls": 0,
+      "escaped": null
+    },
+    {
+      "kind": 1,
+      "code": 2,
+      "message": "bounded accelerator failure",
+      "oom": true,
+      "discard_calls": 1,
+      "escaped": null
+    },
+    {
+      "kind": 1,
+      "code": 7,
+      "message": "CUDA OUT OF MEMORY",
+      "oom": true,
+      "discard_calls": 1,
+      "escaped": null
+    },
+    {
+      "kind": 1,
+      "code": 7,
+      "message": "bounded unrelated accelerator failure",
+      "oom": false,
+      "discard_calls": 0,
+      "escaped": {
+        "class_name": "AcceleratorError",
+        "message": "bounded unrelated accelerator failure"
+      }
+    },
+    {
+      "kind": 2,
+      "code": 2,
+      "message": "out of memory",
+      "oom": false,
+      "discard_calls": 0,
+      "escaped": {
+        "class_name": "RuntimeError",
+        "message": "out of memory"
+      }
+    },
+    {
+      "kind": 2,
+      "code": 0,
+      "message": "bounded unrelated runtime failure",
+      "oom": false,
+      "discard_calls": 0,
+      "escaped": {
+        "class_name": "RuntimeError",
+        "message": "bounded unrelated runtime failure"
+      }
+    }
+  ]
+}

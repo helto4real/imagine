@@ -22,6 +22,7 @@ impl std::fmt::Debug for SourceArgument<'_> {
 pub(crate) fn failure(e: Error) -> Failure {
     match e {
         Error::ReferenceException { class, message } => Failure::raised(class, message),
+        Error::AcceleratorException { message, .. } => Failure::raised("AcceleratorError", message),
         e => Failure::raised("RuntimeError", e.to_string()),
     }
 }

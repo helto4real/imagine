@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "crate": "torch-sys",
+  "version": "0.26.0",
+  "original_files": 20,
+  "patched_files": [
+    "Cargo.toml",
+    "build.rs",
+    "libtch/torch_api.h"
+  ],
+  "added_files": [
+    "LICENSE-APACHE",
+    "LICENSE-MIT",
+    "libtch/imagine_test_errors.cpp"
+  ],
+  "reverse_patch_restores_all_original_hashes": true,
+  "registry_archive_verified": true,
+  "registry_archive_sha256": "5ae60ab95333c42adcc1a9e74057357e4324a1f344c403e48712a144ab731019"
+}

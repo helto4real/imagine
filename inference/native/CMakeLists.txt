@@ -6,8 +6,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 find_package(CUDAToolkit REQUIRED)
 include("${GENERATED_DIR}/kernel_sources.cmake")
 set(KITCHEN_DIR "${REFERENCE_SOURCES}/comfy-kitchen/comfy_kitchen/backends/cuda")
-add_library(imagine_kitchen SHARED bridge.cpp ${KITCHEN_CUDA_SOURCES})
+add_library(imagine_kitchen SHARED bridge.cpp scipy_beta.cpp ${KITCHEN_CUDA_SOURCES})
+set_source_files_properties(scipy_beta.cpp PROPERTIES COMPILE_DEFINITIONS BOOST_MATH_STANDALONE=1)
 target_include_directories(imagine_kitchen PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/scipy_beta"
     $<$<COMPILE_LANGUAGE:CXX>:${LIBTORCH}/include;${LIBTORCH}/include/torch/csrc/api/include>
     "${GENERATED_DIR}" "${KITCHEN_DIR}" "${KITCHEN_DIR}/sage_attention"
     "${KITCHEN_DIR}/flash_compat" "${REFERENCE_SOURCES}/cutlass/include"

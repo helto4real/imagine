@@ -1,0 +1,72 @@
+{
+  "channels": "RGBA",
+  "context_shape": [
+    1,
+    20,
+    4096
+  ],
+  "cpu_threads": 23,
+  "diagnostic_memory_plan": false,
+  "diagnostic_trace": false,
+  "dtype": "float32",
+  "kitchen_triton_disabled": true,
+  "latent_shape": [
+    1,
+    64,
+    32,
+    32
+  ],
+  "pixels_shape": [
+    1,
+    512,
+    512,
+    4
+  ],
+  "production_runtime_read": false,
+  "profile": "qwen21-first-int8",
+  "schema": 1,
+  "source_profile": {
+    "batch": 1,
+    "cfg": 1.0,
+    "checkpoints": {
+      "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+      "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "height": 512,
+    "lora": [],
+    "purpose": "isolated first-image smoke test; not engine defaults or full Stage 2 acceptance",
+    "references": [],
+    "sampler": "euler",
+    "scheduler": "simple",
+    "schema": 1,
+    "seed": 17,
+    "shift": 0.69,
+    "source_configuration": {
+      "attention": "pytorch",
+      "compute_dtype": "bfloat16",
+      "disable_async_offload": true,
+      "disable_comfy_compiler": true,
+      "force_full_load_per_component": true,
+      "kitchen_triton": false,
+      "prefix_cache_device": "auto",
+      "prefix_cache_dtype": "default",
+      "static_patcher": true,
+      "unload_between_components": true
+    },
+    "steps": 4,
+    "synthetic_prompt": "A blue butterfly resting on a red flower, soft daylight.",
+    "variant": "int8_convrot",
+    "width": 512
+  },
+  "timing_method": "monotonic wall clock, CUDA synchronized at phase boundaries; per-step callbacks before Euler update",
+  "timings_seconds": {
+    "dit_load": 0.75807117,
+    "pipeline_wall_including_unload_and_intermediate_export": 4.776210683,
+    "sampling": 0.730581364,
+    "text_encode": 0.313731766,
+    "text_load": 2.002596614,
+    "vae_decode": 0.174129835,
+    "vae_load": 0.271324364
+  }
+}

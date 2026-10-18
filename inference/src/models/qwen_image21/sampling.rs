@@ -1,6 +1,6 @@
 //! Frozen FLUX/CONST parameterization used by Qwen21. Explicit initial sampler
 //! bindings; this module does not narrow the complete sampler registry target.
-use crate::native::Error;
+use crate::native::{Error, Kitchen};
 use tch::{Device, Kind, Tensor};
 pub struct FluxSampling {
     pub shift: f64,
@@ -37,6 +37,17 @@ impl FluxSampling {
     pub fn sigma(&self, t: &Tensor) -> Result<Tensor, Error> {
         Self::shift_time(self.shift, t)
     }
+    pub fn percent_to_sigma(&self, percent: f64) -> f64 {
+        if percent <= 0. {
+            return 1.;
+        }
+        if percent >= 1. {
+            return 0.;
+        }
+        let t = 1. - percent;
+        let e = self.shift.exp();
+        e / (e + (1. / t - 1.).powf(1.))
+    }
     pub fn simple(&self, steps: usize) -> Result<Tensor, Error> {
         let size = self.sigmas.size()[0];
         let ss = size as f64 / steps as f64;
@@ -46,6 +57,66 @@ impl FluxSampling {
                     .double_value(&[size - (1 + (i as f64 * ss) as i64)]) as f32
             })
             .collect::<Vec<_>>();
+        values.push(0.);
+        Ok(Tensor::f_from_slice(&values)?)
+    }
+    /// Original NumPy float64 linspace/rint and SciPy beta.ppf schedule. The
+    /// quantile computation uses the version-matched unchanged Boost body.
+    pub fn beta(
+        &self,
+        steps: i64,
+        alpha: f64,
+        beta: f64,
+        native: &Kitchen,
+        warning: &mut dyn FnMut(&str),
+    ) -> Result<Tensor, Error> {
+        if steps < 0 {
+            return Err(Error::ReferenceException {
+                class: "ValueError",
+                message: format!("Number of samples, {steps}, must be non-negative."),
+            });
+        }
+        let total = self.sigmas.size()[0] - 1;
+        let mut values = Vec::new();
+        let mut last = -1;
+        let step = if steps > 0 { 1. / steps as f64 } else { 0. };
+        for i in 0..steps {
+            let t = 1. - i as f64 * step;
+            // scipy.stats's distribution wrapper handles invalid parameters
+            // and support endpoints before calling the original beta PPF.
+            let quantile = if !(alpha > 0. && beta > 0.) {
+                f64::NAN
+            } else if t == 1. {
+                1.
+            } else {
+                let result = native.beta_quantile(t, alpha, beta)?;
+                if let Some(message) = result.warning {
+                    warning(&message);
+                }
+                result.value
+            };
+            let t = (quantile * total as f64).round_ties_even();
+            if !t.is_finite() {
+                return Err(Error::ReferenceException {
+                    class: if t.is_nan() {
+                        "ValueError"
+                    } else {
+                        "OverflowError"
+                    },
+                    message: if t.is_nan() {
+                        "cannot convert float NaN to integer"
+                    } else {
+                        "cannot convert float infinity to integer"
+                    }
+                    .into(),
+                });
+            }
+            let t = t as i64;
+            if t != last {
+                values.push(self.sigmas.f_get(t)?.double_value(&[]) as f32);
+            }
+            last = t;
+        }
         values.push(0.);
         Ok(Tensor::f_from_slice(&values)?)
     }
@@ -163,6 +234,7 @@ pub fn sample_euler<E: EulerExecution>(
     settings: EulerSettings,
     e: &mut E,
 ) -> Result<Tensor, Error> {
+    let _grad = tch::no_grad_guard();
     let s_in = Tensor::f_ones([x.size()[0]], (x.kind(), x.device()))?;
     let steps = sigmas.size()[0] - 1;
     for i in 0..steps {

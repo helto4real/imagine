@@ -1,0 +1,47 @@
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -40,6 +40,7 @@
+ features = ["doc-only"]
+ 
+ [features]
++imagine-test-errors = []
+ doc-only = []
+ download-libtorch = [
+     "ureq",
+--- a/build.rs
++++ b/build.rs
+@@ -366,6 +366,12 @@
+         println!("cargo:rerun-if-changed=libtch/stb_image_resize.h");
+         println!("cargo:rerun-if-changed=libtch/stb_image.h");
+         let mut c_files = vec!["libtch/torch_api.cpp", "libtch/torch_api_generated.cpp"];
++        println!("cargo:rerun-if-changed=libtch/imagine_inference_mode.cpp");
++        c_files.push("libtch/imagine_inference_mode.cpp");
++        println!("cargo:rerun-if-changed=libtch/imagine_test_errors.cpp");
++        if cfg!(feature = "imagine-test-errors") {
++            c_files.push("libtch/imagine_test_errors.cpp");
++        }
+         if cfg!(feature = "python-extension") {
+             c_files.push("libtch/torch_python.cpp")
+         }
+--- a/libtch/torch_api.h
++++ b/libtch/torch_api.h
+@@ -17,6 +17,10 @@
+ #define PROTECT(x) \
+   try { \
+     x \
++  } catch (const c10::OutOfMemoryError& e) { \
++      torch_last_err = strdup((std::string("[imagine-c10:oom]\n") + e.what_without_backtrace()).c_str()); \
++  } catch (const c10::AcceleratorError& e) { \
++      torch_last_err = strdup((std::string("[imagine-c10:accelerator:") + std::to_string(e.get_error_code()) + "]\n" + e.what_without_backtrace()).c_str()); \
+   } catch (const exception& e) { \
+       torch_last_err = strdup(e.what()); \
+   }
+@@ -29,6 +33,8 @@
+ #endif
+ 
+ char *get_and_reset_last_err(); // thread-local
++void* at_imagine_inference_mode_new(int enabled);
++void at_imagine_inference_mode_free(void* value);
+ void at_manual_seed(int64_t);
+ tensor at_new_tensor();
+ tensor at_tensor_of_blob(void *data, int64_t *dims, size_t ndims, int64_t *strides, size_t nstrides, int type, int device);

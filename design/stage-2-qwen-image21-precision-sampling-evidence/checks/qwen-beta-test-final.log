@@ -1,0 +1,29 @@
+Prepared frozen AIMDO 8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59.
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /tmp/imagine-rust-comfy-parity-20261017/pillow
+[100%] Built target imagine_pillow
+Prepared original Pillow core without Python: 095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/primitives.rs (/tmp/imagine-rust-comfy-parity-20261017/target/debug/deps/primitives-4baf04dcf384217a)
+
+running 1 test
+test qwen_sampling_tests::qwen_image21_original_beta_schedules_quantiles_duplicates_and_errors_match ... FAILED
+
+failures:
+
+---- qwen_sampling_tests::qwen_image21_original_beta_schedules_quantiles_duplicates_and_errors_match stdout ----
+
+thread 'qwen_sampling_tests::qwen_image21_original_beta_schedules_quantiles_duplicates_and_errors_match' (996823) panicked at tests/support/qwen_sampling.rs:110:9:
+assertion `left == right` failed
+  left: "bcacc503fc85d16645b18f8c95c3196597472406558b7879f16ce7c29ad97c7b"
+ right: "fb1cc1ddbe93ddfc419ae639d972df63ebc98f86eff2efcc3834760419d68f9c"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    qwen_sampling_tests::qwen_image21_original_beta_schedules_quantiles_duplicates_and_errors_match
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 189 filtered out; finished in 0.07s
+
+error: test failed, to rerun pass `--test primitives`

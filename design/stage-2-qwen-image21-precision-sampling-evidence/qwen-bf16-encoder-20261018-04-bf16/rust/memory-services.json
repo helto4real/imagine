@@ -1,0 +1,60 @@
+[
+  {
+    "event": "free",
+    "phase": "text_initial",
+    "torch": 0,
+    "total": 14071431168
+  },
+  {
+    "event": "free",
+    "phase": "text_initial",
+    "torch": 0,
+    "total": 14071431168
+  },
+  {
+    "event": "free",
+    "phase": "text_initial",
+    "torch": 0,
+    "total": 14071431168
+  },
+  {
+    "event": "free",
+    "phase": "text_positive",
+    "torch": 1125376,
+    "total": 1569336320
+  },
+  {
+    "event": "free",
+    "phase": "text_positive",
+    "torch": 1125376,
+    "total": 1569336320
+  },
+  {
+    "event": "free",
+    "phase": "text_positive",
+    "torch": 1125376,
+    "total": 1569336320
+  },
+  {
+    "event": "free",
+    "phase": "text_negative",
+    "torch": 503987712,
+    "total": 1526939136
+  },
+  {
+    "event": "empty_cache",
+    "phase": "text_negative"
+  },
+  {
+    "event": "free",
+    "phase": "text_negative",
+    "torch": 32128512,
+    "total": 1526939136
+  },
+  {
+    "event": "free",
+    "phase": "text_negative",
+    "torch": 32128512,
+    "total": 1526939136
+  }
+]

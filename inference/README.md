@@ -5,10 +5,40 @@ The [final report](../design/stage-1-final-validation.md) and
 all 135 registered backend bodies. Model execution and product integration
 remain later stages. Earlier checkpoint counts below are historical.
 
-Stage 2 is in progress: [Qwen Image 2.1](../design/stage-2-qwen-image21.md),
-with INT8 ConvRot, BF16 and Turbo required. The [complete resident DiT
-computation](../design/stage-2-qwen-image21-dit.md) is implemented; complete
-trained-model acceptance and general shared runtime integration remain pending.
+Stage 2's selected [Qwen Image 2.1 vertical path](../design/stage-2-qwen-image21-ready.md)
+is complete for INT8 ConvRot, BF16 and Turbo. Forty-six current regressions and
+all 46 individual Python-free isolations pass; the final trained controls are
+numerically exact. Overall ComfyUI parity, general shared contracts and product
+integration remain later-stage gates. The historical reports below retain their
+original checkpoint scope. The [complete resident DiT
+computation](../design/stage-2-qwen-image21-dit.md) is implemented.
+The [precision/sampling continuation](../design/stage-2-qwen-image21-precision-sampling.md)
+adds independent component precisions, original full-area CFG and ER-SDE/beta,
+shared encoder/VAE memory management and explicit tiled VAE entry points.
+`models::qwen_image21::QwenDenoiser` exposes the actual model/CFG execution as a
+reusable Rust adapter; profile allowlists and artifact exports belong only to
+the development driver. `native::inference_mode` supplies the matching owned
+LibTorch context when the caller follows ComfyUI's inference execution context.
+Model/kernel safety contracts and general Stage 3 coverage remain explicit.
+
+Run an already prepared local development environment with the selected model
+root and a fresh output name:
+
+```bash
+export IMAGINE_PARITY_ROOT=/tmp/imagine-rust-comfy-parity-20261017
+export IMAGINE_REFERENCE_SITE=/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages
+bash inference/tools/launch_qwen21.sh /mnt/media/gemensam/AI/ComfyUI/models \
+  run FRESH_RUN_NAME inference/profiles/qwen21-lora-bf16.json
+```
+
+Choose an existing profile from `profiles/`: `qwen21-lora-int8.json`,
+`qwen21-lora-bf16.json`, or `qwen21-lora-turbo.json` for the
+selected editing/LoRA controls. The `*-bf16-encoder.json` cases use BF16 text
+storage; `qwen21-cfg-er-sde-*.json` exercise CFG/ER-SDE/beta, and
+`qwen21-tiled-int8.json` exercises explicit VAE tiling. This launcher is the
+isolated comparison driver and requires the prepared frozen native dependencies;
+it does not configure the product API. Rust inference runs inside its
+Python-free namespace. Python is used only by development preparation/oracles.
 [First-image preparation](../design/stage-2-qwen-image21-first-image.md) records
 the tokenizer/language, checkpoint, VAE and selected sampler continuation.
 The focused regression entrypoint is `tools/check_qwen_image21.sh`; the isolated

@@ -2,8 +2,8 @@
   "schema": 1,
   "date": "2026-10-18",
   "stage": 2,
-  "status": "in_progress",
-  "preservation_commit": "059c875",
+  "status": "selected_vertical_path_complete_partial_overall",
+  "preservation_commit": "ac8594c",
   "required_variants": [
     "qwen_image21_int8_convrot",
     "qwen_image21_bf16",
@@ -76,12 +76,12 @@
       "scope": "Three exact pairs each for 512x512/4 steps, 1600x896/4 steps, 1600x896/40 steps, plus a fresh three-pair four-step storage control; INT8 ConvRot, Euler/simple, CFG1, seed17. Other variants, editing, LoRA, broader numerical and memory acceptance remain required. Three exact BF16 DiT 1600x896/40 pairs use original static offload with unchanged INT8 text/BF16 VAE. Three exact Turbo BF16 DiT 1600x896/eight-explicit-sigma-step pairs now pass with the same offload policy. All-BF16 encoder/editing/LoRA/general memory acceptance remains pending. Selected 320x224 synthetic reference/editing profiles now pass one pair each for INT8, BF16, Turbo, two references and no-reference-VAE keep-vision, plus final shared-VAE revalidation. This is bounded functional acceptance, not general editing or performance/quality acceptance."
     }
   ],
-  "dit_status": "complete_resident_computation_selected_static_shared_owner_verified_general_acceptance_pending",
-  "latest_report": "stage-2-qwen-image21-ownership.md",
-  "latest_checkpoint": "stage-2-qwen-image21-ownership-checkpoint.json",
+  "dit_status": "complete_selected_qwen_vertical_path_partial_overall_reference_matrix",
+  "latest_report": "stage-2-qwen-image21-ready.md",
+  "latest_checkpoint": "stage-2-qwen-image21-precision-sampling-checkpoint.json",
   "retained_reference_results_and_decisions": 2172,
-  "focused_tests_passed": 35,
-  "python_free_tests_passed": 4,
+  "focused_tests_passed": 46,
+  "python_free_tests_passed": 46,
   "trained_forward_executed": true,
   "image_generation_executed": true,
   "first_image_gate": "Earlier readiness stop fulfilled; user then authorized first trained image and Python timing/quality comparison",
@@ -89,7 +89,7 @@
   "authorized_model_root": "/mnt/media/gemensam/AI/ComfyUI/models",
   "first_image_preflight_status": "load_only_passed_then_trained_generation_authorized",
   "first_image_status": "three_matched_pairs_exact_int8_smoke",
-  "verification_scope": "35 focused Qwen regressions pass; four new ownership tests also pass separately in Python-free isolation. Fresh automatic INT8 1600x1600/40, BF16 320x224/4 and Turbo 320x224/8 LoRA editing pairs have exact finite tensors, PNG pixels and all three sampler/counter/residency phases. INT8 output matches the preserved sampler control. Dynamic ownership, general encoder/VAE sharing, arbitrary clone/patch wrappers and broader Stage 2 acceptance remain incomplete.",
+  "verification_scope": "Selected Stage 2 exit under master Section 15: INT8 ConvRot/BF16/Turbo T2I, editing, selected LoRAs, independent encoder precision, shared static memory, original image VAE regular/OOM/tiled policy and selected sampling. Current 46 focused tests and all 46 isolations pass; unfiltered pre-context snapshot has 191 passing primitives. Twelve continuation comparisons are numerical/PNG exact. Physical state differences with different measured memory inputs remain recorded, with separate exact original-policy proofs on each captured input. General contracts, full model matrix and product lifecycle remain open.",
   "first_image_comparison": {
     "profile": "512x512, seed17, four Euler/simple steps, CFG1, BF16, PyTorch attention, static full residency, Kitchen Triton disabled as source startup",
     "matched_pairs": 3,
@@ -251,7 +251,7 @@
     "diagnostic_is_automatic_acceptance": false,
     "fresh_automatic_validation": "User confirmed memory free; automatic BF16 and Turbo pairs pass after source reload/transfer-order fixes. Final lazy-copy branch is separately tested and not taken by measured pairs; explicit measured-path evidence reuse.",
     "new_parity_exceptions": [],
-    "committed": false,
+    "committed": true,
     "earlier_automatic_pairs_failed": [
       "bf16_model",
       "turbo_model"
@@ -262,7 +262,8 @@
     "repeated_linear_forwards": 24,
     "final_copy_guard_focused_checks": 4,
     "unchanged_focused_checks_reused": 25,
-    "final_standalone_isolations": 4
+    "final_standalone_isolations": 4,
+    "preservation_commit": "ac8594c"
   },
   "sampler_buffer_lifecycle": {
     "report": "stage-2-qwen-image21-sampler-buffer.md",
@@ -284,10 +285,11 @@
     "full_load_counter_delta_bytes": 0,
     "stage2_complete": false,
     "new_parity_exceptions": [],
-    "uncommitted": true
+    "uncommitted": false,
+    "preservation_commit": "ac8594c"
   },
   "historical_python_free_tests_passed": 25,
-  "python_free_verification_scope": "Four fresh shared-ownership tests only; the earlier 25-test snapshot remains historical, not a new 35-test isolated-suite claim.",
+  "python_free_verification_scope": "All 46 declared current Qwen tests separately pass with the same executable hash, without a Python interpreter or usable ComfyUI installation. Historical additional proofs are retained separately.",
   "shared_model_ownership": {
     "report": "stage-2-qwen-image21-ownership.md",
     "status": "selected_static_path_verified",
@@ -302,5 +304,96 @@
     "trained_placements_counters_sampler_states_exact": true,
     "final_registrations_and_pins_zero": true,
     "complete_stage2": false
-  }
+  },
+  "latest_continuation_report": "stage-2-qwen-image21-precision-sampling.md",
+  "latest_continuation_checkpoint": "stage-2-qwen-image21-precision-sampling-checkpoint.json",
+  "preservation_baseline_commit": "ac8594c",
+  "shared_encoder_vae_continuation": {
+    "focused_tests_passed": 40,
+    "python_free_individual_tests_passed": 40,
+    "source_tiler_cases": 32,
+    "source_vae_policy_cases": 32,
+    "source_component_transitions": 20,
+    "source_oom_class_cases": 6,
+    "trained_variant_pairs_exact": 3,
+    "component_states_per_case": 5,
+    "stage2_complete": false
+  },
+  "historical_preservation_commit": "059c875",
+  "stage2_complete": true,
+  "complete_comfyui_parity": false,
+  "boundaries_snapshot": "Historical pre-component continuation inventory retained below; selected closures and open general requirements are recorded in stage-2-qwen-image21-ready.md.",
+  "historical_focused_tests_passed": 35,
+  "historical_python_free_latest_tests_passed": 4,
+  "precision_sampling_continuation": {
+    "report": "stage-2-qwen-image21-precision-sampling.md",
+    "checkpoint": "stage-2-qwen-image21-precision-sampling-checkpoint.json",
+    "trained_comparisons": 12,
+    "numerical_and_png_exact": true,
+    "source_dtype_freeze_cases": 36,
+    "additional_dit_forward_cases": 82,
+    "component_cast_transitions": 40,
+    "source_cfg_histories": 40,
+    "source_er_sde_histories": 60,
+    "source_beta_cases": 198,
+    "source_beta_raw_quantiles": 8000,
+    "source_vae_tiler_cases": 32,
+    "source_vae_policy_cases": 48,
+    "source_context_states": 13,
+    "source_sampler_context_histories": 4,
+    "current_focused_tests": 46,
+    "current_individual_isolations": 46,
+    "pre_context_unfiltered_primitive_tests": 191,
+    "selected_stage2_complete": true,
+    "overall_parity_complete": false,
+    "new_parity_exceptions": [],
+    "uncommitted": false
+  },
+  "final_trained_regressions": [
+    {
+      "profile": "qwen21-tiled-int8.json",
+      "run": "qwen-tiled-20261018-01-int8",
+      "exact_tensor_boundaries": 7,
+      "png_pixels_exact": true
+    },
+    {
+      "profile": "qwen21-lora-portrait-1600-int8.json",
+      "run": "qwen-stage2-final-20261018-portrait1600",
+      "exact_tensor_boundaries": 6,
+      "png_pixels_exact": true
+    },
+    {
+      "profile": "qwen21-editing-int8-two-references.json",
+      "run": "qwen-stage2-final-20261018-two-references",
+      "exact_tensor_boundaries": 8,
+      "png_pixels_exact": true
+    },
+    {
+      "profile": "qwen21-editing-int8-keep-vision.json",
+      "run": "qwen-stage2-final-20261018-keep-vision",
+      "exact_tensor_boundaries": 5,
+      "png_pixels_exact": true
+    },
+    {
+      "profile": "qwen21-first-int8.json",
+      "run": "qwen-stage2-final-20261018-t2i-int8",
+      "exact_tensor_boundaries": 3,
+      "png_pixels_exact": true
+    }
+  ],
+  "remaining_requirements": [
+    {
+      "stage": 3,
+      "scope": "Complete conditioning/sampling/loading/patching registry and interactions; arbitrary clone/hook/LoRA semantics; dynamic compiler/vbars and RAM/pin management contracts"
+    },
+    {
+      "stage": 4,
+      "scope": "Full reference model/variant/modality and trained interaction matrix"
+    },
+    {
+      "stage": 5,
+      "scope": "Product API, GPU coordinator/worker lifecycle, full release acceptance and packaging"
+    }
+  ],
+  "completed_stage2_preservation": "Commit containing stage-2-qwen-image21-ready.md: Preserve completed Qwen Stage 2 parity baseline"
 }

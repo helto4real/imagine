@@ -1,0 +1,4 @@
+   Compiling torch-sys v0.26.0 (/home/thhel/ChatGPT/imagine/inference/vendor/torch-sys)
+   Compiling tch v0.26.0
+   Compiling imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 19.76s

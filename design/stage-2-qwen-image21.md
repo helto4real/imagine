@@ -1,5 +1,35 @@
 # Stage 2 — Qwen Image 2.1
 
+Current status, 2026-10-18: **selected Stage 2 vertical-path acceptance is
+complete** for INT8 ConvRot, BF16 and Turbo. The
+[consolidated report](stage-2-qwen-image21-ready.md) and
+[final checkpoint](stage-2-qwen-image21-precision-sampling-checkpoint.json)
+record the selected scope, 46 current regressions plus all 46 Python-free
+isolations, final trained controls, exact numerical results and retained limits.
+The initial preservation commit is `ac8594c`; the completed continuation is
+preserved by the commit containing this report,
+`Preserve completed Qwen Stage 2 parity baseline`.
+Complete ComfyUI parity and product-release acceptance remain later gates.
+
+The continuation notes below are historical snapshots. Their "in progress"
+wording and counts describe their original source/evidence, not the final status.
+
+## Historical continuation notes
+
+The [precision/sampling continuation](stage-2-qwen-image21-precision-sampling.md)
+adds independent BF16 text storage, additional complete FP16/FP32 DiT controls,
+full-area CFG, original ER-SDE/beta, a reusable Rust denoiser and original
+inference-context semantics. Selected automatic INT8/BF16/Turbo CFG/ER-SDE pairs
+match exactly. Final tiling and broader regression checks remain in progress;
+historical snapshots below retain their original verification scope.
+
+The [encoder/VAE continuation](stage-2-qwen-image21-components.md) binds the
+shared static owner and memory coordinator across all three components and adds
+the original image VAE batch/OOM/tiling policy. Forty focused tests and all forty
+individual Python-free checks pass. The three selected trained variant cases
+have exact tensors, PNG pixels and all five measured component phases; broader
+precision/loader/algorithm/lifecycle coverage remains in progress.
+
 The [shared-ownership continuation](stage-2-qwen-image21-ownership.md) adds the
 original weak model registry, shared static clone/patch ownership, common
 loading/freeing coordinator and model/cache pin accounting. All 35 focused
@@ -236,17 +266,21 @@ Final execution evidence is stored in
 does not claim a new full unfiltered run. Complete-model loading, generated
 images, model VRAM/latency and production acceptance remain untested.
 
-## Remaining Stage 2 work
+## Retained general requirements after the selected Stage 2 exit
 
-The selected text-to-image and reference-editing paths for INT8 ConvRot, BF16
-and Turbo now have trained exact comparisons, including selected LoRAs and
-static shared ownership. This does not complete general model support.
-Remaining gates include general loader detection/conversion/error behavior;
-broader editing and independent component precisions; remaining applicable
+The earlier working list included both selected-path blockers and general
+contracts. The selected encoder/VAE shared-manager binding, independent text
+storage, image OOM/tiling and full-area CFG/ER-SDE/beta gates are now closed at
+the scope documented in the consolidated report. This does not complete general
+model support or the complete reference matrix.
+
+General loader detection/conversion/error behavior; all remaining conditioning,
 sampler/scheduler/guider and CFG combinations; LoRA config/bypass/shape-changing
 and arbitrary hook/object/attachment clone semantics; dynamic compiler/vbars
-ownership and RAM/pin eviction; general encoder/VAE shared-manager binding;
-OOM/tiled policies; and broader trained reuse/pressure/failure acceptance.
+ownership and RAM/pin eviction; graph RAM callbacks; and broader trained
+reuse/pressure/failure acceptance remain required. The consolidated report maps
+each retained requirement to the master design's Stages 3–5. No requirement is
+removed, silently excluded or claimed implemented by that mapping.
 
 The initial prepared-but-unrun image gate in the readiness report is historical
 and was subsequently fulfilled. The latest coverage and continuation reports

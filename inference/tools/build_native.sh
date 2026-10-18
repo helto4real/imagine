@@ -4,6 +4,7 @@ parity_root=${IMAGINE_PARITY_ROOT:?Set IMAGINE_PARITY_ROOT to the isolated devel
 reference_site=${IMAGINE_REFERENCE_SITE:?Set IMAGINE_REFERENCE_SITE to the locked package source}
 project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 image=ca4cca0a2e1591ee30adffe584ff5144fecebde14c4ad0130f54e260878dc426
+python3 -S -B "$project_root/inference/tools/verify_scipy_beta.py"
 python3 -B "$project_root/inference/tools/prepare_kitchen.py" "$parity_root/sources" "$parity_root/generated"
 # NVIDIA's wheels use lib/ whereas the compiler's Unix layout expects lib64/.
 # Only the isolated toolchain is adjusted; package/header bytes stay unchanged.

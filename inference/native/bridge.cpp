@@ -32,6 +32,7 @@ namespace torch { bool CudaIPCCollect(); }
 
 namespace {
 thread_local std::string last_error;
+thread_local int last_accelerator_code = 0;
 thread_local std::string last_metadata;
 thread_local at::CallbackHandle rms_callback = 0;
 thread_local RmsTemporaryMetadata rms_temporary{};
@@ -49,6 +50,8 @@ void rms_metadata_end(const at::RecordFunction& fn, at::ObserverContext*) {
 }
 template<class F> int protect(F&& f) noexcept {
     try { f(); last_error.clear(); return 0; }
+    catch(const c10::OutOfMemoryError& e) { last_error=e.what_without_backtrace(); return -9; }
+    catch(const c10::AcceleratorError& e) { last_error=e.what_without_backtrace(); last_accelerator_code=e.get_error_code(); return -10; }
     catch(const std::exception& e) { last_error=e.what(); return -1; }
     catch(...) { last_error="Unknown native exception"; return -1; }
 }
@@ -137,6 +140,7 @@ extern "C" int imagine_host_registration(const void* input,int64_t pin,int64_t* 
     }
     });
 }
+extern "C" int imagine_last_accelerator_code() { return last_accelerator_code; }
 extern "C" const char* imagine_last_error() { return last_error.c_str(); }
 extern "C" const char* imagine_last_metadata() { return last_metadata.c_str(); }
 extern "C" int imagine_aten_boxed(const char* name,const char* overload,
@@ -170,6 +174,8 @@ extern "C" int imagine_aten_boxed(const char* name,const char* overload,
       catch(const c10::IndexError& e) {last_error=e.what_without_backtrace();return -3;}
       catch(const c10::TypeError& e) {last_error=e.what_without_backtrace();return -4;}
       catch(const c10::NotImplementedError& e) {last_error=e.what_without_backtrace();return -5;}
+      catch(const c10::OutOfMemoryError& e) {last_error=e.what_without_backtrace();return -9;}
+      catch(const c10::AcceleratorError& e) {last_error=e.what_without_backtrace();last_accelerator_code=e.get_error_code();return -10;}
       catch(const c10::Error& e) {last_error=e.what_without_backtrace();return -1;}
       catch(const std::exception& e) {last_error=e.what();return -1;}
 }
@@ -207,7 +213,7 @@ template<class F> int aten_tensor_result(F&& fn,void** output) noexcept {
       catch(const c10::TypeError& e) {last_error=processErrorMsg(e.what_without_backtrace());return -7;}
       catch(const c10::NotImplementedError& e) {last_error=processErrorMsg(e.what_without_backtrace());return -8;}
       catch(const c10::OutOfMemoryError& e) {last_error=processErrorMsg(e.what_without_backtrace());return -9;}
-      catch(const c10::AcceleratorError& e) {last_error=processErrorMsg(e.what_without_backtrace());return -10;}
+      catch(const c10::AcceleratorError& e) {last_error=processErrorMsg(e.what_without_backtrace());last_accelerator_code=e.get_error_code();return -10;}
       catch(const c10::Error& e) {last_error=processErrorMsg(e.what_without_backtrace());return -1;}
       catch(const std::exception& e) {last_error=processErrorMsg(e.what());return -1;}
       catch(...) {last_error="Unknown native exception";return -6;}
@@ -549,7 +555,7 @@ extern "C" int imagine_tensor_item_double(const void* raw,double* out) {
     catch(const c10::TypeError& error) { last_error=error.what_without_backtrace(); return -4; }
     catch(const c10::NotImplementedError& error) { last_error=error.what_without_backtrace(); return -5; }
     catch(const c10::OutOfMemoryError& error) { last_error=error.what_without_backtrace(); return -9; }
-    catch(const c10::AcceleratorError& error) { last_error=error.what_without_backtrace(); return -10; }
+    catch(const c10::AcceleratorError& error) { last_error=error.what_without_backtrace(); last_accelerator_code=error.get_error_code(); return -10; }
     catch(const c10::Error& error) { last_error=error.what_without_backtrace(); return -1; }
     catch(const std::exception& error) { last_error=error.what(); return -1; }
     catch(...) { last_error="Unknown native exception"; return -1; }

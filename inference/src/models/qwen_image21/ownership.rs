@@ -1,6 +1,6 @@
 //! Static Qwen patchers sharing physical parameters, backups, pins and sampler.
 //! A patch selection belongs to the patcher; installed weights belong to storage.
-use super::{StaticOffload, host_available_memory, prepare_patched_offload_modules};
+use super::{StaticOffload, host_available_memory, prepare_component_patched_modules};
 use crate::{
     execution::Runtime,
     memory::{Handle, MemoryServices, Model, Patcher},
@@ -13,8 +13,8 @@ use std::{
 };
 use tch::Device;
 
-pub struct StaticModel<'a> {
-    pub owner: RefCell<StaticOffload>,
+pub struct StaticModel<'a, B: super::ModelBuffers = super::FluxSampling> {
+    pub owner: RefCell<StaticOffload<B>>,
     rt: &'a Runtime,
     token: Rc<()>,
     installed: Cell<Option<u64>>,
@@ -27,12 +27,12 @@ struct Selection {
     patches: crate::patching::PatchMap,
     prefix: String,
 }
-struct StaticPatcher<'a> {
-    shared: Rc<StaticModel<'a>>,
+struct StaticPatcher<'a, B: super::ModelBuffers> {
+    shared: Rc<StaticModel<'a, B>>,
     selection: Rc<Selection>,
 }
-impl<'a> StaticModel<'a> {
-    pub fn new(owner: StaticOffload, rt: &'a Runtime) -> Rc<Self> {
+impl<'a, B: super::ModelBuffers + 'a> StaticModel<'a, B> {
+    pub fn new(owner: StaticOffload<B>, rt: &'a Runtime) -> Rc<Self> {
         let original = Rc::new(Selection {
             id: 0,
             patches: owner.patch_owner.patches.clone(),
@@ -104,7 +104,7 @@ impl<'a> StaticModel<'a> {
         ))
     }
 }
-impl Model for StaticPatcher<'_> {
+impl<B: super::ModelBuffers> Model for StaticPatcher<'_, B> {
     fn patch_selection(&self) -> Option<(u64, crate::patching::PatchMap, String)> {
         Some((
             self.selection.id,
@@ -146,10 +146,11 @@ impl Model for StaticPatcher<'_> {
             .patch_owner
             .key_prefix
             .clone_from(&self.selection.prefix);
-        owner.modules = prepare_patched_offload_modules(
+        owner.modules = prepare_component_patched_modules(
             &owner.parameters,
             &owner.patch_owner,
             owner.modules.clone(),
+            owner.cast_dtype,
         )?;
         let negative = extra < 0. && !unpatch;
         let current = owner.placement.loaded_bytes;

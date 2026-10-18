@@ -1,0 +1,41 @@
+{
+  "crate": "torch-sys",
+  "version": "0.26.0",
+  "registry_archive_sha256": "5ae60ab95333c42adcc1a9e74057357e4324a1f344c403e48712a144ab731019",
+  "upstream_files": {
+    ".cargo_vcs_info.json": "2a63d13360c36f9494fe9d2cdb9db81814c4f7cd12ff12383e50f9c78728d863",
+    "Cargo.toml": "63492d10cee12096eeef0248c6df8a257d983d5a7b6a38fffd2983f25bd867e2",
+    "Cargo.toml.orig": "b61dc0e55457079785d64808a33ce2f76766de6ce51783aced9c1f97f46975e4",
+    "build.rs": "d520a8ba62620cff8768113ab13e25e909a11adde8058e0d90acb3e7484b7eb9",
+    "libtch/CMakeLists.txt": "5cbec8dde02e45be4789454d42d35fe7365785e6ed2fdca6499bd844ef4137a1",
+    "libtch/stb_image.h": "599c64066c333d9b125d65f3394de642a42cf4888c3626535dcf62fcfaee1227",
+    "libtch/stb_image_resize.h": "5ef7cd32cfbd9de3f87606711fdf8543958302cafc95905f9397d4bee3ad67cb",
+    "libtch/stb_image_write.h": "dd0ec918c4cc4477a24a2fd268b8a55c3da6767ba50f4e7a9142b9d8e2592487",
+    "libtch/torch_api.cpp": "3b416a34ff5a6dda9ec6e88ef8e6e8735228e2501ec3c2a01919d93217eaccea",
+    "libtch/torch_api.h": "b5120b143c396a0ed0c1ca19f3cad1dbe2b605351e2ab5eba2b536e17131bb97",
+    "libtch/torch_api_generated.cpp": "d833ea5381c09ee20e0d156b9ad2429995fbc6f9af4e16674c01c0ab8ed4e72b",
+    "libtch/torch_api_generated.h": "9a4886a9340806b081e7e42c2cd645f11fb94a78a93ea4fb9bb3b3cd00e5bd21",
+    "libtch/torch_python.cpp": "fdfd9bb88687fb47e7066a9358af97292a7fdb3c6222c62f6a8b1f554b613b2f",
+    "libtch/torch_python.h": "da330a4c846a15fddc4ab3142ecaa535273724393bad963aa19cf622c5237e2f",
+    "src/c_generated.rs": "db7b1ab88fd6c57fd79efa42847438e58c6269695358e155b5b63278697a88fe",
+    "src/cuda.rs": "5041c0ab989d13aa3a800c4b3070c74d7e587b7b884e66f431a83e5dfcbd699e",
+    "src/io.rs": "fcf37f38ce57acddfa4141fd392dcd5a45a106aa4e76344cfd3902909759bcf6",
+    "src/lib.rs": "3b01047fc37f8f8de98fed728f0492286da49ac346c3ea1457d97597f1ca8ecf",
+    "src/python.rs": "1f11411d6f1f8664f85a48d10957dfbf79667af2ccb9bd548f749cd597df5f8c",
+    "src/traits.rs": "c986a2595e1ee98545579e9b46f14e0059aab4d7c02554c9d53c47d74af15ae0"
+  },
+  "adaptation": "Preserve typed c10 errors and provide an owned thread-local InferenceMode context through the C ABI; original tensor operation bodies unchanged",
+  "licenses_from": "same locked tch 0.26.0 release",
+  "patched_files": {
+    "Cargo.toml": "56944c2393ce7ed601ad107fce09f44449f873d8fd1aeeb0eb6c464196192ae6",
+    "build.rs": "dedfca2994c0ef657af2100a81efd92b28f4dcbd1fa153150e7b5f9aac60d7c0",
+    "libtch/torch_api.h": "b729295ed6213a84b4dfd8a2672d22a5cb9d4753fdf31dda64e3d583a70b875c"
+  },
+  "added_files": {
+    "LICENSE-APACHE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+    "LICENSE-MIT": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
+    "libtch/imagine_test_errors.cpp": "27860c10ed3537e16a7b5ae44d34de675a74d919ba5f701f52416928183b0428",
+    "libtch/imagine_inference_mode.cpp": "230d2e9c645364df0f6c065f66ab6608eb4a6fc0b56e1513f8cc9d20ba963723"
+  },
+  "patch_sha256": "5a466f920ffb7538dfc112fe989463a41fd40c6c67e562dff0641e3113e632da"
+}

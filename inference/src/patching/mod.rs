@@ -68,7 +68,7 @@ pub(crate) fn gap(message: impl Into<String>) -> Error {
 }
 // Frozen Linux/CUDA profile: force_non_blocking=False, deterministic=False,
 // no MPS/XPU/DirectML. The source helper therefore selects non_blocking=True.
-fn cast_to_device(
+pub fn cast_to_device(
     native: &Kitchen,
     t: &Tensor,
     device: tch::Device,

@@ -382,7 +382,35 @@ fn move_parameter(native: &Kitchen, value: &Value, device: Device) -> Result<Val
 /// Templates retain the source module traversal and cast_weights attributes.
 pub fn prepare_offload_modules(
     parameters: &PreparedParameters,
+    modules: Vec<OffloadModule>,
+) -> Result<Vec<OffloadModule>, Error> {
+    prepare_component_offload_modules(parameters, modules, ModelCastDtype::Kind(Kind::BFloat16))
+}
+#[derive(Clone, Copy)]
+pub enum ModelCastDtype {
+    Missing,
+    None,
+    Kind(Kind),
+}
+impl ModelCastDtype {
+    fn cast(self) -> Option<Kind> {
+        match self {
+            Self::Kind(k) => Some(k),
+            _ => None,
+        }
+    }
+    fn patch(self, weight: Kind) -> Kind {
+        match self {
+            Self::Missing => Kind::Float,
+            Self::None => weight,
+            Self::Kind(k) => k,
+        }
+    }
+}
+pub fn prepare_component_offload_modules(
+    parameters: &PreparedParameters,
     mut modules: Vec<OffloadModule>,
+    cast: ModelCastDtype,
 ) -> Result<Vec<OffloadModule>, Error> {
     use crate::storage::ScalarField;
     let names = modules
@@ -407,9 +435,6 @@ pub fn prepare_offload_modules(
         for name in &module.parameters {
             let value = &parameters[name];
             let (shape, kind, quantized) = parameter_shape_kind(value)?;
-            if kind != Kind::BFloat16 {
-                return Err(gap(format!("Expected BF16 logical weight {name}")));
-            }
             if quantized {
                 let q = value.as_quantized()?;
                 if q.layout != "TensorWiseINT8Layout" || q.payload.device() != Device::Cpu {
@@ -447,8 +472,11 @@ pub fn prepare_offload_modules(
                 }
                 module.module_bytes += (t.numel() * t.kind().elt_size_in_bytes()) as u64;
             }
-            if module.cast_weights && (quantized || kind != Kind::BFloat16) {
-                extra += shape.iter().product::<i64>() as u64 * 2;
+            if module.cast_weights
+                && let Some(target) = cast.cast()
+                && (quantized || kind != target)
+            {
+                extra += shape.iter().product::<i64>() as u64 * target.elt_size_in_bytes() as u64;
             }
         }
         module.offload_bytes = module.module_bytes + extra;
@@ -459,7 +487,20 @@ pub fn prepare_offload_modules(
 pub fn prepare_patched_offload_modules(
     parameters: &PreparedParameters,
     owner: &crate::patching::PatchOwner,
+    modules: Vec<OffloadModule>,
+) -> Result<Vec<OffloadModule>, Error> {
+    prepare_component_patched_modules(
+        parameters,
+        owner,
+        modules,
+        ModelCastDtype::Kind(Kind::BFloat16),
+    )
+}
+pub fn prepare_component_patched_modules(
+    parameters: &PreparedParameters,
+    owner: &crate::patching::PatchOwner,
     mut modules: Vec<OffloadModule>,
+    cast: ModelCastDtype,
 ) -> Result<Vec<OffloadModule>, Error> {
     for module in &mut modules {
         if module.cast_weights {
@@ -476,22 +517,71 @@ pub fn prepare_patched_offload_modules(
                     module.offload_bytes = patched_module_offload_bytes(
                         module.offload_bytes,
                         &[elements],
-                        Kind::BFloat16,
+                        cast.patch(kind),
                     );
-                } else if quantized || kind != Kind::BFloat16 {
-                    module.offload_bytes += elements * 2;
+                } else if let Some(target) = cast.cast()
+                    && (quantized || kind != target)
+                {
+                    module.offload_bytes += elements * target.elt_size_in_bytes() as u64;
                 }
             }
         }
     }
     Ok(modules)
 }
-pub struct StaticOffload {
+pub trait ModelBuffers {
+    fn buffer_bytes(&self) -> u64;
+    fn to_device(&mut self, device: Device) -> Result<(), Error>;
+}
+impl ModelBuffers for super::FluxSampling {
+    fn buffer_bytes(&self) -> u64 {
+        self.buffer_bytes()
+    }
+    fn to_device(&mut self, device: Device) -> Result<(), Error> {
+        self.to_device(device)
+    }
+}
+/// Constructor buffers and nonleaf parameters outside _load_list are retained
+/// separately from the leaf parameter table (including text logit_scale).
+/// Nonpersistent buffers move with Module.to but do not contribute to state_dict
+/// module_size, as with Qwen3-VL's rotary inv_freq.
+pub struct ComponentBuffers {
+    pub values: BTreeMap<String, Value>,
+    pub persistent: BTreeSet<String>,
+    pub nonleaf_parameters: BTreeSet<String>,
+}
+impl ModelBuffers for ComponentBuffers {
+    fn buffer_bytes(&self) -> u64 {
+        self.values
+            .iter()
+            .filter(|(n, _)| self.persistent.contains(*n))
+            .map(|(_, v)| {
+                v.as_tensor()
+                    .map(|t| (t.numel() * t.kind().elt_size_in_bytes()) as u64)
+                    .unwrap_or(0)
+            })
+            .sum()
+    }
+    fn to_device(&mut self, device: Device) -> Result<(), Error> {
+        for (name, v) in &mut self.values {
+            let original = v.as_tensor()?;
+            let mut moved = original.f_to_device(device)?;
+            if self.nonleaf_parameters.contains(name) {
+                moved = moved.f_set_requires_grad(original.requires_grad())?;
+            }
+            *v = Value::tensor(moved);
+        }
+        Ok(())
+    }
+}
+pub struct StaticOffload<B: ModelBuffers = super::FluxSampling> {
     pub parameters: PreparedParameters,
     pub patch_owner: crate::patching::PatchOwner,
     pub modules: Vec<OffloadModule>,
     pub placement: StaticPlacement,
-    pub sampling: super::FluxSampling,
+    pub sampling: B,
+    pub cast_dtype: ModelCastDtype,
+    pub force_cast_weights: bool,
     /// Original ModelPatcher caches module_size before patch/load transitions.
     model_size: u64,
     pub model_lowvram: bool,
@@ -511,12 +601,14 @@ impl StaticOffload {
             super::FluxSampling::qwen21()?,
         )
     }
+}
+impl<B: ModelBuffers> StaticOffload<B> {
     /// Explicit source module inventory, also used by bounded lifecycle oracles.
     pub fn from_modules(
         parameters: PreparedParameters,
         native: Kitchen,
         modules: Vec<OffloadModule>,
-        sampling: super::FluxSampling,
+        sampling: B,
     ) -> Result<Self, Error> {
         let modules = prepare_offload_modules(&parameters, modules)?;
         let model_size =
@@ -527,6 +619,8 @@ impl StaticOffload {
             modules,
             placement: StaticPlacement::default(),
             sampling,
+            cast_dtype: ModelCastDtype::Kind(Kind::BFloat16),
+            force_cast_weights: false,
             model_size,
             model_lowvram: false,
             pins: BTreeMap::new(),
@@ -536,6 +630,12 @@ impl StaticOffload {
             pinned_bytes: 0,
             native,
         })
+    }
+    pub fn with_cast_dtype(mut self, cast: ModelCastDtype) -> Result<Self, Error> {
+        self.modules =
+            prepare_component_offload_modules(&self.parameters, self.modules.clone(), cast)?;
+        self.cast_dtype = cast;
+        Ok(self)
     }
     pub fn model_size(&self) -> u64 {
         self.model_size
@@ -656,10 +756,11 @@ impl StaticOffload {
         Ok(())
     }
     pub fn with_patches(mut self, owner: crate::patching::PatchOwner) -> Result<Self, Error> {
-        self.modules = prepare_patched_offload_modules(
+        self.modules = prepare_component_patched_modules(
             &self.parameters,
             &owner,
             std::mem::take(&mut self.modules),
+            self.cast_dtype,
         )?;
         self.patch_owner = owner;
         Ok(self)
@@ -868,7 +969,7 @@ impl StaticOffload {
         self.partially_load_impl(budget, rt)
     }
 }
-impl Drop for StaticOffload {
+impl<B: ModelBuffers> Drop for StaticOffload<B> {
     fn drop(&mut self) {
         let _ = self.native.synchronize_device(0);
         for t in self.pins.values() {

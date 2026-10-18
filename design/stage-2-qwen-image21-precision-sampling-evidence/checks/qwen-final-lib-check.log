@@ -1,0 +1,10 @@
+   Compiling imagine-inference v0.1.0 (/home/thhel/ChatGPT/imagine/inference)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.49s
+     Running unittests src/lib.rs (/tmp/imagine-rust-comfy-parity-20261017/target/debug/deps/imagine_inference-0508000ce16a92a8)
+
+running 2 tests
+test boxed_aten::tests::unsigned_ivalue_ownership_and_tag_cross_the_pinned_c10_abi_without_narrowing ... ok
+test tests::libtorch_cpu_tensor_views_and_dtypes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+

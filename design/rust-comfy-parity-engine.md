@@ -8,9 +8,14 @@ bodies, 155 crate tests and 146 unfiltered Python-free primitive tests. The full
 model, algorithm and integration parity target remains assigned to later stages.
 No new deviation or approval was needed for the final continuation.
 
-Stage 2 has started with Qwen Image 2.1 **INT8 ConvRot, BF16 and Turbo** as
-required variants. See [the Stage 2 report](stage-2-qwen-image21.md) for verified
-component coverage and remaining complete-model acceptance gates. The
+Stage 2's selected Qwen Image 2.1 vertical path is complete for **INT8 ConvRot,
+BF16 and Turbo**, under Section 15's partial-overall-coverage exit condition.
+See [the consolidated acceptance report](stage-2-qwen-image21-ready.md),
+[final checkpoint](stage-2-qwen-image21-precision-sampling-checkpoint.json) and
+[chronological Stage 2 report](stage-2-qwen-image21.md). Forty-six current
+regressions and all 46 individual Python-free isolations pass. The remaining
+general contracts, complete model matrix and product lifecycle/release gates
+retain their scope in Stages 3–5; no full ComfyUI parity is claimed. The
 [first trained INT8 comparison](stage-2-qwen-image21-first-comparison.md)
 records the separately authorized first image and Python comparison; it does
 not complete Stage 2 or establish BF16/Turbo/editing/LoRA acceptance.

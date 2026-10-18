@@ -22,7 +22,46 @@ pub enum Error {
         class: &'static str,
         message: String,
     },
+    AcceleratorException {
+        code: i32,
+        message: String,
+    },
     Torch(tch::TchError),
+}
+/// LibTorch's exact thread-local InferenceMode context. Guards must be dropped
+/// on their creating thread and nested in the same order as Python contexts.
+#[must_use]
+pub struct InferenceMode {
+    handle: NonNull<c_void>,
+    _thread: std::marker::PhantomData<std::rc::Rc<()>>,
+}
+unsafe extern "C" {
+    fn at_imagine_inference_mode_new(enabled: i32) -> *mut c_void;
+    fn at_imagine_inference_mode_free(value: *mut c_void);
+}
+pub fn inference_mode(enabled: bool) -> Result<InferenceMode> {
+    let handle = unsafe { at_imagine_inference_mode_new(i32::from(enabled)) };
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let text = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe { libc::free(error.cast()) };
+        if !handle.is_null() {
+            unsafe { at_imagine_inference_mode_free(handle) };
+        }
+        return Err(tch::TchError::Torch(text).into());
+    }
+    Ok(InferenceMode {
+        handle: NonNull::new(handle)
+            .ok_or_else(|| Error::Native("Null InferenceMode guard".into()))?,
+        _thread: std::marker::PhantomData,
+    })
+}
+impl Drop for InferenceMode {
+    fn drop(&mut self) {
+        unsafe { at_imagine_inference_mode_free(self.handle.as_ptr()) };
+    }
 }
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -33,6 +72,7 @@ impl std::fmt::Display for Error {
             }
             Self::Native(message) => f.write_str(message),
             Self::ReferenceException { message, .. } => f.write_str(message),
+            Self::AcceleratorException { message, .. } => f.write_str(message),
             Self::Torch(error) => error.fmt(f),
         }
     }
@@ -45,6 +85,24 @@ impl From<crate::registry::SelectionError> for Error {
 }
 impl From<tch::TchError> for Error {
     fn from(error: tch::TchError) -> Self {
+        if let tch::TchError::Torch(message) = &error {
+            if let Some(message) = message.strip_prefix("[imagine-c10:oom]\n") {
+                return Self::ReferenceException {
+                    class: "OutOfMemoryError",
+                    message: message.into(),
+                };
+            }
+            if let Some((code, message)) = message
+                .strip_prefix("[imagine-c10:accelerator:")
+                .and_then(|m| m.split_once("]\n"))
+                .and_then(|(c, m)| c.parse().ok().map(|c| (c, m)))
+            {
+                return Self::AcceleratorException {
+                    code,
+                    message: message.into(),
+                };
+            }
+        }
         Self::Torch(error)
     }
 }
@@ -196,6 +254,14 @@ type TensorItemDouble = unsafe extern "C" fn(*const c_void, *mut f64) -> i32;
 type IValueUInt = unsafe extern "C" fn(u64, *mut *mut c_void) -> i32;
 type IValueGetUInt = unsafe extern "C" fn(*const c_void, *mut u64) -> i32;
 struct Library {
+    beta_ppf: unsafe extern "C" fn(
+        f64,
+        f64,
+        f64,
+        *mut f64,
+        *mut *const c_char,
+        *mut *const c_char,
+    ) -> i32,
     item_double: TensorItemDouble,
     grad_name: TensorGradName,
     ivalue_uint: IValueUInt,
@@ -261,6 +327,29 @@ impl Drop for Library {
     }
 }
 impl Library {
+    fn exception(&self, class: &'static str, message: String) -> Error {
+        if class == "AcceleratorError" {
+            let symbol = unsafe {
+                libc::dlsym(
+                    self.handle.as_ptr(),
+                    c"imagine_last_accelerator_code".as_ptr(),
+                )
+            };
+            if symbol.is_null() {
+                return Error::BindingGap {
+                    backend: "native_exception".into(),
+                    operation: "Missing accelerator error code ABI".into(),
+                };
+            }
+            let code: unsafe extern "C" fn() -> i32 = unsafe { std::mem::transmute(symbol) };
+            Error::AcceleratorException {
+                code: unsafe { code() },
+                message,
+            }
+        } else {
+            Error::ReferenceException { class, message }
+        }
+    }
     fn check(&self, code: i32) -> Result<()> {
         if code == 0 {
             return Ok(());
@@ -270,6 +359,8 @@ impl Library {
             .to_string_lossy()
             .into_owned();
         match code {
+            -9 => Err(self.exception("OutOfMemoryError", text)),
+            -10 => Err(self.exception("AcceleratorError", text)),
             -20 | -21 => Err(Error::ReferenceException {
                 class: if code == -20 {
                     "ValueError"
@@ -292,6 +383,11 @@ pub type LaunchGuard = Arc<dyn Fn(&str) -> Result<()> + Send + Sync>;
 pub struct KernelResult {
     pub value: i64,
     pub metadata: Option<String>,
+}
+pub struct BetaQuantile {
+    pub value: f64,
+    /// Original SciPy RuntimeWarning text, retained for the caller's warning sink.
+    pub warning: Option<String>,
 }
 pub struct ScaledMm<'a> {
     pub input: &'a Tensor,
@@ -330,6 +426,30 @@ impl DeviceSpec {
     }
 }
 impl Kitchen {
+    /// Unchanged SciPy 1.17.1 beta inverse body and its exact Boost dependency.
+    pub fn beta_quantile(&self, p: f64, a: f64, b: f64) -> Result<BetaQuantile> {
+        let mut value = 0.;
+        let mut warning = std::ptr::null();
+        let mut error = std::ptr::null();
+        let status =
+            unsafe { (self.library.beta_ppf)(p, a, b, &mut value, &mut warning, &mut error) };
+        let text = |p: *const c_char| {
+            (!p.is_null()).then(|| unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned())
+        };
+        let warning = text(warning);
+        if status != 0 {
+            let message = text(error).unwrap_or_default();
+            return Err(if status == 1 {
+                Error::ReferenceException {
+                    class: "OverflowError",
+                    message,
+                }
+            } else {
+                Error::Native(message)
+            });
+        }
+        Ok(BetaQuantile { value, warning })
+    }
     pub(crate) fn buffer_owner(
         &self,
         tensor: &Tensor,
@@ -405,8 +525,8 @@ impl Kitchen {
             )
         };
         if code != 0 {
-            return Err(Error::ReferenceException {
-                class: match code {
+            return Err(self.library.exception(
+                match code {
                     -2 => "ValueError",
                     -3 => "IndexError",
                     -4 => "BufferError",
@@ -417,10 +537,10 @@ impl Kitchen {
                     -10 => "AcceleratorError",
                     _ => "RuntimeError",
                 },
-                message: unsafe { CStr::from_ptr((self.library.error)()) }
+                unsafe { CStr::from_ptr((self.library.error)()) }
                     .to_string_lossy()
                     .into_owned(),
-            });
+            ));
         }
         if out.is_null() {
             return Err(Error::Native("Null SDPA result".into()));
@@ -636,8 +756,8 @@ impl Kitchen {
         if code == 0 {
             Ok(output)
         } else {
-            Err(Error::ReferenceException {
-                class: match code {
+            Err(self.library.exception(
+                match code {
                     -2 => "ValueError",
                     -3 => "IndexError",
                     -4 => "TypeError",
@@ -646,10 +766,10 @@ impl Kitchen {
                     -10 => "AcceleratorError",
                     _ => "RuntimeError",
                 },
-                message: unsafe { CStr::from_ptr((self.library.error)()) }
+                unsafe { CStr::from_ptr((self.library.error)()) }
                     .to_string_lossy()
                     .into_owned(),
-            })
+            ))
         }
     }
     /// # Safety
@@ -706,14 +826,16 @@ impl Kitchen {
             -3 => "IndexError",
             -4 => "TypeError",
             -5 => "NotImplementedError",
+            -9 => "OutOfMemoryError",
+            -10 => "AcceleratorError",
             _ => "RuntimeError",
         };
-        Err(Error::ReferenceException {
+        Err(self.library.exception(
             class,
-            message: unsafe { CStr::from_ptr((self.library.error)()) }
+            unsafe { CStr::from_ptr((self.library.error)()) }
                 .to_string_lossy()
                 .into_owned(),
-        })
+        ))
     }
     /// Load a specifically selected standalone bridge. No alternate backend is selected.
     ///
@@ -745,6 +867,7 @@ impl Kitchen {
         }
         let loaded = (|| unsafe {
             Ok::<_, Error>(Library {
+                beta_ppf: symbol(handle, c"imagine_beta_ppf")?,
                 aten_boxed: symbol(handle, c"imagine_aten_boxed")?,
                 item_double: symbol(handle, c"imagine_tensor_item_double")?,
                 grad_name: symbol(handle, c"imagine_tensor_grad_name")?,
@@ -861,7 +984,7 @@ impl Kitchen {
                 -10 => "AcceleratorError",
                 _ => "RuntimeError",
             };
-            return Err(Error::ReferenceException { class, message });
+            return Err(self.library.exception(class, message));
         }
         if output.is_null() {
             return Err(Error::Native("Null ATen result".into()));
@@ -924,7 +1047,7 @@ impl Kitchen {
                         | "OutOfMemoryError"
                         | "AcceleratorError",
                     ..
-                }
+                } | Error::AcceleratorException { .. }
             ) {
                 ScaledMmFailure::Runtime(e)
             } else {

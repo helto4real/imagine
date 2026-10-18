@@ -1,0 +1,4 @@
+Captured 40 original CFG histories with 56 model calls
+Captured 60 ER-SDE full histories and 144 exact seeded noise calls
+Captured 32 exact tiler cases and 48 image VAE lifecycle cases
+Captured 198 beta schedule/error cases and 8000 original Boost quantiles

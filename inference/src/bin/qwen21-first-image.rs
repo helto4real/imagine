@@ -5,7 +5,7 @@ use imagine_inference::{
     checkpoint::{Aimdo, PreparedParameters, Safetensors, bind_comfy_layouts},
     execution::Runtime,
     models::qwen_image21 as q,
-    native::{Error, Generator, Kitchen},
+    native::{Error, Kitchen},
     triton_compiler::Compiler,
 };
 use serde_json::{Value, json};
@@ -34,6 +34,14 @@ fn save_f32(t: &Tensor, path: &Path) -> Result<()> {
 fn elapsed(rt: &Runtime, start: Instant) -> Result<f64> {
     rt.native.synchronize_device(0)?;
     Ok(start.elapsed().as_secs_f64())
+}
+fn vae_tiles(profile: &Value, operation: &str) -> Option<q::ImageTileOptions> {
+    let options = profile.get("vae_tiling")?.get(operation)?;
+    Some(q::ImageTileOptions {
+        x: options["tile_x"].as_i64(),
+        y: options["tile_y"].as_i64(),
+        overlap: options["overlap"].as_i64(),
+    })
 }
 fn required(name: &str) -> Result<PathBuf> {
     Ok(std::env::var_os(name)
@@ -134,6 +142,13 @@ fn validate_profile(p: &Value) -> Result<()> {
         include_str!("../../profiles/qwen21-lora-text-int8.json"),
         include_str!("../../profiles/qwen21-lora-stack-int8.json"),
         include_str!("../../profiles/qwen21-lora-portrait-1600-int8.json"),
+        include_str!("../../profiles/qwen21-lora-int8-bf16-encoder.json"),
+        include_str!("../../profiles/qwen21-lora-bf16-bf16-encoder.json"),
+        include_str!("../../profiles/qwen21-lora-turbo-bf16-encoder.json"),
+        include_str!("../../profiles/qwen21-cfg-er-sde-int8.json"),
+        include_str!("../../profiles/qwen21-cfg-er-sde-bf16.json"),
+        include_str!("../../profiles/qwen21-cfg-er-sde-turbo.json"),
+        include_str!("../../profiles/qwen21-tiled-int8.json"),
     ];
     if !registered
         .iter()
@@ -142,51 +157,6 @@ fn validate_profile(p: &Value) -> Result<()> {
         return Err("This development driver requires one of its explicitly registered source-matched comparison profiles".into());
     }
     Ok(())
-}
-struct Denoiser<'a> {
-    rt: &'a Runtime,
-    model: &'a q::DiT,
-    context: Tensor,
-    reference_latents: Vec<Tensor>,
-    image_slots: Vec<i64>,
-    cache: q::PrefixCache<'a, q::StaticCacheServices>,
-    exec: q::ResidentExecution,
-    generator: Generator,
-    step_start: Instant,
-    step_seconds: Vec<f64>,
-}
-impl q::EulerExecution for Denoiser<'_> {
-    fn denoise(&mut self, x: &Tensor, sigma: &Tensor) -> std::result::Result<Tensor, Error> {
-        // Full-area CFG=1 calc_cond_batch still concatenates and aggregates.
-        let input = Tensor::f_cat(&[x], 0)?;
-        let time = Tensor::f_cat(&[sigma], 0)?.f_to_kind(Kind::Float)?;
-        let output = unsafe {
-            self.model.forward(
-                self.rt,
-                &input.f_to_kind(Kind::BFloat16)?,
-                &time,
-                &self.context,
-                &self.reference_latents,
-                &self.image_slots,
-                Some(&mut self.cache),
-                &mut self.exec,
-            )
-        }?
-        .f_to_kind(Kind::Float)?;
-        let denoised = q::flow_denoised(sigma, &output, &input)?;
-        q::single_full_condition_cfg1(x, &denoised)
-    }
-    fn noise_like(&mut self, x: &Tensor) -> std::result::Result<Tensor, Error> {
-        self.generator.randn(&x.size(), x.kind())
-    }
-    fn callback(&mut self, s: q::EulerStep<'_>) -> std::result::Result<(), Error> {
-        self.rt.native.synchronize_device(0)?;
-        self.step_seconds
-            .push(self.step_start.elapsed().as_secs_f64());
-        self.step_start = Instant::now();
-        eprintln!("sampling step {}", s.i + 1);
-        Ok(())
-    }
 }
 // Explicit development diagnostic: replay recorded original placements to
 // distinguish arithmetic differences from different physical allocator inputs.
@@ -251,6 +221,47 @@ fn memory_record(output: &Path, phase: &str, owner: &q::StaticOffload) -> Result
             "dtype":"float32","shape":owner.sampling.sigmas.size(),"bytes":owner.sampling.buffer_bytes()}}),
     )
 }
+fn component_memory_record(
+    phase: &str,
+    owner: &q::StaticOffload<q::ComponentBuffers>,
+    registrations: usize,
+    pins: usize,
+) -> Value {
+    let mut placement = owner.placement.clone();
+    // This component report uses the same source view as component_record:
+    // resident forced-cast flags are reported by cast_modules, not offload keys.
+    placement
+        .lowvram_passes
+        .retain(|name, _| !placement.resident.contains(name));
+    json!({"phase":phase,"registered_models":registrations,"total_pinned_bytes":pins,"model_size":owner.model_size(),"placement":placement,"model_lowvram":owner.model_lowvram,"pinned_bytes":owner.pinned_bytes,"cast_modules":owner.modules.iter().filter(|m|owner.force_cast_weights || (m.cast_weights && owner.placement.lowvram_passes.contains_key(&m.name))).map(|m|m.name.clone()).collect::<std::collections::BTreeSet<_>>(),"buffers":owner.sampling.values.iter().map(|(name,v)|(name,if v.as_tensor().unwrap().device()==Device::Cpu {"cpu"}else{"cuda:0"})).collect::<BTreeMap<_,_>>()})
+}
+// Development-only observation: delegate every query unchanged and retain no
+// tensors. The marker enables this for a fresh isolated diagnostic run.
+struct MemoryObservation {
+    inner: q::StaticMemoryServices,
+    enabled: bool,
+    phase: &'static str,
+    events: Vec<Value>,
+}
+impl imagine_inference::memory::MemoryServices for MemoryObservation {
+    fn free(&mut self, device: Device) -> std::result::Result<(f64, f64), Error> {
+        let result = imagine_inference::memory::MemoryServices::free(&mut self.inner, device)?;
+        if self.enabled && self.phase.starts_with("text_") && device != Device::Cpu {
+            self.events.push(json!({"phase":self.phase,"event":"free","total":result.0 as u64,"torch":result.1 as u64}));
+        }
+        Ok(result)
+    }
+    fn empty_cache(&mut self) -> std::result::Result<(), Error> {
+        if self.enabled && self.phase.starts_with("text_") {
+            self.events
+                .push(json!({"phase":self.phase,"event":"empty_cache"}));
+        }
+        imagine_inference::memory::MemoryServices::empty_cache(&mut self.inner)
+    }
+    fn ensure_pins(&mut self, bytes: f64) -> std::result::Result<(), Error> {
+        imagine_inference::memory::MemoryServices::ensure_pins(&mut self.inner, bytes)
+    }
+}
 fn generate(
     rt: &Runtime,
     aimdo: &Aimdo,
@@ -300,7 +311,12 @@ fn generate(
     let mut manager_records = Vec::new();
     let pins = q::HostPins::new(rt.native.clone())?;
     let mut memory_manager = imagine_inference::memory::Manager::new();
-    let mut memory_services = q::StaticMemoryServices::new(rt.native.clone(), pins.clone());
+    let mut memory_services = MemoryObservation {
+        inner: q::StaticMemoryServices::new(rt.native.clone(), pins.clone()),
+        enabled: own.join("memory-observation-enabled").is_file(),
+        phase: "other",
+        events: vec![],
+    };
     let dev = Device::Cuda(0);
     let editing = p.get("reference_resolution").is_some();
     let mut references = None;
@@ -343,8 +359,77 @@ fn generate(
             })
             .collect::<Result<Vec<_>>>()?;
         let mut reference_vae = None;
+        let mut managed_reference = None;
         let mut encode = |pixels: &Tensor| -> std::result::Result<Tensor, Error> {
             let start = Instant::now();
+            if offload {
+                if managed_reference.is_none() {
+                    let params = load(rt, aimdo, "vae", &paths["vae"], Device::Cpu)
+                        .map_err(|e| Error::Native(e.to_string()))?;
+                    let owner =
+                        q::static_component(rt, "vae", params)?.with_shared_pins(pins.clone());
+                    let model = q::StaticModel::new(owner, rt);
+                    let patcher = model.patcher();
+                    memory_manager.load(
+                        std::slice::from_ref(&patcher),
+                        0.,
+                        None,
+                        false,
+                        false,
+                        &mut memory_services,
+                    )?;
+                    managed_reference = Some((model, patcher));
+                }
+                let (model, patcher) = managed_reference.as_ref().unwrap();
+                let schema = q::constructor_schema()?;
+                let mut exec = q::ResidentExecution::bind(
+                    rt,
+                    &PreparedParameters::default(),
+                    0,
+                    attention(dev),
+                )?;
+                let mut services = q::ManagedImageVae {
+                    runtime: rt,
+                    model: model.clone(),
+                    patcher: patcher.clone(),
+                    manager: &mut memory_manager,
+                    memory: &mut memory_services,
+                    execution: &mut exec,
+                    config: q::ImageVaeConfig {
+                        dim: schema.vae_config.dim,
+                        dec_dim: schema.vae_config.dec_dim,
+                        ..Default::default()
+                    },
+                    device: dev,
+                    force_full_load: false,
+                };
+                let policy = q::ImageVaePolicy {
+                    device: dev,
+                    dtype: Kind::BFloat16,
+                    output_device: Device::Cpu,
+                    output_kind: Kind::Float,
+                    default_kind: Kind::Float,
+                    output_channels: 4,
+                    latent_channels: 64,
+                };
+                let pixels = q::vae_crop_pixels(pixels)?.f_movedim_int(-1, 1)?;
+                let samples = if let Some(tiles) = vae_tiles(p, "encode") {
+                    policy.execute_tiled(q::VaeOperation::Encode, &pixels, tiles, &mut services)?
+                } else {
+                    policy.execute(q::VaeOperation::Encode, &pixels, &mut services)?
+                };
+                drop(services);
+                manager_records.push(component_memory_record(
+                    "reference_vae_encoded",
+                    &model.owner.borrow(),
+                    memory_manager.registrations(),
+                    pins.bytes(),
+                ));
+                rt.native.synchronize_device(0)?;
+                *timings.entry("reference_vae_load_and_encode").or_insert(0.) +=
+                    start.elapsed().as_secs_f64();
+                return Ok(samples);
+            }
             if reference_vae.is_none() {
                 let params = load(rt, aimdo, "vae", &paths["vae"], dev)
                     .map_err(|e| Error::Native(e.to_string()))?;
@@ -383,6 +468,15 @@ fn generate(
             },
         )?;
         drop(reference_vae);
+        if let Some((model, _patcher)) = managed_reference {
+            memory_manager.unload_all(dev, &mut memory_services)?;
+            manager_records.push(component_memory_record(
+                "reference_vae_unloaded",
+                &model.owner.borrow(),
+                memory_manager.registrations(),
+                pins.bytes(),
+            ));
+        }
         if (prepared.width, prepared.height)
             != (p["width"].as_i64().unwrap(), p["height"].as_i64().unwrap())
         {
@@ -415,62 +509,101 @@ fn generate(
             .ok_or("Missing synthetic prompt")?,
         &token_options,
     )?;
-    let conditioning = {
+    let (conditioning, negative_conditioning) = {
         eprintln!("loading text component");
         let start = Instant::now();
-        let mut params = load(rt, aimdo, "text", &paths["text"], dev)?;
+        let mut params = load(
+            rt,
+            aimdo,
+            "text",
+            &paths["text"],
+            if offload { Device::Cpu } else { dev },
+        )?;
         let mut patches = q::component_patch_owner("text", &params, &loras)?;
         record_lora(&output, "text", &patches)?;
-        unsafe {
-            patches.apply(rt, &mut params, dev, Kind::Half)?;
-        }
-        let encoder = q::QwenTextEncoder::from_parameters(Default::default(), &params)?;
-        let vision = if editing {
-            Some(q::QwenVisionEncoder::from_parameters(
-                Default::default(),
-                &params,
-            )?)
+        let managed_text = if offload {
+            let owner = q::static_component(rt, "text", params)?
+                .with_shared_pins(pins.clone())
+                .with_patches(patches)?;
+            let model = q::StaticModel::new(owner, rt);
+            let patcher = model.patcher();
+            memory_services.phase = "text_initial";
+            memory_manager.load(
+                std::slice::from_ref(&patcher),
+                0.,
+                None,
+                false,
+                false,
+                &mut memory_services,
+            )?;
+            memory_services.phase = "other";
+            params = PreparedParameters::default();
+            manager_records.push(component_memory_record(
+                "text_loaded",
+                &model.owner.borrow(),
+                memory_manager.registrations(),
+                pins.bytes(),
+            ));
+            Some((model, patcher))
         } else {
+            unsafe {
+                patches.apply(rt, &mut params, dev, Kind::Half)?;
+            }
             None
         };
-        let mut exec = q::ResidentExecution::bind(rt, &params, 0, attention(dev))?;
-        if own.join("trace-enabled").is_file() {
-            let directory = output.join("text-trace");
-            fs::create_dir(&directory)?;
-            let mut index = 0;
-            exec.tensor_observer = Some(Box::new(move |name, tensor| {
-                let stem = format!("{index:04}-{name}");
-                index += 1;
-                fs::write(directory.join(format!("{stem}.json")), serde_json::to_vec(&json!({"shape":tensor.size(),"strides":tensor.stride(),"dtype":format!("{:?}",tensor.kind())})).unwrap()).map_err(|e| Error::Native(e.to_string()))?;
-                save_f32(tensor, &directory.join(format!("{stem}.bin")))
-                    .map_err(|e| Error::Native(e.to_string()))
-            }));
-        }
         timings.insert("text_load", elapsed(rt, start)?);
         let start = Instant::now();
-        let conditioning = unsafe {
-            encoder.encode_prompt_with_images(
-                rt,
-                &prompt,
-                q::TextConditioningOptions {
-                    execution_device: dev,
-                    intermediate_device: Device::Cpu,
-                },
-                vision
-                    .as_ref()
-                    .zip(references.as_ref())
-                    .map(|(v, r)| (v, r.vision.as_slice())),
-                &mut exec,
-            )
-        }?;
-        timings.insert("text_encode", elapsed(rt, start)?);
-        if editing {
-            let negative = tokenizer
-                .tokenize_prompt(p["negative_prompt"].as_str().unwrap(), &token_options)?;
-            let negative = unsafe {
+        let mut encode_prompt = |prompt: &q::TokenizedPrompt,
+                                 negative: bool|
+         -> Result<q::TextConditioning> {
+            let snapshot = if let Some((model, patcher)) = &managed_text {
+                memory_services.phase = if negative {
+                    "text_negative"
+                } else {
+                    "text_positive"
+                };
+                memory_manager.load(
+                    std::slice::from_ref(patcher),
+                    0.,
+                    None,
+                    false,
+                    false,
+                    &mut memory_services,
+                )?;
+                model.owner.borrow().execution_parameters()
+            } else {
+                params.clone()
+            };
+            let encoder = q::QwenTextEncoder::from_parameters(Default::default(), &snapshot)?;
+            let vision = if editing {
+                Some(q::QwenVisionEncoder::from_parameters(
+                    Default::default(),
+                    &snapshot,
+                )?)
+            } else {
+                None
+            };
+            let mut exec = q::ResidentExecution::bind(rt, &snapshot, 0, attention(dev))?;
+            if own.join("trace-enabled").is_file() {
+                let directory = output.join(if negative {
+                    "negative-text-trace"
+                } else {
+                    "text-trace"
+                });
+                fs::create_dir(&directory)?;
+                let mut index = 0;
+                exec.tensor_observer = Some(Box::new(move |name, tensor| {
+                    let stem = format!("{index:04}-{name}");
+                    index += 1;
+                    fs::write(directory.join(format!("{stem}.json")),serde_json::to_vec(&json!({"shape":tensor.size(),"strides":tensor.stride(),"dtype":format!("{:?}",tensor.kind())})).unwrap()).map_err(|e|Error::Native(e.to_string()))?;
+                    save_f32(tensor, &directory.join(format!("{stem}.bin")))
+                        .map_err(|e| Error::Native(e.to_string()))
+                }));
+            }
+            let conditioning = unsafe {
                 encoder.encode_prompt_with_images(
                     rt,
-                    &negative,
+                    prompt,
                     q::TextConditioningOptions {
                         execution_device: dev,
                         intermediate_device: Device::Cpu,
@@ -482,6 +615,23 @@ fn generate(
                     &mut exec,
                 )
             }?;
+            memory_services.phase = "other";
+            if let Some((model, _)) = &managed_text {
+                manager_records.push(component_memory_record(
+                    "text_encoded",
+                    &model.owner.borrow(),
+                    memory_manager.registrations(),
+                    pins.bytes(),
+                ));
+            }
+            Ok(conditioning)
+        };
+        let conditioning = encode_prompt(&prompt, false)?;
+        timings.insert("text_encode", elapsed(rt, start)?);
+        let negative = if editing {
+            let negative = tokenizer
+                .tokenize_prompt(p["negative_prompt"].as_str().unwrap(), &token_options)?;
+            let negative = encode_prompt(&negative, true)?;
             save_f32(&negative.context, &output.join("negative-context-f32.bin"))?;
             fs::write(
                 output.join("conditioning.json"),
@@ -492,7 +642,10 @@ fn generate(
             if negative.attention_mask.is_some() {
                 return Err("Unexpected negative mask in registered editing profile".into());
             }
-        }
+            Some(negative)
+        } else {
+            None
+        };
         if editing {
             timings.insert("text_encode", elapsed(rt, start)?);
         }
@@ -503,7 +656,17 @@ fn generate(
                 "Nontrivial mask/image conditioning has a separate initial-driver binding".into(),
             );
         }
-        conditioning
+        drop(params);
+        if let Some((model, _patcher)) = managed_text {
+            memory_manager.unload_all(dev, &mut memory_services)?;
+            manager_records.push(component_memory_record(
+                "text_unloaded",
+                &model.owner.borrow(),
+                memory_manager.registrations(),
+                pins.bytes(),
+            ));
+        }
+        (conditioning, negative)
     };
     rt.native.cuda_soft_empty_cache(0)?;
     save_f32(&conditioning.context, &output.join("context-f32.bin"))?;
@@ -614,6 +777,11 @@ fn generate(
             timings.insert("dit_load", elapsed(rt, load_start)?);
             Instant::now()
         };
+        let sampling = borrowed
+            .as_ref()
+            .map(|owner| &owner.sampling)
+            .or(resident_sampling.as_ref())
+            .unwrap();
         let sigmas = if let Some(values) = p.get("custom_sigmas") {
             let values = values
                 .as_array()
@@ -624,53 +792,79 @@ fn generate(
             let sigmas = Tensor::f_from_slice(&values)?;
             save_f32(&sigmas, &output.join("sigmas-f32.bin"))?;
             sigmas
+        } else if p["scheduler"] == "beta" {
+            sampling.beta(
+                p["steps"].as_i64().unwrap(),
+                0.6,
+                0.6,
+                &rt.native,
+                &mut |message| eprintln!("RuntimeWarning: {message}"),
+            )?
         } else {
-            borrowed
-                .as_ref()
-                .map(|owner| &owner.sampling)
-                .or(resident_sampling.as_ref())
-                .unwrap()
-                .simple(p["steps"].as_u64().unwrap() as usize)?
+            sampling.simple(p["steps"].as_u64().unwrap() as usize)?
         }
         .f_to_device(dev)?;
+        if p["scheduler"] == "beta" {
+            save_f32(&sigmas, &output.join("sigmas-f32.bin"))?;
+        }
         let mut cpu_rng = rt
             .native
             .generator(Device::Cpu, p["seed"].as_u64().unwrap())?;
         let noise = cpu_rng.randn(&shape, Kind::Float)?.f_to_device(dev)?;
         let zero = Tensor::f_zeros(shape, (Kind::Float, dev))?;
         let x = q::flow_noise_scaling(&sigmas.f_get(0)?, &noise, &zero, 1.)?;
-        let mut denoiser = Denoiser {
-            rt,
-            model: &model,
-            context: conditioning
-                .context
-                .f_to_device_(dev, Kind::BFloat16, false, false)?,
-            reference_latents: references
-                .as_ref()
-                .map(|r| {
-                    r.reference_latents
-                        .iter()
-                        .map(|latent| {
-                            q::LatentNormalization::new(rt)?
-                                .process_in(latent)?
-                                .f_to_device_(dev, Kind::BFloat16, false, false)
-                                .map_err(Error::from)
+        let condition =
+            |context: &q::TextConditioning| -> std::result::Result<q::FullAreaCondition, Error> {
+                Ok(q::FullAreaCondition {
+                    context: context.context.shallow_clone(),
+                    attention_mask: None,
+                    reference_latents: references
+                        .as_ref()
+                        .map(|r| {
+                            r.reference_latents
+                                .iter()
+                                .map(|latent| q::LatentNormalization::new(rt)?.process_in(latent))
+                                .collect()
                         })
-                        .collect::<std::result::Result<Vec<_>, Error>>()
+                        .transpose()?,
+                    image_slots: Some(context.image_slots.clone()),
                 })
-                .transpose()?
-                .unwrap_or_default(),
-            image_slots: conditioning.image_slots.clone(),
-            cache,
-            exec,
-            generator: rt.native.generator(dev, p["seed"].as_u64().unwrap())?,
-            step_start: Instant::now(),
-            step_seconds: Vec::new(),
+            };
+        let step_seconds = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let observed_steps = step_seconds.clone();
+        let mut step_start = Instant::now();
+        let mut denoiser = unsafe {
+            q::QwenDenoiser::bind(q::QwenDenoiserConfig {
+                runtime: rt,
+                model: &model,
+                positive: condition(&conditioning)?,
+                negative: negative_conditioning.as_ref().map(condition).transpose()?,
+                cfg: p["cfg"].as_f64().unwrap(),
+                disable_cfg1_optimization: false,
+                flash_attention_memory: true,
+                cache,
+                execution: exec,
+                compute_dtype: Kind::BFloat16,
+                generator: rt.native.generator(dev, p["seed"].as_u64().unwrap())?,
+                observer: Some(Box::new(move |step| {
+                    rt.native.synchronize_device(0)?;
+                    observed_steps
+                        .borrow_mut()
+                        .push(step_start.elapsed().as_secs_f64());
+                    step_start = Instant::now();
+                    eprintln!("sampling step {}", step.i + 1);
+                    Ok(())
+                })),
+            })
         };
-        let sampled = q::sample_euler(x, &sigmas, Default::default(), &mut denoiser)?;
+        let sampled = if p["sampler"] == "er_sde" {
+            q::sample_er_sde(x, &sigmas, sampling, Default::default(), &mut denoiser)?
+        } else {
+            q::sample_euler(x, &sigmas, Default::default(), &mut denoiser)?
+        };
         fs::write(
             output.join("step-seconds.json"),
-            serde_json::to_vec_pretty(&denoiser.step_seconds)?,
+            serde_json::to_vec_pretty(&*step_seconds.borrow())?,
         )?;
         let sampled =
             q::flow_inverse_noise_scaling(&sigmas.f_get(sigmas.size()[0] - 1)?, &sampled)?;
@@ -680,13 +874,13 @@ fn generate(
         fs::write(
             output.join("prefix-cache.json"),
             serde_json::to_vec_pretty(&json!({
-                "store_device":denoiser.cache.store_device().map(|d|if d==Device::Cpu {"cpu"}else{"cuda:0"}),
-                "memory_bytes":denoiser.cache.memory_bytes(),
-                "pinned_bytes":denoiser.cache.services.pinned_bytes(),
-                "staging_buffers":denoiser.cache.services.staging_buffers()
+                "store_device":denoiser.cache().store_device().map(|d|if d==Device::Cpu {"cpu"}else{"cuda:0"}),
+                "memory_bytes":denoiser.cache().memory_bytes(),
+                "pinned_bytes":denoiser.cache().services.pinned_bytes(),
+                "staging_buffers":denoiser.cache().services.staging_buffers()
             }))?,
         )?;
-        q::PrefixKv::free(&mut denoiser.cache)?;
+        q::PrefixKv::free(denoiser.cache_mut())?;
         timings.insert("sampling", elapsed(rt, start)?);
         drop(denoiser);
         drop(model);
@@ -714,38 +908,113 @@ fn generate(
     let pixels = {
         eprintln!("loading VAE component");
         let start = Instant::now();
-        let params = load(rt, aimdo, "vae", &paths["vae"], dev)?;
+        let params = load(
+            rt,
+            aimdo,
+            "vae",
+            &paths["vae"],
+            if offload { Device::Cpu } else { dev },
+        )?;
         let schema = q::constructor_schema()?;
-        let vae = q::ImageVae::new(
-            q::ImageVaeConfig {
-                dim: schema.vae_config.dim,
-                dec_dim: schema.vae_config.dec_dim,
-                ..Default::default()
-            },
-            params,
-        );
-        let mut exec =
-            q::ResidentExecution::bind(rt, &PreparedParameters::default(), 0, attention(dev))?;
-        timings.insert("vae_load", elapsed(rt, start)?);
-        let start = Instant::now();
-        let decoded = vae
-            .decode(
-                rt,
-                &latent.f_to_device_(dev, Kind::BFloat16, false, false)?,
-                &mut exec,
-            )?
-            .f_to_device_(Device::Cpu, Kind::Float, false, true)?;
-        let mut out = Tensor::f_empty(decoded.size(), (Kind::Float, Device::Cpu))?;
-        out.f_copy_(&decoded)?;
-        q::vae_process_output(&mut out)?;
-        timings.insert("vae_decode", elapsed(rt, start)?);
-        out.f_movedim_int(1, -1)?
+        if offload {
+            let owner = q::static_component(rt, "vae", params)?.with_shared_pins(pins.clone());
+            let model = q::StaticModel::new(owner, rt);
+            let patcher = model.patcher();
+            let mut exec =
+                q::ResidentExecution::bind(rt, &PreparedParameters::default(), 0, attention(dev))?;
+            memory_manager.load(
+                std::slice::from_ref(&patcher),
+                0.,
+                None,
+                false,
+                false,
+                &mut memory_services,
+            )?;
+            timings.insert("vae_load", elapsed(rt, start)?);
+            let start = Instant::now();
+            let mut services = q::ManagedImageVae {
+                runtime: rt,
+                model: model.clone(),
+                patcher,
+                manager: &mut memory_manager,
+                memory: &mut memory_services,
+                execution: &mut exec,
+                config: q::ImageVaeConfig {
+                    dim: schema.vae_config.dim,
+                    dec_dim: schema.vae_config.dec_dim,
+                    ..Default::default()
+                },
+                device: dev,
+                force_full_load: false,
+            };
+            let policy = q::ImageVaePolicy {
+                device: dev,
+                dtype: Kind::BFloat16,
+                output_device: Device::Cpu,
+                output_kind: Kind::Float,
+                default_kind: Kind::Float,
+                output_channels: 4,
+                latent_channels: 64,
+            };
+            let output = if let Some(tiles) = vae_tiles(p, "decode") {
+                policy.execute_tiled(q::VaeOperation::Decode, &latent, tiles, &mut services)?
+            } else {
+                policy.execute(q::VaeOperation::Decode, &latent, &mut services)?
+            };
+            drop(services);
+            manager_records.push(component_memory_record(
+                "vae_decoded",
+                &model.owner.borrow(),
+                memory_manager.registrations(),
+                pins.bytes(),
+            ));
+            timings.insert("vae_decode", elapsed(rt, start)?);
+            memory_manager.unload_all(dev, &mut memory_services)?;
+            manager_records.push(component_memory_record(
+                "vae_unloaded",
+                &model.owner.borrow(),
+                memory_manager.registrations(),
+                pins.bytes(),
+            ));
+            output
+        } else {
+            let vae = q::ImageVae::new(
+                q::ImageVaeConfig {
+                    dim: schema.vae_config.dim,
+                    dec_dim: schema.vae_config.dec_dim,
+                    ..Default::default()
+                },
+                params,
+            );
+            let mut exec =
+                q::ResidentExecution::bind(rt, &PreparedParameters::default(), 0, attention(dev))?;
+            timings.insert("vae_load", elapsed(rt, start)?);
+            let start = Instant::now();
+            let decoded = vae
+                .decode(
+                    rt,
+                    &latent.f_to_device_(dev, Kind::BFloat16, false, false)?,
+                    &mut exec,
+                )?
+                .f_to_device_(Device::Cpu, Kind::Float, false, true)?;
+            let mut out = Tensor::f_empty(decoded.size(), (Kind::Float, Device::Cpu))?;
+            out.f_copy_(&decoded)?;
+            q::vae_process_output(&mut out)?;
+            timings.insert("vae_decode", elapsed(rt, start)?);
+            out.f_movedim_int(1, -1)?
+        }
     };
     rt.native.cuda_soft_empty_cache(0)?;
     timings.insert(
         "pipeline_wall_including_unload_and_intermediate_export",
         total_start.elapsed().as_secs_f64(),
     );
+    if memory_services.enabled {
+        fs::write(
+            output.join("memory-services.json"),
+            serde_json::to_vec_pretty(&memory_services.events)?,
+        )?;
+    }
     if offload {
         fs::write(
             output.join("memory-policy.json"),
@@ -882,6 +1151,11 @@ fn main() -> Result<()> {
     rt.native.set_comfy_math_state(math)?;
     bind_comfy_layouts(&rt);
     let _grad = tch::no_grad_guard();
+    let _inference = if p["source_configuration"]["inference_mode"] == true {
+        Some(imagine_inference::native::inference_mode(true)?)
+    } else {
+        None
+    };
     eprintln!("preflight: AIMDO");
     let aimdo = unsafe { Aimdo::load(&required("IMAGINE_AIMDO_LIBRARY")?) }?;
     eprintln!("preflight: CUDA memory");

@@ -75,6 +75,8 @@ mod checkpoint_tests;
 mod comfy_sdpa_tests;
 #[path = "support/model_management.rs"]
 mod model_management_tests;
+#[path = "support/qwen_components.rs"]
+mod qwen_component_tests;
 #[path = "support/qwen_host_cache.rs"]
 mod qwen_host_cache_tests;
 #[path = "support/qwen_image21_dit.rs"]
@@ -91,6 +93,8 @@ mod qwen_sampling_tests;
 mod qwen_text_encoder_tests;
 #[path = "support/qwen_tokenizer.rs"]
 mod qwen_tokenizer_tests;
+#[path = "support/qwen_vae_policy.rs"]
+mod qwen_vae_policy_tests;
 #[path = "support/qwen_vae.rs"]
 mod qwen_vae_tests;
 #[path = "support/qwen_vision_geometry.rs"]
@@ -4733,5 +4737,9 @@ mod qwen_multimodal_tests;
 #[path = "support/qwen_image_preprocess.rs"]
 mod qwen_image_preprocess_tests;
 
+#[path = "support/qwen_cfg.rs"]
+mod qwen_cfg_tests;
+#[path = "support/qwen_contexts.rs"]
+mod qwen_context_tests;
 #[path = "support/qwen_lora.rs"]
 mod qwen_lora_tests;

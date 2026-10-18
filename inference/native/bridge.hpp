@@ -10,7 +10,9 @@ struct CudaDeviceProperties { int64_t major; int64_t minor; int64_t shared_memor
 struct RmsTemporaryMetadata { uint64_t start; uint64_t bytes; int64_t count; };
 #pragma GCC visibility push(default)
 extern "C" {
+int imagine_beta_ppf(double,double,double,double*,const char**,const char**);
 const char* imagine_last_error();
+int imagine_last_accelerator_code();
 const char* imagine_last_metadata();
 int imagine_tensor_owned_buffer(void*,const int64_t*,size_t,int64_t,void*,void(*)(void*),void**);
 int imagine_tensor_empty_scalar(const int64_t*,size_t,int64_t,void**);

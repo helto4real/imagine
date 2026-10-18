@@ -664,7 +664,7 @@ fn source_catches(e: &Error) -> bool {
                 | "OutOfMemoryError"
                 | "AcceleratorError"
         ),
-        Error::Selection(_) | Error::Torch(_) => true,
+        Error::Selection(_) | Error::Torch(_) | Error::AcceleratorException { .. } => true,
         _ => false,
     }
 }

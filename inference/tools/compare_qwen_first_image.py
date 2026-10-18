@@ -27,8 +27,8 @@ if reference['profile'].get('lora'):
     assert sum(lora_observations.values())>0,'LoRA test must patch actual parameters'
 metrics = {}
 boundaries = [('context', rust['context_shape']), ('latent', rust['latent_shape']), ('image-rgba', rust['pixels_shape'])]
-if reference['profile'].get('custom_sigmas'):
-    boundaries.append(('sigmas', [reference['profile']['steps']+1]))
+if reference['profile'].get('custom_sigmas')or reference['profile']['scheduler']=='beta':
+    boundaries.append(('sigmas', reference['shapes']['sigmas']))
 if 'reference_resolution' in reference['profile']:
     native_conditioning=json.loads((a.rust/'conditioning.json').read_text())
     original_conditioning=json.loads((a.python/'conditioning.json').read_text())
@@ -73,15 +73,28 @@ if all(path.is_file()for path in memory_files):
             assert paths[0].read_bytes()==paths[1].read_bytes(),f'Registered sampler values differ: {phase}'
             phases.append(dict(phase=phase,sampler_buffer=x['sampler_buffer'],buffer_sha256=hashlib.sha256(paths[0].read_bytes()).hexdigest(),cached_model_size=x['model_size'],same_leaf_placement=same_placement,loaded_bytes_equal=loaded_equal,rust_loaded_bytes=x['placement']['loaded_bytes'],python_loaded_bytes=y['loaded_bytes']))
         memory_comparison=dict(phases=phases,sampler_lifecycle_exact=True)
+component_comparison=None
+component_path=a.python/'component-memory.json'
+if component_path.is_file():
+    original=json.loads(component_path.read_text())
+    observed=json.loads((a.rust/'memory-manager.json').read_text())
+    phases={r['phase']for r in original}
+    observed=[r for r in observed if r['phase']in phases]
+    assert [r['phase']for r in observed]==[r['phase']for r in original],'Component memory phases differ'
+    mismatches=[dict(phase=x['phase'],fields=sorted(k for k in x.keys()|y.keys()if x.get(k)!=y.get(k)))for x,y in zip(observed,original)if x!=y]
+    component_comparison=dict(phases=[r['phase']for r in original],all_observed_fields_exact=not mismatches,mismatches=mismatches,records=original)
 report = dict(schema=1, metrics=metrics, timings_seconds=dict(rust=rust['timings_seconds'], python=reference['timings_seconds']),
     scope=f'One first-process {reference["profile"]["width"]}x{reference["profile"]["height"]} {reference["profile"]["steps"]}-step synthetic {reference["profile"]["variant"]} DiT sample; OS model cache already warm. Not a production quality or steady-state benchmark.',
     production_runtime_read=False)
 if reference['profile'].get('lora'):report['lora_patched_parameters']=lora_observations
 if memory_comparison is not None:report['sampler_lifecycle']=memory_comparison
+if component_comparison is not None:report['component_memory']=component_comparison
 report['diagnostic_memory_plan']=bool(rust.get('diagnostic_memory_plan',False))
 if report['diagnostic_memory_plan']:
     report['scope']='DIAGNOSTIC: Rust replays recorded original placements; automatic physical-memory decisions are not acceptance evidence here. '+report['scope']
 a.output.write_text(json.dumps(report, indent=2) + '\n')
 print(json.dumps(report, indent=2))
+if component_comparison is not None and not component_comparison['all_observed_fields_exact']:
+    raise SystemExit('Exact component memory parity failed; see the saved comparison')
 if not a.allow_mismatch and not (all(metrics[n]['exact_bytes'] and metrics[n]['all_finite'] for n, _ in boundaries) and metrics['png_rgba8']['exact']):
     raise SystemExit('Exact numerical parity failed; see the saved comparison')

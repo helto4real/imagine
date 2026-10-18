@@ -1,0 +1,62 @@
+Prepared 69 native entrypoints and 32 unchanged CUDA sources.
+-- Configuring done (0.1s)
+-- Generating done (0.0s)
+-- Build files have been written to: /build
+[  2%] Building CXX object CMakeFiles/imagine_kitchen.dir/scipy_beta.cpp.o
+[  5%] Building CXX object CMakeFiles/imagine_kitchen.dir/bridge.cpp.o
+[  8%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/per_tensor_quantize.cu.o
+In file included from /src/bridge.cpp:22:
+/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/c10/cuda/CUDAEvent.h:363:23: warning: use of ‘std::hardware_destructive_interference_size’ [-Winterference-size]
+  363 |   struct alignas(c10::hardware_destructive_interference_size) PerDevicePool {
+      |                       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/c10/cuda/CUDAEvent.h:363:23: note: its value can vary between compiler versions or with different ‘-mtune’ or ‘-mcpu’ flags
+/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/c10/cuda/CUDAEvent.h:363:23: note: if this use is part of a public ABI, change it to instead use a constant variable you define
+/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/c10/cuda/CUDAEvent.h:363:23: note: the default value for the current CPU tuning is 64 bytes
+/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/c10/cuda/CUDAEvent.h:363:23: note: you can stabilize this value with ‘--param hardware_destructive_interference_size=64’, or disable this warning with ‘-Wno-interference-size’
+/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/c10/cuda/CUDAEvent.h:364:18: warning: use of ‘std::hardware_destructive_interference_size’ [-Winterference-size]
+  364 |     alignas(c10::hardware_destructive_interference_size) std::mutex mutex_;
+      |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[ 11%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_nvfp4.cu.o
+[ 14%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_mxfp8.cu.o
+[ 17%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cublas_gemm_nvfp4.cu.o
+[ 20%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cublas_gemm_int8.cu.o
+[ 22%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_gemm_int8.cu.o
+[ 25%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_gemm_fp16.cu.o
+[ 28%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/cutlass_conv3d_fp16.cu.o
+[ 31%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/group_norm_pad3d.cu.o
+[ 34%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/turing_int8.cu.o
+[ 37%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/int8_linear.cu.o
+[ 40%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/convrot_w4a4.cu.o
+[ 42%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/turing_int4.cu.o
+[ 45%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/rms_rope.cu.o
+[ 48%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/na3d.cu.o
+[ 51%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn.cu.o
+[ 54%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_preprocess.cu.o
+[ 57%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_producer.cu.o
+[ 60%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_vtranspose.cu.o
+[ 62%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_route.cu.o
+[ 65%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_exact.cu.o
+[ 68%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_token.cu.o
+/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_token.cu(102): warning #550-D: variable "scount" was set but never used
+                int scount;
+                    ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sol_attn_token.cu(359): warning #128-D: loop is not reachable
+      for (int rr = 0; rr < 2; ++rr) {
+      ^
+          detected during instantiation of "void <unnamed>::sol_token_kernel<PASS>(const int8_t *, const float *, const int8_t *, const float2 *, const int8_t *, const uint32_t *, const uint16_t *, const int32_t *, const float *, uint32_t *, uint32_t *, int32_t *, __nv_bfloat16 *, float *, float *, int, int, int, int, int, int, int, int, float) [with PASS=1]" at line 475
+
+[ 71%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/quantize_svdquant_w4a4.cu.o
+[ 74%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/scaled_mm_svdquant_w4a4.cu.o
+[ 77%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/awq_w4a16.cu.o
+[ 80%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/w4a8_gemm.cu.o
+[ 82%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/adaln.cu.o
+[ 85%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/flash_decode.cu.o
+[ 88%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/ops/gated_delta.cu.o
+[ 91%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/quant_v_int8.cu.o
+[ 94%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/quant_qk_int8.cu.o
+[ 97%] Building CUDA object CMakeFiles/imagine_kitchen.dir/tmp/imagine-rust-comfy-parity-20261017/sources/comfy-kitchen/comfy_kitchen/backends/cuda/sage_attention/sage_attn_launcher.cu.o
+[100%] Linking CXX shared library libimagine_kitchen.so
+[100%] Built target imagine_kitchen

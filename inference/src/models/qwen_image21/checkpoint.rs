@@ -17,6 +17,14 @@ pub struct ParameterSpec {
     pub shape: Vec<i64>,
     pub dtype: String,
     pub kind: String,
+    pub requires_grad: Option<bool>,
+}
+#[derive(Clone, Copy)]
+pub struct ComponentLoad {
+    pub dtype: Kind,
+    /// BaseModel freezes the DiT, and CLIP freezes its transformer. The VAE
+    /// keeps constructor flags; its inference caller disables autograd.
+    pub freeze: bool,
 }
 #[derive(Deserialize)]
 pub struct ComponentSchema {
@@ -76,12 +84,30 @@ pub fn prepare_initial_component(
     state: BTreeMap<String, Tensor>,
     device: Device,
 ) -> Result<PreparedParameters, Error> {
+    prepare_initial_component_with_options(
+        rt,
+        component,
+        state,
+        device,
+        ComponentLoad {
+            dtype: Kind::BFloat16,
+            freeze: component != "vae",
+        },
+    )
+}
+pub fn prepare_initial_component_with_options(
+    rt: &Runtime,
+    component: &str,
+    state: BTreeMap<String, Tensor>,
+    device: Device,
+    options: ComponentLoad,
+) -> Result<PreparedParameters, Error> {
     let schema = constructor_schema()?;
     let spec = schema
         .models
         .get(component)
         .ok_or_else(|| gap("Unknown constructor component"))?;
-    prepare_resident_component(rt, component, spec, state, device)
+    prepare_resident_component_with_options(rt, component, spec, state, device, options)
 }
 /// Same source preparation with an explicit original constructor schema. Tiny
 /// constructor fixtures validate the whole loader without trained-model runs.
@@ -89,8 +115,28 @@ pub fn prepare_resident_component(
     rt: &Runtime,
     component: &str,
     spec: &ComponentSchema,
+    state: BTreeMap<String, Tensor>,
+    device: Device,
+) -> Result<PreparedParameters, Error> {
+    prepare_resident_component_with_options(
+        rt,
+        component,
+        spec,
+        state,
+        device,
+        ComponentLoad {
+            dtype: Kind::BFloat16,
+            freeze: true,
+        },
+    )
+}
+pub fn prepare_resident_component_with_options(
+    rt: &Runtime,
+    component: &str,
+    spec: &ComponentSchema,
     mut state: BTreeMap<String, Tensor>,
     device: Device,
+    options: ComponentLoad,
 ) -> Result<PreparedParameters, Error> {
     for p in &spec.parameters {
         let t = state
@@ -115,7 +161,7 @@ pub fn prepare_resident_component(
                 &format!("{module}."),
                 LoadOptions {
                     device: Device::Cpu,
-                    compute_kind: Kind::BFloat16,
+                    compute_kind: options.dtype,
                     original_shape: p.shape.clone(),
                     full_precision: component == "text",
                     disabled_formats: &[],
@@ -129,7 +175,7 @@ pub fn prepare_resident_component(
                 &mut state,
                 &format!("{module}."),
                 p.shape.clone(),
-                Kind::BFloat16,
+                options.dtype,
                 false,
                 &rt.native,
             )?
@@ -145,7 +191,7 @@ pub fn prepare_resident_component(
             let kind = if component == "vae" {
                 Kind::Float
             } else {
-                Kind::BFloat16
+                options.dtype
             };
             let value = rt.native.clone_tensor(&t.f_to_kind(kind)?)?.f_detach()?;
             prepared.values.insert(p.name.clone(), Value::tensor(value));
@@ -198,7 +244,7 @@ pub fn prepare_resident_component(
                 let k = if name == "visual.rotary_pos_emb.inv_freq" {
                     Kind::Float
                 } else {
-                    Kind::BFloat16
+                    options.dtype
                 };
                 Value::tensor(t.f_to_device_(device, k, false, false)?)
             }
@@ -210,6 +256,17 @@ pub fn prepare_resident_component(
             .flatten()
         {
             *v = Value::tensor(v.as_tensor()?.f_to_device(device)?);
+        }
+    }
+    for parameter in &spec.parameters {
+        if let Some(Value::Tensor(_)) = prepared.values.get(&parameter.name) {
+            let tensor = prepared[&parameter.name].as_tensor()?;
+            prepared.values.insert(
+                parameter.name.clone(),
+                Value::tensor(tensor.f_set_requires_grad(
+                    !options.freeze && parameter.requires_grad.unwrap_or(true),
+                )?),
+            );
         }
     }
     Ok(prepared)

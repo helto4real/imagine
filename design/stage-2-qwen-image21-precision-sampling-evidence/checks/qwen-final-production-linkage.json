@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "development_fault_injection_absent": true,
+  "cpython_c_api_symbols_absent": true,
+  "python_dynamic_dependency_absent": true,
+  "libtorch_internal_python_named_symbols": [
+    "_ZN3c104impl22getGlobalPyInterpreterEv"
+  ],
+  "linked_libraries": [
+    "\tlinux-vdso.so.1 (0x00007f7455c1e000)",
+    "\tlibstdc++.so.6 => /usr/lib/libstdc++.so.6 (0x00007f7454400000)",
+    "\tlibtorch_cpu.so => /home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so (0x00007f743f400000)",
+    "\tlibc10.so => /home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib/libc10.so (0x00007f7455aa2000)",
+    "\tlibgcc_s.so.1 => /usr/lib/libgcc_s.so.1 (0x00007f74547d3000)",
+    "\tlibm.so.6 => /usr/lib/libm.so.6 (0x00007f74542c9000)",
+    "\tlibc.so.6 => /usr/lib/libc.so.6 (0x00007f743f000000)",
+    "\t/lib64/ld-linux-x86-64.so.2 => /usr/lib64/ld-linux-x86-64.so.2 (0x00007f7455c20000)",
+    "\tlibrt.so.1 => /usr/lib/librt.so.1 (0x00007f7455a9b000)",
+    "\tlibdl.so.2 => /usr/lib/libdl.so.2 (0x00007f7455a96000)",
+    "\tlibpthread.so.0 => /usr/lib/libpthread.so.0 (0x00007f74547cc000)",
+    "\tlibgomp.so.1 => /home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib/libgomp.so.1 (0x00007f743ec00000)",
+    "\tlibcupti.so.13 => /home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib/../../nvidia/cu13/lib/libcupti.so.13 (0x00007f743e600000)",
+    "\tlibcudart.so.13 => /home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib/../../nvidia/cu13/lib/libcudart.so.13 (0x00007f743e200000)",
+    "\tlibutil.so.1 => /usr/lib/libutil.so.1 (0x00007f74547c7000)"
+  ],
+  "note": "c10::impl::getGlobalPyInterpreter is a native LibTorch dispatch symbol, not the CPython C API. Runtime isolation is verified separately.",
+  "binary_sha256": "08da633ac393ad203c26971bda20574269f6f0f65ea82d1fc032f932d50574be"
+}

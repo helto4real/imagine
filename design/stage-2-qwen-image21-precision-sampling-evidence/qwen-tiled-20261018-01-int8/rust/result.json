@@ -1,0 +1,107 @@
+{
+  "channels": "RGBA",
+  "context_shape": [
+    1,
+    31,
+    4096
+  ],
+  "cpu_threads": 23,
+  "diagnostic_memory_plan": false,
+  "diagnostic_trace": false,
+  "dtype": "float32",
+  "kitchen_triton_disabled": true,
+  "latent_shape": [
+    1,
+    64,
+    14,
+    20
+  ],
+  "pixels_shape": [
+    1,
+    224,
+    320,
+    4
+  ],
+  "production_runtime_read": false,
+  "profile": "qwen21-editing",
+  "schema": 1,
+  "source_profile": {
+    "batch": 1,
+    "cfg": 2.5,
+    "checkpoints": {
+      "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+      "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+      "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
+    },
+    "height": 224,
+    "lora": [
+      {
+        "path": "loras/qwen-image-21/lenovo_qwen21.safetensors",
+        "sha256": "7f1e95c3ec1e9c7cea197f7b6f80f601af8e6b479f6ead78ab16df542f447c0e",
+        "strength_clip": 0.0,
+        "strength_model": 1.0
+      }
+    ],
+    "negative_prompt": "Change the reference image to a red butterfly resting on a yellow flower, soft daylight.",
+    "purpose": "Explicit original VAE tiled encode/decode with shared Rust memory, CFG 2.5, ER-SDE/beta, LoRA and reference editing; no forced OOM",
+    "reference_resolution": 256,
+    "reference_vae": true,
+    "references": [
+      {
+        "byte_multiplier": 37,
+        "byte_offset": 19,
+        "shape": [
+          1,
+          64,
+          96,
+          4
+        ]
+      }
+    ],
+    "sampler": "er_sde",
+    "scheduler": "beta",
+    "schema": 1,
+    "seed": 3061383787,
+    "shift": 0.69,
+    "source_configuration": {
+      "attention": "pytorch",
+      "compute_dtype": "bfloat16",
+      "disable_async_offload": true,
+      "disable_comfy_compiler": true,
+      "force_full_load_per_component": false,
+      "inference_mode": true,
+      "kitchen_triton": false,
+      "prefix_cache_device": "auto",
+      "prefix_cache_dtype": "default",
+      "static_patcher": true,
+      "unload_between_components": true
+    },
+    "steps": 4,
+    "synthetic_prompt": "Change the reference image to a blue butterfly resting on a yellow flower, soft daylight.",
+    "vae_tiling": {
+      "decode": {
+        "overlap": 4,
+        "tile_x": 16,
+        "tile_y": 16
+      },
+      "encode": {
+        "overlap": 16,
+        "tile_x": 128,
+        "tile_y": 96
+      }
+    },
+    "variant": "int8_convrot",
+    "width": 320
+  },
+  "timing_method": "monotonic wall clock, CUDA synchronized at phase boundaries; per-step callbacks before Euler update",
+  "timings_seconds": {
+    "dit_load": 7.795841569,
+    "pipeline_wall_including_unload_and_intermediate_export": 24.293507744,
+    "reference_vae_load_and_encode": 0.68479759,
+    "sampling": 0.852811773,
+    "text_encode": 0.456082359,
+    "text_load": 9.515132167,
+    "vae_decode": 0.178415907,
+    "vae_load": 0.175921916
+  }
+}

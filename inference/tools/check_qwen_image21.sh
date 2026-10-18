@@ -4,6 +4,8 @@ parity_root=${IMAGINE_PARITY_ROOT:?Set the isolated development root}
 reference_site=${IMAGINE_REFERENCE_SITE:?Set the locked package source}
 project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$project_root"
+python3 -B inference/tools/verify_torch_sys.py
+python3 -S -B inference/tools/verify_scipy_beta.py
 export CARGO_INCREMENTAL=0
 export CARGO_HOME="$parity_root/cargo" CARGO_TARGET_DIR="$parity_root/target"
 export LIBTORCH="$reference_site/torch" LIBTORCH_CXX11_ABI=1 CXX=clang++ CARGO_BUILD_JOBS=2
@@ -73,7 +75,18 @@ for test_name in \
     model_management_tests::qwen_image21_original_shared_model_manager_order_pressure_weak_owners_and_failures_match \
     model_management_tests::qwen_image21_original_shared_static_clones_patch_switches_and_forced_cpu_patches_match \
     model_management_tests::qwen_image21_original_shared_host_registration_cap_alias_and_owner_release_match \
-    model_management_tests::qwen_image21_original_shared_static_multiple_models_partial_eviction_and_reloads_match; do
+    model_management_tests::qwen_image21_original_shared_static_multiple_models_partial_eviction_and_reloads_match \
+    qwen_vae_policy_tests::qwen_image21_original_tiled_scale_feather_order_default_dtype_and_batch_match \
+    qwen_vae_policy_tests::qwen_image21_original_image_vae_memory_batches_oom_retry_and_failure_classes_match \
+    qwen_vae_policy_tests::qwen_image21_original_c10_oom_type_accelerator_code_and_plain_errors_remain_distinct \
+    qwen_component_tests::qwen_image21_original_component_nonleaf_parameters_buffers_and_dtype_policies_match \
+    qwen_component_tests::qwen_image21_original_boxed_aten_preserves_oom_and_accelerator_recovery_types \
+    qwen_component_tests::qwen_image21_original_independent_component_dtypes_and_constructor_grad_flags_match \
+    qwen_sampling_tests::qwen_image21_original_er_sde_const_stages_noise_and_full_histories_match \
+    qwen_cfg_tests::qwen_image21_original_full_area_cfg_condition_batches_memory_and_order_match \
+    qwen_sampling_tests::qwen_image21_original_beta_schedules_quantiles_duplicates_and_errors_match \
+    qwen_image21_dit_tests::qwen_image21_original_complete_dit_fp16_fp32_hooks_cache_and_attention_match \
+    qwen_context_tests::qwen_image21_original_execution_contexts_and_sampler_grad_state_match; do
     python3 -B inference/tools/test_isolation.py --root "$parity_root" --site "$reference_site" \
         --binary "$primitive_binary" --aot-library "$IMAGINE_TRITON_PROBE_LIBRARY" \
         --aot-fixture "$IMAGINE_TRITON_PROBE_FIXTURE" \

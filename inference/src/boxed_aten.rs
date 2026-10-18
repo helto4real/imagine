@@ -23,7 +23,7 @@ fn checked<T>(v: T) -> Result<T, Error> {
     } else {
         let msg = unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned();
         unsafe { libc::free(p.cast()) };
-        Err(Error::Torch(tch::TchError::Torch(msg)))
+        Err(tch::TchError::Torch(msg).into())
     }
 }
 fn string(s: &str) -> Result<CString, Error> {
