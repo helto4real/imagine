@@ -12,6 +12,8 @@ required-features = ["ui-preview"]
 
 [dependencies]
 anyhow = "1"
+# Enable egui-winit's native Wayland clipboard fallback as well as X11.
+arboard = { version = "3.6.1", default-features = false, features = ["wayland-data-control"] }
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "wayland", "x11", "accesskit"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 libc = "0.2"

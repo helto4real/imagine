@@ -269,6 +269,14 @@ pub fn gradient(
     }
     painter.add(mesh);
 }
+pub fn focus_and_reveal_textarea(response: &egui::Response) {
+    response.request_focus();
+    response.ctx.data_mut(|data| {
+        data.insert_temp(response.id.with("keyboard-reveal"), true);
+    });
+    response.ctx.request_repaint();
+}
+
 pub fn textarea(
     ui: &mut egui::Ui,
     text: &mut String,
@@ -326,13 +334,32 @@ fn textarea_content(
     ui.scope(|ui| {
         ui.visuals_mut().selection.stroke = Stroke::new(1., FOCUS);
         let id = ui.make_persistent_id(id);
+        let reset_reveal = !ui.memory(|memory| memory.has_focus(id))
+            || ui.input(|input| {
+                !input.focused
+                    || input.events.iter().any(|event| {
+                        matches!(
+                            event,
+                            egui::Event::PointerMoved(_)
+                                | egui::Event::MouseMoved(_)
+                                | egui::Event::PointerGone
+                        )
+                    })
+            });
+        let keyboard_reveal = ui.data_mut(|data| {
+            let reveal_id = id.with("keyboard-reveal");
+            if reset_reveal {
+                data.remove::<bool>(reveal_id);
+            }
+            data.get_temp::<bool>(reveal_id).unwrap_or(false)
+        });
         let previous_selection =
             egui::TextEdit::load_state(ui.ctx(), id).and_then(|state| state.cursor.char_range());
         let mut output = ui
             .scope(|ui| {
                 // Suppress glyphs, selection and caret together, while keeping editing active.
                 // Keep the clipboard menu outside this scope so it remains visible.
-                if hidden {
+                if hidden && !keyboard_reveal {
                     ui.set_opacity(0.);
                 }
                 egui::TextEdit::multiline(text)

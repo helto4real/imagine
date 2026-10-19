@@ -5,6 +5,9 @@ use std::collections::HashMap;
 #[path = "editing_tests.rs"]
 mod editing_tests;
 
+#[path = "shortcut_tests.rs"]
+mod shortcut_tests;
+
 struct Desk {
     ctx: egui::Context,
     app: ImagineApp,

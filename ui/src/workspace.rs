@@ -34,6 +34,43 @@ fn panel(ui: &Ui, rect: Rect, media: bool) {
     );
 }
 
+fn consume_ctrl_key(ctx: &egui::Context, key: egui::Key) -> bool {
+    ctx.input_mut(|input| {
+        let mut pressed = false;
+        input.events.retain(|event| {
+            if let egui::Event::Key {
+                key: event_key,
+                modifiers,
+                pressed: true,
+                repeat,
+                ..
+            } = event
+                && *event_key == key
+                && modifiers.ctrl
+                && !modifiers.shift
+                && !modifiers.alt
+                && !modifiers.mac_cmd
+            {
+                pressed |= !repeat;
+                return false;
+            }
+            true
+        });
+        pressed
+    })
+}
+
+fn focus_prompt_shortcut(response: egui::Response) {
+    let ctx = &response.ctx;
+    if ctx.input(|input| input.focused)
+        && !ctx.text_edit_focused()
+        && consume_ctrl_key(ctx, egui::Key::P)
+    {
+        helto::focus_and_reveal_textarea(&response);
+        response.scroll_to_me(Some(Align::Center));
+    }
+}
+
 fn sampling_setting(
     ui: &mut Ui,
     metadata: Option<&Value>,
@@ -90,6 +127,7 @@ impl ImagineApp {
 
     pub fn content(&mut self, ui: &mut Ui) {
         self.receive(ui.ctx());
+        self.keyboard_shortcuts(ui.ctx());
         if self.busy() || self.connecting {
             ui.ctx().request_repaint_after(Duration::from_millis(100));
         }
@@ -134,6 +172,32 @@ impl ImagineApp {
             self.settings_window(ui.ctx());
         }
         self.enhancement_proposal(ui.ctx());
+    }
+
+    fn keyboard_shortcuts(&mut self, ctx: &egui::Context) {
+        if !ctx.input(|input| input.focused) || ctx.text_edit_focused() {
+            return;
+        }
+        if consume_ctrl_key(ctx, egui::Key::Space) {
+            self.prefs.privacy_mode = !self.prefs.privacy_mode;
+            self.save_preferences();
+        }
+        if self.workspace == Workspace::Video {
+            return;
+        }
+        if consume_ctrl_key(ctx, egui::Key::Z) && self.desk().result.is_some() {
+            let desk = self.desk_mut();
+            desk.actual_pixels = !desk.actual_pixels;
+            desk.image_pan = Vec2::ZERO;
+        }
+        if consume_ctrl_key(ctx, egui::Key::Enter)
+            && self.editable()
+            && self.client.is_some()
+            && !self.picking_folder
+            && self.can_generate()
+        {
+            self.generate(ctx);
+        }
     }
 
     fn header(&mut self, ui: &mut Ui, rect: Rect) {
@@ -358,6 +422,7 @@ impl ImagineApp {
                     .labelled_by(label.id)
                     .on_hover_text("Use Reference 1, Reference 2, … in the prompt.");
                     self.enhancement_field(ui, &response, Field::Prompt);
+                    focus_prompt_shortcut(response);
                     ui.add_space(12.);
                     if ui
                         .add_enabled_ui(
@@ -571,6 +636,7 @@ impl ImagineApp {
                             )
                             .labelled_by(label.id);
                             self.enhancement_field(ui, &response, Field::Character);
+                            focus_prompt_shortcut(response);
                             ui.add_space(8.);
                             let label = self.enhancement_label(
                                 ui,
@@ -599,6 +665,7 @@ impl ImagineApp {
                             )
                             .labelled_by(label.id);
                             self.enhancement_field(ui, &response, Field::Prompt);
+                            focus_prompt_shortcut(response);
                         }
                         ui.add_space(8.);
                         egui::Frame::new()
