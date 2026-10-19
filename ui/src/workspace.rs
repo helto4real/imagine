@@ -120,7 +120,69 @@ fn sampling_setting(
     ui.end_row();
 }
 
+struct ViewerProgress {
+    working: bool,
+    status: String,
+    sampling: Option<client::SamplingProgress>,
+    cancelling: bool,
+    can_cancel: bool,
+    queue_job: Option<(String, usize)>,
+}
+
+// Saving a downloaded result can overlap the next server job. Prefer the
+// inference phase over local saving/retrieval and jobs still awaiting execution.
+fn progress_priority(status: &str) -> u8 {
+    match status {
+        "Queued" | "Submitting" => 2,
+        "Saving" | "Retrieving" => 1,
+        _ => 0,
+    }
+}
+
+impl ViewerProgress {
+    fn label(&self) -> String {
+        match &self.queue_job {
+            Some((_, number)) => format!("#{number} · {}", self.status),
+            None => self.status.clone(),
+        }
+    }
+}
+
 impl ImagineApp {
+    fn viewer_progress(&self) -> ViewerProgress {
+        let desk = self.desk();
+        let mut progress = ViewerProgress {
+            working: desk.working,
+            status: desk.status.clone(),
+            sampling: desk.sampling.clone(),
+            cancelling: desk.cancelling,
+            can_cancel: desk.working
+                && !desk.cancelling
+                && desk.pending.as_ref().is_some_and(|p| p.job.is_some()),
+            queue_job: None,
+        };
+        if self.workspace == Workspace::Image
+            && let Some((index, job)) = self
+                .queue
+                .jobs
+                .iter()
+                .enumerate()
+                .filter(|(_, job)| job.working)
+                .min_by_key(|(_, job)| progress_priority(&job.status))
+            && (!desk.working || progress_priority(&job.status) < progress_priority(&desk.status))
+        {
+            progress = ViewerProgress {
+                working: true,
+                status: job.status.clone(),
+                sampling: job.sampling.clone(),
+                cancelling: job.cancelling,
+                can_cancel: !job.cancelling && job.submission.job.is_some(),
+                queue_job: Some((job.id.clone(), index + 1)),
+            };
+        }
+        progress
+    }
+
     pub(super) fn editable(&self) -> bool {
         !self.busy() && !self.connecting && self.desk().pending.is_none()
     }
@@ -842,6 +904,7 @@ impl ImagineApp {
 
     fn viewer(&mut self, ui: &mut Ui) {
         let bounds = ui.max_rect();
+        let activity = self.viewer_progress();
         let sheet = self.workspace == Workspace::CharacterSheet;
         let editing = self.workspace == Workspace::ImageEdit;
         let stacked_tools = sheet && bounds.width() < 360.;
@@ -940,7 +1003,7 @@ impl ImagineApp {
         });
         let footer_height = (if error.is_some() {
             132.
-        } else if self.desk().sampling.is_some() {
+        } else if activity.working && activity.sampling.is_some() {
             92.
         } else {
             66.
@@ -1061,24 +1124,21 @@ impl ImagineApp {
                     self.upscale(ui.ctx());
                 }
                 if ui
-                    .add_enabled_ui(
-                        self.desk().working
-                            && !self.desk().cancelling
-                            && self
-                                .desk()
-                                .pending
-                                .as_ref()
-                                .is_some_and(|p| p.job.is_some()),
-                        |ui| helto::icon_button(ui, Icon::Stop, "Cancel generation", false),
-                    )
+                    .add_enabled_ui(activity.can_cancel, |ui| {
+                        helto::icon_button(ui, Icon::Stop, "Cancel generation", false)
+                    })
                     .inner
                     .clicked()
                 {
-                    self.cancel(ui.ctx());
+                    if let Some((id, _)) = &activity.queue_job {
+                        self.cancel_queue_job(ui.ctx(), id);
+                    } else {
+                        self.cancel(ui.ctx());
+                    }
                 }
                 ui.add_space(6.);
-                if self.desk().working
-                    && let Some(progress) = &self.desk().sampling
+                if activity.working
+                    && let Some(progress) = &activity.sampling
                 {
                     ui.add(
                         egui::ProgressBar::new(progress.completed as f32 / progress.total as f32)
@@ -1091,10 +1151,13 @@ impl ImagineApp {
                         100. * progress.completed as f32 / progress.total as f32
                     ));
                 } else {
-                    if self.desk().working {
+                    if activity.working {
                         ui.spinner();
                     }
-                    if self.desk().status == "Saved" && self.desk().result.is_some() {
+                    if !activity.working
+                        && self.desk().status == "Saved"
+                        && self.desk().result.is_some()
+                    {
                         let progress = ui.add(
                             egui::ProgressBar::new(1.)
                                 .desired_width((ui.available_width() - 110.).max(40.))
@@ -1115,21 +1178,21 @@ impl ImagineApp {
                                 .on_hover_text(result.file.display().to_string());
                         }
                     } else {
-                        ui.label(RichText::new(&self.desk().status).color(helto::DIM));
+                        ui.label(RichText::new(activity.label()).color(helto::DIM));
                     }
                 }
             });
-            if self.desk().working
-                && let Some(progress) = &self.desk().sampling
+            if activity.working
+                && let Some(progress) = &activity.sampling
             {
                 let mut text = format!(
                     "{} {} / {}",
-                    self.desk().status,
+                    activity.label(),
                     progress.completed,
                     progress.total
                 );
-                if !self.desk().cancelling
-                    && self.desk().status != "Cancelling"
+                if !activity.cancelling
+                    && activity.status != "Cancelling"
                     && let Some(finish) = progress.finish_time()
                 {
                     let remaining = finish

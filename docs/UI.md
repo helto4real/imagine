@@ -123,8 +123,10 @@ shared settings and admits the entire series through `/v1/jobs/batch`. Blank
 rows must be filled or removed; paragraphs are never split into separate jobs.
 The server's shared FIFO owns execution. Pause and reordering are not included.
 
-Each row shows its status and sampling progress. Cancel targets only that job;
-the row remains active until the server reports a terminal state. Errors remain
+Each row shows its status and sampling progress. The main image footer mirrors
+the running image job's progress, phase and ETA, even while an older result is
+selected. Cancel in either location targets the corresponding job; the row
+remains active until the server reports a terminal state. Errors remain
 available for Retry. Uncertain admission reuses the original batch key; retrieval
 and save retries reuse the accepted job and use the currently selected output
 folder. A confirmed failed generation is retried

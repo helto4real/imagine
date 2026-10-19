@@ -10,6 +10,154 @@ fn stage(desk: &mut Desk, prompts: &[&str]) -> Vec<String> {
     desk.app.queue.jobs.iter().map(|j| j.id.clone()).collect()
 }
 
+fn viewer_text(desk: &mut Desk) -> Vec<String> {
+    let mut output = desk.ctx.run_ui(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1280., 800.),
+            )),
+            ..Default::default()
+        },
+        |ui| desk.app.content(ui),
+    );
+    output.textures_delta.clear();
+    output
+        .shapes
+        .iter()
+        .filter_map(|shape| match &shape.shape {
+            egui::Shape::Text(text) => Some(text.galley.text().to_owned()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn sampling(completed: u32, total: u32) -> client::SamplingProgress {
+    client::SamplingProgress {
+        completed,
+        total,
+        remaining_seconds: 10.,
+        updated_at_ms: 0,
+    }
+}
+
+#[test]
+fn main_progress_tracks_the_running_queue_job_without_replacing_the_selected_image() {
+    let mut desk = Desk::new();
+    let ids = stage(&mut desk, &["First", "Second", "Third"]);
+    desk.app.queue.follow = false;
+    let selected = desk.app.image.selected_result().unwrap().asset_id.clone();
+    let draft = desk.app.image.prompt.clone();
+    let done = completed(desk._root.path(), "finished-first", [1, 2, 3, 255]);
+    desk.app.queue_message(
+        &desk.ctx,
+        Event::Finished(ids[0].clone(), Ok(Completion::new(done))),
+    );
+    desk.app.queue_message(
+        &desk.ctx,
+        Event::Accepted(vec![
+            (ids[1].clone(), "job_second".into()),
+            (ids[2].clone(), "job_third".into()),
+        ]),
+    );
+    for (step, percent) in [(12, "60%"), (16, "80%")] {
+        desk.app.queue_message(
+            &desk.ctx,
+            Event::Progress(
+                ids[1].clone(),
+                Progress::Status {
+                    label: "Sampling".into(),
+                    sampling: Some(sampling(step, 20)),
+                },
+            ),
+        );
+        let text = viewer_text(&mut desk);
+        assert!(text.iter().any(|t| t == percent), "{text:?}");
+        assert!(
+            text.iter()
+                .any(|t| t.starts_with(&format!("#2 · Sampling {step} / 20"))),
+            "{text:?}"
+        );
+        assert!(!text.iter().any(|t| t == "100%"));
+        assert_eq!(desk.app.image.selected_result().unwrap().asset_id, selected);
+        assert_eq!(desk.app.image.prompt, draft);
+        assert!(!desk.app.queue.follow);
+    }
+    desk.frame(vec![]);
+    assert!(!desk.control("Cancel generation").is_disabled());
+    desk.app.queue.jobs[1].cancelling = true;
+    desk.app.queue.jobs[1].status = "Cancelling".into();
+    let text = viewer_text(&mut desk);
+    assert!(text.iter().any(|t| t.starts_with("#2 · Cancelling")));
+    assert!(!text.iter().any(|t| t.contains("ETA")));
+    desk.frame(vec![]);
+    assert!(desk.control("Cancel generation").is_disabled());
+}
+
+#[test]
+fn main_progress_prefers_inference_over_local_saving_and_preserves_other_workspace_progress() {
+    let mut desk = Desk::new();
+    let ids = stage(&mut desk, &["Saving first", "Running second"]);
+    desk.app.queue.jobs[0].status = "Saving".into();
+    desk.app.queue.jobs[1].status = "Queued".into();
+    let text = viewer_text(&mut desk);
+    assert!(text.iter().any(|t| t == "#1 · Saving"));
+    assert!(!text.iter().any(|t| t == "100%"));
+    desk.app.queue_message(
+        &desk.ctx,
+        Event::Progress(
+            ids[1].clone(),
+            Progress::Status {
+                label: "Preparing inputs".into(),
+                sampling: None,
+            },
+        ),
+    );
+    let text = viewer_text(&mut desk);
+    assert!(text.iter().any(|t| t == "#2 · Preparing inputs"));
+    assert!(!text.iter().any(|t| t == "100%"));
+    // A queued upscale must not cover the progress of an image already running.
+    desk.app.image.working = true;
+    desk.app.image.status = "Queued".into();
+    desk.app.queue_message(
+        &desk.ctx,
+        Event::Progress(
+            ids[1].clone(),
+            Progress::Status {
+                label: "Sampling".into(),
+                sampling: Some(sampling(2, 20)),
+            },
+        ),
+    );
+    assert!(viewer_text(&mut desk).iter().any(|t| t == "10%"));
+    desk.app.workspace = Workspace::CharacterSheet;
+    desk.app.sheet.working = true;
+    desk.app.sheet.status = "Portrait · Sampling".into();
+    desk.app.sheet.sampling = Some(sampling(5, 20));
+    let text = viewer_text(&mut desk);
+    assert!(text.iter().any(|t| t == "25%"));
+    assert!(!text.iter().any(|t| t == "10%"));
+    desk.app.workspace = Workspace::Image;
+    desk.app.image.working = false;
+    desk.app.image.status = "Saved".into();
+    desk.app.queue.jobs[0].working = false;
+    desk.app.queue_message(
+        &desk.ctx,
+        Event::Progress(
+            ids[1].clone(),
+            Progress::Status {
+                label: "Queued".into(),
+                sampling: None,
+            },
+        ),
+    );
+    let text = viewer_text(&mut desk);
+    assert!(text.iter().any(|t| t == "#2 · Queued"));
+    assert!(!text.iter().any(|t| t == "100%"));
+    desk.app.queue.jobs[1].working = false;
+    assert!(viewer_text(&mut desk).iter().any(|t| t == "100%"));
+}
+
 fn completed(root: &std::path::Path, name: &str, color: [u8; 4]) -> Completed {
     let file = root.join(format!("{name}.png"));
     image::RgbaImage::from_pixel(24, 16, image::Rgba(color))
