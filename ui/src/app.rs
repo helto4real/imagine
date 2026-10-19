@@ -13,6 +13,7 @@ use std::{
     time::Duration,
 };
 
+#[derive(Clone)]
 struct ReferenceView {
     number: usize,
     id: String,
@@ -20,6 +21,7 @@ struct ReferenceView {
     texture: egui::TextureHandle,
 }
 enum Message {
+    Queue(queue::Event),
     Enhancement(enhancement::Event),
     Connected(Result<(Client, crate::model_catalog::LibrarySnapshot), String>),
     Library(Result<crate::model_catalog::LibrarySnapshot, String>),
@@ -145,6 +147,7 @@ pub struct ImagineApp {
     workspace: Workspace,
     settings_open: bool,
     settings_error: Option<String>,
+    queue: queue::Queue,
     tx: Sender<Message>,
     rx: Receiver<Message>,
 }
@@ -187,6 +190,7 @@ impl ImagineApp {
             workspace: Workspace::Image,
             settings_open: false,
             settings_error: None,
+            queue: queue::Queue::default(),
             tx,
             rx,
         }
@@ -263,6 +267,7 @@ impl ImagineApp {
     fn receive(&mut self, ctx: &egui::Context) {
         while let Ok(message) = self.rx.try_recv() {
             match message {
+                Message::Queue(event) => self.queue_message(ctx, event),
                 Message::Enhancement(event) => self.enhancement_message(ctx, event),
                 Message::Library(result) => {
                     self.models.loading = false;
@@ -389,6 +394,11 @@ impl ImagineApp {
                     self.desk_for_mut(workspace).sampling = sampling;
                 }
                 Message::Finished(workspace, result) => {
+                    if matches!(workspace, Workspace::Image | Workspace::ImageEdit)
+                        && let Ok(done) = &result
+                    {
+                        self.archive_completed(ctx, done);
+                    }
                     let state = self.desk_for_mut(workspace);
                     let elapsed = state.attempt_started.take().map(|start| start.elapsed());
                     state.working = false;
@@ -476,6 +486,10 @@ impl ImagineApp {
         if self.busy() || self.connecting || self.workspace == Workspace::Video {
             return;
         }
+        if self.workspace == Workspace::Image && self.image.pending.is_none() {
+            self.enqueue_prompts(ctx, vec![self.image.prompt.clone()]);
+            return;
+        }
         let Some(client) = self.client.clone() else {
             return;
         };
@@ -549,6 +563,9 @@ impl ImagineApp {
         }
     }
     fn upscale_source(&self) -> Option<&ResultView> {
+        if self.queue.loading.is_some() {
+            return None;
+        }
         let role = match self.workspace {
             Workspace::Image => OutputRole::Image,
             Workspace::CharacterSheet => OutputRole::Sheet,
@@ -661,6 +678,12 @@ mod workspace;
 
 #[path = "editing.rs"]
 mod editing;
+
+#[path = "queue.rs"]
+mod queue;
+
+#[path = "queue_ui.rs"]
+mod queue_ui;
 
 #[cfg(any(test, feature = "ui-preview"))]
 #[path = "preview.rs"]

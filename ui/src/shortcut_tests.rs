@@ -207,7 +207,7 @@ fn shortcuts_generate_uses_button_validation_and_respects_disabled_states() {
     let mut desk = Desk::new();
     desk.app.metadata = Some(imagine_server::contract::model(client::MODEL).unwrap());
     desk.app.prefs.generation.steps = 0;
-    desk.click("Generate");
+    desk.click("Add to queue");
     let error = desk.app.image.error.take().expect("button validation");
     ctrl(&mut desk, egui::Key::Enter);
     assert_eq!(desk.app.image.error.take().as_deref(), Some(error.as_str()));

@@ -27,6 +27,7 @@ impl Default for EditSession {
 impl ImagineApp {
     pub(super) fn can_edit_image(&self) -> bool {
         self.workspace == Workspace::Image
+            && self.queue.loading.is_none()
             && !self.busy()
             && !self.connecting
             && self.image.pending.is_none()

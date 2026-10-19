@@ -4,7 +4,7 @@ use super::*;
 use crate::icons::{self, Icon};
 use egui::{Align, Layout, Rect, RichText, Stroke, Ui, UiBuilder, Vec2};
 
-fn region<R>(ui: &mut Ui, id: &str, rect: Rect, add: impl FnOnce(&mut Ui) -> R) -> R {
+pub(super) fn region<R>(ui: &mut Ui, id: &str, rect: Rect, add: impl FnOnce(&mut Ui) -> R) -> R {
     ui.scope_builder(
         UiBuilder::new()
             .id_salt(id)
@@ -18,7 +18,7 @@ fn region<R>(ui: &mut Ui, id: &str, rect: Rect, add: impl FnOnce(&mut Ui) -> R) 
     .inner
 }
 
-fn panel(ui: &Ui, rect: Rect, media: bool) {
+pub(super) fn panel(ui: &Ui, rect: Rect, media: bool) {
     helto::gradient(
         ui.painter(),
         rect,
@@ -128,16 +128,29 @@ impl ImagineApp {
     pub fn content(&mut self, ui: &mut Ui) {
         self.receive(ui.ctx());
         self.keyboard_shortcuts(ui.ctx());
-        if self.busy() || self.connecting {
+        if self.busy()
+            || self.connecting
+            || self.queue.jobs.iter().any(|job| job.working)
+            || self.queue.loading.is_some()
+        {
             ui.ctx().request_repaint_after(Duration::from_millis(100));
         }
         let bounds = ui.max_rect();
         ui.painter().rect_filled(bounds, 0, helto::BG);
         let header = Rect::from_min_size(bounds.min, egui::vec2(bounds.width(), 64.));
         self.header(ui, header);
+        let dock_height = if self.queue.collapsed {
+            44.
+        } else {
+            (bounds.height() * 0.26).clamp(204., 240.)
+        };
+        let dock = Rect::from_min_max(
+            egui::pos2(bounds.left() + 8., bounds.bottom() - dock_height - 8.),
+            bounds.max - egui::vec2(8., 8.),
+        );
         let body = Rect::from_min_max(
             egui::pos2(bounds.left() + 8., header.bottom() + 8.),
-            bounds.max - egui::vec2(8., 8.),
+            egui::pos2(bounds.right() - 8., dock.top() - 8.),
         );
         region(ui, "workspace", body, |ui| match self.workspace {
             Workspace::Image | Workspace::ImageEdit | Workspace::CharacterSheet
@@ -165,6 +178,8 @@ impl ImagineApp {
                 );
             }
         });
+        self.queue_panel(ui, dock);
+        self.multiple_prompts_window(ui.ctx());
         if self.models.open {
             self.loras_window(ui.ctx());
         }
@@ -181,6 +196,9 @@ impl ImagineApp {
         if consume_ctrl_key(ctx, egui::Key::Space) {
             self.prefs.privacy_mode = !self.prefs.privacy_mode;
             self.save_preferences();
+        }
+        if self.queue.drafts.is_some() {
+            return;
         }
         if self.workspace == Workspace::Video {
             return;
@@ -986,12 +1004,34 @@ impl ImagineApp {
                     && ui
                         .add_enabled_ui(
                             ready && self.desk().pending.is_none() && self.can_generate(),
-                            |ui| helto::icon_button(ui, Icon::Generate, "Generate", true),
+                            |ui| {
+                                helto::icon_button(
+                                    ui,
+                                    Icon::Generate,
+                                    if self.workspace == Workspace::Image {
+                                        "Add to queue"
+                                    } else {
+                                        "Generate"
+                                    },
+                                    true,
+                                )
+                            },
                         )
                         .inner
                         .clicked()
                 {
                     self.generate(ui.ctx());
+                }
+                if self.workspace == Workspace::Image
+                    && ui
+                        .add_enabled_ui(ready && self.image.pending.is_none(), |ui| {
+                            helto::icon_button(ui, Icon::Duplicate, "Multiple prompts", false)
+                        })
+                        .inner
+                        .clicked()
+                {
+                    self.queue.drafts = Some(vec![self.image.prompt.clone(), String::new()]);
+                    self.queue.draft_error = None;
                 }
                 if !editing
                     && ui

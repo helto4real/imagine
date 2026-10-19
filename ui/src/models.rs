@@ -168,7 +168,7 @@ impl ImagineApp {
             .cloned()
             .unwrap_or_default()
     }
-    fn selected_model(&self) -> Option<&Value> {
+    pub(super) fn selected_model(&self) -> Option<&Value> {
         let selected = self.prefs.model_groups.get(&self.prefs.model_group)?;
         self.models
             .catalog

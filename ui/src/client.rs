@@ -153,6 +153,31 @@ fn job_progress(value: &Value) -> Progress {
     }
 }
 impl Client {
+    /// Admit the whole series before watching individual jobs. Retrying admission
+    /// with the same key recovers the original jobs after a lost response.
+    pub async fn submit_batch(
+        &self,
+        submissions: &[Submission],
+        key: &str,
+    ) -> std::result::Result<Vec<String>, Failure> {
+        for submission in submissions {
+            check_output_folder(&submission.folder).map_err(|e| Failure::retry(e.to_string()))?;
+        }
+        let body = Self::json(
+            self.post("/v1/jobs/batch")
+                .header("Idempotency-Key", key)
+                .json(&json!({"jobs": submissions.iter().map(|s| &s.request).collect::<Vec<_>>()}))
+                .send()
+                .await,
+        )
+        .await?;
+        let jobs = body["jobs"]
+            .as_array()
+            .filter(|jobs| jobs.len() == submissions.len())
+            .ok_or_else(|| Failure::retry("Invalid batch response. Retry to retrieve the jobs."))?;
+        jobs.iter().map(|job| identifier(&job["id"])).collect()
+    }
+
     pub fn connect(c: &Connection) -> Result<Self> {
         c.validate()?;
         Ok(Self {
@@ -641,6 +666,27 @@ fn read_reference(path: &Path) -> Result<(Vec<u8>, &'static str, Preview)> {
         decode(&bytes, true).context("The reference image is unreadable or too large.")?;
     Ok((bytes, mime, preview))
 }
+pub(crate) fn load_preview(path: &Path) -> Result<Preview> {
+    decode(&std::fs::read(path)?, false)
+}
+
+pub(crate) fn thumbnail(preview: &Preview) -> Preview {
+    let image = image::RgbaImage::from_raw(
+        preview.width as u32,
+        preview.height as u32,
+        preview.pixels.clone(),
+    )
+    .expect("decoded RGBA image");
+    let rgba = image::DynamicImage::ImageRgba8(image)
+        .thumbnail(160, 112)
+        .into_rgba8();
+    Preview {
+        width: rgba.width() as usize,
+        height: rgba.height() as usize,
+        pixels: rgba.into_raw(),
+    }
+}
+
 fn decode(bytes: &[u8], thumbnail: bool) -> Result<Preview> {
     let mut reader = image::ImageReader::new(Cursor::new(bytes)).with_guessed_format()?;
     let mut limits = image::Limits::default();

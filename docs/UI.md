@@ -110,7 +110,45 @@ outputs are session-only and are not written to the profile file or logs.
    Thumbnails are numbered; the up/down controls change reference order.
 3. Open **Settings** (gear) and choose the folder icon under **Save to**.
    The folder choice is saved immediately.
-4. Choose **Generate** (sparkles). The result is shown after its PNG has been saved locally.
+4. Choose **Add to queue** (sparkles). The result is shown after its PNG has been saved locally.
+
+### Image queue and results
+
+The collapsible **Queue & results** dock keeps the main viewer above a job list
+and result thumbnails. **Add to queue** and Ctrl+Enter capture the current image
+prompt, references, model/LoRA selection, sampling settings and output folder.
+The composer stays usable while these jobs run. **Multiple prompts** opens a
+list with one multiline field per prompt; **Add all to queue** captures the
+shared settings and admits the entire series through `/v1/jobs/batch`. Blank
+rows must be filled or removed; paragraphs are never split into separate jobs.
+The server's shared FIFO owns execution. Pause and reordering are not included.
+
+Each row shows its status and sampling progress. Cancel targets only that job;
+the row remains active until the server reports a terminal state. Errors remain
+available for Retry. Uncertain admission reuses the original batch key; retrieval
+and save retries reuse the accepted job and use the currently selected output
+folder. A confirmed failed generation is retried
+as a new job with its original captured settings. A failed row does not block
+other jobs in the series.
+
+Click a thumbnail to load its saved image in the main viewer. This leaves the
+next prompt and controls unchanged and turns off **Follow latest**. Turning that
+checkbox on selects the latest result and follows subsequent results while the
+image workspace is idle. Editing and upscaling use the selected full image.
+**Reuse settings** explicitly restores the result's image prompt, references and
+generation/model settings while retaining the current output folder. Edited and
+upscaled images also appear in the result strip.
+
+The dock uses one privacy boundary: with **Hide previews** enabled, hovering
+anywhere inside the focused dock reveals all its thumbnails and prompt excerpts.
+Leaving the entire panel or losing focus hides them together. Thumbnail hover
+does not independently reveal images. Main images and reference fields retain
+their existing privacy behavior.
+
+The UI job list, result index and captured prompts exist only for this UI session;
+closing the client does not cancel server-accepted jobs. No history is restored
+on reopening. Saved PNGs remain in the chosen output folder. The strip retains
+small textures and loads a selected full image from its saved file on a worker.
 
 The Reference desk layout places ordered references on the left, the image in
 the center, and the prompt/size/seed inspector on the right. Every toolbar action
@@ -335,9 +373,11 @@ running job keeps its captured request and output folder, and its completion
 does not replace the draft. Retry retains the original request but uses the
 currently selected output folder for saving new generations; an upscale retains
 its captured source path. Reference order stays locked
-while a job is pending. In-progress jobs are not restored by the UI after closing it; they
+while a legacy edit, sheet or upscale job is pending; queued image prompts allow
+changing references for subsequent submissions. In-progress jobs are not restored by the UI after closing it; they
 remain accessible through the API until Imagine stops. Server restart clears all
-history and assets; already saved local images remain. The current UI has no history browser.
+history and assets; already saved local images remain. The result strip is a
+session-only browser, with no persistent history.
 
 ## Helto adaptation
 
@@ -581,3 +621,23 @@ window/file-dialog acceptance and real LoRA compatibility remain untested.
 Formatting, workspace/all-targets/all-features Clippy with warnings denied,
 release workspace builds, UI launcher help and diff checks also passed. The
 implementation builds on baseline commit `c81e0af`.
+
+### Image queue and bottom dock — 2026-10-19
+
+The workspace suite passed, including 83 UI unit tests. New synthetic checks
+cover frozen series settings, multiline prompt rows, continued composition,
+result selection without draft replacement, selected-image edit/upscale sources,
+cancel acknowledgement versus completion, and stale asynchronous results.
+An isolated HTTP fixture verifies uncertain batch admission and result retrieval
+retries without duplicate jobs, plus thumbnail-driven loading of saved images.
+The real UI client through the proxy/API verifies atomic batch rejection,
+idempotent admission, FIFO execution and cancellation of a queued job with fake
+inference. Socket tests used approved sandbox escalation.
+
+Workspace formatting, all-targets/all-features Clippy with warnings denied,
+release UI build and diff checks passed. Synthetic CPU renderings were inspected
+at desktop and compact sizes and with privacy enabled. Mesh assertions verify
+that hovering the dock header, a thumbnail or empty panel space reveals every
+thumbnail together; leaving or losing focus submits none of their textures.
+Live model/GPU generation and native-window interaction were not run. No runtime
+data was read, no running service was restarted, and changes remain uncommitted.

@@ -8,6 +8,9 @@ mod editing_tests;
 #[path = "shortcut_tests.rs"]
 mod shortcut_tests;
 
+#[path = "queue_tests.rs"]
+mod queue_tests;
+
 struct Desk {
     ctx: egui::Context,
     app: ImagineApp,
@@ -176,7 +179,7 @@ fn reference_order_and_pending_request_controls_are_preserved() {
     });
     desk.app.image.error = Some("Synthetic recoverable error".into());
     desk.frame(Vec::new());
-    assert!(desk.control("Generate").is_disabled());
+    assert!(desk.control("Add to queue").is_disabled());
     assert!(!desk.control("Retry").is_disabled());
     assert!(desk.control("Remove reference").is_disabled());
     desk.click("Remove reference");
@@ -329,7 +332,7 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
     for name in ["Prompt", "Ratio", "Max side", "Seed"] {
         assert!(!desk.control(name).is_disabled(), "{name}");
     }
-    assert!(desk.control("Generate").is_disabled());
+    assert!(desk.control("Add to queue").is_disabled());
     assert!(desk.control("Upscale").is_disabled());
     let prompt = desk.control("Prompt").bounds().unwrap();
     replace(&mut desk, prompt, "Next prompt");
@@ -983,6 +986,7 @@ fn render(
             }
         }
     }
+    output.textures_delta.clear();
     image
 }
 
@@ -1058,7 +1062,7 @@ fn sheet_tab_preserves_image_draft_and_routes_async_results_to_origin() {
     });
     desk.app.sheet.working = true;
     desk.click("Image");
-    assert!(desk.control("Generate").is_disabled());
+    assert!(desk.control("Add to queue").is_disabled());
     desk.app
         .tx
         .send(Message::Progress(

@@ -685,6 +685,65 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         .await
         .unwrap();
     assert_eq!(refreshed.models.len(), 2);
+
+    // UI series use the same proxy route, admission key and server FIFO as other clients.
+    let before = calls.load(Ordering::SeqCst);
+    let series = [
+        "SYNTHETIC batch first",
+        "SYNTHETIC batch second",
+        "SYNTHETIC batch cancelled",
+    ]
+    .into_iter()
+    .enumerate()
+    .map(|(index, prompt)| {
+        let mut request = make_request(prompt, "", &[], selected, &settings).unwrap();
+        request["model_selection"] = json!({"diffusion":selected["id"],"loras":[]});
+        Submission {
+            request,
+            key: format!("series-{index}"),
+            folder: dir.path().join("series-output"),
+            job: None,
+            upscale_source: None,
+        }
+    })
+    .collect::<Vec<_>>();
+    let mut invalid = series.clone();
+    invalid[1].request["sampling"]["steps"] = json!(0);
+    assert!(
+        client
+            .submit_batch(&invalid, "invalid-series")
+            .await
+            .is_err()
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), before);
+    let ids = client.submit_batch(&series, "same-series").await.unwrap();
+    assert_eq!(ids.len(), 3);
+    assert_eq!(
+        client.submit_batch(&series, "same-series").await.unwrap(),
+        ids
+    );
+    client.cancel(&ids[2]).await.unwrap();
+    for (mut submission, id) in series.into_iter().zip(&ids).take(2) {
+        submission.job = Some(id.clone());
+        assert_eq!(
+            client
+                .generate(submission, |_| {})
+                .await
+                .unwrap()
+                .assets
+                .len(),
+            1
+        );
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), before + 2);
+    {
+        let received = requests.lock().unwrap();
+        assert_eq!(received[received.len() - 2].prompt, "SYNTHETIC batch first");
+        assert_eq!(
+            received[received.len() - 1].prompt,
+            "SYNTHETIC batch second"
+        );
+    }
     control.call(Action::Shutdown).await.unwrap();
     scheduler.await.unwrap().unwrap();
     proxy.close().await;
