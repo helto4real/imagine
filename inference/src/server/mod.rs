@@ -1,5 +1,8 @@
 //! Product entry point over the already validated static inference components.
 //! No development profiles, tensor dumps, prompts or images are written to disk.
+#[path = "../../../shared/component_error.rs"]
+pub mod component_error;
+mod load_error;
 mod moss;
 mod qwen;
 use crate::{
@@ -10,6 +13,7 @@ use crate::{
     models::{moss_image as m, qwen_image21 as q},
     native::Error,
 };
+use load_error::{observe_load, report as load_failure};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
 use tch::{Device, Kind, Tensor};
@@ -47,6 +51,7 @@ pub struct Request {
 pub enum Event {
     Phase(&'static str),
     Step(i64),
+    LoadFailure(component_error::LoadDiagnostic),
 }
 pub type Observer<'a> = dyn FnMut(Event) -> Result<(), Error> + 'a;
 pub(super) fn attention() -> Attention {
@@ -200,16 +205,19 @@ pub(super) fn qwen_vae<'a>(
     op: q::VaeOperation,
     manager: &mut Manager<'a>,
     memory: &mut q::StaticMemoryServices,
+    diagnostic: (&std::path::Path, &mut Observer<'_>),
 ) -> Result<Tensor, Error> {
     let patcher = model.patcher();
-    manager.load(
-        std::slice::from_ref(&patcher),
-        0.,
-        None,
-        false,
-        false,
-        memory,
-    )?;
+    manager
+        .load(
+            std::slice::from_ref(&patcher),
+            0.,
+            None,
+            false,
+            false,
+            memory,
+        )
+        .map_err(|error| load_failure("vae", diagnostic.0, diagnostic.1, error))?;
     let schema = q::constructor_schema()?;
     let mut exec = q::ResidentExecution::bind(rt, &PreparedParameters::default(), 0, attention())?;
     let mut service = q::ManagedImageVae {

@@ -10,26 +10,31 @@ pub(super) fn generate(
     let mut manager = Manager::new();
     let mut memory = q::StaticMemoryServices::new(rt.native.clone(), pins.clone());
     observer(Event::Phase("encoding"))?;
-    let text = q::StaticModel::new(
-        m::static_moss_component(rt, "text", load(rt, aimdo, &r.text_encoder, "text", true)?)?
-            .with_shared_pins(pins.clone()),
-        rt,
-    );
+    let text = observe_load("text", &r.text_encoder, observer, || {
+        Ok(q::StaticModel::new(
+            m::static_moss_component(rt, "text", load(rt, aimdo, &r.text_encoder, "text", true)?)?
+                .with_shared_pins(pins.clone()),
+            rt,
+        ))
+    })?;
     let patcher = text.patcher();
     let mut tokenizer = m::MossTokenizer::frozen()?;
     let mut contexts = Vec::new();
     for prompt in [&r.prompt, &r.negative_prompt] {
         let tokens = tokenizer.tokenize(prompt, &Default::default())?;
-        manager.load(
-            std::slice::from_ref(&patcher),
-            0.,
-            None,
-            false,
-            false,
-            &mut memory,
-        )?;
+        manager
+            .load(
+                std::slice::from_ref(&patcher),
+                0.,
+                None,
+                false,
+                false,
+                &mut memory,
+            )
+            .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?;
         let params = text.owner.borrow().execution_parameters();
-        let encoder = m::Qwen35TextEncoder::from_parameters(Default::default(), &params)?;
+        let encoder = m::Qwen35TextEncoder::from_parameters(Default::default(), &params)
+            .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?;
         let mut exec = m::MossStaticExecution::bind(rt, &params, attention())?;
         contexts.push(
             unsafe {
@@ -51,31 +56,37 @@ pub(super) fn generate(
     drop(text);
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("loading_model"))?;
-    let model = q::StaticModel::new(
-        m::static_moss_component(rt, "dit", load(rt, aimdo, &r.diffusion_model, "dit", true)?)?
-            .with_shared_pins(pins.clone()),
-        rt,
-    );
+    let model = observe_load("dit", &r.diffusion_model, observer, || {
+        Ok(q::StaticModel::new(
+            m::static_moss_component(rt, "dit", load(rt, aimdo, &r.diffusion_model, "dit", true)?)?
+                .with_shared_pins(pins.clone()),
+            rt,
+        ))
+    })?;
     let patcher = model.patcher();
     let shape = [1, 128, r.height / 16, r.width / 16];
-    manager.load(
-        std::slice::from_ref(&patcher),
-        0.,
-        None,
-        false,
-        false,
-        &mut memory,
-    )?;
+    manager
+        .load(
+            std::slice::from_ref(&patcher),
+            0.,
+            None,
+            false,
+            false,
+            &mut memory,
+        )
+        .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
     let mut doubled = shape;
     doubled[0] *= 2;
-    manager.load(
-        std::slice::from_ref(&patcher),
-        m::moss_memory_required(&doubled, Kind::BFloat16, true),
-        Some(m::moss_memory_required(&shape, Kind::BFloat16, true)),
-        false,
-        false,
-        &mut memory,
-    )?;
+    manager
+        .load(
+            std::slice::from_ref(&patcher),
+            m::moss_memory_required(&doubled, Kind::BFloat16, true),
+            Some(m::moss_memory_required(&shape, Kind::BFloat16, true)),
+            false,
+            false,
+            &mut memory,
+        )
+        .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
     let latent = {
         let params = model.owner.borrow().execution_parameters();
         let fused = params.contains_key("layers.0.proj.qkv.weight");
@@ -142,20 +153,24 @@ pub(super) fn generate(
     drop(model);
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("saving_output"))?;
-    let model = q::StaticModel::new(
-        m::static_moss_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", true)?)?
-            .with_shared_pins(pins.clone()),
-        rt,
-    );
+    let model = observe_load("vae", &r.vae, observer, || {
+        Ok(q::StaticModel::new(
+            m::static_moss_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", true)?)?
+                .with_shared_pins(pins.clone()),
+            rt,
+        ))
+    })?;
     let patcher = model.patcher();
-    manager.load(
-        std::slice::from_ref(&patcher),
-        0.,
-        None,
-        false,
-        false,
-        &mut memory,
-    )?;
+    manager
+        .load(
+            std::slice::from_ref(&patcher),
+            0.,
+            None,
+            false,
+            false,
+            &mut memory,
+        )
+        .map_err(|error| load_failure("vae", &r.vae, observer, error))?;
     let mut exec = m::MossStaticExecution::bind(rt, &PreparedParameters::default(), attention())?;
     let mut services = m::ManagedFlux2Vae {
         runtime: rt,

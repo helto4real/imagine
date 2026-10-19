@@ -1,5 +1,6 @@
 //! Shared private worker supervision for Rust inference and optional Comfy core.
 use crate::{
+    component_error::{ComponentLoadError, LoadDiagnostic},
     config::Config,
     contract::{self, WorkflowOptions},
     engine::{Backend, EngineError, EngineFuture, EngineState},
@@ -361,7 +362,31 @@ impl PipeBackend {
                 Event::Error {
                     id: Some(event_id),
                     code,
-                } if event_id == id => bail!(self.error(worker_error(&code))),
+                    diagnostic,
+                } if event_id == id => {
+                    if code == "model_component_load_failed"
+                        && let Some(diagnostic) = diagnostic.filter(LoadDiagnostic::valid)
+                    {
+                        let root = request
+                            .resolved_models
+                            .as_ref()
+                            .map_or(self.config.model_root.as_path(), |m| m.root.as_path());
+                        if let Some(file) = header[diagnostic.component.field()]
+                            .as_str()
+                            .and_then(|path| Path::new(path).strip_prefix(root).ok())
+                            .and_then(Path::to_str)
+                        {
+                            let failure = ComponentLoadError {
+                                diagnostic,
+                                file: file.to_owned(),
+                            };
+                            if failure.valid() {
+                                return Err(failure.into());
+                            }
+                        }
+                    }
+                    bail!(self.error(worker_error(&code)));
+                }
                 _ => bail!(EngineError("comfy_protocol_error")),
             }
         }
@@ -525,6 +550,8 @@ enum Event {
     Error {
         id: Option<String>,
         code: String,
+        #[serde(default)]
+        diagnostic: Option<LoadDiagnostic>,
     },
 }
 async fn read_frame(reader: &mut (impl AsyncRead + Unpin)) -> Result<(Event, Vec<u8>)> {

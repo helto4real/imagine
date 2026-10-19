@@ -529,12 +529,19 @@ impl Scheduler {
             match result {
                 Ok(()) => {}
                 Err(error) => {
-                    let code = error
-                        .downcast_ref::<EngineError>()
-                        .map(|e| e.0)
-                        .unwrap_or("generation_failed");
-                    sqlx::query("UPDATE jobs SET status='failed',error=?,finished=? WHERE id=?")
+                    let details =
+                        error.downcast_ref::<crate::component_error::ComponentLoadError>();
+                    let code = if details.is_some() {
+                        "model_component_load_failed"
+                    } else {
+                        error
+                            .downcast_ref::<EngineError>()
+                            .map(|e| e.0)
+                            .unwrap_or("generation_failed")
+                    };
+                    sqlx::query("UPDATE jobs SET status='failed',error=?,error_details=?,finished=? WHERE id=?")
                         .bind(code)
+                        .bind(details.filter(|details|details.valid()).map(serde_json::to_string).transpose()?)
                         .bind(now())
                         .bind(&active.id)
                         .execute(&self.store.db)

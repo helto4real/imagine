@@ -12,7 +12,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock
 
 from worker import (ATTENTION, MAX_HEADER, MAX_PAYLOAD, WorkerError, read_frame,
-                    references, serve, write_frame)
+                    component_load, references, serve, write_frame)
 from runtime import Runtime, require_kitchen
 
 
@@ -21,6 +21,36 @@ def request(**values):
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_component_failures_keep_role_and_safe_cause_without_exception_text(self):
+        for component in ("text_encoder", "vae", "diffusion_model"):
+            for error, reason, tensor in (
+                (FileNotFoundError("synthetic private sentinel"), "file_not_found", None),
+                (PermissionError("synthetic private sentinel"), "permission_denied", None),
+                (MemoryError("synthetic private sentinel"), "out_of_memory", None),
+                (KeyError("layers.0.weight"), "missing_tensor", "layers.0.weight"),
+                (KeyError("/private/synthetic sentinel"), "missing_tensor", None),
+                (RuntimeError("size mismatch: synthetic private sentinel"), "tensor_shape_mismatch", None),
+                (ValueError("synthetic private sentinel"), "invalid_checkpoint", None),
+                (RuntimeError("VAE is invalid: synthetic private sentinel"), "unsupported_architecture", None),
+                (RuntimeError("unsupported quantization synthetic private sentinel"), "unsupported_quantization", None),
+                (RuntimeError("synthetic private sentinel"), "load_failed", None),
+            ):
+                with self.subTest(component=component, reason=reason):
+                    runtime = Mock()
+                    runtime.generate.side_effect = lambda *_: component_load(component, Mock(side_effect=error))
+                    incoming, outgoing = io.BytesIO(), io.BytesIO()
+                    write_frame(incoming, request())
+                    incoming.seek(0)
+                    serve(incoming, outgoing, runtime)
+                    self.assertNotIn(b"synthetic private sentinel", outgoing.getvalue())
+                    outgoing.seek(0)
+                    read_frame(outgoing)
+                    event, payload = read_frame(outgoing)
+                    diagnostic = {"component": component, "reason": reason}
+                    if tensor is not None:
+                        diagnostic["tensor"] = tensor
+                    self.assertEqual(event, {"type": "error", "id": "synthetic", "code": "model_component_load_failed", "diagnostic": diagnostic})
+                    self.assertEqual(payload, b"")
     def test_real_bootstrap_keeps_import_output_private_and_requires_kitchen(self):
         # Exercise the actual -I entrypoint against tiny source doubles, never
         # the installed Comfy/Torch modules or a GPU.
@@ -164,6 +194,25 @@ class RuntimeTests(unittest.TestCase):
             Path(paths["diffusion_model"]).write_bytes(b"synthetic replacement")
             runtime.load(paths)
             self.assertEqual(runtime.sd.load_diffusion_model.call_count, 2)
+
+    def test_real_load_boundaries_identify_encoder_and_vae(self):
+        for failing in ("text_encoder", "vae"):
+            runtime = Runtime.__new__(Runtime)
+            runtime.loaded_key = None
+            runtime.sd, runtime.utils, runtime.mm = Mock(), Mock(), Mock()
+            runtime.utils.load_torch_file.return_value = ({}, {})
+            if failing == "text_encoder":
+                runtime.sd.load_clip.side_effect = KeyError("layers.0.weight")
+            else:
+                runtime.sd.VAE.return_value.throw_exception_if_invalid.side_effect = RuntimeError("VAE is invalid")
+            with tempfile.TemporaryDirectory() as directory:
+                paths = {name: str(Path(directory) / name) for name in ("diffusion_model", "text_encoder", "vae")}
+                for path in paths.values():
+                    Path(path).write_bytes(b"synthetic")
+                with self.assertRaises(WorkerError) as result:
+                    runtime.load(paths)
+                self.assertEqual(result.exception.diagnostic["component"], failing)
+                self.assertIsNone(runtime.loaded_key)
 
     @staticmethod
     def generation_runtime():

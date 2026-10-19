@@ -8,7 +8,7 @@ import zlib
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from worker import serve
+from worker import serve, WorkerError
 
 
 def png(width, height):
@@ -22,6 +22,12 @@ class FakeRuntime:
     def generate(self, header, references, emit):
         emit("phase", phase="inference")
         mode = header["prompt"]
+        if mode in ("load_text", "load_vae"):
+            raise WorkerError("model_component_load_failed", {
+                "component": "text_encoder" if mode == "load_text" else "vae",
+                "reason": "missing_tensor" if mode == "load_text" else "tensor_shape_mismatch",
+                **({"tensor": "layers.0.weight"} if mode == "load_text" else {}),
+            })
         if mode == "hang":
             time.sleep(60)
         if mode == "disconnect":

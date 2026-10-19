@@ -6,7 +6,7 @@ import sys
 import time
 from pathlib import Path
 
-from worker import ATTENTION, WorkerError
+from worker import ATTENTION, WorkerError, component_load
 
 
 def require_kitchen(device, kitchen, attention):
@@ -47,7 +47,8 @@ class Runtime:
     def load(self, request):
         paths = [request[name] for name in ("diffusion_model", "text_encoder", "vae")]
         # Replacement at the same path must not reuse old tensors.
-        stamps = [Path(path).stat() for path in paths]
+        stamps = [component_load(name, lambda path=path: Path(path).stat())
+                  for name, path in zip(("diffusion_model", "text_encoder", "vae"), paths)]
         key = tuple((path, stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns)
                     for path, stat in zip(paths, stamps))
         if self.loaded_key == key:
@@ -57,10 +58,16 @@ class Runtime:
         self.mm.unload_all_models()
         gc.collect()
         self.mm.soft_empty_cache()
-        self.model = self.sd.load_diffusion_model(paths[0])
-        self.clip = self.sd.load_clip([paths[1]], clip_type=self.sd.CLIPType.QWEN_IMAGE)
-        weights, metadata = self.utils.load_torch_file(paths[2], safe_load=True, return_metadata=True)
-        self.vae = self.sd.VAE(sd=weights, metadata=metadata)
+        self.model = component_load("diffusion_model", lambda: self.sd.load_diffusion_model(paths[0]))
+        self.clip = component_load("text_encoder", lambda: self.sd.load_clip([paths[1]], clip_type=self.sd.CLIPType.QWEN_IMAGE))
+
+        def load_vae():
+            weights, metadata = self.utils.load_torch_file(paths[2], safe_load=True, return_metadata=True)
+            vae = self.sd.VAE(sd=weights, metadata=metadata)
+            vae.throw_exception_if_invalid()
+            return vae
+
+        self.vae = component_load("vae", load_vae)
         self.loaded_key = key
 
     def patched(self, request):

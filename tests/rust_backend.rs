@@ -46,6 +46,8 @@ while True:
  if h['prompt']=='hang':time.sleep(60)
  if h['prompt']=='failure':
   emit(dict(type='error',id=h['id'],code='rust_generation_failed'));break
+ if h['prompt']=='load_vae':
+  emit(dict(type='error',id=h['id'],code='model_component_load_failed',diagnostic=dict(component='vae',reason='invalid_checkpoint')));break
  emit(dict(type='progress',id=h['id'],completed=h['sampling']['steps'],total=h['sampling']['steps'],elapsed_seconds=1))
  channels=3 if h['model']=='moss-image-sft-int8' else 4
  emit(dict(type='result',id=h['id']),bytes([32,64,96,255][:channels])*h['width']*h['height'])
@@ -131,6 +133,28 @@ async fn cancel_reaps_before_release_and_worker_failures_are_sanitized() {
             .0,
         "rust_generation_failed"
     );
+    engine.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn rust_component_errors_are_not_replaced_with_generic_generation_failure() {
+    let (_dir, mut engine, _) = fake();
+    let mut r = request();
+    r.prompt = "load_vae".into();
+    let error = engine.generate(&r).await.unwrap_err();
+    let details = error
+        .downcast_ref::<imagine_server::component_error::ComponentLoadError>()
+        .unwrap();
+    assert_eq!(
+        details.diagnostic.component,
+        imagine_server::component_error::Component::Vae
+    );
+    assert_eq!(
+        details.diagnostic.reason,
+        imagine_server::component_error::Reason::InvalidCheckpoint
+    );
+    assert!(details.file.starts_with("vae/"));
+    assert!(details.valid());
     engine.stop().await.unwrap();
 }
 #[tokio::test]

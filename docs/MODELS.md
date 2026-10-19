@@ -10,7 +10,7 @@ to an existing `ComfyUI/models` directory; no weights are moved or copied.
 
 Discovery runs at server startup, on library setting changes and on Refresh.
 It runs off the HTTP/UI event loop, reads filenames and bounded safetensors
-headers for model components (not LoRAs), and never loads inference weights onto the GPU or reads image previews,
+headers for diffusion candidates only, and never loads inference weights onto the GPU or reads image previews,
 sidecars, prompts or job history. The recognized directories are:
 
 - `diffusion_models/`, with `unet/` as a legacy alias.
@@ -25,28 +25,52 @@ lists weight files by extension without reading LoRA headers or classifying
 compatibility: `.safetensors`, `.safetensor`, `.gguf`, `.ckpt`, `.pt`, `.pth`,
 `.bin` and `.sft` (case-insensitive). Sidecars and previews are excluded.
 
-This first implementation enables the existing Qwen Image 2.1 adapters:
+The Qwen Image 2.1 adapters retain these default filenames:
 
-| Role | Supported filename |
+| Role | Default filename |
 | --- | --- |
 | INT8 diffusion | `qwen_image_2.1_int8_convrot.safetensors` |
 | Turbo diffusion | `qwen_image_2.1_turbo_bf16.safetensors` |
 | Text encoder | `qwen3vl_8b_int8_convrot.safetensors` |
 | VAE | `qwen_image_2.1_vae_bf16.safetensors` |
 
-Known filenames must also have the expected native architecture indicators in
-valid safetensors headers. Other formats/checkpoints remain discoverable but
-unsupported; discovery does not expand the engine's validated architectures or
-quantizations. Header checks establish candidates, not numerical quality or
-complete weight integrity. Native binary/hash validation still runs before
-inference. The frozen engine settings and native source are unchanged.
+Diffusion candidates must have the expected native architecture indicators in
+valid safetensors headers. Other diffusion formats/checkpoints remain discoverable
+but unsupported. Encoder and VAE weight files are selectable regardless of name,
+family, quantization, header contents or compatibility metadata. Their contents
+are not inspected during discovery. The selected backend loads the chosen files;
+discovery does not establish inference compatibility. Native binary/hash validation
+still runs before inference. The frozen engine settings and native source are unchanged.
 
-One matching text encoder and VAE are connected automatically. Ambiguous choices
-require explicit selection in Settings. Missing components block generation.
+Existing family-specific filenames remain automatic default hints. If there is
+no such hint, a sole discovered file is used; ambiguous choices require selection.
+In **Settings → Models**, focus **Text encoder** or **VAE** and type to filter the
+full relative paths. Search is case-insensitive and all whitespace-separated
+words must match. Arrow up/down navigates, Enter selects, and Escape cancels the
+search without changing the saved binding. Clicking a result also selects it.
+No matching files leaves the previous binding intact. Selections are saved per
+diffusion variant. Missing components block generation.
 The selected variant exposes its own operations: Turbo supports image generation
 and editing, while character sheets retain their existing INT8 restriction.
 Turbo uses the shipped quick-draft defaults (including its fixed eight-step
 schedule and CFG 1); incompatible control values produce an actionable error.
+
+## Model-loading errors
+
+Rust and Comfy model-loading failures identify the component, the selected
+root-relative file and a bounded cause in the UI. Causes distinguish missing or
+unreadable files, unsupported formats/architectures/quantization, invalid checkpoints,
+missing weights, mismatched weight dimensions and insufficient memory. A missing
+tensor name is included when safely available. Unrecognized failures explicitly
+report that the loader did not provide a recognized cause; no cause is guessed.
+
+The job API retains `error.code` and adds `component`, `file`, `reason` and optional
+`tensor` for `model_component_load_failed`. Diagnostics refer to the submitted
+job's frozen file selection, not later changes in Settings. They remain in the
+session's in-memory job state. Raw exceptions, stack traces, prompts and tensor
+contents are not added to API errors or logs. Older workers can still return a
+generic failure. Rebuild/deploy the Rust worker with `./prepare-rust-backend.sh`
+and restart Imagine and its UI to enable the full path.
 
 ## LoRA desk
 
@@ -98,7 +122,7 @@ the configured root. Existing retry/idempotency behavior remains in force.
 Catalog file IDs derive from root-relative paths. Model entries provide adapter
 `model`, group, defaults, operations and a request schema. Their `id` identifies
 the discovered diffusion file, not the engine adapter. Model `available` means
-supported component files are present/unambiguous; it is not live inference
+the supported diffusion and selected/default components are present/unambiguous; it is not live inference
 acceptance. To submit a catalog selection, use the ordinary job endpoints:
 
 ```json
@@ -122,8 +146,9 @@ catalog endpoints; this change does not add new MCP tools.
 ## Validation
 
 Tests use tiny synthetic weight headers, temporary settings and fake inference.
-They cover directory aliases/recursion/symlinks, component headers, ambiguity,
-unfiltered LoRA discovery and selection, persistence, missing/replaced files, empty lists,
+They cover directory aliases/recursion/symlinks, diffusion headers, ambiguity,
+unfiltered encoder/VAE/LoRA discovery and selection, cross-family choices, searchable
+component pickers, persistence, missing/replaced files, empty lists,
 queued-job isolation, API rejection and real egui add/remove/close interactions.
 CPU-rendered desktop, compact, settings and LoRA views are separate from native
 window/file-dialog acceptance. No live model generation is part of this change.

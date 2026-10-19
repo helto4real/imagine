@@ -27,6 +27,8 @@ use tower::ServiceExt;
 
 #[derive(Default)]
 struct Probe {
+    component_failure:
+        std::sync::Mutex<Option<imagine_server::component_error::ComponentLoadError>>,
     calls: AtomicUsize,
     stops: AtomicUsize,
     fail: AtomicUsize,
@@ -52,6 +54,9 @@ impl Backend for Fake {
             self.0.passes.lock().unwrap().push(pass.clone());
             self.0.calls.fetch_add(1, Ordering::SeqCst);
             self.0.release.notified().await;
+            if let Some(error) = self.0.component_failure.lock().unwrap().take() {
+                return Err(error.into());
+            }
             if self.0.fail.swap(0, Ordering::SeqCst) > 0 {
                 anyhow::bail!("simulated crash");
             }
@@ -153,6 +158,44 @@ async fn comfy_selection_is_visible_without_starting_inference() {
     let (_, runtime) = req(&h.router, "GET", "/v1/runtime", None, None).await;
     assert_eq!(runtime["engine"]["backend"], "comfy");
     assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
+    stop(h).await;
+}
+#[tokio::test]
+async fn component_load_details_survive_scheduler_storage_and_the_public_api() {
+    use imagine_server::component_error::{Component, ComponentLoadError, LoadDiagnostic, Reason};
+    let h = setup().await;
+    let failure = ComponentLoadError {
+        diagnostic: LoadDiagnostic {
+            component: Component::Vae,
+            reason: Reason::TensorShapeMismatch,
+            tensor: None,
+        },
+        file: "vae/chosen-decoder.pt".into(),
+    };
+    *h.probe.component_failure.lock().unwrap() = Some(failure.clone());
+    let (status, accepted) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs",
+        Some(json!({"profile":"qwen","prompt":"SYNTHETIC private input sentinel"})),
+        Some("component-load-error"),
+    )
+    .await;
+    assert_eq!(status, 202, "{accepted}");
+    let id = accepted["id"].as_str().unwrap();
+    h.probe.release.notify_one();
+    wait_status(&h.store, id, "local", "failed").await;
+    let (status, value) = req(&h.router, "GET", &format!("/v1/jobs/{id}"), None, None).await;
+    assert_eq!(status, 200);
+    assert_eq!(value["error"]["code"], "model_component_load_failed");
+    assert_eq!(value["error"]["component"], "vae");
+    assert_eq!(value["error"]["file"], failure.file);
+    assert_eq!(value["error"]["reason"], "tensor_shape_mismatch");
+    assert!(
+        !value["error"]
+            .to_string()
+            .contains("private input sentinel")
+    );
     stop(h).await;
 }
 async fn req(

@@ -33,11 +33,13 @@ pub(super) fn generate(
                     .ok_or_else(|| Error::Native("Missing Pillow ABI".into()))?,
             ))
         }?;
-        let vae = q::StaticModel::new(
-            q::static_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", false)?)?
-                .with_shared_pins(pins.clone()),
-            rt,
-        );
+        let vae = observe_load("vae", &r.vae, observer, || {
+            Ok(q::StaticModel::new(
+                q::static_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", false)?)?
+                    .with_shared_pins(pins.clone()),
+                rt,
+            ))
+        })?;
         let mut encode = |pixels: &Tensor| {
             qwen_vae(
                 rt,
@@ -46,6 +48,7 @@ pub(super) fn generate(
                 q::VaeOperation::Encode,
                 &mut manager,
                 &mut memory,
+                (&r.vae, observer),
             )
         };
         // Server preparation already applies the shared shrink/crop geometry.
@@ -63,34 +66,39 @@ pub(super) fn generate(
             .is_none_or(|r| r.reference_latents.is_empty()),
         ..Default::default()
     };
-    let params = load(rt, aimdo, &r.text_encoder, "text", false)?;
-    let patches = q::component_patch_owner("text", &params, &loras)?;
-    let text = q::StaticModel::new(
-        q::static_component(rt, "text", params)?
-            .with_shared_pins(pins.clone())
-            .with_patches(patches)?,
-        rt,
-    );
+    let text = observe_load("text", &r.text_encoder, observer, || {
+        let params = load(rt, aimdo, &r.text_encoder, "text", false)?;
+        let patches = q::component_patch_owner("text", &params, &loras)?;
+        Ok(q::StaticModel::new(
+            q::static_component(rt, "text", params)?
+                .with_shared_pins(pins.clone())
+                .with_patches(patches)?,
+            rt,
+        ))
+    })?;
     let patcher = text.patcher();
     let mut encode = |prompt: &str| -> Result<q::TextConditioning, Error> {
         let tokens = tokenizer.tokenize_prompt(prompt, &opts)?;
-        manager.load(
-            std::slice::from_ref(&patcher),
-            0.,
-            None,
-            false,
-            false,
-            &mut memory,
-        )?;
+        manager
+            .load(
+                std::slice::from_ref(&patcher),
+                0.,
+                None,
+                false,
+                false,
+                &mut memory,
+            )
+            .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?;
         let params = text.owner.borrow().execution_parameters();
-        let encoder = q::QwenTextEncoder::from_parameters(Default::default(), &params)?;
+        let encoder = q::QwenTextEncoder::from_parameters(Default::default(), &params)
+            .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?;
         let vision = if images.is_empty() {
             None
         } else {
-            Some(q::QwenVisionEncoder::from_parameters(
-                Default::default(),
-                &params,
-            )?)
+            Some(
+                q::QwenVisionEncoder::from_parameters(Default::default(), &params)
+                    .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?,
+            )
         };
         let mut exec = q::ResidentExecution::bind(rt, &params, 0, attention())?;
         unsafe {
@@ -122,23 +130,27 @@ pub(super) fn generate(
     drop(text);
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("loading_model"))?;
-    let params = load(rt, aimdo, &r.diffusion_model, "dit", false)?;
-    let patches = q::component_patch_owner("dit", &params, &loras)?;
-    let model = q::StaticModel::new(
-        q::StaticOffload::new(params, rt.native.clone())?
-            .with_shared_pins(pins.clone())
-            .with_patches(patches)?,
-        rt,
-    );
+    let model = observe_load("dit", &r.diffusion_model, observer, || {
+        let params = load(rt, aimdo, &r.diffusion_model, "dit", false)?;
+        let patches = q::component_patch_owner("dit", &params, &loras)?;
+        Ok(q::StaticModel::new(
+            q::StaticOffload::new(params, rt.native.clone())?
+                .with_shared_pins(pins.clone())
+                .with_patches(patches)?,
+            rt,
+        ))
+    })?;
     let patcher = model.patcher();
-    manager.load(
-        std::slice::from_ref(&patcher),
-        0.,
-        None,
-        false,
-        false,
-        &mut memory,
-    )?;
+    manager
+        .load(
+            std::slice::from_ref(&patcher),
+            0.,
+            None,
+            false,
+            false,
+            &mut memory,
+        )
+        .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
     let shape = [1, 64, r.height / 16, r.width / 16];
     let refs = references
         .as_ref()
@@ -155,14 +167,16 @@ pub(super) fn generate(
         vec![refs.clone(), refs]
     };
     let (required, minimum) = q::qwen_sampling_memory_with_references(&shape, &groups);
-    manager.load(
-        std::slice::from_ref(&patcher),
-        required,
-        Some(minimum),
-        false,
-        false,
-        &mut memory,
-    )?;
+    manager
+        .load(
+            std::slice::from_ref(&patcher),
+            required,
+            Some(minimum),
+            false,
+            false,
+            &mut memory,
+        )
+        .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
     let latent = {
         let owner = model.owner.borrow();
         let params = &owner.parameters;
@@ -239,11 +253,13 @@ pub(super) fn generate(
     drop(model);
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("saving_output"))?;
-    let vae = q::StaticModel::new(
-        q::static_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", false)?)?
-            .with_shared_pins(pins.clone()),
-        rt,
-    );
+    let vae = observe_load("vae", &r.vae, observer, || {
+        Ok(q::StaticModel::new(
+            q::static_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", false)?)?
+                .with_shared_pins(pins.clone()),
+            rt,
+        ))
+    })?;
     let pixels = qwen_vae(
         rt,
         &vae,
@@ -251,6 +267,7 @@ pub(super) fn generate(
         q::VaeOperation::Decode,
         &mut manager,
         &mut memory,
+        (&r.vae, observer),
     )?;
     manager.unload_all(dev, &mut memory)?;
     Ok(pixels)

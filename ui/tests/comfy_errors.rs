@@ -71,3 +71,87 @@ async fn comfy_errors_survive_submission_and_job_polling_without_raw_details() {
         }
     }
 }
+
+#[tokio::test]
+async fn component_errors_show_the_role_selected_path_and_reason_but_ignore_raw_exceptions() {
+    for (component, file, reason, expected) in [
+        (
+            "text_encoder",
+            "text_encoders/chosen.gguf",
+            "unsupported_format",
+            "file format",
+        ),
+        (
+            "vae",
+            "vae/chosen.pt",
+            "tensor_shape_mismatch",
+            "Weight dimensions",
+        ),
+        (
+            "text_encoder",
+            "clip/chosen.safetensors",
+            "missing_tensor",
+            "Required model weights",
+        ),
+        (
+            "vae",
+            "vae/chosen.safetensors",
+            "out_of_memory",
+            "RAM or VRAM",
+        ),
+    ] {
+        let error = json!({"code":"model_component_load_failed","component":component,"file":file,"reason":reason,
+            "tensor":"layers.0.weight","details":"synthetic private sentinel"});
+        let failure_body = error.clone();
+        let router = Router::new()
+            .route(
+                "/v1/jobs",
+                post(|| async { Json(json!({"id":"job_synthetic"})) }),
+            )
+            .route(
+                "/v1/jobs/{id}",
+                get(move || {
+                    let error = failure_body.clone();
+                    async move { Json(json!({"status":"failed","error":error})) }
+                }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let client = Client::connect(&Connection {
+            url: format!("http://{}", listener.local_addr().unwrap()),
+        })
+        .unwrap();
+        let server = tokio::spawn(async move {
+            axum::serve(listener, router).await.unwrap();
+        });
+        let directory = tempfile::tempdir().unwrap();
+        let result = client
+            .generate(
+                Submission {
+                    request: json!({"prompt":"synthetic"}),
+                    folder: directory.path().into(),
+                    key: "synthetic".into(),
+                    job: None,
+                    upscale_source: None,
+                },
+                |_| {},
+            )
+            .await;
+        let failure = result.err().unwrap();
+        assert!(
+            failure.message.contains(if component == "vae" {
+                "VAE"
+            } else {
+                "Text encoder"
+            }),
+            "{}",
+            failure.message
+        );
+        assert!(failure.message.contains(file), "{}", failure.message);
+        assert!(failure.message.contains(expected), "{}", failure.message);
+        assert!(failure.message.contains("layers.0.weight"));
+        assert!(!failure.message.contains("synthetic private sentinel"));
+        assert!(!failure.retryable);
+        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
+        server.abort();
+    }
+}

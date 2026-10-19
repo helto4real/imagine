@@ -11,8 +11,47 @@ MAX_PAYLOAD = 256 * 1024 * 1024
 
 
 class WorkerError(Exception):
-    def __init__(self, code):
+    def __init__(self, code, diagnostic=None):
         self.code = code
+        self.diagnostic = diagnostic
+
+
+def component_load(component, operation):
+    """Report only a bounded cause and optional tensor key from the loader."""
+    try:
+        return operation()
+    except WorkerError:
+        raise
+    except Exception as error:
+        text = str(error).lower()
+        tensor = None
+        if isinstance(error, FileNotFoundError):
+            reason = "file_not_found"
+        elif isinstance(error, PermissionError):
+            reason = "permission_denied"
+        elif isinstance(error, MemoryError) or "outofmemory" in type(error).__name__.lower() or "out of memory" in text:
+            reason = "out_of_memory"
+        elif isinstance(error, KeyError):
+            reason = "missing_tensor"
+            key = error.args[0] if error.args else None
+            if isinstance(key, str) and 0 < len(key) <= 200 and all(c.isascii() and (c.isalnum() or c in "_.") for c in key):
+                tensor = key
+        elif "size mismatch" in text or "shape mismatch" in text:
+            reason = "tensor_shape_mismatch"
+        elif "quantization" in text or "unsupported dtype" in text:
+            reason = "unsupported_quantization"
+        elif "could not detect" in text or "vae is invalid" in text:
+            reason = "unsupported_architecture"
+        elif isinstance(error, NotImplementedError) or "unsupported format" in text:
+            reason = "unsupported_format"
+        elif "safetensor" in type(error).__name__.lower() or "header" in text or isinstance(error, (ValueError, EOFError)):
+            reason = "invalid_checkpoint"
+        else:
+            reason = "load_failed"
+        diagnostic = {"component": component, "reason": reason}
+        if tensor is not None:
+            diagnostic["tensor"] = tensor
+        raise WorkerError("model_component_load_failed", diagnostic) from None
 
 
 def exact(reader, count):
@@ -78,9 +117,12 @@ def serve(reader, writer, runtime):
             result = runtime.generate(header, references(header, payload), emit)
             write_frame(writer, {"type": "result", "id": request_id}, result)
         except Exception as error:
-            # Never serialize exception messages, paths, prompts or tracebacks.
+            # Never serialize raw exception messages, paths, prompts or tracebacks.
             code = error.code if isinstance(error, WorkerError) else "comfy_generation_failed"
-            write_frame(writer, {"type": "error", "id": request_id, "code": code})
+            event = {"type": "error", "id": request_id, "code": code}
+            if isinstance(error, WorkerError) and error.diagnostic is not None:
+                event["diagnostic"] = error.diagnostic
+            write_frame(writer, event)
             return  # A failed generation discards all GPU/model state.
 
 

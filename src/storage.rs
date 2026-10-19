@@ -53,7 +53,7 @@ impl Store {
               id TEXT PRIMARY KEY, owner TEXT NOT NULL, status TEXT NOT NULL,
               request TEXT NOT NULL, request_hash TEXT NOT NULL, idempotency_key TEXT,
               created INTEGER NOT NULL, started INTEGER, finished INTEGER,
-              output TEXT, error TEXT, UNIQUE(owner,idempotency_key));
+              output TEXT, error TEXT, error_details TEXT, UNIQUE(owner,idempotency_key));
             CREATE TABLE IF NOT EXISTS job_batches (
               owner TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL,
               job_ids TEXT NOT NULL, PRIMARY KEY(owner,idempotency_key));
@@ -97,12 +97,22 @@ impl Store {
             req.as_object_mut().unwrap().remove("resolved_models");
             let output: Option<String> = r.get("output");
             let error: Option<String> = r.get("error");
+            let details: Option<String> = r.get("error_details");
+            let error = error.map(|code| {
+                let mut value = json!({"code":code});
+                if code == "model_component_load_failed" && let Some(details) = details
+                    .and_then(|text|serde_json::from_str::<crate::component_error::ComponentLoadError>(&text).ok())
+                    .filter(crate::component_error::ComponentLoadError::valid) {
+                    value.as_object_mut().unwrap().extend(serde_json::to_value(details).unwrap().as_object().unwrap().clone());
+                }
+                value
+            });
             let started: Option<i64> = r.get("started"); let finished: Option<i64> = r.get("finished");
             Ok(json!({"id":id,"status":r.get::<String,_>("status"),"created_at_ms":r.get::<i64,_>("created"),
                 "started_at_ms":started,"finished_at_ms":finished,
                 "execution_to_saved_ms":started.zip(finished).map(|(s,f)|f-s),
                 "effective":req,"output":output.map(|s|serde_json::from_str::<Value>(&s)).transpose()?,
-                "error":error.map(|code|json!({"code":code}))}))
+                "error":error}))
         }).transpose()
     }
     pub async fn operation(&self, id: &str) -> Result<Option<Value>> {

@@ -53,6 +53,46 @@ fn fake() -> (tempfile::TempDir, Comfy, watch::Receiver<EngineState>) {
     let engine = Comfy::new(config, sender, "/usr/bin/python3".into(), root).unwrap();
     (directory, engine, receiver)
 }
+
+#[tokio::test]
+async fn load_errors_identify_the_component_and_the_submitted_relative_path() {
+    use imagine_server::component_error::{Component, ComponentLoadError, Reason};
+    let (_directory, mut engine, _) = fake();
+    for (mode, component, reason, file) in [
+        (
+            "load_text",
+            Component::TextEncoder,
+            Reason::MissingTensor,
+            "text_encoders/chosen encoder.gguf",
+        ),
+        (
+            "load_vae",
+            Component::Vae,
+            Reason::TensorShapeMismatch,
+            "vae/chosen decoder.pt",
+        ),
+    ] {
+        let mut request = pass(mode);
+        request.model_options.qwen_image_2_1.workflow = Some(contract::WorkflowOptions {
+            diffusion_model: "diffusion_models/chosen.safetensors".into(),
+            text_encoder: "text_encoders/chosen encoder.gguf".into(),
+            vae: "vae/chosen decoder.pt".into(),
+            loras: vec![],
+            zero_negative_conditioning: false,
+            color_match_strength: 0.,
+            brightness_strength: 0.,
+            contrast_strength: 0.,
+        });
+        let error = engine.generate(&request).await.unwrap_err();
+        let details = error.downcast_ref::<ComponentLoadError>().unwrap();
+        assert_eq!(details.diagnostic.component, component);
+        assert_eq!(details.diagnostic.reason, reason);
+        assert_eq!(details.file, file);
+        assert!(details.valid());
+        assert!(!details.to_string().contains("synthetic-private-sentinel"));
+        engine.stop().await.unwrap();
+    }
+}
 #[tokio::test]
 async fn default_rust_sampling_runs_through_python_adapter_without_manual_sigmas() {
     let (_directory, mut engine, _) = fake();

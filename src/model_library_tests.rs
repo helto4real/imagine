@@ -373,7 +373,7 @@ fn changed_lora_files_require_refresh_before_a_new_selection() {
 }
 
 #[test]
-fn moss_selection_keeps_its_own_encoder_vae_and_rejects_cross_family_components() {
+fn moss_defaults_keep_its_encoder_and_vae_but_explicit_cross_family_choices_are_allowed() {
     let (dir, mut library) = setup();
     let root = dir.path().join("models");
     fixture::write(
@@ -424,8 +424,119 @@ fn moss_selection_keeps_its_own_encoder_vae_and_rejects_cross_family_components(
             vae: id(&library, VAE),
         },
     );
+    let (value, _) = library
+        .prepare(json!({"model":contract::MOSS,"operation":"text_to_image",
+        "prompt":"synthetic","model_selection":{"diffusion":diffusion},
+        "sampling":{"steps":4,"cfg_scale":3.,"sampler":"euler","scheduler":"normal"}}))
+        .unwrap();
+    assert!(
+        value["model_options"]["moss_image"]["text_encoder"]
+            .as_str()
+            .unwrap()
+            .ends_with(ENCODER)
+    );
+    assert!(
+        value["model_options"]["moss_image"]["vae"]
+            .as_str()
+            .unwrap()
+            .ends_with(VAE)
+    );
+}
+
+#[test]
+fn encoders_and_vaes_are_uninspected_selectable_and_persist_without_family_restrictions() {
+    let (dir, mut library) = setup();
+    let root = dir.path().join("models");
+    // Even recognized names with invalid headers must remain selectable.
+    for relative in [
+        format!("text_encoders/nested/{ENCODER}"),
+        format!("vae/nested/{VAE}"),
+    ] {
+        std::fs::write(root.join(relative), b"synthetic uninspected contents").unwrap();
+    }
+    for relative in [
+        "clip/other/deep/Custom-encoder.GGUF",
+        "vae/other/deep/Custom-decoder.pt",
+    ] {
+        let path = root.join(relative);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, b"synthetic uninspected contents").unwrap();
+    }
+    library.scan().unwrap();
+    assert!(library.snapshot().warnings.is_empty());
+    let diffusion = id(&library, DIFFUSION);
+    let choice = Components {
+        text_encoder: id(&library, "Custom-encoder.GGUF"),
+        vae: id(&library, "Custom-decoder.pt"),
+    };
+    let mut settings = library.settings.clone();
+    settings
+        .components
+        .insert(diffusion.clone(), choice.clone());
+    library.update(settings).unwrap();
+    let mut restarted =
+        Library::load(dir.path().join("unused"), library.settings_path.clone()).unwrap();
+    assert_eq!(restarted.components(&diffusion).unwrap(), choice);
+    assert!(
+        restarted
+            .files
+            .iter()
+            .filter(|f| matches!(f.kind.as_str(), "text_encoders" | "vae"))
+            .all(|f| f.supported)
+    );
+    // Component flags/group metadata cannot prohibit an explicit choice either.
+    for file in &mut restarted.files {
+        if file.id == choice.text_encoder || file.id == choice.vae {
+            file.supported = false;
+            file.group = Some("other-family".into());
+        }
+    }
+    let (value, resolved) = restarted.prepare(request(&restarted, json!([]))).unwrap();
+    let typed: contract::JobRequest = serde_json::from_value(value).unwrap();
+    typed.validate().unwrap();
+    let workflow = typed.model_options.generation(&typed.model).unwrap();
+    assert_eq!(workflow.text_encoder, "clip/other/deep/Custom-encoder.GGUF");
+    assert_eq!(workflow.vae, "vae/other/deep/Custom-decoder.pt");
+    resolved.unwrap().verify().unwrap();
+    let mut invalid = restarted.settings.clone();
+    invalid.components.get_mut(&diffusion).unwrap().vae = choice.text_encoder.clone();
+    restarted.update(invalid).unwrap();
     assert_eq!(
-        library.components(&diffusion),
-        Err("incompatible_component")
+        restarted
+            .prepare(request(&restarted, json!([])))
+            .unwrap_err()
+            .code,
+        "model_file_missing"
+    );
+    let mut settings = restarted.settings.clone();
+    settings.components.insert(diffusion, choice);
+    restarted.update(settings).unwrap();
+    std::fs::write(
+        root.join("vae/other/deep/Custom-decoder.pt"),
+        b"changed file",
+    )
+    .unwrap();
+    assert_eq!(
+        restarted
+            .prepare(request(&restarted, json!([])))
+            .unwrap_err()
+            .code,
+        "model_catalog_stale"
+    );
+    std::fs::remove_file(root.join("vae/other/deep/Custom-decoder.pt")).unwrap();
+    assert_eq!(
+        restarted
+            .prepare(request(&restarted, json!([])))
+            .unwrap_err()
+            .code,
+        "model_file_missing"
+    );
+    restarted.scan().unwrap();
+    assert_eq!(
+        restarted
+            .prepare(request(&restarted, json!([])))
+            .unwrap_err()
+            .code,
+        "model_file_missing"
     );
 }

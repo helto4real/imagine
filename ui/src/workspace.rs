@@ -1059,8 +1059,11 @@ impl ImagineApp {
                 .with_window_type(egui::X11WindowType::Dialog)
                 .with_decorations(false),
             |ui, class| {
-                if ui.input(|i| i.viewport().close_requested() || i.key_pressed(egui::Key::Escape))
-                {
+                let popup_open = egui::Popup::is_any_open(ui.ctx());
+                if ui.input(|i| {
+                    i.viewport().close_requested()
+                        || (i.key_pressed(egui::Key::Escape) && !popup_open)
+                }) {
                     self.settings_open = false;
                 }
                 self.settings_content(ui, class != egui::ViewportClass::EmbeddedWindow);

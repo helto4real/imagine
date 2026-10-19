@@ -75,6 +75,58 @@ fn model_and_lora_settings_survive_restart_empty_lists_and_group_switches() {
     assert!(desk.app.model_selection().unwrap().loras.is_empty());
 }
 #[test]
+fn escape_cancels_component_search_before_closing_settings() {
+    let mut desk = Desk::new();
+    install(&mut desk);
+    desk.frame(vec![]);
+    desk.click("Settings");
+    let bounds = desk
+        .nodes
+        .iter()
+        .map(|(_, node)| node)
+        .find(|node| {
+            node.role() == egui::accesskit::Role::TextInput
+                && node.labelled_by().iter().any(|label_id| {
+                    desk.nodes.iter().any(|(id, label)| {
+                        id == label_id
+                            && (label.label() == Some("Text encoder")
+                                || label.value() == Some("Text encoder"))
+                    })
+                })
+        })
+        .unwrap()
+        .bounds()
+        .unwrap();
+    let pos = egui::pos2(
+        (bounds.x0 + bounds.x1) as f32 / 2.,
+        (bounds.y0 + bounds.y1) as f32 / 2.,
+    );
+    for pressed in [true, false] {
+        desk.frame(vec![
+            egui::Event::PointerMoved(pos),
+            egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            },
+        ]);
+    }
+    assert!(egui::Popup::is_any_open(&desk.ctx));
+    let escape = egui::Event::Key {
+        key: egui::Key::Escape,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    };
+    desk.frame(vec![escape.clone()]);
+    assert!(desk.app.settings_open);
+    assert!(!egui::Popup::is_any_open(&desk.ctx));
+    desk.frame(vec![escape]);
+    assert!(!desk.app.settings_open);
+}
+#[test]
 fn variants_keep_loras_and_missing_files_do_not_silently_change_selection() {
     let mut desk = Desk::new();
     install(&mut desk);

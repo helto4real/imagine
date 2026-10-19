@@ -2,12 +2,18 @@
 use super::*;
 use crate::{
     icons::Icon,
-    model_catalog::{Components, LibrarySettings, LibrarySnapshot, SelectedLora, Selection},
+    model_catalog::{
+        Components, LibrarySettings, LibrarySnapshot, ModelFile, SelectedLora, Selection,
+    },
     settings::{LoraSetting, ModelGroupSettings},
 };
 use anyhow::{Result, bail};
 use egui::{RichText, Ui};
 use serde_json::json;
+
+#[cfg(test)]
+#[path = "component_picker_tests.rs"]
+mod component_picker_tests;
 
 #[derive(Default)]
 pub(super) struct ModelUi {
@@ -18,6 +24,142 @@ pub(super) struct ModelUi {
     pub dirty: bool,
     search: String,
 }
+
+#[derive(Clone, Default)]
+struct ComponentSearch {
+    query: String,
+    highlighted: usize,
+}
+
+fn component_picker(
+    ui: &mut Ui,
+    label: &str,
+    files: &[ModelFile],
+    kind: &str,
+    selected: &mut String,
+) {
+    let id = ui.make_persistent_id("component-search");
+    let popup = id.with("results");
+    let mut search = ui.data_mut(|data| data.get_temp::<ComponentSearch>(id).unwrap_or_default());
+    let mut open = egui::Popup::is_id_open(ui.ctx(), popup);
+    let (mut down, mut up, mut choose, mut dismiss) = (false, false, false, false);
+    if open {
+        ui.input_mut(|input| {
+            down = input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowDown);
+            up = input.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp);
+            choose = input.consume_key(egui::Modifiers::NONE, egui::Key::Enter);
+            dismiss = input.consume_key(egui::Modifiers::NONE, egui::Key::Escape);
+        });
+    }
+    if dismiss {
+        egui::Popup::close_id(ui.ctx(), popup);
+        open = false;
+        ui.memory_mut(|memory| memory.surrender_focus(id));
+    }
+    let name = files
+        .iter()
+        .find(|f| f.id == *selected && f.kind == kind)
+        .map(|f| f.path.as_str());
+    let mut text = if open {
+        search.query.clone()
+    } else {
+        name.unwrap_or(if selected.is_empty() {
+            ""
+        } else {
+            "Missing file"
+        })
+        .to_owned()
+    };
+    let label = ui.label(label);
+    let response = ui
+        .add(
+            egui::TextEdit::singleline(&mut text)
+                .id(id)
+                .hint_text("Select…")
+                .desired_width(f32::INFINITY),
+        )
+        .labelled_by(label.id);
+    if !dismiss && (response.gained_focus() || response.clicked()) && !open {
+        search.query.clear();
+        search.highlighted = files
+            .iter()
+            .filter(|f| f.kind == kind)
+            .position(|f| f.id == *selected)
+            .unwrap_or(0);
+        egui::Popup::open_id(ui.ctx(), popup);
+        open = true;
+        ui.ctx().request_repaint();
+    } else if open && response.changed() {
+        search.query = text;
+        search.highlighted = 0;
+    }
+    if response.lost_focus()
+        && !ui.input(|input| input.pointer.any_down() || input.pointer.any_released())
+    {
+        egui::Popup::close_id(ui.ctx(), popup);
+        open = false;
+    }
+    let query = search.query.to_lowercase();
+    let terms: Vec<_> = query.split_whitespace().collect();
+    let results: Vec<_> = files
+        .iter()
+        .filter(|file| {
+            let path = file.path.to_lowercase();
+            file.kind == kind && terms.iter().all(|term| path.contains(term))
+        })
+        .collect();
+    let last = results.len().saturating_sub(1);
+    search.highlighted = search.highlighted.min(last);
+    if down {
+        search.highlighted = (search.highlighted + 1).min(last);
+    }
+    if up {
+        search.highlighted = search.highlighted.saturating_sub(1);
+    }
+    let mut chosen = (choose && open)
+        .then(|| results.get(search.highlighted).map(|file| file.id.clone()))
+        .flatten();
+    egui::Popup::from_response(&response)
+        .id(popup)
+        .open_memory(None)
+        .width(response.rect.width())
+        .close_behavior(if response.clicked() {
+            egui::PopupCloseBehavior::IgnoreClicks
+        } else {
+            egui::PopupCloseBehavior::CloseOnClickOutside
+        })
+        .show(|ui| {
+            egui::ScrollArea::vertical()
+                .id_salt(popup)
+                .max_height(180.)
+                .show(ui, |ui| {
+                    if results.is_empty() {
+                        ui.label("No matching files");
+                    }
+                    for (index, file) in results.iter().enumerate() {
+                        let row = ui
+                            .add(
+                                egui::Button::selectable(index == search.highlighted, &file.path)
+                                    .truncate(),
+                            )
+                            .on_hover_text(&file.path);
+                        if index == search.highlighted && (down || up || response.changed()) {
+                            row.scroll_to_me(Some(egui::Align::Center));
+                        }
+                        if row.clicked() {
+                            chosen = Some(file.id.clone());
+                        }
+                    }
+                });
+        });
+    if let Some(chosen) = chosen {
+        *selected = chosen;
+        egui::Popup::close_id(ui.ctx(), popup);
+        ui.memory_mut(|memory| memory.surrender_focus(id));
+    }
+    ui.data_mut(|data| data.insert_temp(id, search));
+}
+
 impl ImagineApp {
     fn group_settings(&self) -> ModelGroupSettings {
         self.prefs
@@ -300,26 +442,9 @@ impl ImagineApp {
                     ),
                     ("vae", "VAE", &mut components.vae),
                 ] {
-                    ui.label(label);
-                    let name = library
-                        .files
-                        .iter()
-                        .find(|f| &f.id == selected)
-                        .map(|f| f.path.as_str())
-                        .unwrap_or("Select…");
-                    egui::ComboBox::from_id_salt(kind)
-                        .width(ui.available_width())
-                        .truncate()
-                        .selected_text(name)
-                        .show_ui(ui, |ui| {
-                            for file in library.files.iter().filter(|f| {
-                                f.kind == kind
-                                    && f.supported
-                                    && f.group.as_deref() == model["group"].as_str()
-                            }) {
-                                ui.selectable_value(selected, file.id.clone(), &file.path);
-                            }
-                        });
+                    ui.push_id((&id, kind), |ui| {
+                        component_picker(ui, label, &library.files, kind, selected);
+                    });
                 }
             });
             if components != before {
@@ -350,7 +475,9 @@ impl ImagineApp {
         let unsupported: Vec<_> = library
             .files
             .iter()
-            .filter(|f| f.kind != "loras" && !f.supported)
+            .filter(|f| {
+                !matches!(f.kind.as_str(), "loras" | "text_encoders" | "vae") && !f.supported
+            })
             .collect();
         if !unsupported.is_empty() {
             egui::CollapsingHeader::new(format!("Unsupported files ({})", unsupported.len())).show(

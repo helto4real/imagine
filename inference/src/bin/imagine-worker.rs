@@ -89,6 +89,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .as_str()
             .ok_or("Missing request identity")?
             .to_owned();
+        let mut load_failure = None;
         let result = (|| -> Result<Vec<u8>, Box<dyn std::error::Error>> {
             let request: Request = serde_json::from_value(value.clone())?;
             let lengths = value["reference_lengths"]
@@ -135,6 +136,10 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             let start = Instant::now();
             let mut observer = |event| {
                 let event = match event {
+                    Event::LoadFailure(diagnostic) => {
+                        load_failure = Some(diagnostic);
+                        return Ok(());
+                    }
                     Event::Phase(phase) => json!({"type":"phase","id":id,"phase":phase}),
                     Event::Step(i) => {
                         json!({"type":"progress","id":id,"completed":i,"total":request.sampling.steps,"elapsed_seconds":start.elapsed().as_secs_f64()})
@@ -160,11 +165,13 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         match result {
             Ok(pixels) => write(&mut output, json!({"type":"result","id":id}), &pixels)?,
             Err(_) => {
-                write(
-                    &mut output,
-                    json!({"type":"error","id":id,"code":"rust_generation_failed"}),
-                    &[],
-                )?;
+                let event = match load_failure {
+                    Some(diagnostic) => {
+                        json!({"type":"error","id":id,"code":"model_component_load_failed","diagnostic":diagnostic})
+                    }
+                    None => json!({"type":"error","id":id,"code":"rust_generation_failed"}),
+                };
+                write(&mut output, event, &[])?;
                 return Ok(());
             }
         }

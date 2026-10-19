@@ -1,5 +1,7 @@
 pub mod api;
 pub mod comfy_engine;
+#[path = "../shared/component_error.rs"]
+pub mod component_error;
 pub mod config;
 pub mod contract;
 pub mod engine;

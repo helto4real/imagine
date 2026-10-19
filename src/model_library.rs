@@ -1,4 +1,4 @@
-//! Server-owned model discovery. Reads weight headers only, never media or sidecars.
+//! Server-owned model discovery. Only diffusion candidates require weight headers.
 use crate::{
     contract::{self, Lora, WorkflowOptions},
     scheduler::Fault,
@@ -221,7 +221,11 @@ impl Library {
     fn file(&self, id: &str, kind: &str) -> std::result::Result<&ModelFile, &'static str> {
         self.files
             .iter()
-            .find(|f| f.id == id && f.kind == kind && f.supported)
+            .find(|f| {
+                f.id == id
+                    && f.kind == kind
+                    && (matches!(kind, "text_encoders" | "vae") || f.supported)
+            })
             .ok_or("model_file_missing")
     }
     fn components(&self, diffusion: &str) -> std::result::Result<Components, &'static str> {
@@ -235,18 +239,23 @@ impl Library {
                 (&choice.text_encoder, "text_encoders"),
                 (&choice.vae, "vae"),
             ] {
-                if self.file(id, kind)?.group.as_deref() != Some(group) {
-                    return Err("incompatible_component");
-                }
+                self.file(id, kind)?;
             }
             return Ok(choice.clone());
         }
         let one = |kind: &str| {
-            let found: Vec<_> = self
-                .files
+            let all: Vec<_> = self.files.iter().filter(|f| f.kind == kind).collect();
+            // Preserve existing family defaults as hints, without restricting explicit choices.
+            let preferred: Vec<_> = all
                 .iter()
-                .filter(|f| f.kind == kind && f.supported && f.group.as_deref() == Some(group))
+                .copied()
+                .filter(|f| f.group.as_deref() == Some(group))
                 .collect();
+            let found = if preferred.is_empty() {
+                &all
+            } else {
+                &preferred
+            };
             match found.as_slice() {
                 [file] => Ok(file.id.clone()),
                 [] => Err("model_component_missing"),
@@ -499,8 +508,9 @@ fn scan_dir(
             || (kind == "text_encoders" && name == ENCODER)
             || (kind == "vae" && name == VAE);
         let mut group = known.then(|| if moss { MOSS_GROUP } else { QWEN_GROUP }.to_owned());
-        let mut supported = known || kind == "loras";
-        if known {
+        let uninspected = matches!(kind, "loras" | "text_encoders" | "vae");
+        let mut supported = known || uninspected;
+        if known && !uninspected {
             supported = if moss {
                 moss_header_matches(&path, kind)
             } else {
@@ -573,15 +583,6 @@ fn model_header_matches(path: &Path, kind: &str) -> Result<bool> {
     // Match native architecture indicators as well as the supported weight filenames.
     Ok(match kind {
         "diffusion_models" => has("txt_in.text_norm.weight") && has("img_in.weight"),
-        "text_encoders" => has("embed_tokens.weight") && has("layers.0.self_attn.q_norm.weight"),
-        "vae" => {
-            has("encoder.conv1.weight")
-                && header
-                    .as_object()
-                    .unwrap()
-                    .iter()
-                    .any(|(k, v)| k.ends_with("decoder.conv1.weight") && v["shape"][1] == 64)
-        }
         _ => false,
     })
 }
@@ -590,11 +591,6 @@ fn moss_header_matches(path: &Path, kind: &str) -> Result<bool> {
     let has = |suffix: &str| h.as_object().unwrap().keys().any(|k| k.ends_with(suffix));
     Ok(match kind {
         "diffusion_models" => has("video_embedder.weight") && has("layers.41.proj.qkv.weight"),
-        "text_encoders" => {
-            has("layers.0.linear_attn.in_proj_qkv.weight")
-                && has("layers.3.self_attn.q_proj.weight")
-        }
-        "vae" => has("bn.running_mean") && has("decoder.conv_in.weight"),
         _ => false,
     })
 }

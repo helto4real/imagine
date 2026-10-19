@@ -578,12 +578,17 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     // Catalog choices travel through the actual native client's HTTP transport and proxy.
     let model_root = dir.path().join("synthetic-models");
     model_fixture::models(&model_root);
+    for relative in ["text_encoders/other/custom.gguf", "vae/other/custom.pt"] {
+        let path = model_root.join(relative);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, b"synthetic uninspected component").unwrap();
+    }
     *library.lock().unwrap() = imagine_server::model_library::Library::load(
         model_root,
         dir.path().join("model-library.json"),
     )
     .unwrap();
-    let catalog = client.library(None, true).await.unwrap();
+    let mut catalog = client.library(None, true).await.unwrap();
     let selected = catalog
         .models
         .iter()
@@ -593,6 +598,27 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         .files
         .iter()
         .find(|f| f.path == "loras/nested/style.safetensors")
+        .unwrap();
+    let encoder = catalog
+        .files
+        .iter()
+        .find(|f| f.path == "text_encoders/other/custom.gguf")
+        .unwrap();
+    let vae = catalog
+        .files
+        .iter()
+        .find(|f| f.path == "vae/other/custom.pt")
+        .unwrap();
+    catalog.settings.components.insert(
+        selected["id"].as_str().unwrap().into(),
+        imagine_ui::model_catalog::Components {
+            text_encoder: encoder.id.clone(),
+            vae: vae.id.clone(),
+        },
+    );
+    client
+        .library(Some(&catalog.settings), false)
+        .await
         .unwrap();
     let mut catalog_request = make_request(
         "Synthetic catalog selection",
@@ -619,6 +645,17 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         .await
         .unwrap();
     assert_eq!(calls.load(Ordering::SeqCst), before + 1);
+    {
+        let received = requests.lock().unwrap();
+        let workflow = received
+            .last()
+            .unwrap()
+            .model_options
+            .generation(imagine_server::contract::MODEL)
+            .unwrap();
+        assert_eq!(workflow.text_encoder, "text_encoders/other/custom.gguf");
+        assert_eq!(workflow.vae, "vae/other/custom.pt");
+    }
     assert_eq!(
         requests
             .lock()

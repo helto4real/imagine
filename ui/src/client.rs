@@ -202,9 +202,8 @@ impl Client {
             .await
             .map_err(|_| Failure::retry("Could not read the server response. Retry."))?;
         if !status.is_success() {
-            let code = body["error"]["code"].as_str().unwrap_or("unknown");
             return Err(Failure {
-                message: error_message(code),
+                message: job_error_message(&body["error"]),
                 retryable: status.is_server_error(),
             });
         }
@@ -273,9 +272,7 @@ impl Client {
             match value["status"].as_str() {
                 Some("succeeded") => break value,
                 Some("failed") => {
-                    return Err(Failure::terminal(error_message(
-                        value["error"]["code"].as_str().unwrap_or("unknown"),
-                    )));
+                    return Err(Failure::terminal(job_error_message(&value["error"])));
                 }
                 Some("cancelled") => return Err(Failure::terminal("Generation cancelled.")),
                 Some("interrupted") => {
@@ -665,8 +662,22 @@ fn decode(bytes: &[u8], thumbnail: bool) -> Result<Preview> {
         pixels: rgba.into_raw(),
     })
 }
+fn job_error_message(error: &Value) -> String {
+    let code = error["code"].as_str().unwrap_or("unknown");
+    if code == "model_component_load_failed" {
+        let details = serde_json::json!({"component":error["component"],"file":error["file"],"reason":error["reason"],"tensor":error["tensor"]});
+        if let Ok(details) =
+            serde_json::from_value::<crate::component_error::ComponentLoadError>(details)
+            && details.valid()
+        {
+            return details.to_string();
+        }
+    }
+    error_message(code)
+}
 pub fn error_message(code: &str) -> String {
     match code {
+        "model_component_load_failed" => "A model component could not be loaded. Restart the updated backend and check the selected encoder and VAE files.",
         "model_library_update_failed" => "Could not save the model folder or assignments. Check the folder, compatibility and server write permissions.",
         "model_library_scan_failed" => "Could not scan the model folder. Check permissions and folder depth, then refresh.",
         "model_file_missing"|"model_component_missing" => "A model or LoRA file is missing. Refresh Models in Settings and update your selection.",
