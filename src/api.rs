@@ -23,6 +23,7 @@ use tokio::sync::{Semaphore, watch};
 
 #[derive(Clone)]
 pub struct App {
+    pub enhancement: Arc<crate::enhancement::Service>,
     pub library: Arc<std::sync::Mutex<crate::model_library::Library>>,
     pub profiles: Arc<crate::profiles::Catalog>,
     pub store: Store,
@@ -67,9 +68,10 @@ pub fn router(app: App) -> Router {
         .route("/v1/runtime/yield", post(yield_gpu))
         .route("/v1/operations/{id}", get(operation))
         .fallback(|| async { Fault::new(404, "not_found") })
+        .with_state(app.clone())
+        .merge(crate::enhancement::routes(app.enhancement.clone()))
         .layer(DefaultBodyLimit::max(32 * 1024 * 1024))
         .layer(middleware::from_fn_with_state(app.clone(), session_guard))
-        .with_state(app)
 }
 async fn session_guard(State(app): State<App>, request: Request, next: Next) -> Response {
     let mut response = if request

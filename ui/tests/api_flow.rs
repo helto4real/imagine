@@ -129,6 +129,10 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         imagine_server::model_library::Library::default(),
     ));
     let app = App {
+        enhancement: imagine_server::enhancement::Service::open(
+            dir.path().join("enhancement-profiles.json"),
+        )
+        .unwrap(),
         library: library.clone(),
         profiles: Arc::new(imagine_server::profiles::Catalog::load(&profiles).unwrap()),
         store,
@@ -170,6 +174,11 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     assert_eq!(catalog_response.status(), 200);
     assert_eq!(catalog_response.headers()["cache-control"], "no-store");
     let client = Client::connect(&Connection { url: url.clone() }).unwrap();
+    assert!(
+        !client.enhancement_profiles().await.unwrap()[0]
+            .system_prompt
+            .is_empty()
+    );
     let meta = client.metadata().await.unwrap();
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     let ref_path = dir.path().join("reference.png");

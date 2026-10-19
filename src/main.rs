@@ -145,6 +145,9 @@ async fn main() -> Result<()> {
     )
     .await?;
     let app = App {
+        enhancement: imagine_server::enhancement::Service::open(
+            config.data.join("enhancement-profiles.json"),
+        )?,
         library,
         profiles,
         store: store.clone(),

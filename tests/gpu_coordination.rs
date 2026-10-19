@@ -89,6 +89,10 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
 
     let (_, engine) = watch::channel(EngineState::default());
     let (imagine, imagine_task) = serve(api::router(App {
+        enhancement: imagine_server::enhancement::Service::open(
+            dir.path().join("enhancement-profiles.json"),
+        )
+        .unwrap(),
         library: Default::default(),
         profiles: Arc::new(
             imagine_server::profiles::Catalog::load(std::path::Path::new(concat!(

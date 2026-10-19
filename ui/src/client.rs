@@ -11,6 +11,8 @@ use std::{
 };
 
 pub const MODEL: &str = "qwen-image-2.1-int8";
+#[path = "enhancement_client.rs"]
+mod enhancement;
 #[derive(Clone)]
 pub struct Client {
     http: reqwest::Client,
@@ -676,6 +678,9 @@ fn job_error_message(error: &Value) -> String {
     error_message(code)
 }
 pub fn error_message(code: &str) -> String {
+    if let Some(message) = enhancement::message(code) {
+        return message.into();
+    }
     match code {
         "model_component_load_failed" => "A model component could not be loaded. Restart the updated backend and check the selected encoder and VAE files.",
         "model_library_update_failed" => "Could not save the model folder or assignments. Check the folder, compatibility and server write permissions.",

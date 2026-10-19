@@ -5,6 +5,9 @@ pub mod component_error;
 pub mod config;
 pub mod contract;
 pub mod engine;
+pub mod enhancement;
+#[path = "../shared/enhancement.rs"]
+pub mod enhancement_types;
 pub mod progress;
 pub mod scheduler;
 pub mod storage;

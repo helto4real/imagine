@@ -1,4 +1,5 @@
 //! Reference desk: ordered inputs, an image viewport, and the prompt inspector.
+use super::enhancement::Field;
 use super::*;
 use crate::icons::{self, Icon};
 use egui::{Align, Layout, Rect, RichText, Stroke, Ui, UiBuilder, Vec2};
@@ -132,6 +133,7 @@ impl ImagineApp {
         if self.settings_open {
             self.settings_window(ui.ctx());
         }
+        self.enhancement_proposal(ui.ctx());
     }
 
     fn header(&mut self, ui: &mut Ui, rect: Rect) {
@@ -344,8 +346,8 @@ impl ImagineApp {
                     ui.add_space(12.);
                     self.model_controls(ui);
                     ui.add_space(8.);
-                    let label = ui.label("Prompt");
-                    helto::textarea(
+                    let label = self.enhancement_label(ui, "Prompt", Field::Prompt);
+                    let response = helto::textarea(
                         ui,
                         &mut self.edit.desk.prompt,
                         6,
@@ -355,6 +357,7 @@ impl ImagineApp {
                     )
                     .labelled_by(label.id)
                     .on_hover_text("Use Reference 1, Reference 2, … in the prompt.");
+                    self.enhancement_field(ui, &response, Field::Prompt);
                     ui.add_space(12.);
                     if ui
                         .add_enabled_ui(
@@ -557,8 +560,8 @@ impl ImagineApp {
                         ui.add_space(8.);
                         let privacy = self.prefs.privacy_mode;
                         if self.workspace == Workspace::CharacterSheet {
-                            let label = ui.label("Character");
-                            helto::textarea(
+                            let label = self.enhancement_label(ui, "Character", Field::Character);
+                            let response = helto::textarea(
                                 ui,
                                 &mut self.sheet.character_description,
                                 6,
@@ -567,9 +570,14 @@ impl ImagineApp {
                                 true,
                             )
                             .labelled_by(label.id);
+                            self.enhancement_field(ui, &response, Field::Character);
                             ui.add_space(8.);
-                            let label = ui.label("Clothing & accessories");
-                            helto::textarea(
+                            let label = self.enhancement_label(
+                                ui,
+                                "Clothing & accessories",
+                                Field::Clothing,
+                            );
+                            let response = helto::textarea(
                                 ui,
                                 &mut self.sheet.clothing_description,
                                 5,
@@ -578,10 +586,19 @@ impl ImagineApp {
                                 true,
                             )
                             .labelled_by(label.id);
+                            self.enhancement_field(ui, &response, Field::Clothing);
                         } else {
-                            let label = ui.label("Prompt");
-                            helto::textarea(ui, &mut self.image.prompt, 8, "prompt", privacy, true)
-                                .labelled_by(label.id);
+                            let label = self.enhancement_label(ui, "Prompt", Field::Prompt);
+                            let response = helto::textarea(
+                                ui,
+                                &mut self.image.prompt,
+                                8,
+                                "prompt",
+                                privacy,
+                                true,
+                            )
+                            .labelled_by(label.id);
+                            self.enhancement_field(ui, &response, Field::Prompt);
                         }
                         ui.add_space(8.);
                         egui::Frame::new()
@@ -1220,6 +1237,8 @@ impl ImagineApp {
                     ui.add_space(24.);
                     ui.separator();
                     ui.add_space(22.);
+                    self.enhancement_settings(ui);
+                    ui.add_space(16.);
                     ui.label(
                         RichText::new("Storage")
                             .strong()
@@ -1297,14 +1316,18 @@ impl ImagineApp {
                     RichText::new(if self.settings_error.is_some() {
                         "Not saved"
                     } else {
-                        "Saved"
+                        self.enhancement_save_status().unwrap_or("Saved")
                     })
                     .small()
-                    .color(if self.settings_error.is_some() {
-                        helto::ERROR
-                    } else {
-                        helto::DIM
-                    }),
+                    .color(
+                        if self.settings_error.is_some()
+                            || self.enhancement_save_status() == Some("Profile not saved")
+                        {
+                            helto::ERROR
+                        } else {
+                            helto::DIM
+                        },
+                    ),
                 );
             });
         });

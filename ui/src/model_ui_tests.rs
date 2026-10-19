@@ -51,6 +51,7 @@ fn model_and_lora_settings_survive_restart_empty_lists_and_group_switches() {
         ModelGroupSettings {
             variant: "future".into(),
             loras: vec![],
+            ..Default::default()
         },
     );
     desk.app.save_preferences();

@@ -648,6 +648,7 @@ fn default_model_group() -> String {
 pub struct ModelGroupSettings {
     pub variant: String,
     pub loras: Vec<LoraSetting>,
+    pub enhancement_profile_id: Option<String>,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LoraSetting {

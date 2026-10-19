@@ -5,6 +5,8 @@ use eframe::egui::{self, Color32, Painter, Rect, Stroke};
 pub enum Icon {
     Image,
     Edit,
+    Enhance,
+    Duplicate,
     Lora,
     CharacterSheet,
     Video,
@@ -46,6 +48,17 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
         );
     };
     match icon {
+        Icon::Enhance => {
+            line(&[[4., 20.], [16., 8.], [19., 11.], [7., 23.], [4., 20.]]);
+            line(&[[5., 3.], [5., 9.]]);
+            line(&[[2., 6.], [8., 6.]]);
+            line(&[[18., 1.], [18., 5.]]);
+            line(&[[16., 3.], [20., 3.]]);
+        }
+        Icon::Duplicate => {
+            box_at(8., 8., 13., 13., 2);
+            line(&[[5., 16.], [3., 16.], [3., 3.], [16., 3.], [16., 5.]]);
+        }
         Icon::Lora => {
             line(&[[3., 7.], [12., 3.], [21., 7.], [12., 11.], [3., 7.]]);
             line(&[[3., 12.], [12., 16.], [21., 12.]]);

@@ -77,6 +77,34 @@ with a native stack or reproduced in a live generation test.
 
 ## Workflow
 
+Configure prompt enhancement in **Settings → Prompt enhancement**. Create or
+duplicate a profile, edit its **System prompt**, choose the model ID, and save
+with **Save profile**. Assign a saved profile to each model family, or select
+**Off**. The default Chat Completions base URL is `http://127.0.0.1:5002/v1`,
+matching `start-proxy.sh`. **Load models** queries that server's `/models` endpoint
+using the entered key (or the saved key for the same server), without saving the
+draft. Choose a returned model or enter a model ID manually. Model lookup never
+forwards a saved key to a different server address.
+
+Optional controls set temperature, Top P/K, Min P, Typical P, repetition,
+frequency and presence penalties, and seed; unchecked controls use server defaults.
+**Advanced → Extra parameters (JSON)** accepts additional provider fields, such as
+`{"stop": ["<end>"], "repeat_last_n": 64}`. Dedicated fields cannot be overridden
+in JSON. Advanced settings also select `max_tokens` or `max_completion_tokens`.
+Unsupported parameters produce a provider error and preserve the prompt.
+API keys are optional,
+stored privately on the Imagine server, and never returned in profile responses.
+
+Use **Enhance prompt** beside a text field to improve it without generating an
+image. The replacement is one undo step. If you edit the draft while waiting,
+the result offers **Use** or **Discard** instead of overwriting your changes.
+Cancelling or a failed/truncated response preserves the draft. Text generation
+through an inference text encoder is not part of this implementation.
+
+Profiles are saved in `enhancement-profiles.json` in the server data directory;
+family selections remain in `.imagine/ui-settings.json`. Enhancement inputs and
+outputs are session-only and are not written to the profile file or logs.
+
 1. Enter a **Prompt**. **Negative prompt** is optional and restored from your last edit.
 2. Optionally choose the **+** icon to upload PNG/JPEG/WebP reference images.
    Thumbnails are numbered; the up/down controls change reference order.

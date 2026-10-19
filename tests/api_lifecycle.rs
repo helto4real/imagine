@@ -122,6 +122,10 @@ async fn setup() -> Harness {
         .unwrap();
     }
     let router = api::router(App {
+        enhancement: imagine_server::enhancement::Service::open(
+            dir.path().join("enhancement-profiles.json"),
+        )
+        .unwrap(),
         library: library.clone(),
         profiles: Arc::new(imagine_server::profiles::Catalog::load(&profile_dir).unwrap()),
         store: store.clone(),
@@ -160,6 +164,80 @@ async fn comfy_selection_is_visible_without_starting_inference() {
     assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
     stop(h).await;
 }
+
+#[tokio::test]
+async fn enhancement_routes_share_session_guard_and_never_start_image_inference() {
+    let h = setup().await;
+    let response = h
+        .router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/enhancement/profiles")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 200);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    let response = h
+        .router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/v1/enhancement/profiles")
+                .header("X-Imagine-Session", "stale-session")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 409);
+    let response = h
+        .router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/enhancement/models")
+                .header("X-Imagine-Session", "stale-session")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"profile_id":"proxy","base_url":"http://127.0.0.1:1/v1","api_key":null}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 409);
+    assert_eq!(response.headers()["cache-control"], "no-store");
+    let profile = imagine_server::enhancement_types::Profile {
+        system_prompt: " \n".into(),
+        ..Default::default()
+    };
+    let update = imagine_server::enhancement_types::ProfileUpdate {
+        profile,
+        api_key: None,
+    };
+    let response = h
+        .router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PUT")
+                .uri("/v1/enhancement/profiles/proxy")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_vec(&update).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 400);
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
+    stop(h).await;
+}
+
 #[tokio::test]
 async fn component_load_details_survive_scheduler_storage_and_the_public_api() {
     use imagine_server::component_error::{Component, ComponentLoadError, LoadDiagnostic, Reason};

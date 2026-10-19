@@ -20,6 +20,7 @@ struct ReferenceView {
     texture: egui::TextureHandle,
 }
 enum Message {
+    Enhancement(enhancement::Event),
     Connected(Result<(Client, crate::model_catalog::LibrarySnapshot), String>),
     Library(Result<crate::model_catalog::LibrarySnapshot, String>),
     ModelFolder(Option<PathBuf>),
@@ -134,6 +135,7 @@ pub struct ImagineApp {
     client: Option<Client>,
     metadata: Option<Value>,
     models: models::ModelUi,
+    enhancement: enhancement::EnhancementUi,
     image: GenerationDesk,
     edit: editing::EditSession,
     sheet: GenerationDesk,
@@ -172,6 +174,7 @@ impl ImagineApp {
             client: None,
             metadata: None,
             models: Default::default(),
+            enhancement: Default::default(),
             image: GenerationDesk::default(),
             edit: editing::EditSession::default(),
             sheet: GenerationDesk {
@@ -260,6 +263,7 @@ impl ImagineApp {
     fn receive(&mut self, ctx: &egui::Context) {
         while let Ok(message) = self.rx.try_recv() {
             match message {
+                Message::Enhancement(event) => self.enhancement_message(ctx, event),
                 Message::Library(result) => {
                     self.models.loading = false;
                     match result {
@@ -289,6 +293,7 @@ impl ImagineApp {
                         Ok((client, data)) => {
                             self.client = Some(client);
                             self.accept_library(data);
+                            self.load_enhancement_profiles(ctx);
                         }
                         Err(e) => {
                             self.client = None;
@@ -856,3 +861,6 @@ mod tests;
 
 #[path = "models.rs"]
 mod models;
+
+#[path = "enhancement.rs"]
+mod enhancement;
