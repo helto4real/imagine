@@ -1,0 +1,128 @@
+[
+  {
+    "phase": "text_initial",
+    "event": "free",
+    "total": 13926793216,
+    "torch": 0
+  },
+  {
+    "phase": "text_initial",
+    "event": "free",
+    "total": 13926793216,
+    "torch": null
+  },
+  {
+    "phase": "text_initial",
+    "event": "free",
+    "total": 13926793216,
+    "torch": null
+  },
+  {
+    "phase": "text_positive",
+    "event": "free",
+    "total": 4922571776,
+    "torch": 58817536
+  },
+  {
+    "phase": "text_positive",
+    "event": "free",
+    "total": 4922571776,
+    "torch": null
+  },
+  {
+    "phase": "text_positive",
+    "event": "free",
+    "total": 4922571776,
+    "torch": null
+  },
+  {
+    "phase": "text_negative",
+    "event": "free",
+    "total": 4903304192,
+    "torch": 381385728
+  },
+  {
+    "phase": "text_negative",
+    "event": "free",
+    "total": 4903304192,
+    "torch": null
+  },
+  {
+    "phase": "text_negative",
+    "event": "free",
+    "total": 4903304192,
+    "torch": null
+  },
+  {
+    "phase": "dit_initial",
+    "event": "free",
+    "total": 14267056128,
+    "torch": 14286848
+  },
+  {
+    "phase": "dit_initial",
+    "event": "free",
+    "total": 14267056128,
+    "torch": null
+  },
+  {
+    "phase": "dit_initial",
+    "event": "free",
+    "total": 14267056128,
+    "torch": null
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1383947776,
+    "torch": 45178368
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1383947776,
+    "torch": null
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1383947776,
+    "torch": null
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1392539648,
+    "torch": null
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1379432960,
+    "torch": null
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1379432960,
+    "torch": null
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1051037184,
+    "torch": null
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1050175488,
+    "torch": null
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1050103296,
+    "torch": null
+  }
+]

@@ -1,0 +1,938 @@
+diff --git a/README.md b/README.md
+index 70e2e8f..ad2ef42 100644
+--- a/README.md
++++ b/README.md
+@@ -3,7 +3,7 @@
+ A local image/video generation server. The default **Rust inference backend**
+ uses our ComfyUI-compatible engine, LibTorch and Comfy Kitchen without Python
+ inference or stable-diffusion.cpp. It supports the selected Qwen Image 2.1
+-INT8/Turbo paths and experimental MOSS SFT INT8 text-to-image.
++INT8/BF16/Turbo paths and experimental MOSS SFT INT8 text-to-image.
+ See [Rust backend setup and coverage](docs/RUST-BACKEND.md).
+ 
+ The frozen **stable-diffusion.cpp** backend remains available with
+diff --git a/design/rust-backend-server-integration.md b/design/rust-backend-server-integration.md
+index 5e94077..c9aeb12 100644
+--- a/design/rust-backend-server-integration.md
++++ b/design/rust-backend-server-integration.md
+@@ -88,6 +88,10 @@ Rust integration, selected MOSS support, reference controls and regression tools
+ Unrelated native optimization and UI layout changes remain outside this commit.
+ Historical evidence hashes and failed comparisons are retained unchanged.
+ 
++The subsequent [Stage 2 follow-up](stage-2-upgraded-followup.md) adds ordinary
++BF16 product selection and investigates the upgraded automatic LoRA placement
++gap. Its new results are separate from this accepted integration checkpoint.
++
+ The exact staged baseline was also exported into an isolated source checkout
+ and its complete offline workspace suite passed, with two test threads. This
+ separately checks that excluding unrelated native/layout work does not leave
+diff --git a/design/rust-comfy-parity-engine.md b/design/rust-comfy-parity-engine.md
+index e662221..b0e8523 100644
+--- a/design/rust-comfy-parity-engine.md
++++ b/design/rust-comfy-parity-engine.md
+@@ -10,6 +10,9 @@ No new deviation or approval was needed for the final continuation.
+ 
+ Stage 2's selected Qwen Image 2.1 vertical path is complete for **INT8 ConvRot,
+ BF16 and Turbo**, under Section 15's partial-overall-coverage exit condition.
++The [upgraded-reference follow-up](stage-2-upgraded-followup.md) also completes
++ordinary BF16 server selection and fresh strict automatic BF16/Turbo LoRA
++controls; the earlier reference checkpoint is preserved independently.
+ See [the consolidated acceptance report](stage-2-qwen-image21-ready.md),
+ [final checkpoint](stage-2-qwen-image21-precision-sampling-checkpoint.json) and
+ [chronological Stage 2 report](stage-2-qwen-image21.md). Forty-six current
+diff --git a/design/stage-2-qwen-image21-ready.md b/design/stage-2-qwen-image21-ready.md
+index bb94afe..2278003 100644
+--- a/design/stage-2-qwen-image21-ready.md
++++ b/design/stage-2-qwen-image21-ready.md
+@@ -5,6 +5,11 @@ the exit condition in master-design Section 15. INT8 ConvRot, BF16 and Turbo can
+ run through conditioning, editing/LoRA, sampling and VAE output in Rust. Overall
+ ComfyUI coverage is partial; this is not production-release acceptance.
+ 
++This report preserves the accepted old-reference checkpoint. The subsequent
++[upgraded-reference follow-up](stage-2-upgraded-followup.md) completes ordinary
++BF16 server selection and fresh strict BF16/Turbo automatic LoRA comparisons.
++Its new results do not relabel the old-reference evidence below.
++
+ ## Contract and preservation
+ 
+ The requested initial commit is **`ac8594c`**, `Preserve Qwen LoRA and
+diff --git a/design/stage-2-upgraded-followup.md b/design/stage-2-upgraded-followup.md
+new file mode 100644
+index 0000000..97e7012
+--- /dev/null
++++ b/design/stage-2-upgraded-followup.md
+@@ -0,0 +1,132 @@
++# Stage 2 follow-up after the approved reference upgrade
++
++## Scope and accepted baseline
++
++Tomas confirmed on 2026-10-18 that the Rust backend works in Imagine and
++requested a baseline commit before completing the remaining Stage 2 work.
++Commit `f6fc1cd` preserves the approved ComfyUI/Kitchen upgrade, Qwen/MOSS
++implementation, default Rust server integration, original-source controls and
++regression tooling. Its exact staged tree passed 148 workspace tests with one
++deliberately ignored live test. Unrelated native optimizations and UI layout
++work remain outside that commit. No push or ordinary service restart occurred.
++
++The original selected Qwen Stage 2 checkpoint remains accepted against its old
++reference. This continuation concerns the upgraded reference
++`446ef4e005fc7134d53ce6869ebd77d2134cd39c`, Kitchen 0.2.38 and the early product
++adapter. It does not relabel old comparisons or weaken their requirements.
++
++## Remaining work and decisions
++
++1. Expose the existing ordinary Qwen BF16 inference path through the model
++   library and Rust server, alongside INT8 and Turbo. Reuse the Qwen component
++   group, ordered LoRA settings, sampling defaults, references and two-pass
++   character-sheet mapping. The explicit BF16 model ID must retain the BF16
++   checkpoint and cannot silently select INT8 or Turbo. Other backends must
++   reject the new Rust-only product selection before admission.
++2. Investigate the retained automatic BF16/Turbo LoRA comparison failures.
++   Observe the original memory-query inputs during DiT initial loading and
++   sampling without overriding them. Preserve the automatic memory policy,
++   source patch arithmetic, exact comparison requirements and autotuning.
++   Recorded-placement replay is diagnostic evidence only.
++3. Validate changed admission/discovery/UI request paths with synthetic tests
++   and the real BF16 Rust worker in a fresh isolated development project. Trained
++   comparisons run serially, after the existing aggregate host-RAM guard.
++
++The new BF16 control separates adapter correctness from the existing LoRA
++placement investigation: it uses the same bounded reference geometry and
++ER-SDE/beta settings as the INT8 server control, with the ordinary BF16 DiT and
++no LoRA. This is a new precision/adapter workload, not a replacement for the
++failed BF16/Turbo LoRA controls. The selected INT8 text encoder and BF16 VAE
++remain unchanged. No new dependency, production memory override or numerical
++tolerance is introduced. New builds use a separate target directory so the
++working baseline's deployed worker and manifest remain intact during validation.
++
++All samplers/schedulers/guiders and general conditioning/loading/patching
++contracts remain required under master-design Stage 3. MOSS variant expansion
++is outside this Qwen Stage 2 continuation. No requirement is removed.
++
++## Results and acceptance
++
++**The selected Stage 2 follow-up is complete.** Ordinary BF16 is exposed through
++the Rust server/model library, and fresh BF16/Turbo automatic LoRA controls pass
++the strict numerical and observed-memory checks against the upgraded reference.
++The [evidence directory](stage-2-upgraded-followup-evidence/README.md) retains
++the new results and the failed intermediate controls separately.
++
++| Control | Result |
++| --- | --- |
++| BF16 HTTP/model-library/reference control, 320×224, four ER-SDE/beta steps, CFG 2.5, no LoRA | Exact decoded PNG pixels through the real queue/Rust-worker path; no Python mapping in worker; shutdown reaps worker and removes session media |
++| BF16 automatic LoRA/reference control, 320×224, four ER-SDE/beta steps, CFG 2.5 | All seven Float32 boundaries and PNG pixels exact; all five component-memory states and three DiT lifecycle states exact |
++| Turbo automatic LoRA/reference control, 320×224, eight ER-SDE/beta steps, CFG 2.5 | Same exact numerical/component/DiT checks; original-first run, no recorded-placement replay |
++| Workspace | 152 passed, two deliberately ignored live tests; workspace and independent inference all-target Clippy pass |
++| Strict automatic acceptance gate | Positive trained control passes; all six negative controls rejected, including stale tensor/memory reports, placement replay and an actual failed pair |
++
++Both accepted automatic controls actually offload: BF16 initially has
++12,888,072,192 loaded bytes and 1,342,177,280 pinned bytes; Turbo has
++12,485,419,008 loaded bytes and 1,744,830,464 pinned bytes. Original and Rust
++agree on resident leaves, lazy patch passes, loaded/buffer/pinned byte counts,
++cached model size, low-VRAM state and sampler-buffer device/dtype/values.
++Unload returns loaded/pinned counts to zero and retains the original registered
++Float32 sampler buffer. No physical placement is injected.
++
++The ordinary BF16 model uses the existing Qwen INT8 text encoder and BF16 VAE,
++with unchanged standard 40-step/CFG 2.5 product defaults. Its distinct model ID
++cannot silently choose INT8/Turbo. Synthetic library and headless UI tests cover
++LoRA retention, model precision identity, request construction, mismatched
++checkpoint rejection and non-Rust admission rejection. The trained adapter
++check is the bounded BF16 reference/no-LoRA case above; it is not a newly
++trained acceptance of every BF16 character-sheet or pressure combination.
++
++## Memory investigation and decisions
++
++The first BF16 pair and two intervening Turbo pairs remain recorded as failed:
++contexts, references and schedules match, but different live free-memory inputs
++lead to different placement and resident/lazy LoRA arithmetic. The first BF16
++pair differed by about 344 MiB before DiT loading. Tomas then reported that he
++had generated concurrently and stopped the ordinary Imagine server himself.
++He subsequently confirmed no other model was running and supplied a dashboard
++showing approximately 2.5 GB of 16 GB in use.
++
++An aggregate-only idle observation still varied by 65 MiB over 20 seconds.
++No process list was read. The exact source of every historical fluctuation was
++not attributed; the user report does not retroactively establish the cause of
++all old failures. The new observation records distinguish ATen active/reserved
++memory from global available memory. The accepted BF16 pair and subsequent
++original-first Turbo pair independently reach identical observed placement and
++exact outputs. Test order changes scheduling only, not operands or policy.
++No failed result is relabelled, and no inference algorithm or memory policy was
++changed to obtain acceptance.
++
++The new `check_qwen_automatic_acceptance.py` gate verifies current tensor-file
++hashes, complete component ownership and every DiT lifecycle field, rather than
++accepting an old report or numerical equality alone. It rejects replayed
++placements and requires actual automatic offload. The normal upgrade runner
++invokes it automatically; explicit placement replay remains diagnostic only.
++`test_qwen_automatic_acceptance.py` preserves the six rejection checks for
++future upgrades without allocating any model weights. `--original-first`
++provides the separate execution-order diagnostic used here.
++
++This closes the selected fresh upgraded-reference controls; it does not promise
++identical images under different live memory/patch operands, establish equal
++physical peak VRAM or replace the wider model/pressure matrix. Earlier 1600-pixel
++benchmarks and old-reference cases retain their original scope. The small new
++timings include loading/export/transport and are not performance benchmarks.
++
++## Preservation and remaining project scope
++
++The baseline commit is `f6fc1cd`. The subsequent implementation, tests and this
++report remain uncommitted. The working baseline's deployed worker and manifest
++were preserved during all new validation; candidate binaries use a separate
++target and manifest. The ordinary server was neither inspected nor restarted
++by the agent. The next normal `./start-server.sh` rebuilds the worker/server and
++publishes the corresponding verified runtime manifest, including BF16 support.
++
++Only selected local model assets and own isolated outputs were read. Test
++socket/GPU/namespace sandbox escalations were granted; none was rejected. No
++new dependency, cloud service, numerical tolerance, autotuning change or design
++deviation was needed. The reference locks, frozen native comparison executable
++and unrelated dirty native/UI changes remain intact.
++
++Full sampler/scheduler/guider and general conditioning/loading/patching parity
++remain Stage 3. Broader model variants and production-release coverage remain
++Stages 4–5. MOSS is still the separately documented selected SFT INT8 T2I path.
+diff --git a/docs/RUST-BACKEND.md b/docs/RUST-BACKEND.md
+index 9495818..405859a 100644
+--- a/docs/RUST-BACKEND.md
++++ b/docs/RUST-BACKEND.md
+@@ -29,6 +29,7 @@ replace another running service or change the proxy's GPU coordination policy.
+ | Model | Product path | Sampling |
+ | --- | --- | --- |
+ | Qwen Image 2.1 INT8 ConvRot | Text-to-image, ordered reference editing, LoRA, existing two-pass character sheets | Euler / ER-SDE; simple / beta; explicit sigmas |
++| Qwen Image 2.1 BF16 | Same Qwen product paths, with the ordinary BF16 DiT | Same sampler/scheduler bindings as INT8 |
+ | Qwen Image 2.1 Turbo BF16 | Text-to-image, ordered reference editing, LoRA | Same sampler bindings; shipped Turbo profile retains its eight manual steps and CFG 1 |
+ | MOSS Image SFT INT8 ConvRot | Text-to-image | Euler; normal / sgm_uniform; profile defaults 50 steps, CFG 3, shift 5 |
+ 
+@@ -48,10 +49,20 @@ selector and component library.
+ The source-controlled `profiles/moss.yaml` gives the local component paths.
+ A library selection can resolve another nested location with the same supported
+ filenames. MOSS references, LoRA, layer skipping, MTP decode and other variants
+-remain unavailable and fail explicitly. General BF16 Qwen checkpoints remain
+-supported by the inference development controls; this adapter retains Imagine's
+-existing public INT8 and official Turbo model IDs. It adds no standalone BF16
+-product selection. Full sampler/scheduler/model parity is still later work.
++remain unavailable and fail explicitly. Ordinary Qwen BF16 is selectable as
++`qwen-image-2.1-bf16` when `qwen_image_2.1_bf16.safetensors` is discovered. It
++shares the Qwen settings/LoRA group and the existing INT8 Qwen3-VL encoder and
++BF16 Qwen VAE. The new product selection requires the Rust backend; other
++backends reject it before queue admission. No existing profile is changed.
++Full sampler/scheduler/model parity is still later work.
++
++The bounded BF16 HTTP/reference control matches the original ComfyUI pixels
++exactly with automatic offload and no LoRA. Fresh BF16/Turbo LoRA controls also
++match all numerical boundaries, pixels and observed component/DiT lifecycle
++states under automatic offload; see the
++[Stage 2 follow-up](../design/stage-2-upgraded-followup.md). Earlier failed pairs
++with different live free-memory inputs remain recorded separately. These
++selected controls do not establish all workload/pressure combinations.
+ 
+ Unsupported `res_multistep` selections fail before queue admission on `rust`.
+ Its metadata advertises only its implemented choices. Native/Comfy keep their
+diff --git a/inference/profiles/qwen-server-bf16.json b/inference/profiles/qwen-server-bf16.json
+new file mode 100644
+index 0000000..deeb9d5
+--- /dev/null
++++ b/inference/profiles/qwen-server-bf16.json
+@@ -0,0 +1,49 @@
++{
++  "schema": 1,
++  "purpose": "Bounded Imagine BF16 model-selection, reference conditioning and automatic offload control; LoRA placement remains a separate strict comparison",
++  "variant": "bf16",
++  "checkpoints": {
++    "dit": "diffusion_models/qwen-image2.1/qwen_image_2.1_bf16.safetensors",
++    "text": "text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
++    "vae": "vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors"
++  },
++  "source_configuration": {
++    "static_patcher": true,
++    "disable_comfy_compiler": true,
++    "disable_async_offload": true,
++    "force_full_load_per_component": false,
++    "unload_between_components": true,
++    "attention": "pytorch",
++    "kitchen_triton": false,
++    "compute_dtype": "bfloat16",
++    "prefix_cache_device": "auto",
++    "prefix_cache_dtype": "default",
++    "inference_mode": true
++  },
++  "synthetic_prompt": "Change the reference image to a blue butterfly resting on a yellow flower, soft daylight.",
++  "width": 320,
++  "height": 224,
++  "batch": 1,
++  "seed": 3061383787,
++  "steps": 4,
++  "sampler": "er_sde",
++  "scheduler": "beta",
++  "shift": 0.69,
++  "cfg": 2.5,
++  "lora": [],
++  "references": [
++    {
++      "shape": [
++        1,
++        224,
++        320,
++        4
++      ],
++      "byte_multiplier": 37,
++      "byte_offset": 19
++    }
++  ],
++  "negative_prompt": "Change the reference image to a red butterfly resting on a yellow flower, soft daylight.",
++  "reference_resolution": 0,
++  "reference_vae": true
++}
+diff --git a/inference/src/bin/qwen21-first-image.rs b/inference/src/bin/qwen21-first-image.rs
+index 5afc693..bbd5f06 100644
+--- a/inference/src/bin/qwen21-first-image.rs
++++ b/inference/src/bin/qwen21-first-image.rs
+@@ -239,6 +239,7 @@ fn component_memory_record(
+ // tensors. The marker enables this for a fresh isolated diagnostic run.
+ struct MemoryObservation {
+     inner: q::StaticMemoryServices,
++    native: Kitchen,
+     enabled: bool,
+     phase: &'static str,
+     events: Vec<Value>,
+@@ -246,13 +247,16 @@ struct MemoryObservation {
+ impl imagine_inference::memory::MemoryServices for MemoryObservation {
+     fn free(&mut self, device: Device) -> std::result::Result<(f64, f64), Error> {
+         let result = imagine_inference::memory::MemoryServices::free(&mut self.inner, device)?;
+-        if self.enabled && self.phase.starts_with("text_") && device != Device::Cpu {
+-            self.events.push(json!({"phase":self.phase,"event":"free","total":result.0 as u64,"torch":result.1 as u64}));
++        if self.enabled && self.phase != "other" && device != Device::Cpu {
++            let Device::Cuda(index) = device else {
++                unreachable!()
++            };
++            self.events.push(json!({"phase":self.phase,"event":"free","total":result.0 as u64,"torch":result.1 as u64,"cuda_memory_after_query":self.native.cuda_memory(index)?}));
+         }
+         Ok(result)
+     }
+     fn empty_cache(&mut self) -> std::result::Result<(), Error> {
+-        if self.enabled && self.phase.starts_with("text_") {
++        if self.enabled && self.phase != "other" {
+             self.events
+                 .push(json!({"phase":self.phase,"event":"empty_cache"}));
+         }
+@@ -313,6 +317,7 @@ fn generate(
+     let mut memory_manager = imagine_inference::memory::Manager::new();
+     let mut memory_services = MemoryObservation {
+         inner: q::StaticMemoryServices::new(rt.native.clone(), pins.clone()),
++        native: rt.native.clone(),
+         enabled: own.join("memory-observation-enabled").is_file(),
+         phase: "other",
+         events: vec![],
+@@ -694,6 +699,7 @@ fn generate(
+         };
+         let patcher = managed.as_ref().map(|model| model.patcher());
+         if let (Some(model), Some(patcher)) = (&managed, &patcher) {
++            memory_services.phase = "dit_initial";
+             memory_manager.load(
+                 std::slice::from_ref(patcher),
+                 0.,
+@@ -702,6 +708,7 @@ fn generate(
+                 false,
+                 &mut memory_services,
+             )?;
++            memory_services.phase = "other";
+             let mut owner = model.owner.borrow_mut();
+             replay_memory_plan(rt, &mut owner, own, p, "dit_initial")?;
+             memory_records.push(memory_record(&output, "dit_initial", &owner)?);
+@@ -744,6 +751,7 @@ fn generate(
+                 vec![]
+             };
+             let (required, minimum) = q::qwen_sampling_memory_with_references(&shape, &groups);
++            memory_services.phase = "dit_sampling";
+             memory_manager.load(
+                 std::slice::from_ref(patcher),
+                 required,
+@@ -752,6 +760,7 @@ fn generate(
+                 false,
+                 &mut memory_services,
+             )?;
++            memory_services.phase = "other";
+             let mut owner = model.owner.borrow_mut();
+             replay_memory_plan(rt, &mut owner, own, p, "dit_sampling")?;
+             memory_records.push(memory_record(&output, "dit_sampling", &owner)?);
+diff --git a/inference/src/server/mod.rs b/inference/src/server/mod.rs
+index fa3dfa4..df1d2e4 100644
+--- a/inference/src/server/mod.rs
++++ b/inference/src/server/mod.rs
+@@ -108,7 +108,7 @@ pub fn generate(
+     if !(moss
+         || matches!(
+             r.model.as_str(),
+-            "qwen-image-2.1-int8" | "qwen-image-2.1-turbo"
++            "qwen-image-2.1-int8" | "qwen-image-2.1-bf16" | "qwen-image-2.1-turbo"
+         ))
+     {
+         return Err(Error::Native("Unsupported model".into()));
+diff --git a/inference/tools/check_qwen_automatic_acceptance.py b/inference/tools/check_qwen_automatic_acceptance.py
+new file mode 100644
+index 0000000..e659415
+--- /dev/null
++++ b/inference/tools/check_qwen_automatic_acceptance.py
+@@ -0,0 +1,91 @@
++#!/usr/bin/env python3
++"""Strict offline gate for explicitly selected isolated Qwen comparison artifacts."""
++import argparse
++import hashlib
++import json
++from pathlib import Path
++
++
++def read(path):
++    return json.loads(path.read_text())
++
++
++def digest(path):
++    with path.open("rb") as stream:
++        return hashlib.file_digest(stream, "sha256").hexdigest()
++
++
++def evaluate(rust, original, comparison):
++    report = read(comparison)
++    rust_result = read(rust / "result.json")
++    original_result = read(original / "result.json")
++    assert not report.get("diagnostic_memory_plan"), "Placement replay is not automatic acceptance"
++    assert not rust_result.get("diagnostic_memory_plan"), "Rust used a diagnostic placement plan"
++    assert rust_result["source_profile"] == original_result["profile"], "Different control operands"
++    profile = original_result["profile"]
++    boundaries = {"context", "latent", "image-rgba"}
++    if profile.get("custom_sigmas") or profile["scheduler"] == "beta":
++        boundaries.add("sigmas")
++    if "reference_resolution" in profile:
++        boundaries.add("negative-context")
++        for i, _ in enumerate(profile["references"]):
++            boundaries.add(f"reference-vision-{i}")
++            if profile["reference_vae"]:
++                boundaries.add(f"reference-latent-{i}")
++    assert boundaries == report["metrics"].keys() - {"png_rgba8"}, "Missing/alternate numeric boundary"
++    assert all(
++        v["exact_bytes"] and v["all_finite"]
++        for name, v in report["metrics"].items() if name != "png_rgba8"
++    ), "Non-exact or non-finite tensor boundary"
++    for name in boundaries:
++        assert [digest(root / f"{name}-f32.bin") for root in (rust, original)] == report["metrics"][name]["hashes"], f"Stale tensor comparison: {name}"
++    assert report["metrics"]["png_rgba8"]["exact"], "PNG pixels differ"
++    assert report["component_memory"]["all_observed_fields_exact"], "Component ownership differs"
++    components = read(original / "component-memory.json")
++    component_phases = {row["phase"] for row in components}
++    actual_components = [row for row in read(rust / "memory-manager.json") if row["phase"] in component_phases]
++    assert actual_components == components, "Actual component ownership differs"
++    if profile.get("lora"):
++        patched = 0
++        for component in ("text", "dit"):
++            x, y = [read(root / f"lora-{component}.json") for root in (rust, original)]
++            assert x == y, f"Different LoRA operands: {component}"
++            patched += len(x)
++        assert patched, "LoRA control did not patch weights"
++    assert report["sampler_lifecycle"]["sampler_lifecycle_exact"], "Sampler lifecycle differs"
++    states = [read(root / "memory-policy.json") for root in (rust, original)]
++    phases = [row["phase"] for row in states[0]]
++    assert phases == [row["phase"] for row in states[1]] == [
++        "dit_initial", "dit_sampling", "dit_unloaded"
++    ], "Missing or reordered DiT lifecycle phase"
++    fields = ("loaded_bytes", "buffer_bytes", "resident", "lowvram_passes")
++    checks = []
++    for x, y in zip(*states):
++        for field in fields:
++            assert x["placement"][field] == y[field], f"{x['phase']}: {field} differs"
++        for field in ("pinned_bytes", "model_size", "model_lowvram", "sampler_buffer"):
++            assert x[field] == y[field], f"{x['phase']}: {field} differs"
++        assert digest(rust / f"sampler-{x['phase']}-f32.bin") == digest(original / f"sampler-{x['phase']}-f32.bin"), "Sampler buffer values differ"
++        checks.append(dict(phase=x["phase"], all_observed_fields_exact=True,
++                           loaded_bytes=x["placement"]["loaded_bytes"],
++                           pinned_bytes=x["pinned_bytes"], model_lowvram=x["model_lowvram"]))
++    assert states[0][0]["model_lowvram"], "Control did not exercise automatic offload"
++    return dict(schema=1, accepted=True, diagnostic_memory_plan=False,
++                variant=original_result["profile"]["variant"],
++                all_numeric_boundaries_and_pixels_exact=True,
++                component_memory_exact=True, dit_lifecycle=checks,
++                comparison_sha256=hashlib.sha256(comparison.read_bytes()).hexdigest())
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    for name in ("rust", "original", "comparison", "output"):
++        parser.add_argument("--" + name, type=Path, required=True)
++    args = parser.parse_args()
++    result = evaluate(args.rust, args.original, args.comparison)
++    args.output.write_text(json.dumps(result, indent=2) + "\n")
++    print(json.dumps(result))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/inference/tools/check_qwen_reference_upgrade.py b/inference/tools/check_qwen_reference_upgrade.py
+index 39ae429..6f84b95 100644
+--- a/inference/tools/check_qwen_reference_upgrade.py
++++ b/inference/tools/check_qwen_reference_upgrade.py
+@@ -6,6 +6,7 @@ p=argparse.ArgumentParser(description=__doc__)
+ for name in ['root','site','comfy','model-root','binary']:p.add_argument('--'+name,type=Path,required=True)
+ p.add_argument('--prefix',required=True)
+ p.add_argument('--variants',nargs='+',choices=['int8','bf16','turbo'],default=['int8','bf16','turbo'])
++p.add_argument('--original-first',action='store_true',help='Diagnostic execution order only; original policy and numerical settings remain unchanged')
+ p.add_argument('--replay-python-prefix',help='Separate diagnostic: replay only the saved original DiT placements, never change the automatic default')
+ a=p.parse_args()
+ assert re.fullmatch('[a-zA-Z0-9_-]+',a.prefix)
+@@ -44,6 +45,11 @@ for variant in a.variants:
+    '--profile',str(profile),'--memory-observation']),('comparison',['bash','inference/tools/launch_reference.sh','inference/tools/compare_qwen_first_image.py',
+    '--site',str(a.site),'--rust',str(rust/'first-image'),'--python',str(reference),
+    '--output',str(reports/f'{variant}-comparison.json')])]
++ if a.original_first:
++  assert not a.replay_python_prefix,'Original-first cannot be combined with saved placement replay'
++  commands=[commands[1],commands[0],*commands[2:]]
++ if not a.replay_python_prefix:
++  commands.append(('automatic-acceptance',[sys.executable,'-B',str(project/'inference/tools/check_qwen_automatic_acceptance.py'),'--rust',str(rust/'first-image'),'--original',str(reference),'--comparison',str(reports/f'{variant}-comparison.json'),'--output',str(reports/f'{variant}-acceptance.json')]))
+  for label,command in commands:
+   if label=='python'and a.replay_python_prefix:continue
+   print(variant,label,'started',flush=True)
+diff --git a/inference/tools/check_server_backend.py b/inference/tools/check_server_backend.py
+index f82b675..df4761b 100644
+--- a/inference/tools/check_server_backend.py
++++ b/inference/tools/check_server_backend.py
+@@ -7,7 +7,7 @@ for key in ['own-root','model-root','manifest','binary','site','control']:p.add_
+ p.add_argument('--expected-image',type=Path)
+ a=p.parse_args();project=Path(__file__).resolve().parents[2]
+ control=json.loads(a.control.read_text());a.own_root.mkdir(parents=True,exist_ok=False)
+-model='moss-image-sft-int8'if control['variant']=='int8_convrot'and 'moss' in control['checkpoints']['dit']else 'qwen-image-2.1-turbo'if control['variant']=='turbo_bf16'else'qwen-image-2.1-int8'
++model='moss-image-sft-int8'if control['variant']=='int8_convrot'and 'moss' in control['checkpoints']['dit']else 'qwen-image-2.1-turbo'if control['variant']=='turbo_bf16'else'qwen-image-2.1-bf16'if control['variant']=='bf16'else'qwen-image-2.1-int8'
+ modelroot=a.own_root/'models'
+ for relative in list(control['checkpoints'].values())+[s['path']for s in control.get('lora',[])]:
+  path=modelroot/relative;path.parent.mkdir(parents=True,exist_ok=True);path.symlink_to(a.model_root/relative)
+diff --git a/inference/tools/reference_qwen_editing.py b/inference/tools/reference_qwen_editing.py
+index 70e2e46..85a882e 100644
+--- a/inference/tools/reference_qwen_editing.py
++++ b/inference/tools/reference_qwen_editing.py
+@@ -24,7 +24,7 @@ p.add_argument('--profile', type=Path, help='One of the registered development c
+ a = p.parse_args()
+ project = Path(__file__).resolve().parents[2]
+ profile = json.loads((a.profile or project / 'inference/profiles/qwen21-first-int8.json').read_text())
+-assert profile in [json.loads((project / 'inference/profiles' / n).read_text()) for n in ('qwen21-first-int8.json', 'qwen21-1600x896-int8.json', 'qwen21-1600x896-40steps-int8.json', 'qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8-seed3061383787.json','qwen21-lora-int8.json','qwen21-lora-bf16.json','qwen21-lora-turbo.json','qwen21-lora-text-int8.json','qwen21-lora-stack-int8.json','qwen21-lora-portrait-1600-int8.json','qwen21-lora-int8-bf16-encoder.json','qwen21-lora-bf16-bf16-encoder.json','qwen21-lora-turbo-bf16-encoder.json','qwen21-cfg-er-sde-int8.json','qwen21-cfg-er-sde-bf16.json','qwen21-cfg-er-sde-turbo.json','qwen21-tiled-int8.json','qwen-server-int8.json','qwen-server-turbo.json','qwen-server-t2i-int8.json','qwen-server-t2i-empty-negative-int8.json')], 'Unregistered comparison profile'
++assert profile in [json.loads((project / 'inference/profiles' / n).read_text()) for n in ('qwen21-first-int8.json', 'qwen21-1600x896-int8.json', 'qwen21-1600x896-40steps-int8.json', 'qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8-seed3061383787.json','qwen21-lora-int8.json','qwen21-lora-bf16.json','qwen21-lora-turbo.json','qwen21-lora-text-int8.json','qwen21-lora-stack-int8.json','qwen21-lora-portrait-1600-int8.json','qwen21-lora-int8-bf16-encoder.json','qwen21-lora-bf16-bf16-encoder.json','qwen21-lora-turbo-bf16-encoder.json','qwen21-cfg-er-sde-int8.json','qwen21-cfg-er-sde-bf16.json','qwen21-cfg-er-sde-turbo.json','qwen21-tiled-int8.json','qwen-server-int8.json','qwen-server-bf16.json','qwen-server-turbo.json','qwen-server-t2i-int8.json','qwen-server-t2i-empty-negative-int8.json')], 'Unregistered comparison profile'
+ manifest = json.loads((reference_dir(project)/'source-manifest.json').read_text())
+ frozen = {str(a.comfy / x['path']): x['sha256'] for x in manifest if x['root'] == 'comfy'}
+ paths = {k: a.model_root / v for k, v in profile['checkpoints'].items()}
+@@ -84,15 +84,19 @@ if a.memory_observation:
+     original_free_memory=mm.get_free_memory
+     def observed_free_memory(dev=None,torch_free_too=False):
+         value=original_free_memory(dev,torch_free_too)
+-        if memory_phase.startswith('text_')and(dev is None or dev.type!='cpu'):
+-            memory_events.append(dict(phase=memory_phase,event='free',total=value[0]if torch_free_too else value,torch=value[1]if torch_free_too else None))
++        if memory_phase!='other'and(dev is None or dev.type!='cpu'):
++            stats=torch.cuda.memory_stats(dev)
++            memory_events.append(dict(phase=memory_phase,event='free',total=value[0]if torch_free_too else value,torch=value[1]if torch_free_too else None,active=stats['active_bytes.all.current'],reserved=stats['reserved_bytes.all.current']))
+         return value
+     mm.get_free_memory=observed_free_memory
+     original_empty_cache=mm.soft_empty_cache
+     def observed_empty_cache(*args,**kwargs):
+-        if memory_phase.startswith('text_'):memory_events.append(dict(phase=memory_phase,event='empty_cache'))
++        if memory_phase!='other':memory_events.append(dict(phase=memory_phase,event='empty_cache'))
+         return original_empty_cache(*args,**kwargs)
+     mm.soft_empty_cache=observed_empty_cache
++    memory_phase='startup'
++    mm.get_free_memory(dev,torch_free_too=True)
++    memory_phase='other'
+ timings = {}
+ shapes = {}
+ 
+@@ -274,7 +278,9 @@ with torch.inference_mode()if profile['source_configuration'].get('inference_mod
+     def record_detach(owner,unpatch_all):
+         if unpatch_all: memory_record('dit_unloaded',owner)
+     model.add_callback(CallbacksMP.ON_DETACH,record_detach)
++    memory_phase='dit_initial'
+     mm.load_models_gpu([model], force_full_load=profile['source_configuration']['force_full_load_per_component'])
++    memory_phase='other'
+     timings['dit_load'] = elapsed(start)
+     memory_record('dit_initial', model)
+     step_seconds = []
+@@ -305,8 +311,10 @@ with torch.inference_mode()if profile['source_configuration'].get('inference_mod
+         comfy.samplers.calculate_sigmas=observed_schedule
+     if custom_sigmas is not None:
+         save('sigmas', custom_sigmas)
++    memory_phase='dit_sampling'
+     latent = sample.sample(model, noise, profile['steps'], profile['cfg'], profile['sampler'], profile['scheduler'],
+         conditioning, negative, zero, sigmas=custom_sigmas, callback=callback, disable_pbar=True, seed=profile['seed'])
++    memory_phase='other'
+     timings['sampling'] = elapsed(start)
+     memory_record('dit_sampling', model)
+     save('latent', latent)
+diff --git a/inference/tools/test_qwen_automatic_acceptance.py b/inference/tools/test_qwen_automatic_acceptance.py
+new file mode 100644
+index 0000000..8dbd5b7
+--- /dev/null
++++ b/inference/tools/test_qwen_automatic_acceptance.py
+@@ -0,0 +1,73 @@
++#!/usr/bin/env python3
++"""Reject poisoned copies of explicitly supplied isolated comparison artifacts.
++
++No models are opened or allocated. Original evidence is never modified.
++"""
++import argparse
++import json
++import tempfile
++from pathlib import Path
++
++from check_qwen_automatic_acceptance import evaluate
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    for name in ("rust", "original", "comparison", "failed-rust", "failed-original",
++                 "failed-comparison", "own-root"):
++        parser.add_argument("--" + name, type=Path, required=True)
++    args = parser.parse_args()
++    args.own_root.mkdir(parents=True, exist_ok=False)
++    assert evaluate(args.rust, args.original, args.comparison)["accepted"]
++    results = []
++
++    def reject(name, rust, original, comparison):
++        try:
++            evaluate(rust, original, comparison)
++        except AssertionError as error:
++            results.append(dict(case=name, rejected=True, reason=str(error)))
++        else:
++            raise AssertionError(name + " was accepted")
++
++    for name, mutate in (
++        ("diagnostic_replay", lambda x: x.update(diagnostic_memory_plan=True)),
++        ("unequal_latent", lambda x: x["metrics"]["latent"].update(exact_bytes=False)),
++        ("missing_boundary", lambda x: x["metrics"].pop("context")),
++    ):
++        with tempfile.TemporaryDirectory(dir=args.own_root) as own:
++            target = Path(own) / "comparison.json"
++            report = json.loads(args.comparison.read_text())
++            mutate(report)
++            target.write_text(json.dumps(report))
++            reject(name, args.rust, args.original, target)
++
++    def links(source, target):
++        for child in source.iterdir():
++            if child.is_file():
++                (target / child.name).symlink_to(child.resolve())
++
++    with tempfile.TemporaryDirectory(dir=args.own_root) as own:
++        own = Path(own)
++        links(args.original, own)
++        path = own / "memory-policy.json"
++        path.unlink()
++        states = json.loads((args.original / path.name).read_text())
++        states[0]["loaded_bytes"] += 1
++        path.write_text(json.dumps(states))
++        reject("stale_memory_report", args.rust, own, args.comparison)
++    with tempfile.TemporaryDirectory(dir=args.own_root) as own:
++        own = Path(own)
++        links(args.rust, own)
++        path = own / "latent-f32.bin"
++        path.unlink()
++        data = bytearray((args.rust / path.name).read_bytes())
++        data[0] ^= 1
++        path.write_bytes(data)
++        reject("stale_tensor_report", own, args.original, args.comparison)
++    reject("actual_failed_pair", args.failed_rust, args.failed_original, args.failed_comparison)
++    (args.own_root / "checks.json").write_text(json.dumps(results, indent=2) + "\n")
++    print(f"Strict automatic gate: positive control passes; {len(results)} negative controls rejected")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/src/comfy_engine.rs b/src/comfy_engine.rs
+index 68993b4..5759bbf 100644
+--- a/src/comfy_engine.rs
++++ b/src/comfy_engine.rs
+@@ -210,7 +210,8 @@ impl PipeBackend {
+     }
+     async fn run(&mut self, request: &ImagePass) -> Result<Vec<u8>> {
+         if !(matches!(request.model.as_str(), contract::MODEL | contract::TURBO)
+-            || self.rust_runtime.is_some() && request.model == contract::MOSS)
++            || self.rust_runtime.is_some()
++                && matches!(request.model.as_str(), contract::BF16 | contract::MOSS))
+         {
+             bail!(EngineError("unsupported_model"));
+         }
+@@ -584,7 +585,7 @@ pub fn model_metadata(mut value: Value, backend: &str) -> Value {
+     if backend == "rust"
+         && matches!(
+             model,
+-            Some(contract::MODEL | contract::TURBO | contract::MOSS)
++            Some(contract::MODEL | contract::BF16 | contract::TURBO | contract::MOSS)
+         )
+     {
+         value["engine"] = json!("Imagine Rust");
+@@ -606,7 +607,7 @@ pub fn model_metadata(mut value: Value, backend: &str) -> Value {
+             "Selected inference components validated; server integration validation is separate"
+         );
+     }
+-    if backend != "rust" && model == Some(contract::MOSS) {
++    if backend != "rust" && matches!(model, Some(contract::BF16 | contract::MOSS)) {
+         value["availability"] = json!("requires_rust_backend");
+         value["available"] = json!(false);
+         value["problem"] = json!("requires_rust_backend");
+diff --git a/src/contract.rs b/src/contract.rs
+index 2d0bba3..19ffee5 100644
+--- a/src/contract.rs
++++ b/src/contract.rs
+@@ -4,6 +4,7 @@ use serde_json::{Value, json};
+ 
+ pub const MOSS: &str = "moss-image-sft-int8";
+ pub const MODEL: &str = "qwen-image-2.1-int8";
++pub const BF16: &str = "qwen-image-2.1-bf16";
+ pub const TURBO: &str = "qwen-image-2.1-turbo";
+ pub const MCP_PROFILE: &str = "qwen-image21-workflow-v1";
+ pub const MAX_SEED: u64 = 9_007_199_254_740_991;
+@@ -189,7 +190,7 @@ impl JobRequest {
+         if self.model == "minimax-h3" {
+             return Err("model_not_validated");
+         }
+-        if self.model != MODEL && self.model != TURBO && self.model != MOSS {
++        if !matches!(self.model.as_str(), MODEL | BF16 | TURBO | MOSS) {
+             return Err("unknown_model");
+         }
+         if !matches!(
+@@ -316,7 +317,7 @@ impl JobRequest {
+         {
+             return Err("unsupported_sampling");
+         }
+-        if self.model == TURBO && workflow.is_none() {
++        if matches!(self.model.as_str(), BF16 | TURBO) && workflow.is_none() {
+             return Err("workflow_settings_required");
+         }
+         if let Some(w) = workflow {
+@@ -333,6 +334,8 @@ impl JobRequest {
+                 "moss_image_sft_int8_convrot.safetensors"
+             } else if self.model == TURBO {
+                 "qwen_image_2.1_turbo_bf16.safetensors"
++            } else if self.model == BF16 {
++                "qwen_image_2.1_bf16.safetensors"
+             } else {
+                 "qwen_image_2.1_int8_convrot.safetensors"
+             };
+@@ -426,10 +429,22 @@ impl JobRequest {
+ }
+ 
+ pub fn models() -> Value {
+-    json!({"models":[model(MODEL).unwrap(), model(TURBO).unwrap(), model(MOSS).unwrap(), model("minimax-h3").unwrap()]})
++    json!({"models":[model(MODEL).unwrap(), model(TURBO).unwrap(), model(MOSS).unwrap(), model(BF16).unwrap(), model("minimax-h3").unwrap()]})
+ }
+ pub fn model(id: &str) -> Option<Value> {
+     match id {
++        BF16 => {
++            let mut v = model(MODEL)?;
++            v["id"] = json!(BF16);
++            v["engine"] = json!("Imagine Rust");
++            v["availability"] = json!("requires_rust_backend_and_weights");
++            v["profile_revision"] = json!(MCP_PROFILE);
++            v["constraints"]["loras"] = json!(true);
++            v["constraints"]["samplers"] = json!(["er_sde", "euler"]);
++            v["constraints"]["schedulers"] = json!(["beta", "simple"]);
++            v["constraints"]["validated_resolutions"] = json!([]);
++            Some(v)
++        }
+         MOSS => {
+             let mut v = model(MODEL)?;
+             v["id"] = json!(MOSS);
+diff --git a/src/engine.rs b/src/engine.rs
+index 0f1fef3..6cc6491 100644
+--- a/src/engine.rs
++++ b/src/engine.rs
+@@ -579,7 +579,7 @@ pub fn validate_selection(
+     model: &str,
+     sampling: &crate::contract::Sampling,
+ ) -> Result<()> {
+-    if model == crate::contract::MOSS && backend != "rust" {
++    if matches!(model, crate::contract::BF16 | crate::contract::MOSS) && backend != "rust" {
+         bail!(EngineError("unsupported_model"))
+     }
+     if backend == "rust"
+diff --git a/src/model_adapter.rs b/src/model_adapter.rs
+index 8fb3c99..9a087e7 100644
+--- a/src/model_adapter.rs
++++ b/src/model_adapter.rs
+@@ -1,7 +1,7 @@
+ //! Explicit operation support and Qwen-specific prompt/reference mapping.
+ use crate::{
+     character_sheet::CharacterSheet,
+-    contract::{JobRequest, MAX_SEED, MODEL},
++    contract::{BF16, JobRequest, MAX_SEED, MODEL},
+ };
+ use serde_json::{Value, json};
+ 
+@@ -15,7 +15,7 @@ pub enum SheetStrategy {
+ }
+ pub fn sheet_strategy(model: &str) -> Result<SheetStrategy, &'static str> {
+     match model {
+-        MODEL => Ok(SheetStrategy::QwenTwoPass),
++        MODEL | BF16 => Ok(SheetStrategy::QwenTwoPass),
+         _ => Err("unsupported_character_sheet_model"),
+     }
+ }
+diff --git a/src/model_library.rs b/src/model_library.rs
+index 7074aee..85b1939 100644
+--- a/src/model_library.rs
++++ b/src/model_library.rs
+@@ -18,6 +18,7 @@ use std::{
+ mod types;
+ pub use types::*;
+ const DIFFUSION: &str = "qwen_image_2.1_int8_convrot.safetensors";
++const BF16_DIFFUSION: &str = "qwen_image_2.1_bf16.safetensors";
+ const TURBO_DIFFUSION: &str = "qwen_image_2.1_turbo_bf16.safetensors";
+ const ENCODER: &str = "qwen3vl_8b_int8_convrot.safetensors";
+ const VAE: &str = "qwen_image_2.1_vae_bf16.safetensors";
+@@ -122,6 +123,8 @@ impl Library {
+                     "MOSS Image · SFT INT8"
+                 } else if model == contract::TURBO {
+                     "Qwen Image 2.1 · Turbo"
++                } else if model == contract::BF16 {
++                    "Qwen Image 2.1 · BF16"
+                 } else {
+                     "Qwen Image 2.1 · INT8"
+                 });
+@@ -406,7 +409,12 @@ pub fn model_metadata(model: &str) -> Value {
+             .remove("moss_image");
+         return v;
+     }
+-    let mut meta = contract::model(contract::MODEL).unwrap();
++    let mut meta = contract::model(if model == contract::BF16 {
++        contract::BF16
++    } else {
++        contract::MODEL
++    })
++    .unwrap();
+     meta["id"] = json!(model);
+     meta["constraints"]["loras"] = json!(true);
+     // Library selection resolves a workflow, whose validation accepts these choices.
+@@ -476,6 +484,7 @@ fn scan_dir(
+         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+         let model = match (kind, name) {
+             ("diffusion_models", DIFFUSION) => Some(contract::MODEL.into()),
++            ("diffusion_models", BF16_DIFFUSION) => Some(contract::BF16.into()),
+             ("diffusion_models", TURBO_DIFFUSION) => Some(contract::TURBO.into()),
+             ("diffusion_models", "moss_image_sft_int8_convrot.safetensors") => {
+                 Some(contract::MOSS.into())
+diff --git a/src/model_library_tests.rs b/src/model_library_tests.rs
+index 7ba5043..2f76415 100644
+--- a/src/model_library_tests.rs
++++ b/src/model_library_tests.rs
+@@ -24,6 +24,49 @@ fn request(library: &Library, loras: Value) -> Value {
+     json!({"model":contract::MODEL,"operation":"text_to_image","prompt":"Synthetic test","model_selection":{"diffusion":id(library,DIFFUSION),"loras":loras}})
+ }
+ #[test]
++fn bf16_selection_retains_precision_loras_and_backend_admission() {
++    let (dir, mut library) = setup();
++    fixture::write(
++        &dir.path().join("models"),
++        &format!("diffusion_models/nested/{BF16_DIFFUSION}"),
++        json!({"txt_in.text_norm.weight":fixture::tensor(&[4096]),"img_in.weight":fixture::tensor(&[4096,64])}),
++    );
++    library.scan().unwrap();
++    let snapshot = library.snapshot();
++    let model = snapshot
++        .models
++        .iter()
++        .find(|m| m["model"] == contract::BF16)
++        .unwrap();
++    assert_eq!(model["group"], QWEN_GROUP);
++    assert_eq!(model["name"], "Qwen Image 2.1 · BF16");
++    assert_eq!(model["available"], true);
++    assert_eq!(
++        model["defaults"]["sampling"],
++        json!(contract::Sampling::default())
++    );
++    let value = json!({"model":contract::BF16,"operation":"text_to_image","prompt":"Synthetic BF16 control",
++        "model_selection":{"diffusion":model["id"],"loras":[{"id":id(&library,"style.safetensors"),"strength":0.65}]}});
++    let (resolved, _) = library.prepare(value).unwrap();
++    let typed: contract::JobRequest = serde_json::from_value(resolved).unwrap();
++    typed.validate().unwrap();
++    let workflow = typed.model_options.generation(&typed.model).unwrap();
++    assert!(workflow.diffusion_model.ends_with(BF16_DIFFUSION));
++    assert_eq!(workflow.loras[0].strength, 0.65);
++    assert!(!workflow.zero_negative_conditioning);
++    crate::engine::validate_selection("rust", &typed.model, &typed.sampling).unwrap();
++    for backend in ["native", "comfy"] {
++        assert!(crate::engine::validate_selection(backend, &typed.model, &typed.sampling).is_err());
++        assert_eq!(
++            crate::comfy_engine::model_metadata(model.clone(), backend)["available"],
++            false
++        );
++    }
++    let mut mismatched = typed;
++    mismatched.model = contract::MODEL.into();
++    assert_eq!(mismatched.validate(), Err("model_settings_mismatch"));
++}
++#[test]
+ fn discovery_uses_recursive_comfy_paths_aliases_and_bounded_headers() {
+     let (dir, mut library) = setup();
+     let root = dir.path().join("models");
+diff --git a/ui/src/model_ui_tests.rs b/ui/src/model_ui_tests.rs
+index adefe95..164bac1 100644
+--- a/ui/src/model_ui_tests.rs
++++ b/ui/src/model_ui_tests.rs
+@@ -618,3 +618,63 @@ fn moss_model_switch_uses_its_group_defaults_and_preserves_qwen_loras() {
+     assert_eq!(desk.app.prefs.model_group, QWEN_GROUP);
+     assert_eq!(desk.app.prefs.model_groups[QWEN_GROUP].loras, vec![lora]);
+ }
++
++#[test]
++fn bf16_variant_switch_preserves_qwen_loras_and_request_precision() {
++    let mut desk = Desk::new();
++    install(&mut desk);
++    let lora = selected_lora(&desk);
++    desk.app
++        .prefs
++        .model_groups
++        .get_mut(QWEN_GROUP)
++        .unwrap()
++        .loras = vec![lora.clone()];
++    fixture::write(
++        &desk._root.path().join("models"),
++        "diffusion_models/nested/qwen_image_2.1_bf16.safetensors",
++        json!({"txt_in.text_norm.weight":fixture::tensor(&[4096]),"img_in.weight":fixture::tensor(&[4096,64])}),
++    );
++    let library = catalog(desk._root.path());
++    let bf16 = library
++        .models
++        .iter()
++        .find(|m| m["model"] == imagine_server::contract::BF16)
++        .unwrap()["id"]
++        .as_str()
++        .unwrap()
++        .to_owned();
++    desk.app.accept_library(library);
++    desk.app.select_model(bf16);
++    assert_eq!(desk.app.prefs.model_group, QWEN_GROUP);
++    assert_eq!(desk.app.prefs.model_groups[QWEN_GROUP].loras, vec![lora]);
++    let meta = desk.app.metadata.as_ref().unwrap();
++    let mut request = client::make_request(
++        "Synthetic BF16 control",
++        "",
++        &[],
++        meta,
++        &desk.app.prefs.generation,
++    )
++    .unwrap();
++    assert_eq!(request["model"], imagine_server::contract::BF16);
++    assert_eq!(request["sampling"]["steps"], 40);
++    assert_eq!(request["sampling"]["cfg_scale"], 2.5);
++    request["model_selection"] = json!(desk.app.model_selection().unwrap());
++    let lib = imagine_server::model_library::Library::load(
++        desk._root.path().join("models"),
++        desk._root.path().join("synthetic-bf16-library.json"),
++    )
++    .unwrap();
++    let (resolved, _) = lib.prepare(request).unwrap();
++    let typed: imagine_server::contract::JobRequest = serde_json::from_value(resolved).unwrap();
++    typed.validate().unwrap();
++    assert!(
++        typed
++            .model_options
++            .generation(&typed.model)
++            .unwrap()
++            .diffusion_model
++            .ends_with("qwen_image_2.1_bf16.safetensors")
++    );
++}

@@ -210,7 +210,8 @@ impl PipeBackend {
     }
     async fn run(&mut self, request: &ImagePass) -> Result<Vec<u8>> {
         if !(matches!(request.model.as_str(), contract::MODEL | contract::TURBO)
-            || self.rust_runtime.is_some() && request.model == contract::MOSS)
+            || self.rust_runtime.is_some()
+                && matches!(request.model.as_str(), contract::BF16 | contract::MOSS))
         {
             bail!(EngineError("unsupported_model"));
         }
@@ -584,7 +585,7 @@ pub fn model_metadata(mut value: Value, backend: &str) -> Value {
     if backend == "rust"
         && matches!(
             model,
-            Some(contract::MODEL | contract::TURBO | contract::MOSS)
+            Some(contract::MODEL | contract::BF16 | contract::TURBO | contract::MOSS)
         )
     {
         value["engine"] = json!("Imagine Rust");
@@ -606,7 +607,7 @@ pub fn model_metadata(mut value: Value, backend: &str) -> Value {
             "Selected inference components validated; server integration validation is separate"
         );
     }
-    if backend != "rust" && model == Some(contract::MOSS) {
+    if backend != "rust" && matches!(model, Some(contract::BF16 | contract::MOSS)) {
         value["availability"] = json!("requires_rust_backend");
         value["available"] = json!(false);
         value["problem"] = json!("requires_rust_backend");

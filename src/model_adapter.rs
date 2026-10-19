@@ -1,7 +1,7 @@
 //! Explicit operation support and Qwen-specific prompt/reference mapping.
 use crate::{
     character_sheet::CharacterSheet,
-    contract::{JobRequest, MAX_SEED, MODEL},
+    contract::{BF16, JobRequest, MAX_SEED, MODEL},
 };
 use serde_json::{Value, json};
 
@@ -15,7 +15,7 @@ pub enum SheetStrategy {
 }
 pub fn sheet_strategy(model: &str) -> Result<SheetStrategy, &'static str> {
     match model {
-        MODEL => Ok(SheetStrategy::QwenTwoPass),
+        MODEL | BF16 => Ok(SheetStrategy::QwenTwoPass),
         _ => Err("unsupported_character_sheet_model"),
     }
 }

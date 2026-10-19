@@ -1,0 +1,182 @@
+[
+  {
+    "cuda_memory_after_query": [
+      14281146368,
+      16769744896,
+      0,
+      0
+    ],
+    "event": "free",
+    "phase": "text_initial",
+    "torch": 0,
+    "total": 14281146368
+  },
+  {
+    "cuda_memory_after_query": [
+      14281146368,
+      16769744896,
+      0,
+      0
+    ],
+    "event": "free",
+    "phase": "text_initial",
+    "torch": 0,
+    "total": 14281146368
+  },
+  {
+    "cuda_memory_after_query": [
+      14281146368,
+      16769744896,
+      0,
+      0
+    ],
+    "event": "free",
+    "phase": "text_initial",
+    "torch": 0,
+    "total": 14281146368
+  },
+  {
+    "cuda_memory_after_query": [
+      4849008640,
+      16769744896,
+      9363686400,
+      9422503936
+    ],
+    "event": "free",
+    "phase": "text_positive",
+    "torch": 58817536,
+    "total": 4907826176
+  },
+  {
+    "cuda_memory_after_query": [
+      4849008640,
+      16769744896,
+      9363686400,
+      9422503936
+    ],
+    "event": "free",
+    "phase": "text_positive",
+    "torch": 58817536,
+    "total": 4907826176
+  },
+  {
+    "cuda_memory_after_query": [
+      4849008640,
+      16769744896,
+      9363686400,
+      9422503936
+    ],
+    "event": "free",
+    "phase": "text_positive",
+    "torch": 58817536,
+    "total": 4907826176
+  },
+  {
+    "cuda_memory_after_query": [
+      4490330112,
+      16769744896,
+      9372468224,
+      9770631168
+    ],
+    "event": "free",
+    "phase": "text_negative",
+    "torch": 398162944,
+    "total": 4888493056
+  },
+  {
+    "cuda_memory_after_query": [
+      4490330112,
+      16769744896,
+      9372468224,
+      9770631168
+    ],
+    "event": "free",
+    "phase": "text_negative",
+    "torch": 398162944,
+    "total": 4888493056
+  },
+  {
+    "cuda_memory_after_query": [
+      4490330112,
+      16769744896,
+      9372468224,
+      9770631168
+    ],
+    "event": "free",
+    "phase": "text_negative",
+    "torch": 398162944,
+    "total": 4888493056
+  },
+  {
+    "cuda_memory_after_query": [
+      14205321216,
+      16769744896,
+      8781824,
+      23068672
+    ],
+    "event": "free",
+    "phase": "dit_initial",
+    "torch": 14286848,
+    "total": 14219608064
+  },
+  {
+    "cuda_memory_after_query": [
+      14205321216,
+      16769744896,
+      8781824,
+      23068672
+    ],
+    "event": "free",
+    "phase": "dit_initial",
+    "torch": 14286848,
+    "total": 14219608064
+  },
+  {
+    "cuda_memory_after_query": [
+      14205321216,
+      16769744896,
+      8781824,
+      23068672
+    ],
+    "event": "free",
+    "phase": "dit_initial",
+    "torch": 14286848,
+    "total": 14219608064
+  },
+  {
+    "cuda_memory_after_query": [
+      1366228992,
+      16769744896,
+      12829761536,
+      12874416128
+    ],
+    "event": "free",
+    "phase": "dit_sampling",
+    "torch": 44654592,
+    "total": 1410883584
+  },
+  {
+    "cuda_memory_after_query": [
+      1366228992,
+      16769744896,
+      12829761536,
+      12874416128
+    ],
+    "event": "free",
+    "phase": "dit_sampling",
+    "torch": 44654592,
+    "total": 1410883584
+  },
+  {
+    "cuda_memory_after_query": [
+      1366228992,
+      16769744896,
+      12829761536,
+      12874416128
+    ],
+    "event": "free",
+    "phase": "dit_sampling",
+    "torch": 44654592,
+    "total": 1410883584
+  }
+]

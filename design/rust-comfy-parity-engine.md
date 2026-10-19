@@ -10,6 +10,9 @@ No new deviation or approval was needed for the final continuation.
 
 Stage 2's selected Qwen Image 2.1 vertical path is complete for **INT8 ConvRot,
 BF16 and Turbo**, under Section 15's partial-overall-coverage exit condition.
+The [upgraded-reference follow-up](stage-2-upgraded-followup.md) also completes
+ordinary BF16 server selection and fresh strict automatic BF16/Turbo LoRA
+controls; the earlier reference checkpoint is preserved independently.
 See [the consolidated acceptance report](stage-2-qwen-image21-ready.md),
 [final checkpoint](stage-2-qwen-image21-precision-sampling-checkpoint.json) and
 [chronological Stage 2 report](stage-2-qwen-image21.md). Forty-six current

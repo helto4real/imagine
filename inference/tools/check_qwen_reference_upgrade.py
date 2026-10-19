@@ -6,6 +6,7 @@ p=argparse.ArgumentParser(description=__doc__)
 for name in ['root','site','comfy','model-root','binary']:p.add_argument('--'+name,type=Path,required=True)
 p.add_argument('--prefix',required=True)
 p.add_argument('--variants',nargs='+',choices=['int8','bf16','turbo'],default=['int8','bf16','turbo'])
+p.add_argument('--original-first',action='store_true',help='Diagnostic execution order only; original policy and numerical settings remain unchanged')
 p.add_argument('--replay-python-prefix',help='Separate diagnostic: replay only the saved original DiT placements, never change the automatic default')
 a=p.parse_args()
 assert re.fullmatch('[a-zA-Z0-9_-]+',a.prefix)
@@ -44,6 +45,11 @@ for variant in a.variants:
    '--profile',str(profile),'--memory-observation']),('comparison',['bash','inference/tools/launch_reference.sh','inference/tools/compare_qwen_first_image.py',
    '--site',str(a.site),'--rust',str(rust/'first-image'),'--python',str(reference),
    '--output',str(reports/f'{variant}-comparison.json')])]
+ if a.original_first:
+  assert not a.replay_python_prefix,'Original-first cannot be combined with saved placement replay'
+  commands=[commands[1],commands[0],*commands[2:]]
+ if not a.replay_python_prefix:
+  commands.append(('automatic-acceptance',[sys.executable,'-B',str(project/'inference/tools/check_qwen_automatic_acceptance.py'),'--rust',str(rust/'first-image'),'--original',str(reference),'--comparison',str(reports/f'{variant}-comparison.json'),'--output',str(reports/f'{variant}-acceptance.json')]))
  for label,command in commands:
   if label=='python'and a.replay_python_prefix:continue
   print(variant,label,'started',flush=True)

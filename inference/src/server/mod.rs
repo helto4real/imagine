@@ -108,7 +108,7 @@ pub fn generate(
     if !(moss
         || matches!(
             r.model.as_str(),
-            "qwen-image-2.1-int8" | "qwen-image-2.1-turbo"
+            "qwen-image-2.1-int8" | "qwen-image-2.1-bf16" | "qwen-image-2.1-turbo"
         ))
     {
         return Err(Error::Native("Unsupported model".into()));

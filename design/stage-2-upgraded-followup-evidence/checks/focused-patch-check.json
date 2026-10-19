@@ -1,0 +1,6 @@
+{
+  "baseline": "f6fc1cdb35984a70a12efc86032368c91c8a852e",
+  "check": "git apply --reverse --check against focused source export",
+  "passed": true,
+  "files_modified": false
+}

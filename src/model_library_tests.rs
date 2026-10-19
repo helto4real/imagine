@@ -24,6 +24,49 @@ fn request(library: &Library, loras: Value) -> Value {
     json!({"model":contract::MODEL,"operation":"text_to_image","prompt":"Synthetic test","model_selection":{"diffusion":id(library,DIFFUSION),"loras":loras}})
 }
 #[test]
+fn bf16_selection_retains_precision_loras_and_backend_admission() {
+    let (dir, mut library) = setup();
+    fixture::write(
+        &dir.path().join("models"),
+        &format!("diffusion_models/nested/{BF16_DIFFUSION}"),
+        json!({"txt_in.text_norm.weight":fixture::tensor(&[4096]),"img_in.weight":fixture::tensor(&[4096,64])}),
+    );
+    library.scan().unwrap();
+    let snapshot = library.snapshot();
+    let model = snapshot
+        .models
+        .iter()
+        .find(|m| m["model"] == contract::BF16)
+        .unwrap();
+    assert_eq!(model["group"], QWEN_GROUP);
+    assert_eq!(model["name"], "Qwen Image 2.1 · BF16");
+    assert_eq!(model["available"], true);
+    assert_eq!(
+        model["defaults"]["sampling"],
+        json!(contract::Sampling::default())
+    );
+    let value = json!({"model":contract::BF16,"operation":"text_to_image","prompt":"Synthetic BF16 control",
+        "model_selection":{"diffusion":model["id"],"loras":[{"id":id(&library,"style.safetensors"),"strength":0.65}]}});
+    let (resolved, _) = library.prepare(value).unwrap();
+    let typed: contract::JobRequest = serde_json::from_value(resolved).unwrap();
+    typed.validate().unwrap();
+    let workflow = typed.model_options.generation(&typed.model).unwrap();
+    assert!(workflow.diffusion_model.ends_with(BF16_DIFFUSION));
+    assert_eq!(workflow.loras[0].strength, 0.65);
+    assert!(!workflow.zero_negative_conditioning);
+    crate::engine::validate_selection("rust", &typed.model, &typed.sampling).unwrap();
+    for backend in ["native", "comfy"] {
+        assert!(crate::engine::validate_selection(backend, &typed.model, &typed.sampling).is_err());
+        assert_eq!(
+            crate::comfy_engine::model_metadata(model.clone(), backend)["available"],
+            false
+        );
+    }
+    let mut mismatched = typed;
+    mismatched.model = contract::MODEL.into();
+    assert_eq!(mismatched.validate(), Err("model_settings_mismatch"));
+}
+#[test]
 fn discovery_uses_recursive_comfy_paths_aliases_and_bounded_headers() {
     let (dir, mut library) = setup();
     let root = dir.path().join("models");

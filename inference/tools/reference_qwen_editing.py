@@ -24,7 +24,7 @@ p.add_argument('--profile', type=Path, help='One of the registered development c
 a = p.parse_args()
 project = Path(__file__).resolve().parents[2]
 profile = json.loads((a.profile or project / 'inference/profiles/qwen21-first-int8.json').read_text())
-assert profile in [json.loads((project / 'inference/profiles' / n).read_text()) for n in ('qwen21-first-int8.json', 'qwen21-1600x896-int8.json', 'qwen21-1600x896-40steps-int8.json', 'qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8-seed3061383787.json','qwen21-lora-int8.json','qwen21-lora-bf16.json','qwen21-lora-turbo.json','qwen21-lora-text-int8.json','qwen21-lora-stack-int8.json','qwen21-lora-portrait-1600-int8.json','qwen21-lora-int8-bf16-encoder.json','qwen21-lora-bf16-bf16-encoder.json','qwen21-lora-turbo-bf16-encoder.json','qwen21-cfg-er-sde-int8.json','qwen21-cfg-er-sde-bf16.json','qwen21-cfg-er-sde-turbo.json','qwen21-tiled-int8.json','qwen-server-int8.json','qwen-server-turbo.json','qwen-server-t2i-int8.json','qwen-server-t2i-empty-negative-int8.json')], 'Unregistered comparison profile'
+assert profile in [json.loads((project / 'inference/profiles' / n).read_text()) for n in ('qwen21-first-int8.json', 'qwen21-1600x896-int8.json', 'qwen21-1600x896-40steps-int8.json', 'qwen21-1600x896-40steps-bf16.json','qwen21-1600x896-40steps-bf16-offload.json','qwen21-1600x896-8steps-turbo-offload.json','qwen21-editing-int8.json','qwen21-editing-bf16.json','qwen21-editing-turbo.json','qwen21-editing-int8-two-references.json','qwen21-editing-int8-keep-vision.json','qwen21-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8.json','qwen21-editing-portrait-1mpx-int8-seed3061383787.json','qwen21-lora-int8.json','qwen21-lora-bf16.json','qwen21-lora-turbo.json','qwen21-lora-text-int8.json','qwen21-lora-stack-int8.json','qwen21-lora-portrait-1600-int8.json','qwen21-lora-int8-bf16-encoder.json','qwen21-lora-bf16-bf16-encoder.json','qwen21-lora-turbo-bf16-encoder.json','qwen21-cfg-er-sde-int8.json','qwen21-cfg-er-sde-bf16.json','qwen21-cfg-er-sde-turbo.json','qwen21-tiled-int8.json','qwen-server-int8.json','qwen-server-bf16.json','qwen-server-turbo.json','qwen-server-t2i-int8.json','qwen-server-t2i-empty-negative-int8.json')], 'Unregistered comparison profile'
 manifest = json.loads((reference_dir(project)/'source-manifest.json').read_text())
 frozen = {str(a.comfy / x['path']): x['sha256'] for x in manifest if x['root'] == 'comfy'}
 paths = {k: a.model_root / v for k, v in profile['checkpoints'].items()}
@@ -84,15 +84,19 @@ if a.memory_observation:
     original_free_memory=mm.get_free_memory
     def observed_free_memory(dev=None,torch_free_too=False):
         value=original_free_memory(dev,torch_free_too)
-        if memory_phase.startswith('text_')and(dev is None or dev.type!='cpu'):
-            memory_events.append(dict(phase=memory_phase,event='free',total=value[0]if torch_free_too else value,torch=value[1]if torch_free_too else None))
+        if memory_phase!='other'and(dev is None or dev.type!='cpu'):
+            stats=torch.cuda.memory_stats(dev)
+            memory_events.append(dict(phase=memory_phase,event='free',total=value[0]if torch_free_too else value,torch=value[1]if torch_free_too else None,active=stats['active_bytes.all.current'],reserved=stats['reserved_bytes.all.current']))
         return value
     mm.get_free_memory=observed_free_memory
     original_empty_cache=mm.soft_empty_cache
     def observed_empty_cache(*args,**kwargs):
-        if memory_phase.startswith('text_'):memory_events.append(dict(phase=memory_phase,event='empty_cache'))
+        if memory_phase!='other':memory_events.append(dict(phase=memory_phase,event='empty_cache'))
         return original_empty_cache(*args,**kwargs)
     mm.soft_empty_cache=observed_empty_cache
+    memory_phase='startup'
+    mm.get_free_memory(dev,torch_free_too=True)
+    memory_phase='other'
 timings = {}
 shapes = {}
 
@@ -274,7 +278,9 @@ with torch.inference_mode()if profile['source_configuration'].get('inference_mod
     def record_detach(owner,unpatch_all):
         if unpatch_all: memory_record('dit_unloaded',owner)
     model.add_callback(CallbacksMP.ON_DETACH,record_detach)
+    memory_phase='dit_initial'
     mm.load_models_gpu([model], force_full_load=profile['source_configuration']['force_full_load_per_component'])
+    memory_phase='other'
     timings['dit_load'] = elapsed(start)
     memory_record('dit_initial', model)
     step_seconds = []
@@ -305,8 +311,10 @@ with torch.inference_mode()if profile['source_configuration'].get('inference_mod
         comfy.samplers.calculate_sigmas=observed_schedule
     if custom_sigmas is not None:
         save('sigmas', custom_sigmas)
+    memory_phase='dit_sampling'
     latent = sample.sample(model, noise, profile['steps'], profile['cfg'], profile['sampler'], profile['scheduler'],
         conditioning, negative, zero, sigmas=custom_sigmas, callback=callback, disable_pbar=True, seed=profile['seed'])
+    memory_phase='other'
     timings['sampling'] = elapsed(start)
     memory_record('dit_sampling', model)
     save('latent', latent)

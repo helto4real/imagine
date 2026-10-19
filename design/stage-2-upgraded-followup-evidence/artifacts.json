@@ -1,0 +1,922 @@
+[
+  {
+    "file": ".gitignore",
+    "bytes": 63,
+    "sha256": "3382e3f384ae8076102e52f348cdd2f150620a2328e1d7718f3f9db0f0649688"
+  },
+  {
+    "file": "README.md",
+    "bytes": 4199,
+    "sha256": "db55e65f69d7d067522b0b1b55d2a3a6eed892f71cc4a34f426711534a73f625"
+  },
+  {
+    "file": "accepted-bf16/acceptance.json",
+    "bytes": 822,
+    "sha256": "b646ded185ed4842bd2535c7e07cc3cd327d4e889bd16faba4845e1697ee51b3"
+  },
+  {
+    "file": "accepted-bf16/comparison.json",
+    "bytes": 179488,
+    "sha256": "5fc3026b4411c6a205faff8fb86370d9b06bf19230e14676cbeaf74d7179a283"
+  },
+  {
+    "file": "accepted-bf16/isolation.json",
+    "bytes": 15080,
+    "sha256": "1acd22e48105d15b40a8f44f8ff99ca897ca92536e98a21d7986c2b01da2a132"
+  },
+  {
+    "file": "accepted-bf16/python/component-memory.json",
+    "bytes": 157929,
+    "sha256": "457212f8fca3a1db5c4716cf1c55474ac078f1fd0a56d0dd21ed2f4155762814"
+  },
+  {
+    "file": "accepted-bf16/python/conditioning.json",
+    "bytes": 207,
+    "sha256": "3e10947f0f308fdf474994f20ad9ac0f59d09113be72a4a3b57bfc1426d99858"
+  },
+  {
+    "file": "accepted-bf16/python/context-f32.bin",
+    "bytes": 507904,
+    "sha256": "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+  },
+  {
+    "file": "accepted-bf16/python/image-rgba-f32.bin",
+    "bytes": 1146880,
+    "sha256": "5b7bc1018cc9bc664757ed04a99ed81ece4a8329a41c5600ff80bf22a8b87e26"
+  },
+  {
+    "file": "accepted-bf16/python/image.png",
+    "bytes": 98515,
+    "sha256": "411df8d38e39781fcef7f54651cf56c01997777aa2ee6d9bc7e3537a4fe778e9"
+  },
+  {
+    "file": "accepted-bf16/python/latent-f32.bin",
+    "bytes": 71680,
+    "sha256": "54d95f85bbdd94cc89d1c164955b8eeef4ff9ab74cec09a3181f150a515e507b"
+  },
+  {
+    "file": "accepted-bf16/python/lora-dit.json",
+    "bytes": 29511,
+    "sha256": "284d11f3e4d6daabea412a22efbbe22d69d0bcb89fef530db453e4d5fd9d7be3"
+  },
+  {
+    "file": "accepted-bf16/python/lora-text.json",
+    "bytes": 3,
+    "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+  },
+  {
+    "file": "accepted-bf16/python/memory-policy.json",
+    "bytes": 29000,
+    "sha256": "8b398e8f7c0d8a9cfd3d2dc977a750a11fcd87cfbf0a321ad01038d1c1878756"
+  },
+  {
+    "file": "accepted-bf16/python/memory-services.json",
+    "bytes": 3382,
+    "sha256": "94182c52e2d8d0bfdfcf5b4922d64d20db08b8badcb637a7c13077b08a3b4d9e"
+  },
+  {
+    "file": "accepted-bf16/python/negative-context-f32.bin",
+    "bytes": 507904,
+    "sha256": "130a9d402de2838ac2096cd943b9df9f7df3ca6826129c80b2601ae04191def7"
+  },
+  {
+    "file": "accepted-bf16/python/reference-latent-0-f32.bin",
+    "bytes": 71680,
+    "sha256": "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+  },
+  {
+    "file": "accepted-bf16/python/reference-vision-0-f32.bin",
+    "bytes": 860160,
+    "sha256": "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+  },
+  {
+    "file": "accepted-bf16/python/result.json",
+    "bytes": 32402,
+    "sha256": "92adec2fb6fe6697df348856aa91e801ebd50f2f3e671ee259fe733cda42aedd"
+  },
+  {
+    "file": "accepted-bf16/python/sampler-dit_initial-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-bf16/python/sampler-dit_sampling-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-bf16/python/sampler-dit_unloaded-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-bf16/python/sigmas-f32.bin",
+    "bytes": 20,
+    "sha256": "e1b9e1d2e1cba3302da1aadb1daad1c496aa5b0b55b990b095a80aeef6160a5d"
+  },
+  {
+    "file": "accepted-bf16/rust/conditioning.json",
+    "bytes": 206,
+    "sha256": "f9b18885e9173ffc899403e7b5c1234c6006724ccc0b7190a754de96eac87847"
+  },
+  {
+    "file": "accepted-bf16/rust/context-f32.bin",
+    "bytes": 507904,
+    "sha256": "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+  },
+  {
+    "file": "accepted-bf16/rust/image-rgba-f32.bin",
+    "bytes": 1146880,
+    "sha256": "5b7bc1018cc9bc664757ed04a99ed81ece4a8329a41c5600ff80bf22a8b87e26"
+  },
+  {
+    "file": "accepted-bf16/rust/image.png",
+    "bytes": 154959,
+    "sha256": "9963b2c1889abb98fc63a54b08b044305a50f96f6878f3ed852801c059c04ce3"
+  },
+  {
+    "file": "accepted-bf16/rust/latent-f32.bin",
+    "bytes": 71680,
+    "sha256": "54d95f85bbdd94cc89d1c164955b8eeef4ff9ab74cec09a3181f150a515e507b"
+  },
+  {
+    "file": "accepted-bf16/rust/lora-dit.json",
+    "bytes": 29510,
+    "sha256": "68ed8ab3a7b6f3102577bc6aa6607b1cfee50891854787215e8fbeab488b3a4e"
+  },
+  {
+    "file": "accepted-bf16/rust/lora-text.json",
+    "bytes": 2,
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "file": "accepted-bf16/rust/memory-manager.json",
+    "bytes": 189882,
+    "sha256": "e669daa3ead7ae745922cedbd07ebcef5eee2ae9818e7cdeae87ed02e5912cf2"
+  },
+  {
+    "file": "accepted-bf16/rust/memory-policy.json",
+    "bytes": 30426,
+    "sha256": "c90532b65fb6e0be20eb42b509d21c54c5712731737450fc161a1105c3a53b36"
+  },
+  {
+    "file": "accepted-bf16/rust/memory-services.json",
+    "bytes": 3206,
+    "sha256": "be31810e47c7d98dea3e81b1ead76f4b3158fe0474985d2588d727da72cb0788"
+  },
+  {
+    "file": "accepted-bf16/rust/negative-context-f32.bin",
+    "bytes": 507904,
+    "sha256": "130a9d402de2838ac2096cd943b9df9f7df3ca6826129c80b2601ae04191def7"
+  },
+  {
+    "file": "accepted-bf16/rust/reference-latent-0-f32.bin",
+    "bytes": 71680,
+    "sha256": "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+  },
+  {
+    "file": "accepted-bf16/rust/reference-vision-0-f32.bin",
+    "bytes": 860160,
+    "sha256": "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+  },
+  {
+    "file": "accepted-bf16/rust/result.json",
+    "bytes": 2663,
+    "sha256": "84cb8ccd58f982883852e570d3559f5e4b81a65e2b392185fa25350c555b1f7a"
+  },
+  {
+    "file": "accepted-bf16/rust/sampler-dit_initial-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-bf16/rust/sampler-dit_sampling-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-bf16/rust/sampler-dit_unloaded-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-bf16/rust/sigmas-f32.bin",
+    "bytes": 20,
+    "sha256": "e1b9e1d2e1cba3302da1aadb1daad1c496aa5b0b55b990b095a80aeef6160a5d"
+  },
+  {
+    "file": "accepted-turbo/acceptance.json",
+    "bytes": 828,
+    "sha256": "9a0b1b1cb35f1d796a1b556b2e0da32477f36f9d31bb381a69c83254b95f56ef"
+  },
+  {
+    "file": "accepted-turbo/comparison.json",
+    "bytes": 179492,
+    "sha256": "c90f39eeadb6070bb7cd1f576c4234bc9167ac638eed614513c721656130bd08"
+  },
+  {
+    "file": "accepted-turbo/isolation.json",
+    "bytes": 15092,
+    "sha256": "139f95e62a18c998ea3b91ad3d7f7704500012eccecd2957aeeac783cfd08bf2"
+  },
+  {
+    "file": "accepted-turbo/python/component-memory.json",
+    "bytes": 157929,
+    "sha256": "457212f8fca3a1db5c4716cf1c55474ac078f1fd0a56d0dd21ed2f4155762814"
+  },
+  {
+    "file": "accepted-turbo/python/conditioning.json",
+    "bytes": 207,
+    "sha256": "3e10947f0f308fdf474994f20ad9ac0f59d09113be72a4a3b57bfc1426d99858"
+  },
+  {
+    "file": "accepted-turbo/python/context-f32.bin",
+    "bytes": 507904,
+    "sha256": "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+  },
+  {
+    "file": "accepted-turbo/python/image-rgba-f32.bin",
+    "bytes": 1146880,
+    "sha256": "ff53f46ac704f80e6effb5d59a660d34aab4d97c33e7172c2b76deed3ee23189"
+  },
+  {
+    "file": "accepted-turbo/python/image.png",
+    "bytes": 101563,
+    "sha256": "b7ec8375ad8f5978b02c7c6c6ee24d388a60291e00cde615b1b6fa4ede4723e0"
+  },
+  {
+    "file": "accepted-turbo/python/latent-f32.bin",
+    "bytes": 71680,
+    "sha256": "7a83c04fe15cac919f9d672cc548999d7f630bdb3868e366a5deb7301e8846be"
+  },
+  {
+    "file": "accepted-turbo/python/lora-dit.json",
+    "bytes": 29511,
+    "sha256": "284d11f3e4d6daabea412a22efbbe22d69d0bcb89fef530db453e4d5fd9d7be3"
+  },
+  {
+    "file": "accepted-turbo/python/lora-text.json",
+    "bytes": 3,
+    "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+  },
+  {
+    "file": "accepted-turbo/python/memory-policy.json",
+    "bytes": 29072,
+    "sha256": "dfd779f4f231d561a87f2b04653d43609fc9c0ab094f4e14b67b6b732f0c95e9"
+  },
+  {
+    "file": "accepted-turbo/python/memory-services.json",
+    "bytes": 4014,
+    "sha256": "de0f76db84730453df3635a9bc571ba9277d07e8de0514f6ca3f9005ea504cfb"
+  },
+  {
+    "file": "accepted-turbo/python/negative-context-f32.bin",
+    "bytes": 507904,
+    "sha256": "130a9d402de2838ac2096cd943b9df9f7df3ca6826129c80b2601ae04191def7"
+  },
+  {
+    "file": "accepted-turbo/python/reference-latent-0-f32.bin",
+    "bytes": 71680,
+    "sha256": "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+  },
+  {
+    "file": "accepted-turbo/python/reference-vision-0-f32.bin",
+    "bytes": 860160,
+    "sha256": "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+  },
+  {
+    "file": "accepted-turbo/python/result.json",
+    "bytes": 32510,
+    "sha256": "c76c66518a5d5a55b1194c8ef56615103568f8a6b6c74690debcde203c3ef86b"
+  },
+  {
+    "file": "accepted-turbo/python/sampler-dit_initial-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-turbo/python/sampler-dit_sampling-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-turbo/python/sampler-dit_unloaded-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-turbo/python/sigmas-f32.bin",
+    "bytes": 36,
+    "sha256": "d32b26e5149ac597d3e337fc0864efebaf842fdd0d26dd61da16dc44527614e9"
+  },
+  {
+    "file": "accepted-turbo/rust/conditioning.json",
+    "bytes": 206,
+    "sha256": "f9b18885e9173ffc899403e7b5c1234c6006724ccc0b7190a754de96eac87847"
+  },
+  {
+    "file": "accepted-turbo/rust/context-f32.bin",
+    "bytes": 507904,
+    "sha256": "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+  },
+  {
+    "file": "accepted-turbo/rust/image-rgba-f32.bin",
+    "bytes": 1146880,
+    "sha256": "ff53f46ac704f80e6effb5d59a660d34aab4d97c33e7172c2b76deed3ee23189"
+  },
+  {
+    "file": "accepted-turbo/rust/image.png",
+    "bytes": 150477,
+    "sha256": "24e14050f18ed3d03ccd09a7631d4a36042df3d34d7f861a9dd3621c9fb651f3"
+  },
+  {
+    "file": "accepted-turbo/rust/latent-f32.bin",
+    "bytes": 71680,
+    "sha256": "7a83c04fe15cac919f9d672cc548999d7f630bdb3868e366a5deb7301e8846be"
+  },
+  {
+    "file": "accepted-turbo/rust/lora-dit.json",
+    "bytes": 29510,
+    "sha256": "68ed8ab3a7b6f3102577bc6aa6607b1cfee50891854787215e8fbeab488b3a4e"
+  },
+  {
+    "file": "accepted-turbo/rust/lora-text.json",
+    "bytes": 2,
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "file": "accepted-turbo/rust/memory-manager.json",
+    "bytes": 189882,
+    "sha256": "8bf0aee931fb3ba69e92af8d98a70c29878abb0444ed016d932970bde68b76f4"
+  },
+  {
+    "file": "accepted-turbo/rust/memory-policy.json",
+    "bytes": 30498,
+    "sha256": "abb82db6b3a6cf3498cc94246e5ed39a2b5361f3f8784afd23f5f1e7c07ae4bd"
+  },
+  {
+    "file": "accepted-turbo/rust/memory-services.json",
+    "bytes": 3206,
+    "sha256": "2b7f041dcff127906d46f632215ebeda96b5846bb5703d2ffb4314361b7974e0"
+  },
+  {
+    "file": "accepted-turbo/rust/negative-context-f32.bin",
+    "bytes": 507904,
+    "sha256": "130a9d402de2838ac2096cd943b9df9f7df3ca6826129c80b2601ae04191def7"
+  },
+  {
+    "file": "accepted-turbo/rust/reference-latent-0-f32.bin",
+    "bytes": 71680,
+    "sha256": "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+  },
+  {
+    "file": "accepted-turbo/rust/reference-vision-0-f32.bin",
+    "bytes": 860160,
+    "sha256": "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+  },
+  {
+    "file": "accepted-turbo/rust/result.json",
+    "bytes": 2674,
+    "sha256": "67ae8b32337b199bcf31bc2d9c9bfac365ffe01d92be60152d22f4dabb7be0dc"
+  },
+  {
+    "file": "accepted-turbo/rust/sampler-dit_initial-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-turbo/rust/sampler-dit_sampling-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-turbo/rust/sampler-dit_unloaded-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "accepted-turbo/rust/sigmas-f32.bin",
+    "bytes": 36,
+    "sha256": "d32b26e5149ac597d3e337fc0864efebaf842fdd0d26dd61da16dc44527614e9"
+  },
+  {
+    "file": "aggregate-idle-gpu.json",
+    "bytes": 1820,
+    "sha256": "d088d211d61f441ff8b45c2c6a833afd500320aaadd5189eee19b33eb15116c2"
+  },
+  {
+    "file": "bf16-http/python/component-memory.json",
+    "bytes": 157929,
+    "sha256": "457212f8fca3a1db5c4716cf1c55474ac078f1fd0a56d0dd21ed2f4155762814"
+  },
+  {
+    "file": "bf16-http/python/conditioning.json",
+    "bytes": 207,
+    "sha256": "3e10947f0f308fdf474994f20ad9ac0f59d09113be72a4a3b57bfc1426d99858"
+  },
+  {
+    "file": "bf16-http/python/image.png",
+    "bytes": 89755,
+    "sha256": "b06477099085e8e00c8cfbbe3a14438ce90607485cea4ec14900e8eb6d6e515f"
+  },
+  {
+    "file": "bf16-http/python/memory-policy.json",
+    "bytes": 29046,
+    "sha256": "14d88eff2e61a0f7eb5e1a7500ca830c04dab67615df284438956169ac84ce3e"
+  },
+  {
+    "file": "bf16-http/python/memory-services.json",
+    "bytes": 3379,
+    "sha256": "cc626b255aa1e8c0f0318e005c77459f7718cbd63dae2536e6568ee01bb164e4"
+  },
+  {
+    "file": "bf16-http/python/result.json",
+    "bytes": 32193,
+    "sha256": "3cf425b959deb173b81636781d853241513f1d103894e4d96069fee1b35a677e"
+  },
+  {
+    "file": "bf16-http/rust/image.png",
+    "bytes": 98817,
+    "sha256": "1e706f141c8af590008f0a587f24c6369a4507f476375275f6a739f0cecf9dd6"
+  },
+  {
+    "file": "bf16-http/rust/result.json",
+    "bytes": 804,
+    "sha256": "36d2ee3a97ac75d1fccedca932f331c3c6bd226f934bc2ad330620bb59f4446b"
+  },
+  {
+    "file": "checks/baseline-index-socket-denial.log",
+    "bytes": 7177,
+    "sha256": "74d336caf2789795ba4d53cc5c74cce8a0107f0ed3fd95fd8558fba4f77c9d92"
+  },
+  {
+    "file": "checks/baseline-index-workspace.log",
+    "bytes": 33292,
+    "sha256": "489c18f9a686cc262e75f780ed02130774a6358ced274cbb964e440060819c53"
+  },
+  {
+    "file": "checks/focused-clippy.log",
+    "bytes": 383,
+    "sha256": "0ef1a54fbab842e91e48277f4f76ecc0d4dc035465d10a84db23ecf675ae2692"
+  },
+  {
+    "file": "checks/focused-patch-check.json",
+    "bytes": 178,
+    "sha256": "c7291289063d133db009a2c69066e7e05539699495d10db4d6c73c4be513ed72"
+  },
+  {
+    "file": "checks/focused-workspace.log",
+    "bytes": 33802,
+    "sha256": "f1e092bea30ff222f900941bc014016662bcde3c1893c16646d4423e7382e458"
+  },
+  {
+    "file": "checks/gate-negative-controls.json",
+    "bytes": 710,
+    "sha256": "7b71ce0db9db8a39fbe7f2518f136d0d04d46875d9bafbd0197879844078fc0f"
+  },
+  {
+    "file": "checks/gate-regression.log",
+    "bytes": 77,
+    "sha256": "744e2e3b03f816ec3fa01ad38f449538ed01d5e4ccc8e8d87a8327fd67b56c99"
+  },
+  {
+    "file": "checks/inference-clippy.log",
+    "bytes": 150,
+    "sha256": "4051ac26adaa2e2e99504c9ddf180a57ad9dba506e207230b8b0423d3282075f"
+  },
+  {
+    "file": "checks/observer-build.log",
+    "bytes": 150,
+    "sha256": "c99b013ee4eb05a2fcc7ab5244724a044cb801c12c648eec31cba976c4896168"
+  },
+  {
+    "file": "checks/preserved-fixture-regression.log",
+    "bytes": 77,
+    "sha256": "744e2e3b03f816ec3fa01ad38f449538ed01d5e4ccc8e8d87a8327fd67b56c99"
+  },
+  {
+    "file": "checks/preserved-turbo-acceptance.json",
+    "bytes": 828,
+    "sha256": "9a0b1b1cb35f1d796a1b556b2e0da32477f36f9d31bb381a69c83254b95f56ef"
+  },
+  {
+    "file": "checks/preserved-turbo-gate.log",
+    "bytes": 686,
+    "sha256": "053ae96f70714b5503bf6c1ba01418b8386d49b8675f99892bb732f5da285111"
+  },
+  {
+    "file": "checks/server-build.log",
+    "bytes": 128,
+    "sha256": "70454e04ea199740adb1a58f37f308ce89e412df71de47b2e5d7e0c8a71b7c88"
+  },
+  {
+    "file": "checks/worker-build.log",
+    "bytes": 2510,
+    "sha256": "027fee161b790164d94dd04d0e03355135533acc7d763c65e832384a0a9252bb"
+  },
+  {
+    "file": "checks/workspace-clippy.log",
+    "bytes": 136,
+    "sha256": "134c94e8492b84bdddf7284d2031082fabbae4b014b0ee467f0ab53b08ec8ec6"
+  },
+  {
+    "file": "checks/workspace.log",
+    "bytes": 34382,
+    "sha256": "fb1a62b7744764629afe5cccbd73c6e19849c9eeba9b5063ee6a63f168823435"
+  },
+  {
+    "file": "deployment.json",
+    "bytes": 2025,
+    "sha256": "c63f9fdde022b01ca126ddf8c0c066e75aa502fe81cd20c35ed5de9172d2633a"
+  },
+  {
+    "file": "focused-source-inputs.json",
+    "bytes": 129937,
+    "sha256": "fba427ac864341ba496ed6676d855060e32f74ccf3301f38e4802ba0b58b4bb9"
+  },
+  {
+    "file": "focused-source.patch",
+    "bytes": 50028,
+    "sha256": "2b8f6b206563054952bd81fd1ab1042926f911cc5b30116f4a0d2ff884a247af"
+  },
+  {
+    "file": "initial-bf16-failure/comparison.json",
+    "bytes": 179611,
+    "sha256": "585fa358e3b2480f5a5ef958f72d974cacaedfbd30e966b91daafd3de6ebacdf"
+  },
+  {
+    "file": "initial-bf16-failure/isolation.json",
+    "bytes": 15080,
+    "sha256": "7f9cef1065c6ad449202e1a00fdafc5c0e9e859a11eb7d3cd002f6cfca3a78fe"
+  },
+  {
+    "file": "initial-bf16-failure/python/component-memory.json",
+    "bytes": 157929,
+    "sha256": "457212f8fca3a1db5c4716cf1c55474ac078f1fd0a56d0dd21ed2f4155762814"
+  },
+  {
+    "file": "initial-bf16-failure/python/conditioning.json",
+    "bytes": 207,
+    "sha256": "3e10947f0f308fdf474994f20ad9ac0f59d09113be72a4a3b57bfc1426d99858"
+  },
+  {
+    "file": "initial-bf16-failure/python/context-f32.bin",
+    "bytes": 507904,
+    "sha256": "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+  },
+  {
+    "file": "initial-bf16-failure/python/image-rgba-f32.bin",
+    "bytes": 1146880,
+    "sha256": "5b7bc1018cc9bc664757ed04a99ed81ece4a8329a41c5600ff80bf22a8b87e26"
+  },
+  {
+    "file": "initial-bf16-failure/python/image.png",
+    "bytes": 98515,
+    "sha256": "411df8d38e39781fcef7f54651cf56c01997777aa2ee6d9bc7e3537a4fe778e9"
+  },
+  {
+    "file": "initial-bf16-failure/python/latent-f32.bin",
+    "bytes": 71680,
+    "sha256": "54d95f85bbdd94cc89d1c164955b8eeef4ff9ab74cec09a3181f150a515e507b"
+  },
+  {
+    "file": "initial-bf16-failure/python/lora-dit.json",
+    "bytes": 29511,
+    "sha256": "284d11f3e4d6daabea412a22efbbe22d69d0bcb89fef530db453e4d5fd9d7be3"
+  },
+  {
+    "file": "initial-bf16-failure/python/lora-text.json",
+    "bytes": 3,
+    "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+  },
+  {
+    "file": "initial-bf16-failure/python/memory-policy.json",
+    "bytes": 29003,
+    "sha256": "acf5e41565a71775cb9736181a9fb9b34bc08d860d79236efde73802385ea2b4"
+  },
+  {
+    "file": "initial-bf16-failure/python/memory-services.json",
+    "bytes": 2168,
+    "sha256": "4c11c6e556f8c7b94d0afecc82b1afde583b42f53b15390de424361f39e42eb1"
+  },
+  {
+    "file": "initial-bf16-failure/python/negative-context-f32.bin",
+    "bytes": 507904,
+    "sha256": "130a9d402de2838ac2096cd943b9df9f7df3ca6826129c80b2601ae04191def7"
+  },
+  {
+    "file": "initial-bf16-failure/python/reference-latent-0-f32.bin",
+    "bytes": 71680,
+    "sha256": "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+  },
+  {
+    "file": "initial-bf16-failure/python/reference-vision-0-f32.bin",
+    "bytes": 860160,
+    "sha256": "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+  },
+  {
+    "file": "initial-bf16-failure/python/result.json",
+    "bytes": 32401,
+    "sha256": "2f05301c00e7b3b70506afe4dd7e01bcd4655f29ae0f9732b7e0e029f9ad5e34"
+  },
+  {
+    "file": "initial-bf16-failure/python/sampler-dit_initial-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "initial-bf16-failure/python/sampler-dit_sampling-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "initial-bf16-failure/python/sampler-dit_unloaded-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "initial-bf16-failure/python/sigmas-f32.bin",
+    "bytes": 20,
+    "sha256": "e1b9e1d2e1cba3302da1aadb1daad1c496aa5b0b55b990b095a80aeef6160a5d"
+  },
+  {
+    "file": "initial-bf16-failure/rust/conditioning.json",
+    "bytes": 206,
+    "sha256": "f9b18885e9173ffc899403e7b5c1234c6006724ccc0b7190a754de96eac87847"
+  },
+  {
+    "file": "initial-bf16-failure/rust/context-f32.bin",
+    "bytes": 507904,
+    "sha256": "697087c8acf0df67d3b0076a01b99e1f6d58c3ecd8fd27889f306dfd9a06df26"
+  },
+  {
+    "file": "initial-bf16-failure/rust/image-rgba-f32.bin",
+    "bytes": 1146880,
+    "sha256": "8acd48d67266bd11d2f190f3acfc9d9ec12e97f24c57c397fea4adb993b0ff4e"
+  },
+  {
+    "file": "initial-bf16-failure/rust/image.png",
+    "bytes": 155860,
+    "sha256": "c8e5e7754d69c48fd10d8ff2069b505aea564d73af579b10b21870d6abbb748b"
+  },
+  {
+    "file": "initial-bf16-failure/rust/latent-f32.bin",
+    "bytes": 71680,
+    "sha256": "c7c8346d18e4b3e5af9130d4b4e67d82c84cf2882287edf47f583aa8df4a4675"
+  },
+  {
+    "file": "initial-bf16-failure/rust/lora-dit.json",
+    "bytes": 29510,
+    "sha256": "68ed8ab3a7b6f3102577bc6aa6607b1cfee50891854787215e8fbeab488b3a4e"
+  },
+  {
+    "file": "initial-bf16-failure/rust/lora-text.json",
+    "bytes": 2,
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "file": "initial-bf16-failure/rust/memory-manager.json",
+    "bytes": 189882,
+    "sha256": "c41d053e13fa4d528a8cdd6f4a042570104e62c4d3bd158b7e01dcf6b1a6b584"
+  },
+  {
+    "file": "initial-bf16-failure/rust/memory-policy.json",
+    "bytes": 30492,
+    "sha256": "e88c62b68076f2356530346486374c7435cb7e7e01a7ca040cacfeb07d7ecb05"
+  },
+  {
+    "file": "initial-bf16-failure/rust/memory-services.json",
+    "bytes": 1583,
+    "sha256": "987a4f811e7f2d230abdd447d6274b394b9622952f61d58c23c722adea364d89"
+  },
+  {
+    "file": "initial-bf16-failure/rust/negative-context-f32.bin",
+    "bytes": 507904,
+    "sha256": "130a9d402de2838ac2096cd943b9df9f7df3ca6826129c80b2601ae04191def7"
+  },
+  {
+    "file": "initial-bf16-failure/rust/reference-latent-0-f32.bin",
+    "bytes": 71680,
+    "sha256": "16880b885a7bdd4bc4ae5d13c1598f0d2a3ddb92be8f79da04ffe213b9789206"
+  },
+  {
+    "file": "initial-bf16-failure/rust/reference-vision-0-f32.bin",
+    "bytes": 860160,
+    "sha256": "917afe5b38676b46d5c8dcb9aa0a2e318fbcf2acaaa89d5e9233a36f35ba8cf8"
+  },
+  {
+    "file": "initial-bf16-failure/rust/result.json",
+    "bytes": 2655,
+    "sha256": "4454042255c8736b0cdf27a44a4893b7d365d572960e36d0441d1a99382c9f27"
+  },
+  {
+    "file": "initial-bf16-failure/rust/sampler-dit_initial-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "initial-bf16-failure/rust/sampler-dit_sampling-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "initial-bf16-failure/rust/sampler-dit_unloaded-f32.bin",
+    "bytes": 40000,
+    "sha256": "77fdc7101e679fbcdf3aeffd40c0b9afb98fd4b49f14bf7d25e2379f807b4266"
+  },
+  {
+    "file": "initial-bf16-failure/rust/sigmas-f32.bin",
+    "bytes": 20,
+    "sha256": "e1b9e1d2e1cba3302da1aadb1daad1c496aa5b0b55b990b095a80aeef6160a5d"
+  },
+  {
+    "file": "source-inputs.json",
+    "bytes": 130098,
+    "sha256": "e2b085c8d28ca8f35399bd5453675995a65b9eab148a8a63835199b20845d648"
+  },
+  {
+    "file": "summary.json",
+    "bytes": 2435,
+    "sha256": "5df96f425afadcb6f986fbfb97dfd5097021be8fbf2c8d5e19d07683a632e558"
+  },
+  {
+    "file": "turbo-first-failure/comparison.json",
+    "bytes": 179608,
+    "sha256": "0ed7a623fa12aed346bc6e2c59c74e154d9bc1cdac52b66742f2f9dfc66fd3ec"
+  },
+  {
+    "file": "turbo-first-failure/isolation.json",
+    "bytes": 15092,
+    "sha256": "139f95e62a18c998ea3b91ad3d7f7704500012eccecd2957aeeac783cfd08bf2"
+  },
+  {
+    "file": "turbo-first-failure/python/component-memory.json",
+    "bytes": 157929,
+    "sha256": "457212f8fca3a1db5c4716cf1c55474ac078f1fd0a56d0dd21ed2f4155762814"
+  },
+  {
+    "file": "turbo-first-failure/python/conditioning.json",
+    "bytes": 207,
+    "sha256": "3e10947f0f308fdf474994f20ad9ac0f59d09113be72a4a3b57bfc1426d99858"
+  },
+  {
+    "file": "turbo-first-failure/python/image.png",
+    "bytes": 101488,
+    "sha256": "724e70e2cd032d2d741fc99fc9505a79a7c261b9b1b27a8359616c315e4de5d8"
+  },
+  {
+    "file": "turbo-first-failure/python/lora-dit.json",
+    "bytes": 29511,
+    "sha256": "284d11f3e4d6daabea412a22efbbe22d69d0bcb89fef530db453e4d5fd9d7be3"
+  },
+  {
+    "file": "turbo-first-failure/python/lora-text.json",
+    "bytes": 3,
+    "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+  },
+  {
+    "file": "turbo-first-failure/python/memory-policy.json",
+    "bytes": 29160,
+    "sha256": "909fbfa13f6104e6413109bd06070949f1b41c92a86bbf950114b1d142636ffe"
+  },
+  {
+    "file": "turbo-first-failure/python/memory-services.json",
+    "bytes": 3855,
+    "sha256": "23ae613da1fb23670a3911b49269128a051bec117e7c74c1c138c0176b943b31"
+  },
+  {
+    "file": "turbo-first-failure/python/result.json",
+    "bytes": 32509,
+    "sha256": "816d76e9cab1c4fa39c510aeecec17dd5f3b84a0a1b9a64fd9baee0952c3f102"
+  },
+  {
+    "file": "turbo-first-failure/rust/conditioning.json",
+    "bytes": 206,
+    "sha256": "f9b18885e9173ffc899403e7b5c1234c6006724ccc0b7190a754de96eac87847"
+  },
+  {
+    "file": "turbo-first-failure/rust/image.png",
+    "bytes": 152227,
+    "sha256": "19b86c9992ef2efdb5207da45322abb886e3861abeca376ddc4756d1d03fe15a"
+  },
+  {
+    "file": "turbo-first-failure/rust/lora-dit.json",
+    "bytes": 29510,
+    "sha256": "68ed8ab3a7b6f3102577bc6aa6607b1cfee50891854787215e8fbeab488b3a4e"
+  },
+  {
+    "file": "turbo-first-failure/rust/lora-text.json",
+    "bytes": 2,
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "file": "turbo-first-failure/rust/memory-manager.json",
+    "bytes": 189882,
+    "sha256": "32d8c8685fe846e1921def5f67de2c1ee50db9a233ac082c59cad96a940d6f7f"
+  },
+  {
+    "file": "turbo-first-failure/rust/memory-policy.json",
+    "bytes": 30492,
+    "sha256": "0d84c7223cd0f8acfd954e9c1aa4b265ad254430ba3b0441d0de0b94b3eeb3e4"
+  },
+  {
+    "file": "turbo-first-failure/rust/memory-services.json",
+    "bytes": 3206,
+    "sha256": "a7bec1248734e3171e4d7a910149f37d4e573bba5d6ea5fe979c661d82e9f249"
+  },
+  {
+    "file": "turbo-first-failure/rust/result.json",
+    "bytes": 2667,
+    "sha256": "7acaee35894fa2e397eb6353312c3c77b952ebe8d05b8270db6511c671e1eeb2"
+  },
+  {
+    "file": "turbo-post-stop-failure/comparison.json",
+    "bytes": 179620,
+    "sha256": "6a9738e05d86110907702a5fd85542ac676e524741aa5370f90181e816966e5e"
+  },
+  {
+    "file": "turbo-post-stop-failure/isolation.json",
+    "bytes": 15092,
+    "sha256": "139f95e62a18c998ea3b91ad3d7f7704500012eccecd2957aeeac783cfd08bf2"
+  },
+  {
+    "file": "turbo-post-stop-failure/python/component-memory.json",
+    "bytes": 157929,
+    "sha256": "457212f8fca3a1db5c4716cf1c55474ac078f1fd0a56d0dd21ed2f4155762814"
+  },
+  {
+    "file": "turbo-post-stop-failure/python/conditioning.json",
+    "bytes": 207,
+    "sha256": "3e10947f0f308fdf474994f20ad9ac0f59d09113be72a4a3b57bfc1426d99858"
+  },
+  {
+    "file": "turbo-post-stop-failure/python/image.png",
+    "bytes": 102422,
+    "sha256": "049d7481e142910614471e4e3c0953accd8616f29188be309da843d4ebd1740e"
+  },
+  {
+    "file": "turbo-post-stop-failure/python/lora-dit.json",
+    "bytes": 29511,
+    "sha256": "284d11f3e4d6daabea412a22efbbe22d69d0bcb89fef530db453e4d5fd9d7be3"
+  },
+  {
+    "file": "turbo-post-stop-failure/python/lora-text.json",
+    "bytes": 3,
+    "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+  },
+  {
+    "file": "turbo-post-stop-failure/python/memory-policy.json",
+    "bytes": 29066,
+    "sha256": "a362e2ffb69e81afe0b427c5e298f0da502e24732694b91f13135facbf9972ee"
+  },
+  {
+    "file": "turbo-post-stop-failure/python/memory-services.json",
+    "bytes": 4013,
+    "sha256": "4ac4e2717a8ba0c8bedb9db349a33ed9a16a9ad11ba75edd333b70e091191c3e"
+  },
+  {
+    "file": "turbo-post-stop-failure/python/result.json",
+    "bytes": 32513,
+    "sha256": "ea00c4582351c21218aa0b89add686d7c1776ea317c7d480ebeaab7fd7706077"
+  },
+  {
+    "file": "turbo-post-stop-failure/rust/conditioning.json",
+    "bytes": 206,
+    "sha256": "f9b18885e9173ffc899403e7b5c1234c6006724ccc0b7190a754de96eac87847"
+  },
+  {
+    "file": "turbo-post-stop-failure/rust/image.png",
+    "bytes": 151231,
+    "sha256": "dc1db8186681f660b3a2456e68e290303815a07f5ab4957785c6f5580715a36c"
+  },
+  {
+    "file": "turbo-post-stop-failure/rust/lora-dit.json",
+    "bytes": 29510,
+    "sha256": "68ed8ab3a7b6f3102577bc6aa6607b1cfee50891854787215e8fbeab488b3a4e"
+  },
+  {
+    "file": "turbo-post-stop-failure/rust/lora-text.json",
+    "bytes": 2,
+    "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  {
+    "file": "turbo-post-stop-failure/rust/memory-manager.json",
+    "bytes": 189882,
+    "sha256": "97f8f872ed54dede5d794c32483010da9349aa6be09fe9b9543368d553fd0e41"
+  },
+  {
+    "file": "turbo-post-stop-failure/rust/memory-policy.json",
+    "bytes": 30600,
+    "sha256": "a78620a3dac6f50dd3222e224cdbbfe664ff6c351c0e9d55567e5eb22d51cd51"
+  },
+  {
+    "file": "turbo-post-stop-failure/rust/memory-services.json",
+    "bytes": 3206,
+    "sha256": "27448628ce9c7d80b112b22b5098e4b8231f731950e5ed08277bdc0cd4837994"
+  },
+  {
+    "file": "turbo-post-stop-failure/rust/result.json",
+    "bytes": 2673,
+    "sha256": "bae0a2555e96074996c4c6bc839919d68326017edae6ab466ac0e2aea41cf570"
+  }
+]

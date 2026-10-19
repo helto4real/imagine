@@ -5,6 +5,11 @@ the exit condition in master-design Section 15. INT8 ConvRot, BF16 and Turbo can
 run through conditioning, editing/LoRA, sampling and VAE output in Rust. Overall
 ComfyUI coverage is partial; this is not production-release acceptance.
 
+This report preserves the accepted old-reference checkpoint. The subsequent
+[upgraded-reference follow-up](stage-2-upgraded-followup.md) completes ordinary
+BF16 server selection and fresh strict BF16/Turbo automatic LoRA comparisons.
+Its new results do not relabel the old-reference evidence below.
+
 ## Contract and preservation
 
 The requested initial commit is **`ac8594c`**, `Preserve Qwen LoRA and

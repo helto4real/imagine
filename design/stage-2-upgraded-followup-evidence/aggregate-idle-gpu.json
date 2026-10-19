@@ -1,0 +1,102 @@
+[
+  {
+    "monotonic": 1081306.280480366,
+    "free_mib": 13535,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081307.307680541,
+    "free_mib": 13535,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081308.326806016,
+    "free_mib": 13535,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081309.350514802,
+    "free_mib": 13535,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081310.377926719,
+    "free_mib": 13535,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081311.404050192,
+    "free_mib": 13535,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081312.430603256,
+    "free_mib": 13535,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081313.45369608,
+    "free_mib": 13531,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081314.47427832,
+    "free_mib": 13531,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081315.499753447,
+    "free_mib": 13533,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081316.524510912,
+    "free_mib": 13534,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081317.549537008,
+    "free_mib": 13534,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081318.573909647,
+    "free_mib": 13534,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081319.594305874,
+    "free_mib": 13534,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081320.623564234,
+    "free_mib": 13470,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081321.650110359,
+    "free_mib": 13470,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081322.67387044,
+    "free_mib": 13470,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081323.702643605,
+    "free_mib": 13470,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081324.724076394,
+    "free_mib": 13470,
+    "total_mib": 16376
+  },
+  {
+    "monotonic": 1081325.747115369,
+    "free_mib": 13470,
+    "total_mib": 16376
+  }
+]

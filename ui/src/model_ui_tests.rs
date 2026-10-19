@@ -618,3 +618,63 @@ fn moss_model_switch_uses_its_group_defaults_and_preserves_qwen_loras() {
     assert_eq!(desk.app.prefs.model_group, QWEN_GROUP);
     assert_eq!(desk.app.prefs.model_groups[QWEN_GROUP].loras, vec![lora]);
 }
+
+#[test]
+fn bf16_variant_switch_preserves_qwen_loras_and_request_precision() {
+    let mut desk = Desk::new();
+    install(&mut desk);
+    let lora = selected_lora(&desk);
+    desk.app
+        .prefs
+        .model_groups
+        .get_mut(QWEN_GROUP)
+        .unwrap()
+        .loras = vec![lora.clone()];
+    fixture::write(
+        &desk._root.path().join("models"),
+        "diffusion_models/nested/qwen_image_2.1_bf16.safetensors",
+        json!({"txt_in.text_norm.weight":fixture::tensor(&[4096]),"img_in.weight":fixture::tensor(&[4096,64])}),
+    );
+    let library = catalog(desk._root.path());
+    let bf16 = library
+        .models
+        .iter()
+        .find(|m| m["model"] == imagine_server::contract::BF16)
+        .unwrap()["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    desk.app.accept_library(library);
+    desk.app.select_model(bf16);
+    assert_eq!(desk.app.prefs.model_group, QWEN_GROUP);
+    assert_eq!(desk.app.prefs.model_groups[QWEN_GROUP].loras, vec![lora]);
+    let meta = desk.app.metadata.as_ref().unwrap();
+    let mut request = client::make_request(
+        "Synthetic BF16 control",
+        "",
+        &[],
+        meta,
+        &desk.app.prefs.generation,
+    )
+    .unwrap();
+    assert_eq!(request["model"], imagine_server::contract::BF16);
+    assert_eq!(request["sampling"]["steps"], 40);
+    assert_eq!(request["sampling"]["cfg_scale"], 2.5);
+    request["model_selection"] = json!(desk.app.model_selection().unwrap());
+    let lib = imagine_server::model_library::Library::load(
+        desk._root.path().join("models"),
+        desk._root.path().join("synthetic-bf16-library.json"),
+    )
+    .unwrap();
+    let (resolved, _) = lib.prepare(request).unwrap();
+    let typed: imagine_server::contract::JobRequest = serde_json::from_value(resolved).unwrap();
+    typed.validate().unwrap();
+    assert!(
+        typed
+            .model_options
+            .generation(&typed.model)
+            .unwrap()
+            .diffusion_model
+            .ends_with("qwen_image_2.1_bf16.safetensors")
+    );
+}

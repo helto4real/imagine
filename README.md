@@ -3,7 +3,7 @@
 A local image/video generation server. The default **Rust inference backend**
 uses our ComfyUI-compatible engine, LibTorch and Comfy Kitchen without Python
 inference or stable-diffusion.cpp. It supports the selected Qwen Image 2.1
-INT8/Turbo paths and experimental MOSS SFT INT8 text-to-image.
+INT8/BF16/Turbo paths and experimental MOSS SFT INT8 text-to-image.
 See [Rust backend setup and coverage](docs/RUST-BACKEND.md).
 
 The frozen **stable-diffusion.cpp** backend remains available with

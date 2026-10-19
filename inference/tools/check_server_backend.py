@@ -7,7 +7,7 @@ for key in ['own-root','model-root','manifest','binary','site','control']:p.add_
 p.add_argument('--expected-image',type=Path)
 a=p.parse_args();project=Path(__file__).resolve().parents[2]
 control=json.loads(a.control.read_text());a.own_root.mkdir(parents=True,exist_ok=False)
-model='moss-image-sft-int8'if control['variant']=='int8_convrot'and 'moss' in control['checkpoints']['dit']else 'qwen-image-2.1-turbo'if control['variant']=='turbo_bf16'else'qwen-image-2.1-int8'
+model='moss-image-sft-int8'if control['variant']=='int8_convrot'and 'moss' in control['checkpoints']['dit']else 'qwen-image-2.1-turbo'if control['variant']=='turbo_bf16'else'qwen-image-2.1-bf16'if control['variant']=='bf16'else'qwen-image-2.1-int8'
 modelroot=a.own_root/'models'
 for relative in list(control['checkpoints'].values())+[s['path']for s in control.get('lora',[])]:
  path=modelroot/relative;path.parent.mkdir(parents=True,exist_ok=True);path.symlink_to(a.model_root/relative)

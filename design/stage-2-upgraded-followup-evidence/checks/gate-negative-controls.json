@@ -1,0 +1,32 @@
+[
+  {
+    "case": "diagnostic_replay",
+    "rejected": true,
+    "reason": "Placement replay is not automatic acceptance"
+  },
+  {
+    "case": "unequal_latent",
+    "rejected": true,
+    "reason": "Non-exact or non-finite tensor boundary"
+  },
+  {
+    "case": "missing_boundary",
+    "rejected": true,
+    "reason": "Missing/alternate numeric boundary"
+  },
+  {
+    "case": "stale_memory_report",
+    "rejected": true,
+    "reason": "dit_initial: loaded_bytes differs"
+  },
+  {
+    "case": "stale_tensor_report",
+    "rejected": true,
+    "reason": "Stale tensor comparison: latent"
+  },
+  {
+    "case": "actual_failed_pair",
+    "rejected": true,
+    "reason": "Non-exact or non-finite tensor boundary"
+  }
+]

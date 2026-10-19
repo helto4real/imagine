@@ -1,0 +1,92 @@
+[
+  {
+    "event": "free",
+    "phase": "text_initial",
+    "torch": 0,
+    "total": 13927251968
+  },
+  {
+    "event": "free",
+    "phase": "text_initial",
+    "torch": 0,
+    "total": 13927251968
+  },
+  {
+    "event": "free",
+    "phase": "text_initial",
+    "torch": 0,
+    "total": 13927251968
+  },
+  {
+    "event": "free",
+    "phase": "text_positive",
+    "torch": 58817536,
+    "total": 4561796096
+  },
+  {
+    "event": "free",
+    "phase": "text_positive",
+    "torch": 58817536,
+    "total": 4561796096
+  },
+  {
+    "event": "free",
+    "phase": "text_positive",
+    "torch": 58817536,
+    "total": 4561796096
+  },
+  {
+    "event": "free",
+    "phase": "text_negative",
+    "torch": 398162944,
+    "total": 4543708160
+  },
+  {
+    "event": "free",
+    "phase": "text_negative",
+    "torch": 398162944,
+    "total": 4543708160
+  },
+  {
+    "event": "free",
+    "phase": "text_negative",
+    "torch": 398162944,
+    "total": 4543708160
+  },
+  {
+    "event": "free",
+    "phase": "dit_initial",
+    "torch": 14286848,
+    "total": 13906083840
+  },
+  {
+    "event": "free",
+    "phase": "dit_initial",
+    "torch": 14286848,
+    "total": 13906083840
+  },
+  {
+    "event": "free",
+    "phase": "dit_initial",
+    "torch": 14286848,
+    "total": 13906083840
+  },
+  {
+    "event": "free",
+    "phase": "dit_sampling",
+    "torch": 44654592,
+    "total": 1385390080
+  },
+  {
+    "event": "free",
+    "phase": "dit_sampling",
+    "torch": 44654592,
+    "total": 1385390080
+  },
+  {
+    "event": "free",
+    "phase": "dit_sampling",
+    "torch": 44654592,
+    "total": 1385390080
+  }
+]

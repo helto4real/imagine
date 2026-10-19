@@ -4,6 +4,7 @@ use serde_json::{Value, json};
 
 pub const MOSS: &str = "moss-image-sft-int8";
 pub const MODEL: &str = "qwen-image-2.1-int8";
+pub const BF16: &str = "qwen-image-2.1-bf16";
 pub const TURBO: &str = "qwen-image-2.1-turbo";
 pub const MCP_PROFILE: &str = "qwen-image21-workflow-v1";
 pub const MAX_SEED: u64 = 9_007_199_254_740_991;
@@ -189,7 +190,7 @@ impl JobRequest {
         if self.model == "minimax-h3" {
             return Err("model_not_validated");
         }
-        if self.model != MODEL && self.model != TURBO && self.model != MOSS {
+        if !matches!(self.model.as_str(), MODEL | BF16 | TURBO | MOSS) {
             return Err("unknown_model");
         }
         if !matches!(
@@ -316,7 +317,7 @@ impl JobRequest {
         {
             return Err("unsupported_sampling");
         }
-        if self.model == TURBO && workflow.is_none() {
+        if matches!(self.model.as_str(), BF16 | TURBO) && workflow.is_none() {
             return Err("workflow_settings_required");
         }
         if let Some(w) = workflow {
@@ -333,6 +334,8 @@ impl JobRequest {
                 "moss_image_sft_int8_convrot.safetensors"
             } else if self.model == TURBO {
                 "qwen_image_2.1_turbo_bf16.safetensors"
+            } else if self.model == BF16 {
+                "qwen_image_2.1_bf16.safetensors"
             } else {
                 "qwen_image_2.1_int8_convrot.safetensors"
             };
@@ -426,10 +429,22 @@ impl JobRequest {
 }
 
 pub fn models() -> Value {
-    json!({"models":[model(MODEL).unwrap(), model(TURBO).unwrap(), model(MOSS).unwrap(), model("minimax-h3").unwrap()]})
+    json!({"models":[model(MODEL).unwrap(), model(TURBO).unwrap(), model(MOSS).unwrap(), model(BF16).unwrap(), model("minimax-h3").unwrap()]})
 }
 pub fn model(id: &str) -> Option<Value> {
     match id {
+        BF16 => {
+            let mut v = model(MODEL)?;
+            v["id"] = json!(BF16);
+            v["engine"] = json!("Imagine Rust");
+            v["availability"] = json!("requires_rust_backend_and_weights");
+            v["profile_revision"] = json!(MCP_PROFILE);
+            v["constraints"]["loras"] = json!(true);
+            v["constraints"]["samplers"] = json!(["er_sde", "euler"]);
+            v["constraints"]["schedulers"] = json!(["beta", "simple"]);
+            v["constraints"]["validated_resolutions"] = json!([]);
+            Some(v)
+        }
         MOSS => {
             let mut v = model(MODEL)?;
             v["id"] = json!(MOSS);

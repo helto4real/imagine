@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "accepted": true,
+  "diagnostic_memory_plan": false,
+  "variant": "bf16",
+  "all_numeric_boundaries_and_pixels_exact": true,
+  "component_memory_exact": true,
+  "dit_lifecycle": [
+    {
+      "phase": "dit_initial",
+      "all_observed_fields_exact": true,
+      "loaded_bytes": 12888072192,
+      "pinned_bytes": 1342177280,
+      "model_lowvram": true
+    },
+    {
+      "phase": "dit_sampling",
+      "all_observed_fields_exact": true,
+      "loaded_bytes": 12888072192,
+      "pinned_bytes": 1342177280,
+      "model_lowvram": true
+    },
+    {
+      "phase": "dit_unloaded",
+      "all_observed_fields_exact": true,
+      "loaded_bytes": 0,
+      "pinned_bytes": 0,
+      "model_lowvram": false
+    }
+  ],
+  "comparison_sha256": "5fc3026b4411c6a205faff8fb86370d9b06bf19230e14676cbeaf74d7179a283"
+}

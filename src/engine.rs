@@ -579,7 +579,7 @@ pub fn validate_selection(
     model: &str,
     sampling: &crate::contract::Sampling,
 ) -> Result<()> {
-    if model == crate::contract::MOSS && backend != "rust" {
+    if matches!(model, crate::contract::BF16 | crate::contract::MOSS) && backend != "rust" {
         bail!(EngineError("unsupported_model"))
     }
     if backend == "rust"

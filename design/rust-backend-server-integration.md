@@ -88,6 +88,10 @@ Rust integration, selected MOSS support, reference controls and regression tools
 Unrelated native optimization and UI layout changes remain outside this commit.
 Historical evidence hashes and failed comparisons are retained unchanged.
 
+The subsequent [Stage 2 follow-up](stage-2-upgraded-followup.md) adds ordinary
+BF16 product selection and investigates the upgraded automatic LoRA placement
+gap. Its new results are separate from this accepted integration checkpoint.
+
 The exact staged baseline was also exported into an isolated source checkout
 and its complete offline workspace suite passed, with two test threads. This
 separately checks that excluding unrelated native/layout work does not leave

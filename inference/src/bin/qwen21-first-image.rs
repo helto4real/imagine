@@ -239,6 +239,7 @@ fn component_memory_record(
 // tensors. The marker enables this for a fresh isolated diagnostic run.
 struct MemoryObservation {
     inner: q::StaticMemoryServices,
+    native: Kitchen,
     enabled: bool,
     phase: &'static str,
     events: Vec<Value>,
@@ -246,13 +247,16 @@ struct MemoryObservation {
 impl imagine_inference::memory::MemoryServices for MemoryObservation {
     fn free(&mut self, device: Device) -> std::result::Result<(f64, f64), Error> {
         let result = imagine_inference::memory::MemoryServices::free(&mut self.inner, device)?;
-        if self.enabled && self.phase.starts_with("text_") && device != Device::Cpu {
-            self.events.push(json!({"phase":self.phase,"event":"free","total":result.0 as u64,"torch":result.1 as u64}));
+        if self.enabled && self.phase != "other" && device != Device::Cpu {
+            let Device::Cuda(index) = device else {
+                unreachable!()
+            };
+            self.events.push(json!({"phase":self.phase,"event":"free","total":result.0 as u64,"torch":result.1 as u64,"cuda_memory_after_query":self.native.cuda_memory(index)?}));
         }
         Ok(result)
     }
     fn empty_cache(&mut self) -> std::result::Result<(), Error> {
-        if self.enabled && self.phase.starts_with("text_") {
+        if self.enabled && self.phase != "other" {
             self.events
                 .push(json!({"phase":self.phase,"event":"empty_cache"}));
         }
@@ -313,6 +317,7 @@ fn generate(
     let mut memory_manager = imagine_inference::memory::Manager::new();
     let mut memory_services = MemoryObservation {
         inner: q::StaticMemoryServices::new(rt.native.clone(), pins.clone()),
+        native: rt.native.clone(),
         enabled: own.join("memory-observation-enabled").is_file(),
         phase: "other",
         events: vec![],
@@ -694,6 +699,7 @@ fn generate(
         };
         let patcher = managed.as_ref().map(|model| model.patcher());
         if let (Some(model), Some(patcher)) = (&managed, &patcher) {
+            memory_services.phase = "dit_initial";
             memory_manager.load(
                 std::slice::from_ref(patcher),
                 0.,
@@ -702,6 +708,7 @@ fn generate(
                 false,
                 &mut memory_services,
             )?;
+            memory_services.phase = "other";
             let mut owner = model.owner.borrow_mut();
             replay_memory_plan(rt, &mut owner, own, p, "dit_initial")?;
             memory_records.push(memory_record(&output, "dit_initial", &owner)?);
@@ -744,6 +751,7 @@ fn generate(
                 vec![]
             };
             let (required, minimum) = q::qwen_sampling_memory_with_references(&shape, &groups);
+            memory_services.phase = "dit_sampling";
             memory_manager.load(
                 std::slice::from_ref(patcher),
                 required,
@@ -752,6 +760,7 @@ fn generate(
                 false,
                 &mut memory_services,
             )?;
+            memory_services.phase = "other";
             let mut owner = model.owner.borrow_mut();
             replay_memory_plan(rt, &mut owner, own, p, "dit_sampling")?;
             memory_records.push(memory_record(&output, "dit_sampling", &owner)?);

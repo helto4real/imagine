@@ -18,6 +18,7 @@ use std::{
 mod types;
 pub use types::*;
 const DIFFUSION: &str = "qwen_image_2.1_int8_convrot.safetensors";
+const BF16_DIFFUSION: &str = "qwen_image_2.1_bf16.safetensors";
 const TURBO_DIFFUSION: &str = "qwen_image_2.1_turbo_bf16.safetensors";
 const ENCODER: &str = "qwen3vl_8b_int8_convrot.safetensors";
 const VAE: &str = "qwen_image_2.1_vae_bf16.safetensors";
@@ -122,6 +123,8 @@ impl Library {
                     "MOSS Image · SFT INT8"
                 } else if model == contract::TURBO {
                     "Qwen Image 2.1 · Turbo"
+                } else if model == contract::BF16 {
+                    "Qwen Image 2.1 · BF16"
                 } else {
                     "Qwen Image 2.1 · INT8"
                 });
@@ -406,7 +409,12 @@ pub fn model_metadata(model: &str) -> Value {
             .remove("moss_image");
         return v;
     }
-    let mut meta = contract::model(contract::MODEL).unwrap();
+    let mut meta = contract::model(if model == contract::BF16 {
+        contract::BF16
+    } else {
+        contract::MODEL
+    })
+    .unwrap();
     meta["id"] = json!(model);
     meta["constraints"]["loras"] = json!(true);
     // Library selection resolves a workflow, whose validation accepts these choices.
@@ -476,6 +484,7 @@ fn scan_dir(
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
         let model = match (kind, name) {
             ("diffusion_models", DIFFUSION) => Some(contract::MODEL.into()),
+            ("diffusion_models", BF16_DIFFUSION) => Some(contract::BF16.into()),
             ("diffusion_models", TURBO_DIFFUSION) => Some(contract::TURBO.into()),
             ("diffusion_models", "moss_image_sft_int8_convrot.safetensors") => {
                 Some(contract::MOSS.into())

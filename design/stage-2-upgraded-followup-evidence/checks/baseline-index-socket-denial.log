@@ -1,0 +1,111 @@
+   Compiling st-proxy v0.1.0 (/home/thhel/ChatGPT/imagine/comfyui/baseline-index-review-20261018/proxy)
+   Compiling imagine-server v0.1.0 (/home/thhel/ChatGPT/imagine/comfyui/baseline-index-review-20261018)
+   Compiling imagine-ui v0.1.0 (/home/thhel/ChatGPT/imagine/comfyui/baseline-index-review-20261018/ui)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 29.52s
+     Running unittests src/lib.rs (target/debug/deps/imagine_server-6bf1cc87ee623e5e)
+
+running 35 tests
+test character_sheet::tests::layout_matches_aio_geometry_and_rejects_invalid_panels ... ok
+test character_sheet::tests::pose_guide_is_deterministic_and_has_three_distinct_orientations ... ok
+test color_match::tests::color_roundtrip ... ok
+test color_match::tests::tone_identity ... ok
+test comfy_engine::tests::bounded_protocol_rejects_oversize_truncated_and_unknown_events ... ok
+test comfy_engine::tests::lora_paths_use_the_selected_library_loras_directory ... ok
+test comfy_engine::tests::ordered_refs_use_shared_geometry_and_turbo_sigmas_are_unchanged ... ok
+test comfy_engine::tests::rust_is_default_and_metadata_does_not_claim_native_validation ... ok
+test config::tests::local_configuration_needs_no_credentials_and_keeps_single_instance ... ok
+test contract::tests::dimensions_accept_aligned_sizes_and_reject_out_of_bounds ... ok
+test contract::tests::strict_contract_and_order ... ok
+test engine::tests::absent_or_unverified_reference_executable_falls_back ... ok
+test engine::tests::changing_reference_profile_stops_the_previous_native_process ... ok
+test engine::tests::counts_real_steps_and_estimates_only_sampling ... ok
+test engine::tests::native_pass_prepares_every_reference_in_order_without_touching_output_size ... ok
+test engine::tests::reference_cache_selection_uses_model_and_actual_pass_inputs ... ok
+test model_adapter::tests::prompts_keep_clothing_out_of_portrait_and_reserve_internal_slots ... ok
+test model_library::tests::changed_lora_files_require_refresh_before_a_new_selection ... ok
+test model_library::tests::discovered_turbo_keeps_shipped_sampling_and_operation_limits ... ok
+test character_sheet::tests::composition_is_deterministic_preserves_aspect_and_flattens_alpha ... ok
+test model_library::tests::discovery_uses_recursive_comfy_paths_aliases_and_bounded_headers ... ok
+test model_library::tests::invalid_selection_never_injects_paths_profiles_or_internal_metadata ... ok
+test model_library::tests::legacy_lora_assignments_do_not_restrict_selection_after_restart ... ok
+test model_library::tests::moss_selection_keeps_its_own_encoder_vae_and_rejects_cross_family_components ... ok
+test model_library::tests::duplicate_components_require_selection_and_bad_weights_are_not_ready ... ok
+test model_library::tests::selection_is_frozen_across_root_changes_and_rejects_replaced_or_missing_files ... ok
+test privacy::tests::synthetic_envelope_and_wrong_key ... ok
+test model_library::tests::nested_loras_are_selectable_without_header_or_metadata_checks ... ok
+test progress::tests::parses_split_live_records_without_waiting_for_newline ... ok
+test session::tests::purge_removes_history_without_following_links_or_removing_credentials ... ok
+test session::tests::sessions_are_isolated_and_remove_only_their_own_media ... ok
+test workflow_image::tests::aio_geometry_never_enlarges_and_caps_each_reference_independently ... ok
+test workflow_image::tests::preprocessing_preserves_small_pixels_and_center_crops_all_channels ... ok
+test profiles::tests::rejects_broken_yaml_and_defaults_without_loading_models ... ok
+test workflow_image::tests::preprocessing_shrinks_before_crop_and_rejects_too_thin_inputs ... ok
+
+test result: ok. 35 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+
+     Running unittests src/main.rs (target/debug/deps/imagine_server-46bb6d95df687761)
+
+running 3 tests
+test tests::discovers_home_checkout_and_prefers_project_checkout ... ok
+test tests::explicit_paths_override_discovery_and_preserve_venv_symlink ... ok
+test tests::missing_installation_has_actionable_errors_without_fallback ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/api_lifecycle.rs (target/debug/deps/api_lifecycle-7e2761921c07d968)
+
+running 19 tests
+test batch_is_atomic_and_idempotent_for_the_entire_request ... ok
+test character_sheet_cancel_or_second_pass_failure_never_publishes_partial_results ... ok
+test character_sheet_validation_schema_and_sensitive_fields ... ok
+test comfy_selection_is_visible_without_starting_inference ... ok
+test crash_recovery_does_not_retain_any_jobs ... ok
+test character_sheet_is_one_job_with_ordered_in_memory_passes_and_three_results ... ok
+test engine_failure_isolated_next_job_can_run_and_sse_finishes ... ok
+test old_session_requests_are_rejected_before_mutation ... ok
+test output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid ... ok
+test model_library_api_freezes_queued_selection_and_validates_before_admission ... ok
+test profile_reference_sizing_and_missing_assets ... ok
+test profiles_reject_invalid_overrides_before_batch_admission ... ok
+test queue_idempotency_unload_resume_and_cancel ... ok
+test restart_starts_empty_and_unpaused ... ok
+test rust_admission_exposes_its_own_capabilities_and_rejects_unsupported_sampler_before_queue ... ok
+test session_assets_are_plain_owned_and_removed_on_close ... ok
+test strict_inputs_assets_and_queued_cancel ... ok
+test yaml_profiles_resolve_overrides_and_persist_provenance ... ok
+test progress_is_scoped_to_active_job_in_polling_and_events ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.73s
+
+     Running tests/comfy_backend.rs (target/debug/deps/comfy_backend-4d2acc1d0f680521)
+
+running 6 tests
+test cancellation_drops_generation_then_stop_reaps_before_returning ... ok
+test default_rust_sampling_runs_through_python_adapter_without_manual_sigmas ... ok
+test live_lora_through_rust_backend ... ignored, requires explicit Comfy paths, model files and a GPU-coordinator ticket
+test persistent_child_reuses_pid_and_restarts_after_confirmed_stop ... ok
+test turbo_rust_profile_accepts_comfy_conditioning_without_pooled_tensor ... ok
+test failures_are_safe_and_next_job_can_restart ... ok
+
+test result: ok. 5 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+     Running tests/gpu_coordination.rs (target/debug/deps/gpu_coordination-a4966c4163cc7ad2)
+
+running 1 test
+test direct_jobs_share_fifo_and_coordinator_loss_stops_gpu ... FAILED
+
+failures:
+
+---- direct_jobs_share_fifo_and_coordinator_loss_stops_gpu stdout ----
+
+thread 'direct_jobs_share_fifo_and_coordinator_loss_stops_gpu' (4441) panicked at tests/gpu_coordination.rs:69:64:
+called `Result::unwrap()` on an `Err` value: Os { code: 1, kind: PermissionDenied, message: "Operation not permitted" }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    direct_jobs_share_fifo_and_coordinator_loss_stops_gpu
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+error: test failed, to rerun pass `-p imagine-server --test gpu_coordination`

@@ -1,0 +1,202 @@
+[
+  {
+    "phase": "startup",
+    "event": "free",
+    "total": 14345371648,
+    "torch": 0,
+    "active": 0,
+    "reserved": 0
+  },
+  {
+    "phase": "text_initial",
+    "event": "free",
+    "total": 14299168768,
+    "torch": 0,
+    "active": 0,
+    "reserved": 0
+  },
+  {
+    "phase": "text_initial",
+    "event": "free",
+    "total": 14299168768,
+    "torch": null,
+    "active": 0,
+    "reserved": 0
+  },
+  {
+    "phase": "text_initial",
+    "event": "free",
+    "total": 14299168768,
+    "torch": null,
+    "active": 0,
+    "reserved": 0
+  },
+  {
+    "phase": "text_positive",
+    "event": "free",
+    "total": 4940069888,
+    "torch": 58817536,
+    "active": 9363686400,
+    "reserved": 9422503936
+  },
+  {
+    "phase": "text_positive",
+    "event": "free",
+    "total": 4940069888,
+    "torch": null,
+    "active": 9363686400,
+    "reserved": 9422503936
+  },
+  {
+    "phase": "text_positive",
+    "event": "free",
+    "total": 4940069888,
+    "torch": null,
+    "active": 9363686400,
+    "reserved": 9422503936
+  },
+  {
+    "phase": "text_negative",
+    "event": "free",
+    "total": 4765088768,
+    "torch": 381385728,
+    "active": 9372468224,
+    "reserved": 9753853952
+  },
+  {
+    "phase": "text_negative",
+    "event": "free",
+    "total": 4765088768,
+    "torch": null,
+    "active": 9372468224,
+    "reserved": 9753853952
+  },
+  {
+    "phase": "text_negative",
+    "event": "free",
+    "total": 4765088768,
+    "torch": null,
+    "active": 9372468224,
+    "reserved": 9753853952
+  },
+  {
+    "phase": "dit_initial",
+    "event": "free",
+    "total": 14146732032,
+    "torch": 14286848,
+    "active": 8781824,
+    "reserved": 23068672
+  },
+  {
+    "phase": "dit_initial",
+    "event": "free",
+    "total": 14146732032,
+    "torch": null,
+    "active": 8781824,
+    "reserved": 23068672
+  },
+  {
+    "phase": "dit_initial",
+    "event": "free",
+    "total": 14146732032,
+    "torch": null,
+    "active": 8781824,
+    "reserved": 23068672
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1302355456,
+    "torch": 44654080,
+    "active": 12762653184,
+    "reserved": 12807307264
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1302355456,
+    "torch": null,
+    "active": 12762653184,
+    "reserved": 12807307264
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1302355456,
+    "torch": null,
+    "active": 12762653184,
+    "reserved": 12807307264
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1301706752,
+    "torch": null,
+    "active": 12763301888,
+    "reserved": 12809404416
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1288600064,
+    "torch": null,
+    "active": 12776408576,
+    "reserved": 12845056000
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1304969216,
+    "torch": null,
+    "active": 12783828992,
+    "reserved": 12945719296
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1305287168,
+    "torch": null,
+    "active": 12783904256,
+    "reserved": 12945719296
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1354760192,
+    "torch": null,
+    "active": 12783976448,
+    "reserved": 12945719296
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1244594176,
+    "torch": null,
+    "active": 12783976448,
+    "reserved": 12945719296
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1240334336,
+    "torch": null,
+    "active": 12783976448,
+    "reserved": 12945719296
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 1032847360,
+    "torch": null,
+    "active": 12783976448,
+    "reserved": 12945719296
+  },
+  {
+    "phase": "dit_sampling",
+    "event": "free",
+    "total": 952172544,
+    "torch": null,
+    "active": 12783976448,
+    "reserved": 12945719296
+  }
+]

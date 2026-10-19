@@ -29,6 +29,7 @@ replace another running service or change the proxy's GPU coordination policy.
 | Model | Product path | Sampling |
 | --- | --- | --- |
 | Qwen Image 2.1 INT8 ConvRot | Text-to-image, ordered reference editing, LoRA, existing two-pass character sheets | Euler / ER-SDE; simple / beta; explicit sigmas |
+| Qwen Image 2.1 BF16 | Same Qwen product paths, with the ordinary BF16 DiT | Same sampler/scheduler bindings as INT8 |
 | Qwen Image 2.1 Turbo BF16 | Text-to-image, ordered reference editing, LoRA | Same sampler bindings; shipped Turbo profile retains its eight manual steps and CFG 1 |
 | MOSS Image SFT INT8 ConvRot | Text-to-image | Euler; normal / sgm_uniform; profile defaults 50 steps, CFG 3, shift 5 |
 
@@ -48,10 +49,20 @@ selector and component library.
 The source-controlled `profiles/moss.yaml` gives the local component paths.
 A library selection can resolve another nested location with the same supported
 filenames. MOSS references, LoRA, layer skipping, MTP decode and other variants
-remain unavailable and fail explicitly. General BF16 Qwen checkpoints remain
-supported by the inference development controls; this adapter retains Imagine's
-existing public INT8 and official Turbo model IDs. It adds no standalone BF16
-product selection. Full sampler/scheduler/model parity is still later work.
+remain unavailable and fail explicitly. Ordinary Qwen BF16 is selectable as
+`qwen-image-2.1-bf16` when `qwen_image_2.1_bf16.safetensors` is discovered. It
+shares the Qwen settings/LoRA group and the existing INT8 Qwen3-VL encoder and
+BF16 Qwen VAE. The new product selection requires the Rust backend; other
+backends reject it before queue admission. No existing profile is changed.
+Full sampler/scheduler/model parity is still later work.
+
+The bounded BF16 HTTP/reference control matches the original ComfyUI pixels
+exactly with automatic offload and no LoRA. Fresh BF16/Turbo LoRA controls also
+match all numerical boundaries, pixels and observed component/DiT lifecycle
+states under automatic offload; see the
+[Stage 2 follow-up](../design/stage-2-upgraded-followup.md). Earlier failed pairs
+with different live free-memory inputs remain recorded separately. These
+selected controls do not establish all workload/pressure combinations.
 
 Unsupported `res_multistep` selections fail before queue admission on `rust`.
 Its metadata advertises only its implemented choices. Native/Comfy keep their

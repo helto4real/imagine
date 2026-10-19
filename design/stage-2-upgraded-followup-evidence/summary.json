@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "baseline_commit": "f6fc1cdb35984a70a12efc86032368c91c8a852e",
+  "manual_imagine_acceptance": "user-reported for committed baseline",
+  "baseline_exact_index_tests": {
+    "passed": 148,
+    "ignored": 1
+  },
+  "workspace_tests": {
+    "passed": 152,
+    "ignored": 2
+  },
+  "workspace_clippy": "passed",
+  "inference_clippy": "passed",
+  "gate_negative_controls": 6,
+  "bf16_http_pixels_exact": true,
+  "automatic_pairs": [
+    {
+      "case": "initial-bf16-failure",
+      "variant": "bf16",
+      "accepted": false,
+      "original_first": false,
+      "dit_initial_free_bytes": {
+        "rust": 13906083840,
+        "python": 14267056128
+      },
+      "free_input_difference_bytes": 360972288
+    },
+    {
+      "case": "accepted-bf16",
+      "variant": "bf16",
+      "accepted": true,
+      "original_first": false,
+      "dit_initial_free_bytes": {
+        "rust": 14268956672,
+        "python": 14279704576
+      },
+      "free_input_difference_bytes": 10747904
+    },
+    {
+      "case": "turbo-first-failure",
+      "variant": "turbo",
+      "accepted": false,
+      "original_first": false,
+      "dit_initial_free_bytes": {
+        "rust": 14219608064,
+        "python": 14146732032
+      },
+      "free_input_difference_bytes": -72876032
+    },
+    {
+      "case": "turbo-post-stop-failure",
+      "variant": "turbo",
+      "accepted": false,
+      "original_first": false,
+      "dit_initial_free_bytes": {
+        "rust": 13190299648,
+        "python": 13905690624
+      },
+      "free_input_difference_bytes": 715390976
+    },
+    {
+      "case": "accepted-turbo",
+      "variant": "turbo",
+      "accepted": true,
+      "original_first": true,
+      "dit_initial_free_bytes": {
+        "rust": 13888192512,
+        "python": 13884981248
+      },
+      "free_input_difference_bytes": -3211264
+    }
+  ],
+  "production_policy_changed": false,
+  "autotuning_changed": false,
+  "numeric_tolerance_changed": false,
+  "ordinary_runtime_read": false,
+  "ordinary_services_restarted_by_agent": false,
+  "new_implementation_committed": false,
+  "focused_source_tests": {
+    "passed": 150,
+    "ignored": 1
+  },
+  "focused_source_clippy": "passed",
+  "preserved_fixture_gate_tests": "positive control and six rejections passed using retained fixtures only",
+  "preserved_turbo_gate": "passed using retained fixtures only",
+  "new_model": "qwen-image-2.1-bf16",
+  "selected_stage2_followup_complete": true
+}

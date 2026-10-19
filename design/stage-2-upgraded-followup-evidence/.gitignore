@@ -1,0 +1,3 @@
+# Deliberate isolated development evidence only.
+!*.png
+!*.log
