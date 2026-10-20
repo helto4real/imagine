@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "result": "failed",
+  "scope": "tiny synthetic CUDA H3 conditioning",
+  "trained_weights": 0,
+  "socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+  "binary_sha256": "8a3582c1dc762a50b4f7a2dc4479c50625b96f9e4553fb37a0719eebf33422e7",
+  "controller_sha256": "356b72028d056ee4f46d5e1354d007bfbd328f82231241a4ae3c144608bfea23",
+  "entry_sha256": "91309943b999722b5a86f1cade6cc25baadc41dfdcba312e929a9a90cb54740f",
+  "runs": [
+    {
+      "phase": "original",
+      "returncode": 1,
+      "reservation": {
+        "coordinator_socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+        "direct_worker": "/usr/bin/bwrap",
+        "job_id": "h3-stage4-conditioning-cuda-01-original",
+        "process_form": "bwrap-pid-namespace",
+        "report": {
+          "namespace_exited": true,
+          "namespace_init": 2061971,
+          "worker": {
+            "child_reaped": true,
+            "child_started": true,
+            "exit_code": 1,
+            "finish_sent": true,
+            "signal": null,
+            "state": "completed"
+          }
+        },
+        "schema": 1
+      }
+    }
+  ],
+  "inputs": {
+    "h3-video.json": "266a50346c5a66aa9e741491f3b39e929b1d0cd744e62b8a005062dab1dfb441",
+    "h3-video-quant.json": "7f0c187a62b2cc1f2c4ff2c081d2b50c7b58d775676ecac5cbc5fd2c49f16a5a"
+  },
+  "reference_script_sha256": "a04ccc8c37f33794cae6c90f2166c596acdcd634e49af0792113bf693f4fa653"
+}

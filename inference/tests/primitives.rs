@@ -1,3 +1,19 @@
+#[path = "support/h3_audio.rs"]
+mod h3_audio_tests;
+#[path = "support/h3_checkpoint.rs"]
+mod h3_checkpoint_tests;
+#[path = "support/h3_conditioning.rs"]
+mod h3_conditioning_tests;
+#[path = "support/h3_dit.rs"]
+mod h3_dit_tests;
+#[path = "support/h3_quantized.rs"]
+mod h3_quantized_tests;
+#[path = "support/h3_sampling.rs"]
+mod h3_sampling_tests;
+#[path = "support/h3_text.rs"]
+mod h3_text_tests;
+#[path = "support/h3_video.rs"]
+mod h3_video_tests;
 #[path = "support/native_av_composed.rs"]
 mod native_av_composed_tests;
 #[path = "support/native_av_payload.rs"]
@@ -5057,6 +5073,8 @@ mod qwen_multimodal_tests;
 #[path = "support/qwen_image_preprocess.rs"]
 mod qwen_image_preprocess_tests;
 
+#[path = "support/h3_layout.rs"]
+mod h3_layout_tests;
 #[path = "support/qwen_cfg.rs"]
 mod qwen_cfg_tests;
 #[path = "support/qwen_contexts.rs"]

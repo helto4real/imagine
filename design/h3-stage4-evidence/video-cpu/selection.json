@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "56b3e2e87d8d6e543c01bd9ba3d0faeb7108d9ec4ff783101fb08e1b5cff8374",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_video_tests::h3_complete_video_vae_matches_original_causal_encoder_vit_decoder_spatial_blending_and_temporal_streaming",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/56b3e2e87d8d6e543c01bd9ba3d0faeb7108d9ec4ff783101fb08e1b5cff8374/runs/f381d832281845388f47fddd2cf2a7bb/00-h3_complete_video_vae_matches_original_causal_encoder_vit_decoder_spatial_blending_and_temporal_streaming.log",
+      "evidence": "00-h3_complete_video_vae_matches_original_causal_encoder_vit_decoder_spatial_blending_and_temporal_streaming.json"
+    }
+  ],
+  "result": "passed"
+}

@@ -1,0 +1,44 @@
+--- a/inference/native/CMakeLists.txt
++++ b/inference/native/CMakeLists.txt
+@@ -24 +24 @@
+-set_target_properties(imagine_kitchen PROPERTIES CXX_VISIBILITY_PRESET default)
++set_target_properties(imagine_kitchen PROPERTIES CXX_VISIBILITY_PRESET default CUDA_RUNTIME_LIBRARY Shared)
+@@ -26 +26,3 @@
+-target_link_libraries(imagine_kitchen PRIVATE torch torch_cpu torch_cuda c10 c10_cuda CUDA::cudart_static ${CMAKE_DL_LIBS})
++# Pin refusal recovery runs through LibTorch. A separate static runtime retains
++# its own last-error slot, poisoning the next original Kitchen kernel launch.
++target_link_libraries(imagine_kitchen PRIVATE torch torch_cpu torch_cuda c10 c10_cuda CUDA::cudart ${CMAKE_DL_LIBS})
+--- a/inference/native/bridge.cpp
++++ b/inference/native/bridge.cpp
+@@ -33 +32,0 @@
+-#include <dlfcn.h>
+@@ -41,22 +39,0 @@
+-// torch.cuda.cudart() uses LibTorch's shared runtime, while Kitchen's original
+-// extension links its own static runtime. Host registration must not poison the
+-// latter's last-error slot: Comfy's discard executes only through LibTorch.
+-struct TorchCudart {
+-    void* handle;
+-    decltype(&cudaHostRegister) register_host;
+-    decltype(&cudaHostUnregister) unregister_host;
+-    TorchCudart() : handle(dlopen("libcudart.so.13", RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD)) {
+-        if (!handle) throw std::runtime_error("LibTorch CUDA runtime is not loaded");
+-        register_host=reinterpret_cast<decltype(register_host)>(dlsym(handle,"cudaHostRegister"));
+-        unregister_host=reinterpret_cast<decltype(unregister_host)>(dlsym(handle,"cudaHostUnregister"));
+-        if (!register_host || !unregister_host) {
+-            dlclose(handle);
+-            throw std::runtime_error("LibTorch CUDA host registration symbols are missing");
+-        }
+-    }
+-    ~TorchCudart() { dlclose(handle); }
+-};
+-cudaError_t torch_host_registration(void* pointer,size_t bytes,bool pin) {
+-    static const TorchCudart runtime;
+-    return pin ? runtime.register_host(pointer,bytes,1) : runtime.unregister_host(pointer);
+-}
+@@ -159 +136 @@
+-    const auto status=torch_host_registration(t.data_ptr(),t.nbytes(),pin!=0);
++    const auto status=pin ? cudaHostRegister(t.data_ptr(),t.nbytes(),1) : cudaHostUnregister(t.data_ptr());
+@@ -171 +148,2 @@
+-        const auto status = torch_host_registration(reinterpret_cast<void*>(pointer),bytes,pin!=0);
++        const auto status = pin ? cudaHostRegister(reinterpret_cast<void*>(pointer),bytes,1)
++                                : cudaHostUnregister(reinterpret_cast<void*>(pointer));

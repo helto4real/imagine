@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "scope": "Freeze packaging only; no GPU jobs, model reads, builds or heavy tests",
+  "gpu_jobs_started": 0,
+  "model_payload_bytes_read": 0,
+  "bash_blocks_syntax_checked": 6,
+  "host_cli_help": {
+    "run_h3_trained_phase.py": 0,
+    "export_h3_probe_clip.py": 0
+  },
+  "rejected_source_patch_restoration": {
+    "CMakeLists.txt": "396183e82a9573dad43094fbf1e5d6014cad5acd1e77cbdceaaae1d1ef805af3",
+    "bridge.cpp": "b751afb0e56d37ad1f14637299168643bf31ede0b0f996889f068ae184b8faf5",
+    "bridge.hpp": "9d8978c2fb8520f7feb2aa4a19698bdb5d621c808c26b0072e01ee17add49b31"
+  },
+  "owned_reservations_confirmed_reaped": 103,
+  "own_in_progress_selections": 0,
+  "cargo_metadata_locked_offline": {
+    "inference_bins": [
+      "h3-stage4",
+      "imagine-worker",
+      "moss-first-image",
+      "qwen21-first-image"
+    ],
+    "reservation_bins": [
+      "imagine-native-gpu-reservation",
+      "namespace_entry",
+      "namespace_probe"
+    ],
+    "namespace_probe": "existing GPU-free lifecycle test fixture"
+  },
+  "observed_compiler_at_freeze": {
+    "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)\nbinary: rustc\ncommit-hash: 31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd\ncommit-date: 2026-06-26\nhost: x86_64-unknown-linux-gnu\nrelease: 1.96.1\nLLVM version: 22.1.2\n",
+    "clang": "clang version 23.1.1"
+  },
+  "historical_patch_apply_flags": [
+    "--unidiff-zero"
+  ]
+}

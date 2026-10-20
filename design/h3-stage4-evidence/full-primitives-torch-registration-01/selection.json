@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "trained_weights": 0,
+  "test": "full-primitives",
+  "binary_sha256": "a5374a86e6d84c39d281fbf678c8999f19f1909f2871fa8d54a1c7a911e345b0",
+  "controller_sha256": "356b72028d056ee4f46d5e1354d007bfbd328f82231241a4ae3c144608bfea23",
+  "entry_sha256": "91309943b999722b5a86f1cade6cc25baadc41dfdcba312e929a9a90cb54740f",
+  "bridge_sha256": "ab7c807cd5f9aac244f58a302d9500a6ab04b0314b7223404881ce407ed0d4a3",
+  "bridge_provenance_sha256": "aa6d068f30fabc2b161415a96e270a55094d6aca2033cba964a64e78d757ed5d",
+  "returncode": 0,
+  "reservation": {
+    "coordinator_socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+    "direct_worker": "/usr/bin/bwrap",
+    "job_id": "h3-stage4-full-primitives-torch-registration-01",
+    "process_form": "bwrap-pid-namespace",
+    "report": {
+      "namespace_exited": true,
+      "namespace_init": 791084,
+      "worker": {
+        "child_reaped": true,
+        "child_started": true,
+        "exit_code": 0,
+        "finish_sent": true,
+        "signal": null,
+        "state": "completed"
+      }
+    },
+    "schema": 1
+  },
+  "tests_passed": 415,
+  "tests_failed": 0,
+  "tests_ignored": 7,
+  "announced_tests": 422
+}

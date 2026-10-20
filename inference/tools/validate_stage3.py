@@ -209,6 +209,8 @@ def main():
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--site', type=Path, required=True)
     parser.add_argument('--binary', type=Path, required=True)
+    parser.add_argument('--kitchen-library', type=Path)
+    parser.add_argument('--kitchen-provenance', type=Path)
     parser.add_argument('--execution-root', type=Path, help='Separate writable track root; --root remains the immutable dependency source')
     parser.add_argument('--cpu-only', action='store_true', help='Mount no NVIDIA devices and hide CUDA in the selected tests')
     parser.add_argument('--output', type=Path, required=True)
@@ -238,6 +240,11 @@ def main():
         parser.error('Duplicate test selectors')
     prefix = [sys.executable, str(project / 'inference/tools/test_isolation.py'),
               '--root', str(root), '--site', str(site), '--binary', str(frozen)]
+    if args.kitchen_library is not None:
+        assert args.kitchen_provenance is not None
+        prefix.extend(['--kitchen-library',str(args.kitchen_library),'--kitchen-provenance',str(args.kitchen_provenance)])
+    elif args.kitchen_provenance is not None:
+        parser.error('Bridge provenance requires an explicit bridge')
     if args.execution_root is not None:prefix.extend(['--runtime-root',str(runtime_root)])
     if args.cpu_only:prefix.append('--cpu-only')
     for flag, relative in [

@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "adff3d08853b87f1636960139bfa100e384f2838df935d59be7110b7b20d7d41",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_conditioning_tests::h3_complete_conditioning_matches_original_raw_text_images_frame_pairs_deepstack_and_tags",
+      "returncode": 1,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/adff3d08853b87f1636960139bfa100e384f2838df935d59be7110b7b20d7d41/runs/7f9d1a182c944fbb93ee5f533a716273/00-h3_complete_conditioning_matches_original_raw_text_images_frame_pairs_deepstack_and_tags.log"
+    }
+  ],
+  "result": "failed"
+}

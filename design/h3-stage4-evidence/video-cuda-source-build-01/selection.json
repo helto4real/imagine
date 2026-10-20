@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "scope": "tiny synthetic CUDA H3 video",
+  "trained_weights": 0,
+  "socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+  "binary_sha256": "a5374a86e6d84c39d281fbf678c8999f19f1909f2871fa8d54a1c7a911e345b0",
+  "controller_sha256": "356b72028d056ee4f46d5e1354d007bfbd328f82231241a4ae3c144608bfea23",
+  "entry_sha256": "91309943b999722b5a86f1cade6cc25baadc41dfdcba312e929a9a90cb54740f",
+  "runs": [
+    {
+      "phase": "original",
+      "returncode": 0,
+      "reservation": {
+        "coordinator_socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+        "direct_worker": "/usr/bin/bwrap",
+        "job_id": "h3-stage4-video-cuda-source-build-01-original",
+        "process_form": "bwrap-pid-namespace",
+        "report": {
+          "namespace_exited": true,
+          "namespace_init": 4184005,
+          "worker": {
+            "child_reaped": true,
+            "child_started": true,
+            "exit_code": 0,
+            "finish_sent": true,
+            "signal": null,
+            "state": "completed"
+          }
+        },
+        "schema": 1
+      }
+    },
+    {
+      "phase": "native",
+      "returncode": 0,
+      "reservation": {
+        "coordinator_socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+        "direct_worker": "/usr/bin/bwrap",
+        "job_id": "h3-stage4-video-cuda-source-build-01-native",
+        "process_form": "bwrap-pid-namespace",
+        "report": {
+          "namespace_exited": true,
+          "namespace_init": 4186982,
+          "worker": {
+            "child_reaped": true,
+            "child_started": true,
+            "exit_code": 0,
+            "finish_sent": true,
+            "signal": null,
+            "state": "completed"
+          }
+        },
+        "schema": 1
+      }
+    }
+  ],
+  "inputs": {
+    "h3-video.json": "266a50346c5a66aa9e741491f3b39e929b1d0cd744e62b8a005062dab1dfb441",
+    "h3-video-quant.json": "7f0c187a62b2cc1f2c4ff2c081d2b50c7b58d775676ecac5cbc5fd2c49f16a5a",
+    "h3-loading.json": "85d7069ffd26e1abd81517eaf48facbdc713e251e0376e9965be32a7570322b5"
+  },
+  "reference_script_sha256": "3f54de10e61c8c8609651b5cdceb9266524b6e836005b47833b0f11d812e73d5",
+  "oracle_sha256": "e550153e40ce90db11d8cc650979a109030d71548f52e22cd7b12040297700e6",
+  "bridge_sha256": "aabf3b4ba6bf8459a779276dcc806380916d7a37ee3ab8820639dc2ef578461d",
+  "bridge_provenance_sha256": "56b048c7f47e7c2a4618f8d906a71c072c86b1f999ebd0bc0de8aa44b3cf4220"
+}

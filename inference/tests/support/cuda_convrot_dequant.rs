@@ -41,3 +41,26 @@ fn cuda_original_convrot_wide_dequantization_matches() {
     }
     assert_eq!(fixture["cases"].as_array().unwrap().len(), 24);
 }
+
+#[test]
+#[ignore = "Requires an explicitly reserved CUDA worker; injects an own pin refusal"]
+fn cuda_pin_refusal_discard_does_not_poison_next_convrot_launch() {
+    let native = kitchen();
+    let _grad = tch::no_grad_guard();
+    cuda_original_convrot_wide_dequantization_matches();
+    let own_host = Tensor::ones([1], (Kind::Uint8, Device::Cpu));
+    // CUDA rejects a zero-byte registration before accessing the owned pointer.
+    assert!(
+        !unsafe { native.host_registration_raw(own_host.data_ptr() as usize, 0, true) }.unwrap()
+    );
+    imagine_inference::memory::exceptions::discard_native_cuda_async_error(
+        &native,
+        Device::Cuda(0),
+    )
+    .unwrap();
+    cuda_original_convrot_wide_dequantization_matches();
+    let [allocated, reserved, peak_allocated, peak_reserved] =
+        native.cuda_allocator_stats(0).unwrap();
+    assert!(peak_allocated >= allocated && peak_allocated > 0);
+    assert!(peak_reserved >= reserved && peak_reserved >= peak_allocated);
+}

@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "scope": "selected trained H3 component phase",
+  "engine": "original",
+  "phase": "text",
+  "reference": true,
+  "load_only": false,
+  "output_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/trained/reference-cold-01/original",
+  "profile_sha256": "53f5f4ac008fdb828da50c612415dc0fd043384d4a65233831b84ef601bcd5c4",
+  "model_lock_sha256": "9cb461e3b118be5775602a81e4ddbd7e727b178f45aba9ce8fab0a3917c296b4",
+  "selected_component": {
+    "role": "text",
+    "path": "/mnt/media/gemensam/AI/ComfyUI/models/text_encoders/minimax_h3/qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors",
+    "file_bytes": 26363476151,
+    "mtime_ns": 1786377363770414500,
+    "header_sha256": "c96da5bad1827e9b02615a1f2d997c14a07f45798db80bdb62b29016dd3b0f36",
+    "sha256": "d84547412144b7c50a6ec77437a889b869d3ace88da77ef1775d3d2a4901c192",
+    "checksum_seconds": 29.716294734040275
+  },
+  "controller_sha256": "356b72028d056ee4f46d5e1354d007bfbd328f82231241a4ae3c144608bfea23",
+  "entry_sha256": "91309943b999722b5a86f1cade6cc25baadc41dfdcba312e929a9a90cb54740f",
+  "reference_sha256": "1e9298690dc3b0aaff959e3eed25d6c4a00d1621f20fffc8326a238b01f874e6",
+  "oracle_source_sha256": {
+    "inference/tools/reference_h3_trained.py": "71f7677927d80be4bfb28036cbbeaa0a32ce5651907df972304d8a249558a1c8",
+    "inference/tools/reference_h3_loading.py": "461046d000d8e20655ae73febc2fcba12529da197ee67096136027283cbfade3",
+    "inference/tools/reference_paths.py": "4f82e6a33f5dcda5f684464e9e89474cf0d6c36d46d8a2497b5487f27b35059b"
+  },
+  "returncode": 0,
+  "reservation": {
+    "coordinator_socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+    "direct_worker": "/usr/bin/bwrap",
+    "job_id": "h3-stage4-reference-cold-01-original-text",
+    "process_form": "bwrap-pid-namespace",
+    "report": {
+      "namespace_exited": true,
+      "namespace_init": 3918355,
+      "worker": {
+        "child_reaped": true,
+        "child_started": true,
+        "exit_code": 0,
+        "finish_sent": true,
+        "signal": null,
+        "state": "completed"
+      }
+    },
+    "schema": 1
+  },
+  "phase_report": {
+    "schema": 1,
+    "phase": "text",
+    "reference": true,
+    "trained_weights": true,
+    "kitchen_triton_enabled": false,
+    "model_sha256": "d84547412144b7c50a6ec77437a889b869d3ace88da77ef1775d3d2a4901c192",
+    "prepared": {
+      "model_size": 26363248757,
+      "loaded_bytes": 0,
+      "model_lowvram": false,
+      "pinned_bytes": 0,
+      "force_cast_weights": true
+    },
+    "prepare_seconds": 27.238180759828538,
+    "loaded": {
+      "model_size": 26363248757,
+      "loaded_bytes": 11819105281,
+      "model_lowvram": true,
+      "pinned_bytes": 9732512,
+      "force_cast_weights": true
+    },
+    "context": {
+      "shape": [
+        1,
+        124,
+        5120
+      ],
+      "dtype": "float32",
+      "sha256": "4a69776bc137b49c25c4347a5378dfc52e029b1984f794be8968ba323009f008",
+      "bytes": 2539520
+    },
+    "token_tags": {
+      "shape": [
+        124
+      ],
+      "dtype": "int64",
+      "sha256": "33bae01a00571e3dd711ffff73d7c1659f22910f870a2842ad76b6f312e5a3d2",
+      "bytes": 992
+    },
+    "inference_seconds": 16.07398802298121,
+    "unloaded": {
+      "model_size": 26363248757,
+      "loaded_bytes": 11819105281,
+      "model_lowvram": true,
+      "pinned_bytes": 9732512,
+      "force_cast_weights": true
+    },
+    "peak_allocated_bytes": 13254574592,
+    "cuda_after_release": {
+      "allocated": 8781824,
+      "reserved": 23068672
+    },
+    "seconds": 49.3161906208843
+  }
+}

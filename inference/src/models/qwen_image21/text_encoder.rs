@@ -133,7 +133,7 @@ pub struct QwenTextEncoder {
     pub config: TextEncoderConfig,
     pub embedding: Value,
     blocks: Vec<LanguageBlock>,
-    norm: Tensor,
+    norm: Option<Tensor>,
 }
 fn parameter(state: &PreparedParameters, name: &str) -> Result<Value, Error> {
     state.get(name).cloned().ok_or_else(|| Error::BindingGap {
@@ -470,6 +470,15 @@ impl QwenTextEncoder {
         config: TextEncoderConfig,
         state: &PreparedParameters,
     ) -> Result<Self, Error> {
+        Self::from_parameters_with_final_norm(config, state, true)
+    }
+    /// The source Qwen3-VL constructor makes the final norm optional. H3's
+    /// truncated language checkpoint selects false; existing image models use true.
+    pub fn from_parameters_with_final_norm(
+        config: TextEncoderConfig,
+        state: &PreparedParameters,
+        final_norm: bool,
+    ) -> Result<Self, Error> {
         let mut blocks = vec![];
         for i in 0..config.layers {
             let prefix = format!("model.layers.{i}");
@@ -520,7 +529,11 @@ impl QwenTextEncoder {
         }
         Ok(Self {
             embedding: parameter(state, "model.embed_tokens.weight")?,
-            norm: parameter(state, "model.norm.weight")?.as_tensor()?,
+            norm: if final_norm {
+                Some(parameter(state, "model.norm.weight")?.as_tensor()?)
+            } else {
+                None
+            },
             blocks,
             config,
         })
@@ -628,16 +641,20 @@ impl QwenTextEncoder {
             }
         }
         exec.queue_end(x.device())?;
-        x = rms(&x, &self.norm, self.config.eps)?;
+        if let Some(norm) = &self.norm {
+            x = rms(&x, norm, self.config.eps)?;
+        }
         if wants(self.blocks.len()) {
             all.push(rt.native.clone_tensor(&x.f_unsqueeze(1)?)?);
         }
         if collect {
             intermediate = Some(Tensor::f_cat(&all, 1)?);
         }
-        if options.final_layer_norm_intermediate {
+        if let Some(norm) = &self.norm
+            && options.final_layer_norm_intermediate
+        {
             intermediate = intermediate
-                .map(|t| rms(&t, &self.norm, self.config.eps))
+                .map(|t| rms(&t, norm, self.config.eps))
                 .transpose()?;
         }
         Ok(TextEncoderOutput {

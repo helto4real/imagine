@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "result": "failed",
+  "trained_weights": 0,
+  "test": "cuda_convrot_dequant_tests::cuda_pin_refusal_discard_does_not_poison_next_convrot_launch",
+  "binary_sha256": "afad302cb2697792163cd4d0392b706edddd89b0d943b769734a73ca66fec7de",
+  "controller_sha256": "356b72028d056ee4f46d5e1354d007bfbd328f82231241a4ae3c144608bfea23",
+  "entry_sha256": "91309943b999722b5a86f1cade6cc25baadc41dfdcba312e929a9a90cb54740f",
+  "returncode": 1,
+  "reservation": {
+    "coordinator_socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+    "direct_worker": "/usr/bin/bwrap",
+    "job_id": "h3-stage4-pin-discard-cuda-02",
+    "process_form": "bwrap-pid-namespace",
+    "report": {
+      "namespace_exited": true,
+      "namespace_init": 3710402,
+      "worker": {
+        "child_reaped": true,
+        "child_started": true,
+        "exit_code": 101,
+        "finish_sent": true,
+        "signal": null,
+        "state": "completed"
+      }
+    },
+    "schema": 1
+  },
+  "exactly_one_test_passed": false
+}

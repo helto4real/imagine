@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "phase": "dit",
+  "reference": false,
+  "trained_weights": true,
+  "kitchen_triton_enabled": false,
+  "model_sha256": "9255f52b6677845ad238f20dfaafa94727053694127ab7f255c048f0f9365779",
+  "prepared": {
+    "model_size": 20967513920,
+    "loaded_bytes": 0,
+    "model_lowvram": false,
+    "pinned_bytes": 0,
+    "force_cast_weights": false
+  },
+  "prepare_seconds": 23.382353646913543,
+  "loaded": {
+    "model_size": 20967513920,
+    "loaded_bytes": 12357368816,
+    "model_lowvram": true,
+    "pinned_bytes": 73269504,
+    "force_cast_weights": false
+  },
+  "observations": {
+    "h3.sampling.0.x": {
+      "shape": [
+        1,
+        1,
+        114752
+      ],
+      "dtype": "float32",
+      "sha256": "a5646283740c4c7816717060f312641e3b0676af53de53b4fa604610ffbc0296",
+      "bytes": 459008
+    },
+    "h3.sampling.0.denoised": {
+      "shape": [
+        1,
+        1,
+        114752
+      ],
+      "dtype": "float32",
+      "sha256": "ac9a53888e3f96e7603e3ede69dace4a2c4e6dfdbabdeb5ba3b7048708fc9796",
+      "bytes": 459008
+    },
+    "h3.sampling.1.x": {
+      "shape": [
+        1,
+        1,
+        114752
+      ],
+      "dtype": "float32",
+      "sha256": "d6e10d05b4134e6aa98f4f3071ce1df0b66e482622a2a309ee25edcd8dc2e8d6",
+      "bytes": 459008
+    },
+    "h3.sampling.1.denoised": {
+      "shape": [
+        1,
+        1,
+        114752
+      ],
+      "dtype": "float32",
+      "sha256": "ee3943a50f044b7d994af15d0fb77b11f41e5b305f00cf0085f7c53bdc73126d",
+      "bytes": 459008
+    },
+    "h3.sampling.2.x": {
+      "shape": [
+        1,
+        1,
+        114752
+      ],
+      "dtype": "float32",
+      "sha256": "ca8bc9fc6252202cf4664ad367b5548b606a26302051512e3a763bceb15373dc",
+      "bytes": 459008
+    },
+    "h3.sampling.2.denoised": {
+      "shape": [
+        1,
+        1,
+        114752
+      ],
+      "dtype": "float32",
+      "sha256": "9ab09b30278d7b34d23a332608e5f388808fd8c46b3331da34ccad3e5ec9fbf0",
+      "bytes": 459008
+    },
+    "h3.sampling.3.x": {
+      "shape": [
+        1,
+        1,
+        114752
+      ],
+      "dtype": "float32",
+      "sha256": "18f04ce193b6ad6a511705451f0fe25d9f8304922d687bbfec5dc77a6b319d2d",
+      "bytes": 459008
+    },
+    "h3.sampling.3.denoised": {
+      "shape": [
+        1,
+        1,
+        114752
+      ],
+      "dtype": "float32",
+      "sha256": "3504b79ccbffb6dca7e8ef6e6cfb68c2a639211eadcbb8252b33252b4cf5ebc8",
+      "bytes": 459008
+    }
+  },
+  "inference_seconds": 10.760839488822967,
+  "unloaded": {
+    "model_size": 20967513920,
+    "loaded_bytes": 12357368816,
+    "model_lowvram": true,
+    "pinned_bytes": 73269504,
+    "force_cast_weights": false
+  },
+  "peak_allocated_bytes": 12643938816,
+  "cuda_after_release": {
+    "allocated": 8519680,
+    "reserved": 20971520
+  },
+  "seconds": 43.145748572889715
+}

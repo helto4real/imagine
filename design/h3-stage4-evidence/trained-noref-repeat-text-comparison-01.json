@@ -1,0 +1,187 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "criterion": "Exact payload SHA-256, shape, dtype, byte count and token entries",
+  "phase": "text",
+  "reference": false,
+  "profile_sha256": "53f5f4ac008fdb828da50c612415dc0fd043384d4a65233831b84ef601bcd5c4",
+  "model_sha256": "d84547412144b7c50a6ec77437a889b869d3ace88da77ef1775d3d2a4901c192",
+  "cases": [
+    {
+      "name": "context",
+      "equal": true,
+      "native": {
+        "bytes": 409600,
+        "dtype": "float32",
+        "sha256": "df26815bb4a20fa0e5130335680448a36c5725efbf0c0ce32281a1d78c841088",
+        "shape": [
+          1,
+          20,
+          5120
+        ]
+      },
+      "original": {
+        "shape": [
+          1,
+          20,
+          5120
+        ],
+        "dtype": "float32",
+        "sha256": "df26815bb4a20fa0e5130335680448a36c5725efbf0c0ce32281a1d78c841088",
+        "bytes": 409600
+      }
+    },
+    {
+      "name": "tags",
+      "equal": true,
+      "native": {
+        "bytes": 160,
+        "dtype": "int64",
+        "sha256": "9edc6c2722e35d348c7966e1b56fd87be5db35a2176efcacf1ea0f6e50a2f775",
+        "shape": [
+          20
+        ]
+      },
+      "original": {
+        "shape": [
+          20
+        ],
+        "dtype": "int64",
+        "sha256": "9edc6c2722e35d348c7966e1b56fd87be5db35a2176efcacf1ea0f6e50a2f775",
+        "bytes": 160
+      }
+    },
+    {
+      "name": "tokens",
+      "equal": true,
+      "native": [
+        {
+          "id": 32
+        },
+        {
+          "id": 33828
+        },
+        {
+          "id": 3145
+        },
+        {
+          "id": 6303
+        },
+        {
+          "id": 42024
+        },
+        {
+          "id": 23739
+        },
+        {
+          "id": 13970
+        },
+        {
+          "id": 89059
+        },
+        {
+          "id": 389
+        },
+        {
+          "id": 264
+        },
+        {
+          "id": 3100
+        },
+        {
+          "id": 22360
+        },
+        {
+          "id": 1965
+        },
+        {
+          "id": 304
+        },
+        {
+          "id": 264
+        },
+        {
+          "id": 11340
+        },
+        {
+          "id": 7015
+        },
+        {
+          "id": 31635
+        },
+        {
+          "id": 3054
+        },
+        {
+          "id": 13
+        }
+      ],
+      "original": [
+        {
+          "id": 32
+        },
+        {
+          "id": 33828
+        },
+        {
+          "id": 3145
+        },
+        {
+          "id": 6303
+        },
+        {
+          "id": 42024
+        },
+        {
+          "id": 23739
+        },
+        {
+          "id": 13970
+        },
+        {
+          "id": 89059
+        },
+        {
+          "id": 389
+        },
+        {
+          "id": 264
+        },
+        {
+          "id": 3100
+        },
+        {
+          "id": 22360
+        },
+        {
+          "id": 1965
+        },
+        {
+          "id": 304
+        },
+        {
+          "id": 264
+        },
+        {
+          "id": 11340
+        },
+        {
+          "id": 7015
+        },
+        {
+          "id": 31635
+        },
+        {
+          "id": 3054
+        },
+        {
+          "id": 13
+        }
+      ]
+    }
+  ],
+  "selections": {
+    "design/h3-stage4-evidence/trained-noref-repeat-01-native-text/selection.json": "fd4c3f653b56be7b65171835047d0fbf58ee5563863ffd828c1a14e9d085a946",
+    "design/h3-stage4-evidence/trained-noref-cold-01-original-text/selection.json": "f904571ca10df6243b2abda4bcb62b85145b45e6c8f24bda0b6f13e4df25e405"
+  }
+}

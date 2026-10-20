@@ -20,6 +20,7 @@ int imagine_tensor_buffer_context(const void*,void(*)(void*),void**);
 int imagine_comfy_sdpa(const void*,const void*,const void*,const void*,int64_t,double,int64_t,int64_t,void**);
 int imagine_sdpa_state(int64_t*,int64_t);
 int imagine_cuda_memory(int64_t,uint64_t*);
+int imagine_cuda_allocator_stats(int64_t,uint64_t*);
 int imagine_host_registration(const void*,int64_t,int64_t*);
 int imagine_host_registration_raw(uint64_t,uint64_t,int64_t,int64_t*);
 int imagine_tensor_video_slice_assign(void*,int64_t,int64_t,const void*);

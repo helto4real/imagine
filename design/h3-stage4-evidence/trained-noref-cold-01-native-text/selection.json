@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "result": "failed",
+  "scope": "selected trained H3 component phase",
+  "engine": "native",
+  "phase": "text",
+  "reference": false,
+  "load_only": false,
+  "output_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/trained/noref-cold-01/native",
+  "profile_sha256": "53f5f4ac008fdb828da50c612415dc0fd043384d4a65233831b84ef601bcd5c4",
+  "model_lock_sha256": "9cb461e3b118be5775602a81e4ddbd7e727b178f45aba9ce8fab0a3917c296b4",
+  "selected_component": {
+    "role": "text",
+    "path": "/mnt/media/gemensam/AI/ComfyUI/models/text_encoders/minimax_h3/qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors",
+    "file_bytes": 26363476151,
+    "mtime_ns": 1786377363770414500,
+    "header_sha256": "c96da5bad1827e9b02615a1f2d997c14a07f45798db80bdb62b29016dd3b0f36",
+    "sha256": "d84547412144b7c50a6ec77437a889b869d3ace88da77ef1775d3d2a4901c192",
+    "checksum_seconds": 29.716294734040275
+  },
+  "controller_sha256": "356b72028d056ee4f46d5e1354d007bfbd328f82231241a4ae3c144608bfea23",
+  "entry_sha256": "91309943b999722b5a86f1cade6cc25baadc41dfdcba312e929a9a90cb54740f",
+  "worker_sha256": "c5ff618739b9a7e7396b57956c97216f0e8143df6ea4b21284c44e14c969205e",
+  "returncode": 1,
+  "reservation": {
+    "coordinator_socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+    "direct_worker": "/usr/bin/bwrap",
+    "job_id": "h3-stage4-noref-cold-01-native-text",
+    "process_form": "bwrap-pid-namespace",
+    "report": {
+      "namespace_exited": true,
+      "namespace_init": 3377180,
+      "worker": {
+        "child_reaped": true,
+        "child_started": true,
+        "exit_code": 1,
+        "finish_sent": true,
+        "signal": null,
+        "state": "completed"
+      }
+    },
+    "schema": 1
+  }
+}

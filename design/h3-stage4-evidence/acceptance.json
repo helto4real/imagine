@@ -1,0 +1,204 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "scope": "Selected standalone H3 Stage 4 core, technical 384x256 / 39-frame CFG1 Euler profile",
+  "stage3_registry_complete": false,
+  "product_integration": false,
+  "visual_quality_acceptance": false,
+  "source_snapshot_sha256": "03ac3d334b5a88bcdf5dd7357508d2b02df72dedb9604339a5e15b8ec82532f5",
+  "native_library_sha256": "ab7c807cd5f9aac244f58a302d9500a6ab04b0314b7223404881ce407ed0d4a3",
+  "native_provenance_sha256": "aa6d068f30fabc2b161415a96e270a55094d6aca2033cba964a64e78d757ed5d",
+  "model_lock_sha256": "9cb461e3b118be5775602a81e4ddbd7e727b178f45aba9ce8fab0a3917c296b4",
+  "checks": {
+    "design/h3-stage4-evidence/complete-cpu-v4/selection.json": "c7dc722b0c13b56c7bd91b9b0f312871abb0c541297f9159f31726bcd13567c1",
+    "design/h3-stage4-evidence/pin-discard-cuda-06/selection.json": "66c555215f68d7df1b9417fd2761514080358120177e9d7cc0a3f319a19dc21c",
+    "design/h3-stage4-evidence/sol-chunked-cuda-01/selection.json": "70181b68e2ba6fca75347558b058f938acffa162b2df461445a285f22eaeb4f5",
+    "design/h3-stage4-evidence/full-primitives-torch-registration-01/selection.json": "774ff1b1d799a87b8cf4123034c05bf3a8a33b41b36c2addd522a285aba81c42",
+    "design/h3-stage4-evidence/trained-lifecycle-cancel-after-loaded-02/selection.json": "e3d3aae7d83c05c2d4efa21d7dfb3fc4d0c176cdccb350f02db600c8e38aab6d",
+    "design/h3-stage4-evidence/trained-lifecycle-missing-input-02/selection.json": "ec69cc451e2551913a0e0bface1739d8889e2cc5c71984eb9b7b29c5c55d0edf",
+    "design/h3-stage4-evidence/video-cuda-source-build-02/selection.json": "6a0ce795f6d81b25dca35921b5c5eb6832380dc5832ce16a854e26fc56bb506d",
+    "design/h3-stage4-evidence/audio-cuda-source-build-02/selection.json": "74d94b259995b1514b429e35cd0bc0979df22d6a356309e103f1ff503d3128cc",
+    "design/h3-stage4-evidence/dit-cuda-source-build-02/selection.json": "e58f469455b148187723e728a932302782ba9a4ab6e55a4e891b76079eec80a3",
+    "design/h3-stage4-evidence/sampling-cuda-source-build-02/selection.json": "89ed9ba99a0c26b657c9aa0e35357fc39a6aad0a5b074bc96bb24cb9d57577f9",
+    "design/h3-stage4-evidence/conditioning-cuda-source-build-02/selection.json": "a572fbe036e1600a05807c01ad2f24a96b788002b13c98a9fc7c78b13ef1d03b",
+    "design/h3-stage4-evidence/quantized-cuda-source-build-02/selection.json": "97e2005750387f0bcd1248bff01cb1f07eba2ca6f1fc40bf1f9b0b4224c210a5",
+    "design/h3-stage4-evidence/trained-noref-final-text-comparison-01.json": "7aed44563896616e6792422071eff58c6bf4de9468e54ea87e4f3f7947046466",
+    "design/h3-stage4-evidence/trained-noref-final-dit-comparison-01.json": "204509fe33617e659413364461232a41d0e7de91f994e16dd848d610f2cf31e0",
+    "design/h3-stage4-evidence/trained-noref-final-video-comparison-01.json": "6880f3f9b414027e56bd04ce2ef4e5bc0018db72d655e59d669471afa0f22999",
+    "design/h3-stage4-evidence/trained-noref-final-audio-comparison-01.json": "7e6d2eeac443dac3f2c8278154247ab96c9b9a44655ed0b864ee98ec9c3501fd",
+    "design/h3-stage4-evidence/trained-reference-final-text-comparison-01.json": "db1bc5fa0b65dc26676260e22ca39eb1e792077138fd167e3f0612dc08f53c29",
+    "design/h3-stage4-evidence/trained-reference-final-reference-comparison-01.json": "e110d02ff108277c151a4eb38f2058da0949217da1eb3251364d2b40d9efee4a",
+    "design/h3-stage4-evidence/trained-reference-final-dit-comparison-01.json": "a56eb903a6825ad55498c5579f79ac6029f640189f2e6ba21029ef7da544b5e5",
+    "design/h3-stage4-evidence/trained-reference-final-video-comparison-01.json": "817c44cd664b7e8f1b51f5c89467227dd71018f75c767089aa53aa6407c8decb",
+    "design/h3-stage4-evidence/trained-reference-final-audio-comparison-01.json": "b9ea1526b1b83f9069261a466c014af3328dc8b0aaab2198f8289cf670bb7f09",
+    "design/h3-stage4-evidence/trained-noref-final-repeat-text-comparison-01.json": "2be681b8bd58c96e7e0d1159e0ed6da06f9d18be20930e738d35f4141c1ddea5",
+    "design/h3-stage4-evidence/trained-noref-final-repeat-dit-comparison-01.json": "54d3dd673b3ad44902cfb7884c685b1fa0327d5c203c56a808a8b2110830d5ef",
+    "design/h3-stage4-evidence/trained-noref-final-repeat-video-comparison-01.json": "b8dc3fd43be43b0d9e394a5ebdb9f4640396729d58399175d0783750b1c326e1",
+    "design/h3-stage4-evidence/trained-noref-final-repeat-audio-comparison-01.json": "4d1ec899ebbc054c5e0996232643be0e0a2afc22f2c4224eef1c9bb469783ae8"
+  },
+  "cpu_h3_tests": 12,
+  "cuda_h3_synthetic_histories": 101,
+  "full_primitive_tests": 415,
+  "exact_trained_phase_comparisons": 13,
+  "exact_trained_artifact_comparisons": 55,
+  "lifecycle": "Real trained cancellation after load, failure cleanup, subsequent reference-image encode and complete repeated generation; namespace reaped before finish send",
+  "memory": [
+    {
+      "run": "noref-final-repeat-01",
+      "engine": "native",
+      "phase": "text",
+      "peak_allocated_bytes": 12855572992,
+      "allocated_after_release": 8781824,
+      "phase_selection_sha256": "edaa18c722e1cd8529fb002468ffbf58be8e52f4b5670e0c93ad42aaab45ff60"
+    },
+    {
+      "run": "noref-final-repeat-01",
+      "engine": "native",
+      "phase": "dit",
+      "peak_allocated_bytes": 12327449600,
+      "allocated_after_release": 8519680,
+      "phase_selection_sha256": "e89746596fbf98b43fd1a1ce6bd3c98befab15c91c6bcae993b7c5c91538ea5e"
+    },
+    {
+      "run": "noref-final-repeat-01",
+      "engine": "native",
+      "phase": "video",
+      "peak_allocated_bytes": 3050701312,
+      "allocated_after_release": 8519680,
+      "phase_selection_sha256": "379523cbdb70ba205fcc695e207611b0c3b41eb23bd177d71663405030b02e74"
+    },
+    {
+      "run": "noref-final-repeat-01",
+      "engine": "native",
+      "phase": "audio",
+      "peak_allocated_bytes": 675951616,
+      "allocated_after_release": 0,
+      "phase_selection_sha256": "5381032fb834c8c603c09d9eef25bb11d45f4c54293264eb4b5b6a3e0473b9af"
+    },
+    {
+      "run": "noref-cold-01",
+      "engine": "original",
+      "phase": "text",
+      "peak_allocated_bytes": 13228884480,
+      "allocated_after_release": 8781824,
+      "phase_selection_sha256": "f904571ca10df6243b2abda4bcb62b85145b45e6c8f24bda0b6f13e4df25e405"
+    },
+    {
+      "run": "noref-cold-01",
+      "engine": "original",
+      "phase": "dit",
+      "peak_allocated_bytes": 12643938816,
+      "allocated_after_release": 8519680,
+      "phase_selection_sha256": "45088c28f32a8efc5dd846475eeec1dcd38479dd3c152bef80f043ea29fd4dab"
+    },
+    {
+      "run": "noref-cold-01",
+      "engine": "original",
+      "phase": "video",
+      "peak_allocated_bytes": 3006560768,
+      "allocated_after_release": 8519680,
+      "phase_selection_sha256": "c7682e75f54bfd0dfa2014d7d2b4e4b8ef2dbb3ddd0ed760b83ef915336cf55b"
+    },
+    {
+      "run": "noref-cold-01",
+      "engine": "original",
+      "phase": "audio",
+      "peak_allocated_bytes": 675951616,
+      "allocated_after_release": 0,
+      "phase_selection_sha256": "221f65a3435be1b3f58f59f946147bf11597ac254beaacd6d551d96007766251"
+    },
+    {
+      "run": "reference-final-01",
+      "engine": "native",
+      "phase": "text",
+      "peak_allocated_bytes": 13119745024,
+      "allocated_after_release": 8781824,
+      "phase_selection_sha256": "f54159d4db54a7c9dfa0a691f949b66ec351e6a709ef2138d5f275357f47b264"
+    },
+    {
+      "run": "reference-final-01",
+      "engine": "native",
+      "phase": "reference",
+      "peak_allocated_bytes": 2870395904,
+      "allocated_after_release": 0,
+      "phase_selection_sha256": "635be9ad016b759fc597386e9d82578752163299305b8065ecf73b764a83a2a6"
+    },
+    {
+      "run": "reference-final-01",
+      "engine": "native",
+      "phase": "dit",
+      "peak_allocated_bytes": 12601960448,
+      "allocated_after_release": 8519680,
+      "phase_selection_sha256": "e39454987d104cee0a1817447d65258948b39e50711184cef0b1557ab3ee2bad"
+    },
+    {
+      "run": "reference-final-01",
+      "engine": "native",
+      "phase": "video",
+      "peak_allocated_bytes": 3050701312,
+      "allocated_after_release": 8519680,
+      "phase_selection_sha256": "c601cf60011eeebf62f4683bc4d732318cf00229791d0371c0f5bcf9dd1a378e"
+    },
+    {
+      "run": "reference-final-01",
+      "engine": "native",
+      "phase": "audio",
+      "peak_allocated_bytes": 675951616,
+      "allocated_after_release": 0,
+      "phase_selection_sha256": "0760b2ccb08161795e54f28a5c96fe7f2c44e87a979f0e97c243e31bf27496e2"
+    },
+    {
+      "run": "reference-cold-01",
+      "engine": "original",
+      "phase": "text",
+      "peak_allocated_bytes": 13254574592,
+      "allocated_after_release": 8781824,
+      "phase_selection_sha256": "8cf401a681fb9360cf4ee86fb6d3351ca490b9ceb831ac1bfeaac725568da9af"
+    },
+    {
+      "run": "reference-cold-01",
+      "engine": "original",
+      "phase": "reference",
+      "peak_allocated_bytes": 2870395904,
+      "allocated_after_release": 0,
+      "phase_selection_sha256": "f823bbfdb044c2713464bec86e65cb5445b541b8fd8899c7436e3e31f59c7d2b"
+    },
+    {
+      "run": "reference-cold-01",
+      "engine": "original",
+      "phase": "dit",
+      "peak_allocated_bytes": 12671642624,
+      "allocated_after_release": 8519680,
+      "phase_selection_sha256": "10e0c0acfb85747ad109e14ee4030a977920a3affc24823b192d834dbb9c67dd"
+    },
+    {
+      "run": "reference-cold-01",
+      "engine": "original",
+      "phase": "video",
+      "peak_allocated_bytes": 3006560768,
+      "allocated_after_release": 8519680,
+      "phase_selection_sha256": "c032ba06aca6a91631d5020b381893541b4f517adc3650f27a19b5f65838e6a7"
+    },
+    {
+      "run": "reference-cold-01",
+      "engine": "original",
+      "phase": "audio",
+      "peak_allocated_bytes": 675951616,
+      "allocated_after_release": 0,
+      "phase_selection_sha256": "639b43280fc5da8fb677a96510be5e117102174d92273340264e90fd2c46c0d5"
+    }
+  ],
+  "clips": [
+    {
+      "path": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/trained/noref-final-repeat-01/native/no-reference.mp4",
+      "sha256": "cdf4488177e955e89188a99774b8714713d26cd7fe65030bd1de7000fbe8f4ea",
+      "metadata_sha256": "6a123fed57435c6fce2ed901ae8b8b2823ce451ab216fd2f4d250bd914f99e4c"
+    },
+    {
+      "path": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/trained/reference-final-01/native/synthetic-reference.mp4",
+      "sha256": "f93772cc5892567a124ad4d3a62078f6e8b1742fdd409486fc275baad3a3503f",
+      "metadata_sha256": "2e7582cf4bfea60d55af4c2818f70ea3219e74b7acf75982f6754c56e98aa593"
+    }
+  ],
+  "limits": "No broker finish acknowledgement, controller SIGKILL resilience, production integration, broad Stage 3 completeness or quality/performance benchmark is claimed"
+}

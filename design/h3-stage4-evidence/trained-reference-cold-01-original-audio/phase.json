@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "phase": "audio",
+  "reference": true,
+  "trained_weights": true,
+  "kitchen_triton_enabled": false,
+  "model_sha256": "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48",
+  "prepared": {
+    "model_size": 605149280,
+    "loaded_bytes": 0,
+    "model_lowvram": false,
+    "pinned_bytes": 0,
+    "force_cast_weights": false
+  },
+  "prepare_seconds": 0.8169100400991738,
+  "loaded": {
+    "model_size": 605149280,
+    "loaded_bytes": 605149280,
+    "model_lowvram": false,
+    "pinned_bytes": 0,
+    "force_cast_weights": false
+  },
+  "pcm": {
+    "shape": [
+      1,
+      2,
+      52000
+    ],
+    "dtype": "float32",
+    "sha256": "ec951feacb3359772a14c5059712a20caa797ba62558c43ee47ed5128f240db3",
+    "bytes": 416000
+  },
+  "inference_seconds": 0.21781363594345748,
+  "unloaded": {
+    "model_size": 605149280,
+    "loaded_bytes": 605149280,
+    "model_lowvram": false,
+    "pinned_bytes": 0,
+    "force_cast_weights": false
+  },
+  "peak_allocated_bytes": 675951616,
+  "cuda_after_release": {
+    "allocated": 0,
+    "reserved": 0
+  },
+  "seconds": 1.221324650105089
+}

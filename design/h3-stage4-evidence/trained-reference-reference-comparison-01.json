@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "criterion": "Exact payload SHA-256, shape, dtype, byte count and token entries",
+  "phase": "reference",
+  "reference": true,
+  "profile_sha256": "53f5f4ac008fdb828da50c612415dc0fd043384d4a65233831b84ef601bcd5c4",
+  "model_sha256": "9bb2d96f218c76babd85e0611b85ca8fb330a90546c01a0005e8a58a59593410",
+  "cases": [
+    {
+      "name": "latent",
+      "equal": true,
+      "native": {
+        "bytes": 36864,
+        "dtype": "float32",
+        "sha256": "b58ceb3e46621741a6d5c34944f945fef6bf9aac945e6db66895d6eabf469051",
+        "shape": [
+          1,
+          24,
+          1,
+          16,
+          24
+        ]
+      },
+      "original": {
+        "shape": [
+          1,
+          24,
+          1,
+          16,
+          24
+        ],
+        "dtype": "float32",
+        "sha256": "b58ceb3e46621741a6d5c34944f945fef6bf9aac945e6db66895d6eabf469051",
+        "bytes": 36864
+      }
+    }
+  ],
+  "selections": {
+    "design/h3-stage4-evidence/trained-reference-cold-01-native-reference/selection.json": "49798fa40836b2a410ad04ed17b4a85ac22e2035b0b00822e8bcd594dfcbc554",
+    "design/h3-stage4-evidence/trained-reference-cold-01-original-reference/selection.json": "f823bbfdb044c2713464bec86e65cb5445b541b8fd8899c7436e3e31f59c7d2b"
+  }
+}

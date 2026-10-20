@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "phase": "text",
+  "reference": true,
+  "trained_weights": true,
+  "kitchen_triton_enabled": false,
+  "model_sha256": "d84547412144b7c50a6ec77437a889b869d3ace88da77ef1775d3d2a4901c192",
+  "prepared": {
+    "model_size": 26363248757,
+    "loaded_bytes": 0,
+    "model_lowvram": false,
+    "pinned_bytes": 0,
+    "force_cast_weights": true
+  },
+  "prepare_seconds": 27.238180759828538,
+  "loaded": {
+    "model_size": 26363248757,
+    "loaded_bytes": 11819105281,
+    "model_lowvram": true,
+    "pinned_bytes": 9732512,
+    "force_cast_weights": true
+  },
+  "context": {
+    "shape": [
+      1,
+      124,
+      5120
+    ],
+    "dtype": "float32",
+    "sha256": "4a69776bc137b49c25c4347a5378dfc52e029b1984f794be8968ba323009f008",
+    "bytes": 2539520
+  },
+  "token_tags": {
+    "shape": [
+      124
+    ],
+    "dtype": "int64",
+    "sha256": "33bae01a00571e3dd711ffff73d7c1659f22910f870a2842ad76b6f312e5a3d2",
+    "bytes": 992
+  },
+  "inference_seconds": 16.07398802298121,
+  "unloaded": {
+    "model_size": 26363248757,
+    "loaded_bytes": 11819105281,
+    "model_lowvram": true,
+    "pinned_bytes": 9732512,
+    "force_cast_weights": true
+  },
+  "peak_allocated_bytes": 13254574592,
+  "cuda_after_release": {
+    "allocated": 8781824,
+    "reserved": 23068672
+  },
+  "seconds": 49.3161906208843
+}

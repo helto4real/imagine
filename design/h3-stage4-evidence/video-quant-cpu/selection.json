@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "be18ff417bbc6d6a8c8d846c444a410db1d161092924946bef85ab0d35ce92fb",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_video_tests::h3_complete_video_vae_matches_original_causal_encoder_vit_decoder_spatial_blending_and_temporal_streaming",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/be18ff417bbc6d6a8c8d846c444a410db1d161092924946bef85ab0d35ce92fb/runs/748b983f260043d98ffcfc15bd712f20/00-h3_complete_video_vae_matches_original_causal_encoder_vit_decoder_spatial_blending_and_temporal_streaming.log",
+      "evidence": "00-h3_complete_video_vae_matches_original_causal_encoder_vit_decoder_spatial_blending_and_temporal_streaming.json"
+    },
+    {
+      "name": "h3_video_tests::h3_int8_video_vae_preserves_convrot_fused_norm_swiglu_and_residual_rounding",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/be18ff417bbc6d6a8c8d846c444a410db1d161092924946bef85ab0d35ce92fb/runs/748b983f260043d98ffcfc15bd712f20/01-h3_int8_video_vae_preserves_convrot_fused_norm_swiglu_and_residual_rounding.log",
+      "evidence": "01-h3_int8_video_vae_preserves_convrot_fused_norm_swiglu_and_residual_rounding.json"
+    }
+  ],
+  "result": "passed"
+}

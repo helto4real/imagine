@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "result": "failed",
+  "trained_weights": 0,
+  "test": "full-primitives",
+  "binary_sha256": "a5374a86e6d84c39d281fbf678c8999f19f1909f2871fa8d54a1c7a911e345b0",
+  "controller_sha256": "356b72028d056ee4f46d5e1354d007bfbd328f82231241a4ae3c144608bfea23",
+  "entry_sha256": "91309943b999722b5a86f1cade6cc25baadc41dfdcba312e929a9a90cb54740f",
+  "bridge_sha256": "aabf3b4ba6bf8459a779276dcc806380916d7a37ee3ab8820639dc2ef578461d",
+  "bridge_provenance_sha256": "56b048c7f47e7c2a4618f8d906a71c072c86b1f999ebd0bc0de8aa44b3cf4220",
+  "returncode": 1,
+  "reservation": {
+    "coordinator_socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+    "direct_worker": "/usr/bin/bwrap",
+    "job_id": "h3-stage4-full-primitives-shared-cuda-01",
+    "process_form": "bwrap-pid-namespace",
+    "report": {
+      "namespace_exited": true,
+      "namespace_init": 54142,
+      "worker": {
+        "child_reaped": true,
+        "child_started": true,
+        "exit_code": 101,
+        "finish_sent": true,
+        "signal": null,
+        "state": "completed"
+      }
+    },
+    "schema": 1
+  },
+  "tests_passed": 414,
+  "tests_ignored": 7,
+  "tests_failed": 1
+}

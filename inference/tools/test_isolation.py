@@ -20,6 +20,8 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--root',type=Path,required=True)
 parser.add_argument('--site',type=Path,required=True)
 parser.add_argument('--binary',type=Path,required=True)
+parser.add_argument('--kitchen-library',type=Path,help='Explicit separately built bridge; requires its source/hash provenance')
+parser.add_argument('--kitchen-provenance',type=Path)
 parser.add_argument('--runtime-root',type=Path,help='Separate writable development manifests/output; frozen dependencies still come from --root')
 parser.add_argument('--cpu-only',action='store_true',help='Do not expose NVIDIA devices; prohibit GPU execution in this validation')
 parser.add_argument('--aot-library',type=Path,required=True)
@@ -28,6 +30,7 @@ parser.add_argument('--int8-library',type=Path,required=True)
 parser.add_argument('--int8-fixture',type=Path,required=True)
 parser.add_argument('--backend-fixture',type=Path,required=True)
 parser.add_argument('--test-filter',help='Run one exact test; require one executed success')
+parser.add_argument('--emit-command',type=Path,help='Write the verified bwrap command for separate lease supervision; do not execute it')
 parser.add_argument('--pillow-library',type=Path,help='Verified original-source Pillow buffer ABI; no interpreter')
 parser.add_argument('--aimdo-library',type=Path,help='Explicit isolated copy of the frozen AIMDO ELF')
 parser.add_argument('--qwen-driver-profile','--driver-profile',dest='qwen_driver_profile',type=Path,help='Explicit frozen first-image development profile; switches from primitive tests to the standalone driver')
@@ -86,6 +89,15 @@ lazy_files=sorted(path for path in objects if path.parent==args.site/'nvidia/cud
                   or path==args.site/'torch/lib/libtorch_cuda_linalg.so')
 files=list(dict.fromkeys([*files,*lazy_files]))
 bridge=args.root/'kitchen-manylinux/libimagine_kitchen.so'
+if args.kitchen_library is not None:
+    assert args.kitchen_provenance is not None
+    provenance=json.loads(args.kitchen_provenance.read_text())
+    assert hashlib.file_digest(args.kitchen_library.open('rb'),'sha256').hexdigest()==provenance['library_sha256']
+    for relative,digest in provenance['native_sources'].items():
+        assert hashlib.file_digest((project/relative).open('rb'),'sha256').hexdigest()==digest,relative
+    bridge=args.kitchen_library
+elif args.kitchen_provenance is not None:
+    parser.error('Bridge provenance requires an explicit bridge')
 if args.aimdo_library is not None:
     expected=objects[args.site/'comfy_aimdo/aimdo.so']['sha256']
     assert hashlib.file_digest(args.aimdo_library.open('rb'),'sha256').hexdigest()==expected
@@ -200,6 +212,10 @@ command=['bwrap','--unshare-all','--die-with-parent','--new-session','--clearenv
     *driver_mounts,*(['--setenv','CUDA_VISIBLE_DEVICES','']if args.cpu_only else []),'--chdir','/tmp','/runtime/primitives',*(driver_args if driver_args is not None else ['--test-threads=1'])]
 if args.test_filter:
     command += [args.test_filter,'--exact']
+if args.emit_command is not None:
+    args.emit_command.write_text(json.dumps(dict(schema=1,binary_sha256=binary_sha256,bridge_sha256=hashlib.file_digest(bridge.open('rb'),'sha256').hexdigest(),bridge_provenance_sha256=hashlib.file_digest(args.kitchen_provenance.open('rb'),'sha256').hexdigest()if args.kitchen_provenance else None,command=command),indent=2)+'\n')
+    raise SystemExit(0)
+if args.test_filter:
     completed=subprocess.run(command,capture_output=True,text=True)
     print(completed.stdout,end='')
     print(completed.stderr,end='',file=sys.stderr)

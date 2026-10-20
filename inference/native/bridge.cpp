@@ -30,6 +30,7 @@ namespace torch { bool CudaIPCCollect(); }
 #include <string>
 #include <sstream>
 #include <utility>
+#include <dlfcn.h>
 
 namespace {
 thread_local std::string last_error;
@@ -37,6 +38,28 @@ thread_local int last_accelerator_code = 0;
 thread_local std::string last_metadata;
 thread_local at::CallbackHandle rms_callback = 0;
 thread_local RmsTemporaryMetadata rms_temporary{};
+// torch.cuda.cudart() uses LibTorch's shared runtime, while Kitchen's original
+// extension links its own static runtime. Host registration must not poison the
+// latter's last-error slot: Comfy's discard executes only through LibTorch.
+struct TorchCudart {
+    void* handle;
+    decltype(&cudaHostRegister) register_host;
+    decltype(&cudaHostUnregister) unregister_host;
+    TorchCudart() : handle(dlopen("libcudart.so.13", RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD)) {
+        if (!handle) throw std::runtime_error("LibTorch CUDA runtime is not loaded");
+        register_host=reinterpret_cast<decltype(register_host)>(dlsym(handle,"cudaHostRegister"));
+        unregister_host=reinterpret_cast<decltype(unregister_host)>(dlsym(handle,"cudaHostUnregister"));
+        if (!register_host || !unregister_host) {
+            dlclose(handle);
+            throw std::runtime_error("LibTorch CUDA host registration symbols are missing");
+        }
+    }
+    ~TorchCudart() { dlclose(handle); }
+};
+cudaError_t torch_host_registration(void* pointer,size_t bytes,bool pin) {
+    static const TorchCudart runtime;
+    return pin ? runtime.register_host(pointer,bytes,1) : runtime.unregister_host(pointer);
+}
 std::unique_ptr<at::ObserverContext> rms_metadata_start(const at::RecordFunction&) { return nullptr; }
 void rms_metadata_end(const at::RecordFunction& fn, at::ObserverContext*) {
     if (std::strcmp(fn.name(), "aten::_fused_rms_norm") != 0) return;
@@ -133,7 +156,7 @@ extern "C" int imagine_host_registration(const void* input,int64_t pin,int64_t* 
     *success=0;
     if (!t.device().is_cpu() || !t.is_contiguous() || t.data_ptr()==nullptr) return;
     if (pin && t.is_pinned()) return;
-    const auto status=pin ? cudaHostRegister(t.data_ptr(),t.nbytes(),1) : cudaHostUnregister(t.data_ptr());
+    const auto status=torch_host_registration(t.data_ptr(),t.nbytes(),pin!=0);
     *success=status==cudaSuccess;
     if (status!=cudaSuccess) {
         // Original discard_cuda_async_error; failure is a nonfatal pin refusal.
@@ -145,8 +168,7 @@ extern "C" int imagine_host_registration_raw(uint64_t pointer,uint64_t bytes,int
     return protect([&] {
         // torch.cuda.cudart() performs _lazy_init before the registration call.
         at::globalContext().lazyInitDevice(c10::DeviceType::CUDA);
-        const auto status = pin ? cudaHostRegister(reinterpret_cast<void*>(pointer),bytes,1)
-                                : cudaHostUnregister(reinterpret_cast<void*>(pointer));
+        const auto status = torch_host_registration(reinterpret_cast<void*>(pointer),bytes,pin!=0);
         *success = status == cudaSuccess;
     });
 }
@@ -305,6 +327,20 @@ extern "C" int imagine_cuda_memory(int64_t index,uint64_t* result) {
         size_t free=0,total=0;C10_CUDA_CHECK(cudaMemGetInfo(&free,&total));
         result[0]=free;result[1]=total;
         result[2]=stats.active_bytes[0].current;result[3]=stats.reserved_bytes[0].current;
+    });
+}
+extern "C" int imagine_cuda_allocator_stats(int64_t index,uint64_t* result) {
+    return protect([&] {
+        at::globalContext().lazyInitDevice(c10::DeviceType::CUDA);
+        c10::cuda::CUDAGuard guard(static_cast<c10::DeviceIndex>(index));
+        const auto stats=c10::cuda::CUDACachingAllocator::getDeviceStats(index);
+        // The same aggregate counters as torch.cuda.memory_{allocated,reserved}
+        // and max_memory_{allocated,reserved}; peaks are allocator counters,
+        // not a maximum of sampled cudaMemGetInfo observations.
+        result[0]=stats.allocated_bytes[0].current;
+        result[1]=stats.reserved_bytes[0].current;
+        result[2]=stats.allocated_bytes[0].peak;
+        result[3]=stats.reserved_bytes[0].peak;
     });
 }
 extern "C" int imagine_comfy_math_state(int64_t* state,int64_t write) {

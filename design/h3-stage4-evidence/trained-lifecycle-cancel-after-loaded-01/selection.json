@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "scope": "selected trained H3 component phase",
+  "engine": "native",
+  "phase": "text",
+  "reference": false,
+  "load_only": false,
+  "exercise": "cancel-after-loaded",
+  "output_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/trained/lifecycle-cancel-after-loaded-01/native",
+  "profile_sha256": "53f5f4ac008fdb828da50c612415dc0fd043384d4a65233831b84ef601bcd5c4",
+  "model_lock_sha256": "9cb461e3b118be5775602a81e4ddbd7e727b178f45aba9ce8fab0a3917c296b4",
+  "selected_component": {
+    "role": "text",
+    "path": "/mnt/media/gemensam/AI/ComfyUI/models/text_encoders/minimax_h3/qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors",
+    "file_bytes": 26363476151,
+    "mtime_ns": 1786377363770414500,
+    "header_sha256": "c96da5bad1827e9b02615a1f2d997c14a07f45798db80bdb62b29016dd3b0f36",
+    "sha256": "d84547412144b7c50a6ec77437a889b869d3ace88da77ef1775d3d2a4901c192",
+    "checksum_seconds": 29.716294734040275
+  },
+  "controller_sha256": "356b72028d056ee4f46d5e1354d007bfbd328f82231241a4ae3c144608bfea23",
+  "entry_sha256": "91309943b999722b5a86f1cade6cc25baadc41dfdcba312e929a9a90cb54740f",
+  "worker_sha256": "b0c73a729febdd413773a9eb60532925efb3d302aa4bf020570a494c401c7705",
+  "bridge_sha256": "aabf3b4ba6bf8459a779276dcc806380916d7a37ee3ab8820639dc2ef578461d",
+  "bridge_provenance_sha256": "56b048c7f47e7c2a4618f8d906a71c072c86b1f999ebd0bc0de8aa44b3cf4220",
+  "cancel_sent_after_gpu_ready": true,
+  "returncode": 1,
+  "reservation": {
+    "coordinator_socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+    "direct_worker": "/usr/bin/bwrap",
+    "job_id": "h3-stage4-lifecycle-cancel-after-loaded-01-native-text",
+    "process_form": "bwrap-pid-namespace",
+    "report": {
+      "namespace_exited": true,
+      "namespace_init": 4121414,
+      "worker": {
+        "child_reaped": true,
+        "child_started": true,
+        "exit_code": 137,
+        "finish_sent": true,
+        "signal": null,
+        "state": "cancelled"
+      }
+    },
+    "schema": 1
+  }
+}

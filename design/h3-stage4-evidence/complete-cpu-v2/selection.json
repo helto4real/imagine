@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_layout_tests::h3_packed_layout_matches_original_references_keyframes_time_grids_and_update_masks",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/00-h3_packed_layout_matches_original_references_keyframes_time_grids_and_update_masks.log",
+      "evidence": "00-h3_packed_layout_matches_original_references_keyframes_time_grids_and_update_masks.json"
+    },
+    {
+      "name": "h3_layout_tests::h3_latent_patch_rows_and_stereo_audio_order_match_original",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/01-h3_latent_patch_rows_and_stereo_audio_order_match_original.log",
+      "evidence": "01-h3_latent_patch_rows_and_stereo_audio_order_match_original.json"
+    },
+    {
+      "name": "h3_layout_tests::h3_denoise_mask_pooling_preserves_original_replicate_padding_and_generation_threshold",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/02-h3_denoise_mask_pooling_preserves_original_replicate_padding_and_generation_threshold.log",
+      "evidence": "02-h3_denoise_mask_pooling_preserves_original_replicate_padding_and_generation_threshold.json"
+    },
+    {
+      "name": "h3_text_tests::h3_truncated_language_matches_original_fifty_layers_without_final_norm",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/03-h3_truncated_language_matches_original_fifty_layers_without_final_norm.log",
+      "evidence": "03-h3_truncated_language_matches_original_fifty_layers_without_final_norm.json"
+    },
+    {
+      "name": "h3_checkpoint_tests::h3_component_loading_preserves_original_quantized_payloads_scales_constructor_dtypes_and_flags",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/04-h3_component_loading_preserves_original_quantized_payloads_scales_constructor_dtypes_and_flags.log",
+      "evidence": "04-h3_component_loading_preserves_original_quantized_payloads_scales_constructor_dtypes_and_flags.json"
+    },
+    {
+      "name": "h3_checkpoint_tests::selected_h3_schemas_retain_all_original_parameter_shapes_and_component_specific_buffer_owners",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/05-selected_h3_schemas_retain_all_original_parameter_shapes_and_component_specific_buffer_owners.log",
+      "evidence": "05-selected_h3_schemas_retain_all_original_parameter_shapes_and_component_specific_buffer_owners.json"
+    },
+    {
+      "name": "h3_conditioning_tests::h3_complete_conditioning_matches_original_raw_text_images_frame_pairs_deepstack_and_tags",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/06-h3_complete_conditioning_matches_original_raw_text_images_frame_pairs_deepstack_and_tags.log",
+      "evidence": "06-h3_complete_conditioning_matches_original_raw_text_images_frame_pairs_deepstack_and_tags.json"
+    },
+    {
+      "name": "h3_dit_tests::h3_complete_dense_dit_matches_original_basis_refiner_masks_refs_keyframes_and_audio_carry",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/07-h3_complete_dense_dit_matches_original_basis_refiner_masks_refs_keyframes_and_audio_carry.log",
+      "evidence": "07-h3_complete_dense_dit_matches_original_basis_refiner_masks_refs_keyframes_and_audio_carry.json"
+    },
+    {
+      "name": "h3_audio_tests::h3_complete_audio_vae_matches_original_encoder_causal_projection_resampling_decoder_and_stereo_pcm",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/08-h3_complete_audio_vae_matches_original_encoder_causal_projection_resampling_decoder_and_stereo_pcm.log",
+      "evidence": "08-h3_complete_audio_vae_matches_original_encoder_causal_projection_resampling_decoder_and_stereo_pcm.json"
+    },
+    {
+      "name": "h3_video_tests::h3_complete_video_vae_matches_original_causal_encoder_vit_decoder_spatial_blending_and_temporal_streaming",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/09-h3_complete_video_vae_matches_original_causal_encoder_vit_decoder_spatial_blending_and_temporal_streaming.log",
+      "evidence": "09-h3_complete_video_vae_matches_original_causal_encoder_vit_decoder_spatial_blending_and_temporal_streaming.json"
+    },
+    {
+      "name": "h3_video_tests::h3_int8_video_vae_preserves_convrot_fused_norm_swiglu_and_residual_rounding",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/10-h3_int8_video_vae_preserves_convrot_fused_norm_swiglu_and_residual_rounding.log",
+      "evidence": "10-h3_int8_video_vae_preserves_convrot_fused_norm_swiglu_and_residual_rounding.json"
+    },
+    {
+      "name": "h3_sampling_tests::h3_learned_av_sampling_matches_original_noise_schedule_cfg1_mask_injection_each_euler_step_and_both_streams",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/5ca1dbfe8f4bb0fae4834c3eeb5159f2807bce982556f45b8aa5fac2a06e6bf0/runs/7a2038f2a5b24f1092bc93bc51f4f2e0/11-h3_learned_av_sampling_matches_original_noise_schedule_cfg1_mask_injection_each_euler_step_and_both_streams.log",
+      "evidence": "11-h3_learned_av_sampling_matches_original_noise_schedule_cfg1_mask_injection_each_euler_step_and_both_streams.json"
+    }
+  ],
+  "result": "passed"
+}

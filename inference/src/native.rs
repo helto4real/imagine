@@ -915,6 +915,28 @@ impl Kitchen {
             .check(unsafe { call(index as i64, values.as_mut_ptr()) })?;
         Ok(values)
     }
+    /// LibTorch aggregate allocated/reserved current and true peak byte counts.
+    /// This optional bridge extension leaves frozen earlier bridges loadable.
+    pub fn cuda_allocator_stats(&self, index: usize) -> Result<[u64; 4]> {
+        type Query = unsafe extern "C" fn(i64, *mut u64) -> i32;
+        let symbol = unsafe {
+            libc::dlsym(
+                self.library.handle.as_ptr(),
+                c"imagine_cuda_allocator_stats".as_ptr(),
+            )
+        };
+        if symbol.is_null() {
+            return Err(Error::BindingGap {
+                backend: "ATen".into(),
+                operation: "imagine_cuda_allocator_stats".into(),
+            });
+        }
+        let call: Query = unsafe { std::mem::transmute(symbol) };
+        let mut values = [0; 4];
+        self.library
+            .check(unsafe { call(index as i64, values.as_mut_ptr()) })?;
+        Ok(values)
+    }
     /// Calls the CUDA registration operation without tensor guards or recovery.
     ///
     /// # Safety

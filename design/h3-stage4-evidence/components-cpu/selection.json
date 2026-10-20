@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "425e50615707694a78db5e9c825bf7788b3d23dddde0fde7c7bb6eaaa2634111",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_layout_tests::h3_packed_layout_matches_original_references_keyframes_time_grids_and_update_masks",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/425e50615707694a78db5e9c825bf7788b3d23dddde0fde7c7bb6eaaa2634111/runs/4161c66913f34832bb43a422a4585ff4/00-h3_packed_layout_matches_original_references_keyframes_time_grids_and_update_masks.log",
+      "evidence": "00-h3_packed_layout_matches_original_references_keyframes_time_grids_and_update_masks.json"
+    },
+    {
+      "name": "h3_layout_tests::h3_latent_patch_rows_and_stereo_audio_order_match_original",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/425e50615707694a78db5e9c825bf7788b3d23dddde0fde7c7bb6eaaa2634111/runs/4161c66913f34832bb43a422a4585ff4/01-h3_latent_patch_rows_and_stereo_audio_order_match_original.log",
+      "evidence": "01-h3_latent_patch_rows_and_stereo_audio_order_match_original.json"
+    },
+    {
+      "name": "h3_layout_tests::h3_denoise_mask_pooling_preserves_original_replicate_padding_and_generation_threshold",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/425e50615707694a78db5e9c825bf7788b3d23dddde0fde7c7bb6eaaa2634111/runs/4161c66913f34832bb43a422a4585ff4/02-h3_denoise_mask_pooling_preserves_original_replicate_padding_and_generation_threshold.log",
+      "evidence": "02-h3_denoise_mask_pooling_preserves_original_replicate_padding_and_generation_threshold.json"
+    },
+    {
+      "name": "h3_text_tests::h3_truncated_language_matches_original_fifty_layers_without_final_norm",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/425e50615707694a78db5e9c825bf7788b3d23dddde0fde7c7bb6eaaa2634111/runs/4161c66913f34832bb43a422a4585ff4/03-h3_truncated_language_matches_original_fifty_layers_without_final_norm.log",
+      "evidence": "03-h3_truncated_language_matches_original_fifty_layers_without_final_norm.json"
+    }
+  ],
+  "result": "passed"
+}

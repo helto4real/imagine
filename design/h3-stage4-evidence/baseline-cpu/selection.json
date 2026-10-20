@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "b953f17f60f1f5d8111a1ed93bc9201f72cf517c98359b13e4fe341238e57247",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "native_av_preprocessing_tests::h3_video_block_matches_original_two_frame_patches_and_default_dtype",
+      "returncode": 1,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/b953f17f60f1f5d8111a1ed93bc9201f72cf517c98359b13e4fe341238e57247/runs/b39d4c89139a4d30ad581b65d9e6a5d8/00-h3_video_block_matches_original_two_frame_patches_and_default_dtype.log"
+    }
+  ],
+  "result": "failed"
+}

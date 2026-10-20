@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "criterion": "Exact payload SHA-256, shape, dtype, byte count and token entries",
+  "phase": "video",
+  "reference": true,
+  "profile_sha256": "53f5f4ac008fdb828da50c612415dc0fd043384d4a65233831b84ef601bcd5c4",
+  "model_sha256": "9bb2d96f218c76babd85e0611b85ca8fb330a90546c01a0005e8a58a59593410",
+  "cases": [
+    {
+      "name": "frames",
+      "equal": true,
+      "native": {
+        "bytes": 46006272,
+        "dtype": "float32",
+        "sha256": "b1352d2ca867541d21c10b516ff641f5254ca0c3a64cb45fb9b4cf95fdb8d5df",
+        "shape": [
+          1,
+          3,
+          39,
+          256,
+          384
+        ]
+      },
+      "original": {
+        "shape": [
+          1,
+          3,
+          39,
+          256,
+          384
+        ],
+        "dtype": "float32",
+        "sha256": "b1352d2ca867541d21c10b516ff641f5254ca0c3a64cb45fb9b4cf95fdb8d5df",
+        "bytes": 46006272
+      }
+    }
+  ],
+  "selections": {
+    "design/h3-stage4-evidence/trained-reference-final-01-native-video/selection.json": "c601cf60011eeebf62f4683bc4d732318cf00229791d0371c0f5bcf9dd1a378e",
+    "design/h3-stage4-evidence/trained-reference-cold-01-original-video/selection.json": "c032ba06aca6a91631d5020b381893541b4f517adc3650f27a19b5f65838e6a7"
+  }
+}

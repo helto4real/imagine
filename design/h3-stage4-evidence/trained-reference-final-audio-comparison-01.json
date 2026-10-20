@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "criterion": "Exact payload SHA-256, shape, dtype, byte count and token entries",
+  "phase": "audio",
+  "reference": true,
+  "profile_sha256": "53f5f4ac008fdb828da50c612415dc0fd043384d4a65233831b84ef601bcd5c4",
+  "model_sha256": "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48",
+  "cases": [
+    {
+      "name": "pcm",
+      "equal": true,
+      "native": {
+        "bytes": 416000,
+        "dtype": "float32",
+        "sha256": "ec951feacb3359772a14c5059712a20caa797ba62558c43ee47ed5128f240db3",
+        "shape": [
+          1,
+          2,
+          52000
+        ]
+      },
+      "original": {
+        "shape": [
+          1,
+          2,
+          52000
+        ],
+        "dtype": "float32",
+        "sha256": "ec951feacb3359772a14c5059712a20caa797ba62558c43ee47ed5128f240db3",
+        "bytes": 416000
+      }
+    }
+  ],
+  "selections": {
+    "design/h3-stage4-evidence/trained-reference-final-01-native-audio/selection.json": "0760b2ccb08161795e54f28a5c96fe7f2c44e87a979f0e97c243e31bf27496e2",
+    "design/h3-stage4-evidence/trained-reference-cold-01-original-audio/selection.json": "639b43280fc5da8fb677a96510be5e117102174d92273340264e90fd2c46c0d5"
+  }
+}

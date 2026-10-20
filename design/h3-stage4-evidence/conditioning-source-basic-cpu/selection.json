@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "ee6d581b03472dc8e04cba06f4cc0dcdadcd6cd4a4950eb78856c2308cf6e422",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_conditioning_tests::h3_complete_conditioning_matches_original_raw_text_images_frame_pairs_deepstack_and_tags",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/ee6d581b03472dc8e04cba06f4cc0dcdadcd6cd4a4950eb78856c2308cf6e422/runs/1aeef4f2f16c42e08d762c4b1a36b938/00-h3_complete_conditioning_matches_original_raw_text_images_frame_pairs_deepstack_and_tags.log",
+      "evidence": "00-h3_complete_conditioning_matches_original_raw_text_images_frame_pairs_deepstack_and_tags.json"
+    }
+  ],
+  "result": "passed"
+}

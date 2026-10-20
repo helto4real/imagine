@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "4283375589535291e3d3deb2a4a73dc7a783e093a346a38bad6a04c66086d517",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_dit_tests::h3_complete_dense_dit_matches_original_basis_refiner_masks_refs_keyframes_and_audio_carry",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/4283375589535291e3d3deb2a4a73dc7a783e093a346a38bad6a04c66086d517/runs/d3589652608e438a8c497d42ae2d9ccf/00-h3_complete_dense_dit_matches_original_basis_refiner_masks_refs_keyframes_and_audio_carry.log",
+      "evidence": "00-h3_complete_dense_dit_matches_original_basis_refiner_masks_refs_keyframes_and_audio_carry.json"
+    }
+  ],
+  "result": "passed"
+}

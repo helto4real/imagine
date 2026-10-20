@@ -1,0 +1,5 @@
+{
+  "result": "failed",
+  "gpu_started": false,
+  "reason": "Setup provenance check incorrectly matched the Python package directory in RUNPATH; no GPU reservation or worker started."
+}

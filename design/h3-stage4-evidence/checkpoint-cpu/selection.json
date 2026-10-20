@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "28888aca711d3191b9b77275b32f4ba8c8c335a10146a6c55e421c05665d36df",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_checkpoint_tests::h3_component_loading_preserves_original_quantized_payloads_scales_constructor_dtypes_and_flags",
+      "returncode": 1,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/28888aca711d3191b9b77275b32f4ba8c8c335a10146a6c55e421c05665d36df/runs/954e461309ee4a6ea6d87460e7751478/00-h3_component_loading_preserves_original_quantized_payloads_scales_constructor_dtypes_and_flags.log"
+    }
+  ],
+  "result": "failed"
+}

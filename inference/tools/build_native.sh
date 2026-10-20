@@ -2,10 +2,11 @@
 set -euo pipefail
 parity_root=${IMAGINE_PARITY_ROOT:?Set IMAGINE_PARITY_ROOT to the isolated development directory}
 reference_site=${IMAGINE_REFERENCE_SITE:?Set IMAGINE_REFERENCE_SITE to the locked package source}
+native_build_root=${IMAGINE_NATIVE_BUILD_ROOT:-$parity_root}
 project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 image=ca4cca0a2e1591ee30adffe584ff5144fecebde14c4ad0130f54e260878dc426
 python3 -S -B "$project_root/inference/tools/verify_scipy_beta.py"
-python3 -B "$project_root/inference/tools/prepare_kitchen.py" "$parity_root/sources" "$parity_root/generated"
+python3 -B "$project_root/inference/tools/prepare_kitchen.py" "$parity_root/sources" "$native_build_root/generated"
 # NVIDIA's wheels use lib/ whereas the compiler's Unix layout expects lib64/.
 # Only the isolated toolchain is adjusted; package/header bytes stay unchanged.
 if [[ ! -e "$parity_root/cuda13/nvidia/cu13/lib64" ]]; then
@@ -14,7 +15,7 @@ fi
 if [[ ! -e "$parity_root/cuda13/nvidia/cu13/lib/libcudart.so" ]]; then
     ln -s libcudart.so.13 "$parity_root/cuda13/nvidia/cu13/lib/libcudart.so"
 fi
-mkdir -p "$parity_root/kitchen-manylinux"
+mkdir -p "$native_build_root/kitchen-manylinux"
 # Reuse the immutable pinned image root without copying a VFS writable layer.
 # The same compiler, build directory, source paths and flags are retained.
 image_root=$(python3 -S -B - "$parity_root" "$image" <<'PYIMAGE'
@@ -38,18 +39,31 @@ bwrap --unshare-all --die-with-parent --tmpfs / \
     --ro-bind "$project_root/inference/native" /src \
     --ro-bind "$parity_root/sources" "$parity_root/sources" \
     --ro-bind "$parity_root/cuda13" "$parity_root/cuda13" \
-    --ro-bind "$parity_root/generated" "$parity_root/generated" \
-    --bind "$parity_root/kitchen-manylinux" /build \
+    --ro-bind "$native_build_root/generated" "$native_build_root/generated" \
+    --bind "$native_build_root/kitchen-manylinux" /build \
     --ro-bind "$reference_site" "$reference_site" \
     --clearenv --setenv PATH /usr/local/bin:/usr/bin:/bin \
     --setenv LANG C.UTF-8 --setenv PARITY_ROOT "$parity_root" \
+    --setenv NATIVE_BUILD_ROOT "$native_build_root" \
     --setenv REFERENCE_SITE "$reference_site" /bin/bash -e -c '
 cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_CXX_COMPILER=/opt/rh/gcc-toolset-14/root/usr/bin/g++ \
     -DCMAKE_CUDA_COMPILER="$PARITY_ROOT/cuda13/nvidia/cu13/bin/nvcc" \
     -DCMAKE_CUDA_HOST_COMPILER=/opt/rh/gcc-toolset-14/root/usr/bin/g++ \
     -DCMAKE_CUDA_ARCHITECTURES=89 \
-    -DGENERATED_DIR="$PARITY_ROOT/generated" -DREFERENCE_SOURCES="$PARITY_ROOT/sources" \
+    -DGENERATED_DIR="$NATIVE_BUILD_ROOT/generated" -DREFERENCE_SOURCES="$PARITY_ROOT/sources" \
     -DLIBTORCH="$REFERENCE_SITE/torch" -DFROZEN_CUDA_INCLUDE="$REFERENCE_SITE/nvidia/cu13/include"
 cmake --build /build --parallel 2
 '
+python3 -S -B - "$project_root" "$native_build_root" <<'PY'
+import hashlib,json,sys
+from pathlib import Path
+project,root=map(Path,sys.argv[1:])
+def sha(path):
+    with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
+sources={str(path.relative_to(project)):sha(path) for path in sorted((project/'inference/native').rglob('*')) if path.is_file()}
+record=dict(schema=1,scope='Full original-source bridge build; original static Kitchen runtime and LibTorch host registration',native_sources=sources,
+            library_sha256=sha(root/'kitchen-manylinux/libimagine_kitchen.so'),
+            generated={str(path.relative_to(root)):sha(path) for path in sorted((root/'generated').rglob('*')) if path.is_file()})
+(root/'kitchen-manylinux/provenance.json').write_text(json.dumps(record,indent=2)+'\n')
+PY

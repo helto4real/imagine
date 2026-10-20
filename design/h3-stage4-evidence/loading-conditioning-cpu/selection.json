@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "14bd376ea27bf5f988ba0c8c48c0b264a7bc29199ff0bd2f79ec426218e38ba7",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_checkpoint_tests::h3_component_loading_preserves_original_quantized_payloads_scales_constructor_dtypes_and_flags",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/14bd376ea27bf5f988ba0c8c48c0b264a7bc29199ff0bd2f79ec426218e38ba7/runs/5b90e7e96ba349d3b6ca5599b4a7442f/00-h3_component_loading_preserves_original_quantized_payloads_scales_constructor_dtypes_and_flags.log",
+      "evidence": "00-h3_component_loading_preserves_original_quantized_payloads_scales_constructor_dtypes_and_flags.json"
+    },
+    {
+      "name": "h3_checkpoint_tests::selected_h3_schemas_retain_all_original_parameter_shapes_and_component_specific_buffer_owners",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/14bd376ea27bf5f988ba0c8c48c0b264a7bc29199ff0bd2f79ec426218e38ba7/runs/5b90e7e96ba349d3b6ca5599b4a7442f/01-selected_h3_schemas_retain_all_original_parameter_shapes_and_component_specific_buffer_owners.log",
+      "evidence": "01-selected_h3_schemas_retain_all_original_parameter_shapes_and_component_specific_buffer_owners.json"
+    },
+    {
+      "name": "h3_conditioning_tests::h3_complete_conditioning_matches_original_raw_text_images_frame_pairs_deepstack_and_tags",
+      "returncode": 1,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/14bd376ea27bf5f988ba0c8c48c0b264a7bc29199ff0bd2f79ec426218e38ba7/runs/5b90e7e96ba349d3b6ca5599b4a7442f/02-h3_complete_conditioning_matches_original_raw_text_images_frame_pairs_deepstack_and_tags.log"
+    }
+  ],
+  "result": "failed"
+}

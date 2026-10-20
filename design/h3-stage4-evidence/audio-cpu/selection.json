@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "9e74b4736ce149f7dbe4f502055b922afc1783b2c2763fc10c1ddb11eeb39646",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_audio_tests::h3_complete_audio_vae_matches_original_encoder_causal_projection_resampling_decoder_and_stereo_pcm",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/9e74b4736ce149f7dbe4f502055b922afc1783b2c2763fc10c1ddb11eeb39646/runs/9215dab2255f48ecafe58114acc09525/00-h3_complete_audio_vae_matches_original_encoder_causal_projection_resampling_decoder_and_stereo_pcm.log",
+      "evidence": "00-h3_complete_audio_vae_matches_original_encoder_causal_projection_resampling_decoder_and_stereo_pcm.json"
+    }
+  ],
+  "result": "passed"
+}

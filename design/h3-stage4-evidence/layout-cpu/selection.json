@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "0478cf92d94b5fed7c45ed2daca9bfb802323ef19a3391023a33185c6b504505",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_layout_tests::h3_packed_layout_matches_original_references_keyframes_time_grids_and_update_masks",
+      "returncode": 1,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/0478cf92d94b5fed7c45ed2daca9bfb802323ef19a3391023a33185c6b504505/runs/9b506b348c6248d89228dcb980a37871/00-h3_packed_layout_matches_original_references_keyframes_time_grids_and_update_masks.log"
+    }
+  ],
+  "result": "failed"
+}

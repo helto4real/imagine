@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "eb03d37299bfc32fc092a3935ac8af854d3e7720a0501deabd1215846adf67b4",
+  "execution_root": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "h3_sampling_tests::h3_learned_av_sampling_matches_original_noise_schedule_cfg1_mask_injection_each_euler_step_and_both_streams",
+      "returncode": 0,
+      "log": "/home/thhel/.codex/worktrees/be07/imagine/comfyui/h3-stage4-20261020/stage3-validation/eb03d37299bfc32fc092a3935ac8af854d3e7720a0501deabd1215846adf67b4/runs/2c75b8ffc8104189b342020c7a81553a/00-h3_learned_av_sampling_matches_original_noise_schedule_cfg1_mask_injection_each_euler_step_and_both_streams.log",
+      "evidence": "00-h3_learned_av_sampling_matches_original_noise_schedule_cfg1_mask_injection_each_euler_step_and_both_streams.json"
+    }
+  ],
+  "result": "passed"
+}
