@@ -29,6 +29,8 @@ use tower::ServiceExt;
 struct Probe {
     component_failure:
         std::sync::Mutex<Option<imagine_server::component_error::ComponentLoadError>>,
+    video_calls: AtomicUsize,
+    video_prompts: std::sync::Mutex<Vec<String>>,
     calls: AtomicUsize,
     stops: AtomicUsize,
     fail: AtomicUsize,
@@ -70,6 +72,24 @@ impl Backend for Fake {
             }
         })
     }
+    fn generate_video<'a>(
+        &'a mut self,
+        input: &'a imagine_server::h3_protocol::Request,
+    ) -> EngineFuture<'a, imagine_server::short_av::Av> {
+        Box::pin(async move {
+            self.0
+                .video_prompts
+                .lock()
+                .unwrap()
+                .push(input.prompt.clone());
+            self.0.video_calls.fetch_add(1, Ordering::SeqCst);
+            self.0.release.notified().await;
+            Ok(imagine_server::short_av::Av {
+                frames: (0..39).map(|i| vec![i; 384 * 256 * 3]).collect(),
+                pcm: vec![0; 52000 * 8],
+            })
+        })
+    }
     fn stage(&mut self, stage: Option<&str>) {
         if let Some(stage) = stage {
             self.0.stages.lock().unwrap().push(stage.into());
@@ -89,16 +109,52 @@ struct Harness {
     store: Store,
     control: Control,
     task: JoinHandle<anyhow::Result<()>>,
+    broker: Option<JoinHandle<()>>,
     router: Router,
     probe: Arc<Probe>,
 }
 async fn setup() -> Harness {
+    setup_inner(false).await
+}
+async fn setup_inner(coordinated: bool) -> Harness {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::open(dir.path()).await.unwrap();
     let probe = Arc::new(Probe::default());
-    let (control, task) = scheduler::start(store.clone(), Box::new(Fake(probe.clone())))
-        .await
-        .unwrap();
+    let socket = dir.path().join("own-broker.sock");
+    let broker = if coordinated {
+        let listener = tokio::net::UnixListener::bind(&socket).unwrap();
+        Some(tokio::spawn(async move {
+            use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+            while let Ok((stream, _)) = listener.accept().await {
+                tokio::spawn(async move {
+                    let (read, mut write) = stream.into_split();
+                    let mut read = BufReader::new(read);
+                    let mut line = String::new();
+                    if read.read_line(&mut line).await.unwrap_or(0) == 0 {
+                        return;
+                    }
+                    if write
+                        .write_all(b"{\"queued\":true}\n{\"granted\":true}\n")
+                        .await
+                        .is_err()
+                    {
+                        return;
+                    }
+                    line.clear();
+                    let _ = read.read_line(&mut line).await;
+                });
+            }
+        }))
+    } else {
+        None
+    };
+    let (control, task) = scheduler::start_coordinated(
+        store.clone(),
+        Box::new(Fake(probe.clone())),
+        coordinated.then_some(socket),
+    )
+    .await
+    .unwrap();
     let (engine_state, engine) = watch::channel(EngineState::default());
 
     let library = Arc::new(std::sync::Mutex::new(
@@ -141,6 +197,7 @@ async fn setup() -> Harness {
         store,
         control,
         task,
+        broker,
         router,
         probe,
     }
@@ -316,6 +373,13 @@ async fn wait_status(store: &Store, id: &str, owner: &str, status: &str) -> Valu
             if v["status"] == status {
                 return v;
             }
+            if v["status"] == "failed" && status != "failed" {
+                panic!(
+                    "Expected {status}; synthetic job failed: {}",
+                    v["error"]["code"]
+                );
+            }
+
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
     })
@@ -334,6 +398,10 @@ async fn wait_calls(probe: &Probe, count: usize) {
 async fn stop(h: Harness) {
     h.control.call(Action::Shutdown).await.unwrap();
     h.task.await.unwrap().unwrap();
+    if let Some(broker) = h.broker {
+        broker.abort();
+        let _ = broker.await;
+    }
 }
 
 #[tokio::test]
@@ -519,7 +587,7 @@ async fn strict_inputs_assets_and_queued_cancel() {
         req(&h.router, "POST", "/v1/jobs", Some(wrong), None)
             .await
             .1["error"]["code"],
-        "model_not_validated"
+        "h3_runtime_unavailable"
     );
     let mut reference = Cursor::new(Vec::new());
     image::RgbImage::from_pixel(65, 67, image::Rgb([42, 50, 60]))
@@ -1547,4 +1615,165 @@ async fn rust_admission_exposes_its_own_capabilities_and_rejects_unsupported_sam
     assert_eq!(moss["operations"], json!(["text_to_image"]));
     h.control.call(Action::Shutdown).await.unwrap();
     h.task.await.unwrap().unwrap();
+}
+
+fn h3_request() -> Value {
+    json!({"model":"minimax-h3","operation":"text_to_video","prompt":"  SYNTHETIC h3 åäö\n  ","width":384,"height":256,"seed":42,
+    "sampling":{"steps":4,"cfg_scale":1.,"sampler":"euler","scheduler":"simple"},
+    "output":{"format":"mkv","count":1},"video":{"profile":"h3-short-av-noref-v1","frames":39,"fps":24,"audio":true}})
+}
+#[tokio::test]
+async fn h3_fixed_requests_require_deployment_and_reject_profile_expansion() {
+    let h = setup_inner(true).await;
+    let (status, body) = req(&h.router, "POST", "/v1/jobs", Some(h3_request()), None).await;
+    assert_eq!(status, 422);
+    assert_eq!(body["error"]["code"], "h3_runtime_unavailable");
+    h.engine_state.send_modify(|s| {
+        s.backend = "rust".into();
+        s.h3_available = true;
+    });
+    let (_, metadata) = req(&h.router, "GET", "/v1/models/minimax-h3", None, None).await;
+    assert_eq!(metadata["available"], true);
+    assert_eq!(metadata["experimental"], true);
+    for (field, value) in [
+        ("seed", json!(43)),
+        ("width", json!(512)),
+        ("negative_prompt", json!("forbidden")),
+        ("inputs", json!({"reference_images":["asset_synthetic"]})),
+    ] {
+        let mut input = h3_request();
+        input[field] = value;
+        assert_eq!(
+            req(&h.router, "POST", "/v1/jobs", Some(input), None)
+                .await
+                .0,
+            422
+        );
+    }
+    assert_eq!(h.probe.video_calls.load(Ordering::SeqCst), 0);
+    stop(h).await;
+}
+#[tokio::test]
+async fn h3_and_images_share_fifo_atomic_publication_ranges_and_cancellation() {
+    let h = setup_inner(true).await;
+    h.engine_state.send_modify(|s| {
+        s.backend = "rust".into();
+        s.h3_available = true;
+    });
+    let (status, first) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs",
+        Some(h3_request()),
+        Some("own-h3-queue"),
+    )
+    .await;
+    assert_eq!(status, 202);
+    let first = first["id"].as_str().unwrap();
+    wait_status(&h.store, first, "local", "running").await;
+    let (status, second) = req(&h.router, "POST", "/v1/jobs", Some(request()), None).await;
+    assert_eq!(status, 202);
+    let second = second["id"].as_str().unwrap();
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
+    let before = h.store.job(first, "local").await.unwrap().unwrap();
+    assert!(before["output"].is_null());
+    h.probe.release.notify_one();
+    let video = wait_status(&h.store, first, "local", "succeeded").await;
+    assert_eq!(
+        video["effective"]["profile_revision"],
+        "h3-short-av-noref-v1"
+    );
+    assert_eq!(video["effective"]["prompt"], h3_request()["prompt"]);
+    assert_eq!(video["output"]["format"], "mkv");
+    assert_eq!(video["output"]["assets"][0]["role"], "video");
+    assert_eq!(
+        h.probe.video_prompts.lock().unwrap()[0],
+        h3_request()["prompt"].as_str().unwrap()
+    );
+    let asset = video["output"]["assets"][0]["id"].as_str().unwrap();
+    let data = h.store.read_asset(asset, "local").await.unwrap();
+    let decoded = imagine_server::short_av::decode(&data).unwrap();
+    assert_eq!(decoded.frames[38][0], 38);
+    let response = h
+        .router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/v1/assets/{asset}"))
+                .header("Range", "bytes=2-9")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 206);
+    assert_eq!(response.headers()["Cache-Control"], "no-store");
+    assert_eq!(
+        response.headers()["Content-Type"],
+        imagine_server::short_av::MIME
+    );
+    assert_eq!(
+        &to_bytes(response.into_body(), 16).await.unwrap()[..],
+        &data[2..10]
+    );
+    let response = h
+        .router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/v1/assets/{asset}"))
+                .header("X-Imagine-Session", "wrong-session")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 409);
+    wait_calls(&h.probe, 1).await;
+    h.probe.release.notify_one();
+    wait_status(&h.store, second, "local", "succeeded").await;
+    let (_, cancel) = req(&h.router, "POST", "/v1/jobs", Some(h3_request()), None).await;
+    let cancel = cancel["id"].as_str().unwrap();
+    wait_status(&h.store, cancel, "local", "running").await;
+    let (status, _) = req(
+        &h.router,
+        "POST",
+        &format!("/v1/jobs/{cancel}/cancel"),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(status, 202);
+    let cancelled = wait_status(&h.store, cancel, "local", "cancelled").await;
+    assert!(cancelled["output"].is_null());
+    assert!(h.probe.stops.load(Ordering::SeqCst) > 0);
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn h3_never_admits_without_coordinator_even_with_a_deployed_worker() {
+    let h = setup().await;
+    h.engine_state.send_modify(|s| {
+        s.backend = "rust".into();
+        s.h3_available = true;
+    });
+    let (_, metadata) = req(&h.router, "GET", "/v1/models/minimax-h3", None, None).await;
+    assert_eq!(metadata["available"], false);
+    assert_eq!(metadata["reason"], "coordinator_unavailable");
+    let (status, error) = req(&h.router, "POST", "/v1/jobs", Some(h3_request()), None).await;
+    assert_eq!(status, 503);
+    assert_eq!(error["error"]["code"], "coordinator_unavailable");
+    let request = serde_json::from_value(h3_request()).unwrap();
+    let error = h
+        .control
+        .call(Action::Submit {
+            owner: "local".into(),
+            request: Box::new(request),
+            key: None,
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, "coordinator_unavailable");
+    assert_eq!(h.probe.video_calls.load(Ordering::SeqCst), 0);
+    stop(h).await;
 }

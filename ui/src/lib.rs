@@ -11,3 +11,8 @@ pub mod settings;
 
 #[path = "../../shared/model_catalog.rs"]
 pub mod model_catalog;
+
+#[path = "../../shared/h3_protocol.rs"]
+pub mod h3_protocol;
+#[path = "../../shared/short_av.rs"]
+pub mod short_av;

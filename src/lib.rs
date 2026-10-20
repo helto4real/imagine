@@ -33,3 +33,9 @@ pub mod model_library;
 pub mod rust_runtime;
 
 pub mod video;
+
+#[path = "../shared/h3_protocol.rs"]
+pub mod h3_protocol;
+
+#[path = "../shared/short_av.rs"]
+pub mod short_av;

@@ -27,6 +27,15 @@ pub struct Artifact {
     pub role: &'static str,
     pub bytes: Vec<u8>,
 }
+pub enum Generated {
+    Images(Vec<Artifact>),
+    Video(Vec<u8>),
+}
+impl From<Vec<Artifact>> for Generated {
+    fn from(v: Vec<Artifact>) -> Self {
+        Self::Images(v)
+    }
+}
 enum Task<'a> {
     Image,
     CharacterSheet(
@@ -48,6 +57,26 @@ impl<'a> Task<'a> {
     }
 }
 pub async fn generate(
+    engine: &mut dyn Backend,
+    request: &JobRequest,
+    owner: &str,
+    store: &Store,
+) -> Result<Generated> {
+    if request.model == "minimax-h3" {
+        let input = crate::video::job::request(request).map_err(crate::engine::EngineError)?;
+        let av = engine.generate_video(&input).await?;
+        engine.stage(Some("encoding_video"));
+        let bytes = tokio::task::spawn_blocking(move || crate::short_av::encode(av))
+            .await?
+            .map_err(crate::engine::EngineError)?;
+        Ok(Generated::Video(bytes))
+    } else {
+        generate_images(engine, request, owner, store)
+            .await
+            .map(Generated::Images)
+    }
+}
+async fn generate_images(
     engine: &mut dyn Backend,
     request: &JobRequest,
     owner: &str,

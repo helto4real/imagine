@@ -189,6 +189,9 @@ impl ImagineApp {
 
     pub fn content(&mut self, ui: &mut Ui) {
         self.receive(ui.ctx());
+        if self.workspace != Workspace::Video {
+            self.pause_video();
+        }
         self.keyboard_shortcuts(ui.ctx());
         if self.busy()
             || self.connecting
@@ -229,16 +232,7 @@ impl ImagineApp {
                         ui.push_id(self.workspace, |ui| self.image_workspace(ui, rect));
                     });
             }
-            Workspace::Video => {
-                panel(ui, body, true);
-                ui.painter().text(
-                    body.center(),
-                    egui::Align2::CENTER_CENTER,
-                    "Video editing is not available yet",
-                    egui::FontId::proportional(14.),
-                    helto::DIM,
-                );
-            }
+            Workspace::Video => self.video_workspace(ui, body),
         });
         self.queue_panel(ui, dock);
         self.multiple_prompts_window(ui.ctx());
@@ -303,7 +297,14 @@ impl ImagineApp {
                         ui.add_space(8.);
                         ui.separator();
                         ui.add_space(8.);
-                        ui.label(RichText::new(self.selected_model_name()).color(helto::DIM));
+                        ui.label(
+                            RichText::new(if self.workspace == Workspace::Video {
+                                "H3".into()
+                            } else {
+                                self.selected_model_name()
+                            })
+                            .color(helto::DIM),
+                        );
                     }
                 });
             },

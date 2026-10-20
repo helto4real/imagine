@@ -8,3 +8,6 @@ pub mod project;
 mod bundle;
 pub mod library;
 pub mod persistence;
+
+pub mod http;
+pub mod job;

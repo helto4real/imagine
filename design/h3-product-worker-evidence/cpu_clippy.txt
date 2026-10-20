@@ -1,0 +1,2 @@
+    Checking imagine-h3-product-cpu v0.1.0 (/home/thhel/.codex/worktrees/h3-product-worker/imagine/inference/tools/h3-product-cpu)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.07s

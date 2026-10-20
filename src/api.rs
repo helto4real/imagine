@@ -99,15 +99,46 @@ async fn models(State(app): State<App>) -> Json<Value> {
     let mut value = contract::models();
     let backend = app.engine.borrow().backend.clone();
     for model in value["models"].as_array_mut().unwrap() {
-        *model = crate::comfy_engine::model_metadata(model.take(), &backend);
+        *model = model_capability(
+            &app,
+            crate::comfy_engine::model_metadata(model.take(), &backend),
+        );
     }
     Json(value)
 }
 async fn model(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Fault> {
     contract::model(&id)
-        .map(|model| crate::comfy_engine::model_metadata(model, &app.engine.borrow().backend))
+        .map(|model| {
+            model_capability(
+                &app,
+                crate::comfy_engine::model_metadata(model, &app.engine.borrow().backend),
+            )
+        })
         .map(Json)
         .ok_or(Fault::new(404, "model_not_found"))
+}
+fn model_capability(app: &App, mut value: Value) -> Value {
+    if value["id"] == "minimax-h3" {
+        let deployed = app.engine.borrow().backend == "rust" && app.engine.borrow().h3_available;
+        let available = deployed && app.control.is_coordinated();
+        value["available"] = json!(available);
+        value["execution_enabled"] = json!(available);
+        value["experimental"] = json!(true);
+        value["live_validated"] = json!(false);
+        value["product_gpu_acceptance"] = json!("pending");
+        value["reason"] = if available {
+            Value::Null
+        } else if deployed && !app.control.is_coordinated() {
+            json!("coordinator_unavailable")
+        } else {
+            json!("h3_runtime_unavailable")
+        };
+        value["operations"] = json!(["text_to_video"]);
+        value["profile"] = json!(crate::video::job::PROFILE);
+        value["video"] =
+            json!({"width":384,"height":256,"frames":39,"fps":24,"audio":true,"seed":42});
+    }
+    value
 }
 async fn upload(
     State(app): State<App>,
@@ -133,21 +164,12 @@ async fn upload(
         .map_err(|_| Fault::new(422, "invalid_image"))?;
     Ok((StatusCode::CREATED, Json(asset)))
 }
-async fn download(State(app): State<App>, Path(id): Path<String>) -> Result<Response, Fault> {
-    let info = app
-        .store
-        .asset(&id, LOCAL_OWNER)
-        .await?
-        .ok_or(Fault::new(404, "asset_not_found"))?;
-    let bytes = app.store.read_asset(&id, LOCAL_OWNER).await?;
-    Ok((
-        [
-            (header::CONTENT_TYPE, info["mime_type"].as_str().unwrap()),
-            (header::CONTENT_DISPOSITION, "attachment"),
-        ],
-        bytes,
-    )
-        .into_response())
+async fn download(
+    State(app): State<App>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Response, Fault> {
+    crate::video::http::download(&app.store, &id, &headers).await
 }
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -340,6 +362,19 @@ async fn validate_job(
 }
 
 async fn resolve_request(app: &App, value: Value) -> Result<crate::contract::JobRequest, Fault> {
+    if value["model"] == "minimax-h3" {
+        if !app.engine.borrow().h3_available || app.engine.borrow().backend != "rust" {
+            return Err(Fault::new(422, "h3_runtime_unavailable"));
+        }
+        if !app.control.is_coordinated() {
+            return Err(Fault::new(503, "coordinator_unavailable"));
+        }
+        let request: crate::contract::JobRequest =
+            serde_json::from_value(value).map_err(|_| Fault::new(422, "invalid_request"))?;
+        request.validate().map_err(|code| Fault::new(422, code))?;
+        return Ok(request);
+    }
+
     let library = app.library.clone();
     let (value, resolved) = tokio::task::spawn_blocking(move || {
         library

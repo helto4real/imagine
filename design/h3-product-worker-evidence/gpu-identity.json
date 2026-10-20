@@ -1,0 +1,8 @@
+{
+  "protocol": 1,
+  "profile": "h3-short-av-noref-v1",
+  "core_revision": "40ff91114a6d71782aa1a79a76df6940546570bb",
+  "model_lock_sha256": "9cb461e3b118be5775602a81e4ddbd7e727b178f45aba9ce8fab0a3917c296b4",
+  "worker_sha256": "31294b34e1472409fa6a3c7a829c2fb4088fc4028e83799e3c603118c4e122a0",
+  "dependencies_sha256": "42ba7fcc9e18721e5a5bf62f124728b6a183a7823221cc4072b42e1c9c6a26ee"
+}

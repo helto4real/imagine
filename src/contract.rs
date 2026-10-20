@@ -180,6 +180,8 @@ impl Default for Output {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Video {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<String>,
     pub frames: u32,
     pub fps: u32,
     pub audio: bool,
@@ -188,7 +190,7 @@ pub struct Video {
 impl JobRequest {
     pub fn validate(&self) -> Result<(), &'static str> {
         if self.model == "minimax-h3" {
-            return Err("model_not_validated");
+            return crate::video::job::request(self).map(|_| ());
         }
         if !matches!(self.model.as_str(), MODEL | BF16 | TURBO | MOSS) {
             return Err("unknown_model");
@@ -413,6 +415,12 @@ impl JobRequest {
     }
     pub fn effective(&self) -> Value {
         let mut v = serde_json::to_value(self).expect("serializable request");
+        if self.model == "minimax-h3" {
+            v.as_object_mut().unwrap().remove("model_options");
+            v["profile_revision"] = json!(crate::video::job::PROFILE);
+            v["api_revision"] = json!(API_REVISION);
+            return v;
+        }
         v["profile_revision"] = json!(if self.model_options.qwen_image_2_1.workflow.is_some() {
             MCP_PROFILE
         } else {

@@ -21,6 +21,7 @@ struct ReferenceView {
     texture: egui::TextureHandle,
 }
 enum Message {
+    Video(video_ui::Event),
     Queue(queue::Event),
     Enhancement(enhancement::Event),
     Connected(Result<(Client, crate::model_catalog::LibrarySnapshot), String>),
@@ -138,6 +139,7 @@ pub struct ImagineApp {
     metadata: Option<Value>,
     models: models::ModelUi,
     enhancement: enhancement::EnhancementUi,
+    video: video_ui::VideoDesk,
     image: GenerationDesk,
     edit: editing::EditSession,
     sheet: GenerationDesk,
@@ -178,6 +180,7 @@ impl ImagineApp {
             metadata: None,
             models: Default::default(),
             enhancement: Default::default(),
+            video: Default::default(),
             image: GenerationDesk::default(),
             edit: editing::EditSession::default(),
             sheet: GenerationDesk {
@@ -267,6 +270,7 @@ impl ImagineApp {
     fn receive(&mut self, ctx: &egui::Context) {
         while let Ok(message) = self.rx.try_recv() {
             match message {
+                Message::Video(event) => self.video_message(ctx, event),
                 Message::Queue(event) => self.queue_message(ctx, event),
                 Message::Enhancement(event) => self.enhancement_message(ctx, event),
                 Message::Library(result) => {
@@ -297,6 +301,7 @@ impl ImagineApp {
                     match value {
                         Ok((client, data)) => {
                             self.client = Some(client);
+                            self.refresh_video(ctx);
                             self.accept_library(data);
                             self.load_enhancement_profiles(ctx);
                         }
@@ -632,7 +637,7 @@ impl ImagineApp {
         let ctx = ctx.clone();
         std::thread::spawn(move || {
             let folder = rfd::FileDialog::new()
-                .set_title("Save images to")
+                .set_title("Save results to")
                 .set_directory(folder)
                 .pick_folder();
             send(&tx, &ctx, Message::Folder(folder));
@@ -887,3 +892,6 @@ mod models;
 
 #[path = "enhancement.rs"]
 mod enhancement;
+
+#[path = "video_ui.rs"]
+mod video_ui;

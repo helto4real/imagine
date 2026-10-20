@@ -60,10 +60,14 @@ struct Message {
 }
 #[derive(Clone)]
 pub struct Control {
+    coordinated: bool,
     tx: mpsc::Sender<Message>,
     pub state: watch::Receiver<Value>,
 }
 impl Control {
+    pub fn is_coordinated(&self) -> bool {
+        self.coordinated
+    }
     pub async fn call(&self, action: Action) -> std::result::Result<Value, Fault> {
         let (tx, rx) = oneshot::channel();
         self.tx
@@ -83,7 +87,7 @@ struct Active {
 struct Finished {
     ticket: Option<crate::coordination::Ticket>,
     engine: Box<dyn Backend>,
-    result: Result<Vec<crate::generation::Artifact>>,
+    result: Result<crate::generation::Generated>,
     stopped: Result<()>,
 }
 struct Prepared {
@@ -121,6 +125,7 @@ pub async fn start_coordinated(
     let paused = store.paused().await?;
     let (tx, rx) = mpsc::channel(128);
     let (state, receiver) = watch::channel(json!({"paused":paused,"active_job":false,"queued":0}));
+    let coordinated = coordinator.is_some();
     let scheduler = Scheduler {
         coordinator,
         tickets: Default::default(),
@@ -135,6 +140,7 @@ pub async fn start_coordinated(
     };
     Ok((
         Control {
+            coordinated,
             tx,
             state: receiver,
         },
@@ -380,6 +386,9 @@ impl Scheduler {
         mut request: JobRequest,
     ) -> std::result::Result<Prepared, Fault> {
         request.validate().map_err(|e| Fault::new(422, e))?;
+        if request.model == "minimax-h3" && self.coordinator.is_none() {
+            return Err(Fault::new(503, "coordinator_unavailable"));
+        }
         let fingerprint = hash(&serde_json::to_vec(&request).expect("serializable request"));
         let reference_preprocessing =
             crate::generation::reference_metadata(&request, owner, &self.store).await?;

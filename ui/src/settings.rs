@@ -241,6 +241,12 @@ pub fn save_image(folder: &Path, bytes: &[u8]) -> Result<PathBuf> {
     Ok(save_outputs(&folder, &[("", bytes)], Naming::Numbered)?.remove(0))
 }
 
+/// Called only after explicit Save; generation/preview never writes the output folder.
+pub fn save_video(folder: &Path, bytes: &[u8]) -> Result<PathBuf> {
+    let folder = dated_folder(folder, std::time::SystemTime::now())?;
+    Ok(save_outputs(&folder, &[("", bytes)], Naming::VideoNumbered)?.remove(0))
+}
+
 /// Save one complete sheet set with a shared number.
 pub fn save_sheet(folder: &Path, images: &[(&str, &[u8])]) -> Result<Vec<PathBuf>> {
     if images.iter().map(|(role, _)| *role).collect::<Vec<_>>()
@@ -277,6 +283,7 @@ pub fn save_upscaled(source: &Path, bytes: &[u8]) -> Result<PathBuf> {
 
 enum Naming<'a> {
     Numbered,
+    VideoNumbered,
     Upscaled(&'a str),
 }
 
@@ -302,12 +309,15 @@ fn save_outputs(
     let names = std::fs::read_dir(folder)?
         .map(|entry| entry.map(|e| e.file_name().to_string_lossy().into_owned()))
         .collect::<std::io::Result<Vec<_>>>()?;
+    let video = matches!(naming, Naming::VideoNumbered);
+    let extension = if video { "mkv" } else { "png" };
+    let prefix = if video { "video_" } else { "image_" };
     let stem = match naming {
-        Naming::Numbered => {
+        Naming::Numbered | Naming::VideoNumbered => {
             let number = names
                 .iter()
                 .filter_map(|name| {
-                    name.strip_prefix("image_")?
+                    name.strip_prefix(prefix)?
                         .split(['_', '.'])
                         .next()?
                         .parse::<u64>()
@@ -317,7 +327,7 @@ fn save_outputs(
                 .unwrap_or(0)
                 .checked_add(1)
                 .context("Image numbering is exhausted.")?;
-            format!("image_{number:04}")
+            format!("{prefix}{number:04}")
         }
         Naming::Upscaled(base) => {
             let prefix = format!("{base}_upscaled");
@@ -350,7 +360,7 @@ fn save_outputs(
             } else {
                 format!("_{role}")
             };
-            let path = folder.join(format!("{stem}{suffix}.png"));
+            let path = folder.join(format!("{stem}{suffix}.{extension}"));
             let mut file = OpenOptions::new()
                 .write(true)
                 .create_new(true)

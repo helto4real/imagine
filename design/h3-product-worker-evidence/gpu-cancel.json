@@ -1,0 +1,44 @@
+{
+  "audio_samples": 0,
+  "case": "cancel",
+  "child_reaped": true,
+  "complete": false,
+  "elapsed_seconds": 62.588993794,
+  "error": null,
+  "events": [
+    {
+      "kind": "ready",
+      "seconds": 0.940945818
+    },
+    {
+      "kind": "phase",
+      "phase": "loading_text",
+      "seconds": 0.941365973
+    },
+    {
+      "kind": "phase",
+      "phase": "encoding_text",
+      "seconds": 62.327034128
+    }
+  ],
+  "exit_code": null,
+  "finish_sent_after_reap": true,
+  "forced_stop": true,
+  "frames": 0,
+  "media_retained": false,
+  "pcm_f32le_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "prompt_source": "frozen source profile fixture",
+  "result": "passed",
+  "schema": 1,
+  "ticket_socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+  "video_rgb8_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "worker": {
+    "core_revision": "40ff91114a6d71782aa1a79a76df6940546570bb",
+    "dependencies_sha256": "42ba7fcc9e18721e5a5bf62f124728b6a183a7823221cc4072b42e1c9c6a26ee",
+    "model_lock_sha256": "9cb461e3b118be5775602a81e4ddbd7e727b178f45aba9ce8fab0a3917c296b4",
+    "profile": "h3-short-av-noref-v1",
+    "protocol": 1,
+    "worker_sha256": "31294b34e1472409fa6a3c7a829c2fb4088fc4028e83799e3c603118c4e122a0"
+  },
+  "worker_pid": 3765829
+}

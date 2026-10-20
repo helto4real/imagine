@@ -1,0 +1,7 @@
+{
+  "result": "deployment_mismatch",
+  "reason": "Two dependency paths contained parent components; normalize only own deployment map, strict validator unchanged",
+  "ticket_registered": false,
+  "worker_started": false,
+  "gpu_started": false
+}

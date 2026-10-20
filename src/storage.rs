@@ -138,8 +138,39 @@ impl Store {
         &self,
         job: &str,
         owner: &str,
-        artifacts: Vec<crate::generation::Artifact>,
+        generated: impl Into<crate::generation::Generated>,
     ) -> Result<()> {
+        let (artifacts, format) = match generated.into() {
+            crate::generation::Generated::Images(artifacts) => {
+                let mut media = Vec::new();
+                for a in artifacts {
+                    media.push((
+                        a.role,
+                        tokio::task::spawn_blocking(move || inspect_image(a.bytes)).await??,
+                    ));
+                }
+                (media, "png")
+            }
+            crate::generation::Generated::Video(bytes) => {
+                let bytes = tokio::task::spawn_blocking(move || {
+                    crate::short_av::decode(&bytes).map_err(anyhow::Error::msg)?;
+                    Ok::<_, anyhow::Error>(bytes)
+                })
+                .await??;
+                (
+                    vec![(
+                        "video",
+                        ImageInfo {
+                            bytes,
+                            width: crate::h3_protocol::WIDTH,
+                            height: crate::h3_protocol::HEIGHT,
+                            mime: crate::short_av::MIME.into(),
+                        },
+                    )],
+                    "mkv",
+                )
+            }
+        };
         if artifacts.is_empty() {
             bail!("empty generation result");
         }
@@ -147,8 +178,7 @@ impl Store {
         let result = async {
             let mut transaction = self.db.begin().await?;
             let mut assets = Vec::new();
-            for artifact in artifacts {
-                let info = tokio::task::spawn_blocking(move || inspect_image(artifact.bytes)).await??;
+            for (role,info) in artifacts {
                 let asset_id = id("asset");
                 let tmp = self.media.join(format!("{asset_id}.partial"));
                 let destination = self.media.join(&asset_id);
@@ -163,10 +193,11 @@ impl Store {
                 sqlx::query("INSERT INTO assets VALUES (?,?,?,?,?,?,?,?)")
                     .bind(&asset_id).bind(owner).bind(&info.mime).bind(info.width).bind(info.height)
                     .bind(info.bytes.len() as i64).bind(&sha256).bind(now()).execute(&mut *transaction).await?;
-                assets.push(json!({"id":asset_id,"role":artifact.role,"mime_type":info.mime,"width":info.width,
+                assets.push(json!({"id":asset_id,"role":role,"mime_type":info.mime,"width":info.width,
                     "height":info.height,"bytes":info.bytes.len(),"sha256":sha256}));
             }
-            let output = json!({"assets":assets,"format":"png"});
+            let mut output=json!({"assets":assets,"format":format});
+            if format=="mkv"{output["video"]=json!({"frames":39,"fps":24,"audio":true,"sample_rate":32000,"channels":2,"samples":52000});}
             let updated = sqlx::query("UPDATE jobs SET status='succeeded',output=?,finished=? WHERE id=? AND owner=? AND status='running'")
                 .bind(output.to_string()).bind(now()).bind(job).bind(owner).execute(&mut *transaction).await?;
             if updated.rows_affected() != 1 { bail!("output job is no longer running"); }

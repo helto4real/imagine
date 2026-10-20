@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-20T12:52:24.118297+00:00",
+  "worktree": "/home/thhel/.codex/worktrees/h3-product-worker/imagine",
+  "branch": "h3-product-worker",
+  "base_commit": "40ff91114a6d71782aa1a79a76df6940546570bb",
+  "direct_human_authorization": "produktkopplingen och GPU pausen b\u00e5da",
+  "gpu_pause": "lifted by direct human authorization in this chat; 2026-10-20",
+  "product_integration": {
+    "state": "blocked by automatic permissions review despite direct human authorization",
+    "attempted_action_executed": false,
+    "attempted_action": "copy existing product adapter, media module and tests into isolated worker worktree",
+    "review_reason": "broad product/runtime files outside inference-only scope; reviving previously rejected product wiring",
+    "workaround_attempted": false,
+    "product_paths_unchanged": true,
+    "details": "authorization-20261020.md"
+  },
+  "worker": {
+    "core_revision": "40ff91114a6d71782aa1a79a76df6940546570bb",
+    "dependencies_sha256": "42ba7fcc9e18721e5a5bf62f124728b6a183a7823221cc4072b42e1c9c6a26ee",
+    "model_lock_sha256": "9cb461e3b118be5775602a81e4ddbd7e727b178f45aba9ce8fab0a3917c296b4",
+    "profile": "h3-short-av-noref-v1",
+    "protocol": 1,
+    "worker_sha256": "31294b34e1472409fa6a3c7a829c2fb4088fc4028e83799e3c603118c4e122a0"
+  },
+  "worker_unchanged_since_cpu_milestone": true,
+  "supervisor": {
+    "path": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/target-acceptance/debug/imagine-h3-product-acceptance",
+    "sha256": "ed22dcab69adddd5fc314fee67611cf3214fe5cdbf69da9b940933e555c3f046",
+    "source_sha256": {
+      "inference/tools/h3-product-acceptance/Cargo.toml": "b3f62fedcb9f35253243287a71c278b50cfed85c628d4f4abeb2136d0b458b34",
+      "inference/tools/h3-product-acceptance/Cargo.lock": "ccb2a12807a038815e6ef5b100c3f5c62b2b50a1ed20db8b35547a9334e11080",
+      "inference/tools/h3-product-acceptance/README.md": "75ffcb0f758276390176219e6dfc5af97b56095faa3d7d39560da083ed5ad2e5",
+      "inference/tools/h3-product-acceptance/src/lib.rs": "253b8a438bfbb993cd745ebbdff3cd466ad1deb38c9b1bf5e9a1869017c544d9",
+      "inference/tools/h3-product-acceptance/src/main.rs": "f10f9cf922706429e611675d75b164c1e63a92963bbbadeef00b62f472519bfc"
+    },
+    "clippy": "passed; all targets, warnings denied",
+    "build": "passed; locked and offline",
+    "dependencies": "exact frozen inference/reservation package versions and checksums",
+    "ticket_implementation_source": "src/coordination.rs",
+    "ticket_implementation_sha256": "189f23c1cfa35287932043001fb9bd355be1456feb00882d61e01e82db4218fe"
+  },
+  "checks": {
+    "baseline": {
+      "result": "passed",
+      "evidence": "gpu-baseline.json",
+      "evidence_sha256": "f8188196a36ae2667caf0b69e6b876a8e9b36e5aec3d1f11cb8355d5246a91b9",
+      "elapsed_seconds": 127.822321444,
+      "frames": 39,
+      "audio_samples": 52000,
+      "child_reaped": true,
+      "finish_sent_after_reap": true
+    },
+    "cancel": {
+      "result": "passed",
+      "evidence": "gpu-cancel.json",
+      "evidence_sha256": "0762ff93d191cade6cd9d9377a77ae8802260fcf0af0e3de70c0335c4401b53c",
+      "elapsed_seconds": 62.588993794,
+      "frames": 0,
+      "audio_samples": 0,
+      "child_reaped": true,
+      "finish_sent_after_reap": true
+    },
+    "alternate": {
+      "result": "passed",
+      "evidence": "gpu-alternate.json",
+      "evidence_sha256": "c294995c4195c79eda87f51b2d2139646b29b81b0dfc5d4ba91b0458f470d561",
+      "elapsed_seconds": 102.598033788,
+      "frames": 39,
+      "audio_samples": 52000,
+      "child_reaped": true,
+      "finish_sent_after_reap": true
+    }
+  },
+  "gpu_worker_runs": 3,
+  "all_own_workers_reaped": true,
+  "source_owned_synthetic_data_only": true,
+  "generated_media_retained": false,
+  "alternate_prompt_changed_video_digest": true,
+  "alternate_prompt_changed_pcm_digest": true,
+  "cpu_milestone": {
+    "tests_passed": 8,
+    "tests_failed": 0,
+    "inputs_unchanged": true,
+    "results_reused": "cpu-milestone.json"
+  },
+  "preflight_failure": {
+    "evidence": "gpu-preflight-01.json",
+    "started_gpu_worker": false,
+    "requested_ticket": false,
+    "resolved": "normalized two dependency paths containing parent components; validator unchanged"
+  },
+  "frozen_control_clean": true,
+  "frozen_algorithms_unchanged": true,
+  "shared_protocol_unchanged": true,
+  "not_validated": [
+    "Intermediate tensor equality against frozen oracle",
+    "Peak GPU memory",
+    "Real loss/shutdown paths through product scheduler",
+    "Next image job recovery through product scheduler",
+    "Product common queue/API/storage/mux/preview/Save integration",
+    "Native UI/playback or visual/audio quality"
+  ],
+  "no_product_restart": true,
+  "no_downloads": true,
+  "committed": false,
+  "pushed": false,
+  "main_merged": false
+}

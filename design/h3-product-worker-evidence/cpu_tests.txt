@@ -1,0 +1,34 @@
+   Compiling imagine-h3-product-cpu v0.1.0 (/home/thhel/.codex/worktrees/h3-product-worker/imagine/inference/tools/h3-product-cpu)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running unittests src/lib.rs (comfyui/h3-product-20261020/target-transport/debug/deps/imagine_h3_product_cpu-0cc281ab8e44e09b)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/h3-cpu-worker-fixture.rs (comfyui/h3-product-20261020/target-transport/debug/deps/h3_cpu_worker_fixture-b69a598836cb1354)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/product_cpu.rs (comfyui/h3-product-20261020/target-transport/debug/deps/product_cpu-778fe9a0efb77135)
+
+running 8 tests
+test actual_identity_is_canonical_verified_and_fails_on_changed_dependency ... ok
+test authoritative_export_rounding_and_invalid_pcm_are_closed ... ok
+test cpu_child_cancel_is_killed_and_reaped_without_any_gpu_or_ticket ... ok
+test cpu_child_partial_error_and_private_panic_never_publish_complete ... ok
+test invalid_request_rejects_before_factory_or_native_initialization ... ok
+test real_cpu_child_streams_complete_av_with_private_prompt_only_on_stdin ... ok
+test request_keeps_unicode_whitespace_and_exact_private_text ... ok
+test transport_write_failure_is_returned_without_exception_or_path_text ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.07s
+
+   Doc-tests imagine_h3_product_cpu
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

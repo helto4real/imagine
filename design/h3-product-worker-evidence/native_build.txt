@@ -1,0 +1,2 @@
+   Compiling imagine-inference v0.1.0 (/home/thhel/.codex/worktrees/h3-product-worker/imagine/inference)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.69s

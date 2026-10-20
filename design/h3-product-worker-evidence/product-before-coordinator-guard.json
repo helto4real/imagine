@@ -1,0 +1,150 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-20T13:55:44.317628+00:00",
+  "worktree": "/home/thhel/.codex/worktrees/h3-product-worker/imagine",
+  "branch": "h3-product-worker",
+  "base_commit": "40ff91114a6d71782aa1a79a76df6940546570bb",
+  "authorization": "Direct current human imperative: G\u00f6r produktkopplingen jag godk\u00e4nner",
+  "prior_approval_block": "resolved; implementation permissions succeeded after direct human instruction",
+  "product_integration": "implemented; actual UI-client/API/common FIFO/Ticket/worker/AV/explicit Save path passed",
+  "profile": "h3-short-av-noref-v1",
+  "worker": {
+    "core_revision": "40ff91114a6d71782aa1a79a76df6940546570bb",
+    "dependencies_sha256": "42ba7fcc9e18721e5a5bf62f124728b6a183a7823221cc4072b42e1c9c6a26ee",
+    "model_lock_sha256": "9cb461e3b118be5775602a81e4ddbd7e727b178f45aba9ce8fab0a3917c296b4",
+    "profile": "h3-short-av-noref-v1",
+    "protocol": 1,
+    "worker_sha256": "31294b34e1472409fa6a3c7a829c2fb4088fc4028e83799e3c603118c4e122a0"
+  },
+  "source_snapshot": "product-source-snapshot-before-coordinator-guard.json",
+  "source_snapshot_sha256": "4d674ffadcd90c42bd6dcdebf1efe1df45e66344a52da0fa361696e0d61bf038",
+  "source_transfer": "product-source-transfer.json",
+  "source_owner_checkout_changed_by_this_task": false,
+  "cpu_workspace_tests": {
+    "passed": 237,
+    "failed": 0,
+    "ignored": 2
+  },
+  "cpu_workspace_commands": [
+    "cargo test --locked --offline --workspace",
+    "cargo clippy --locked --offline --workspace --all-targets -- -D warnings",
+    "cargo fmt --all --check",
+    "cargo build --locked --offline --workspace"
+  ],
+  "late_fixture_checks": [
+    "cargo clippy --locked --offline -p imagine-ui --test h3_product_live -- -D warnings",
+    "cargo fmt --all --check"
+  ],
+  "product_gpu_test": {
+    "passed": 1,
+    "failed": 0,
+    "fixture": "source-owned synthetic prompt only",
+    "command": "CUDA_VISIBLE_DEVICES=0 IMAGINE_H3_TEST_RUNTIME=<own product-runtime.json> cargo test --locked --offline -p imagine-ui --test h3_product_live -- --ignored --nocapture",
+    "wall_seconds": 205.43,
+    "real_h3_jobs": 1,
+    "frame_count": 39,
+    "audio_samples_per_channel": 52000,
+    "sample_rate": 32000,
+    "channels": 2,
+    "fps": 24,
+    "explicit_save_only": true,
+    "save_failure_keeps_result": true,
+    "save_retry_without_resubmission": true,
+    "own_worker_reaped": true,
+    "test_server_stopped": true,
+    "temporary_test_media_retained": false
+  },
+  "native_audio_test": "passed with source-owned silence and dummy SDL devices; no real playback/window",
+  "evidence": {
+    "workspace_tests": {
+      "path": "product-workspace_tests.txt",
+      "sha256": "87cc5fee47ab3eb43c0e0eb2a4945d806fc3492eaa3d186f6c866a5a558bd080"
+    },
+    "workspace_clippy": {
+      "path": "product-workspace_clippy.txt",
+      "sha256": "27f4a2dc8051eccc285b9c01851a87a204b0f7e5fa706c8dd59d7c41ff863183"
+    },
+    "workspace_format": {
+      "path": "product-workspace_format.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "workspace_build": {
+      "path": "product-workspace_build.txt",
+      "sha256": "2b34696728dc82b03cbf6311d7e3a6a41658bbde097834c3010a78bc82842c1a"
+    },
+    "live_test_clippy": {
+      "path": "product-live_test_clippy.txt",
+      "sha256": "21b8f934ea08b9dfab999215684d206dbfdcd081e4c3bd181a768b0b4ebc9b14"
+    },
+    "final_format": {
+      "path": "product-final_format.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "product_gpu": {
+      "path": "product-product_gpu.txt",
+      "sha256": "cad62b926999a38c3f9754a4959e90a5fb751eaec07f4c030216d254f51e1d90"
+    },
+    "dummy_audio": {
+      "path": "product-dummy_audio.txt",
+      "sha256": "05373b8f1d660997f52b8ef22d1b021b1291fca7bacd9b56d863f7e1e24291e7"
+    }
+  },
+  "runtime_manifest": {
+    "path": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/manifests/product-runtime.json",
+    "sha256": "4f76c71b5b518b42caf5f28b72f2d74f1f2086cc407524398f7859a1ac7cfb89",
+    "purpose": "explicit opt-in/test deployment only; no active configuration replaced"
+  },
+  "host_media_tools": {
+    "ffmpeg": {
+      "path": "/usr/bin/ffmpeg",
+      "sha256": "ba5be4f60d2ec3ab668e3d60a1092f65ad2697957c2319dcbfb056ae58202c46"
+    },
+    "ffprobe": {
+      "path": "/usr/bin/ffprobe",
+      "sha256": "b9170e6e9da249120590cb6c76064d38295b3beb65615b73db7c1d9148884f99"
+    },
+    "ffplay": {
+      "path": "/usr/bin/ffplay",
+      "sha256": "d2fec92c97e1145db4f3f3c3d00a8de0545cf8f996e10154a6a44c36b873cc67"
+    }
+  },
+  "built_artifacts": {
+    "imagine-server": {
+      "path": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/target-product/debug/imagine-server",
+      "sha256": "43dcde891eb23a0aeac41abf393466f852ed2b251a568899753e4eeea51efaa3"
+    },
+    "imagine-ui": {
+      "path": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/target-product/debug/imagine-ui",
+      "sha256": "23cdcc0d7c414d1c2cdac761f54e8548dd21b6a611527aed05b25d9845027c7c"
+    }
+  },
+  "test_setup_failures_resolved": [
+    "Long TMPDIR exceeded Unix socket path limit; product-workspace-tests-01.log",
+    "Symlink TMPDIR correctly rejected by existing storage validation; product-workspace-tests-02.log",
+    "Empty own profile catalog rejected before job admission; product-gpu-live-01.log",
+    "AV metadata probe expected BrokenPipe allowed only when probe exits normally and stream constraints validate"
+  ],
+  "private_test_tmp": "Physical task-owned test temporary directory: /tmp/h3pt-27e791ab26\nReason: Linux AF_UNIX path length and required no-symlink project storage validation. No source validation relaxed.",
+  "frozen_control_clean": true,
+  "shared_protocol_unchanged": true,
+  "inference_algorithms_unchanged": true,
+  "native_worker_bytes_unchanged": true,
+  "ordinary_private_runtime_data_read": false,
+  "existing_product_restarted": false,
+  "computer_use": false,
+  "subagents": false,
+  "other_chats_messaged": false,
+  "downloads": false,
+  "committed": false,
+  "pushed": false,
+  "main_merged": false,
+  "limits": [
+    "Native window rendering/manual UI acceptance not run",
+    "Real audio device and AV synchronization not manually checked",
+    "Intermediate tensor equality and peak VRAM not remeasured",
+    "Trained next-image-job recovery not run; image/video switching and FIFO covered with synthetic backends",
+    "One original unrelated live test remains ignored; the new GPU test passed separately",
+    "Debug workspace build; release packaging not requested or run"
+  ],
+  "historical_stage": "first product-path pass, before final no-uncoordinated-H3 admission gate"
+}

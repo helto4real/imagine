@@ -26,6 +26,12 @@ impl std::error::Error for EngineError {}
 pub type EngineFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T>> + Send + 'a>>;
 pub trait Backend: Send {
     fn generate<'a>(&'a mut self, request: &'a ImagePass) -> EngineFuture<'a, Vec<u8>>;
+    fn generate_video<'a>(
+        &'a mut self,
+        _request: &'a crate::h3_protocol::Request,
+    ) -> EngineFuture<'a, crate::short_av::Av> {
+        Box::pin(async { anyhow::bail!(EngineError("h3_runtime_unavailable")) })
+    }
     fn stage(&mut self, _stage: Option<&str>) {}
     fn mark_idle(&mut self) {}
     fn begin_job(&mut self, _id: &str) {}
@@ -35,6 +41,8 @@ pub trait Backend: Send {
 pub struct EngineState {
     #[serde(default)]
     pub backend: String,
+    #[serde(default)]
+    pub h3_available: bool,
     pub phase: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stage: Option<String>,

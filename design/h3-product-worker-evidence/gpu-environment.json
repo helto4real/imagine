@@ -1,0 +1,18 @@
+{
+  "PATH": "/usr/bin",
+  "LD_LIBRARY_PATH": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib:/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cu13/lib:/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib",
+  "OMP_NUM_THREADS": "2",
+  "CUDA_VISIBLE_DEVICES": "0",
+  "IMAGINE_KITCHEN_LIBRARY": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/bin/libimagine_kitchen.so",
+  "IMAGINE_AIMDO_LIBRARY": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/aimdo/aimdo.so",
+  "IMAGINE_H3_DEPENDENCY_MAP": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/manifests/gpu-dependencies.json",
+  "IMAGINE_H3_MODEL_ROOT": "/mnt/media/gemensam/AI/ComfyUI/models",
+  "XDG_CACHE_HOME": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/cache",
+  "TORCH_HOME": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/torch",
+  "TRITON_CACHE_DIR": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/triton",
+  "CUDA_CACHE_PATH": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/cuda",
+  "HF_HOME": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/hf",
+  "TMPDIR": "/home/thhel/.codex/worktrees/h3-product-worker/imagine/comfyui/h3-product-20261020/tmp",
+  "HF_HUB_OFFLINE": "1",
+  "TRANSFORMERS_OFFLINE": "1"
+}

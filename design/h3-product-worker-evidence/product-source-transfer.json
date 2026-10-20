@@ -1,0 +1,24 @@
+{
+  "source": "/home/thhel/.codex/worktrees/h3-product-integration/imagine",
+  "base": "40ff91114a6d71782aa1a79a76df6940546570bb",
+  "source_sha256": {
+    "shared/short_av.rs": "8477acda3b408c03bb04b9f3f898f41eff3aa4c12e8dd2eb47f382b14406c0d5",
+    "src/comfy_engine/h3.rs": "38369c07678f82d92455bdd7f942926bbd9b7dcfa9a4e12b079a4fa7fe659180",
+    "src/comfy_engine.rs": "b59f159b6a83c4fe950e11fb7c01217eeda079f18b1d6987ad454006b2e6ebc8",
+    "src/engine.rs": "45003c539493b4b95c6419d65059eec86b0506e64393c9dbd6d057fab44e7136",
+    "src/rust_runtime.rs": "168c6af05ec1ef15c2136ddd3d7e71400af91ac941e2da2115bc2adeb4d20b69",
+    "src/lib.rs": "342dcdd04cc28edf4f094017941b4e91eea2db26ce20d6ce93ea2a430443f543",
+    "src/api.rs": "c17f5f31cd83c476485648309b1844bc83065956fccd6df5fc7bde0d19adec74",
+    "src/contract.rs": "182ac51eff21f1236445465f7a386a7227d0fcdcf37eeac82ae6936718d0c433",
+    "src/generation.rs": "0567b0e1d947122f656582b373e4b699fca2a815482c6b6b49798f7289169ac2",
+    "src/scheduler.rs": "286468e42fa54a5d32263284ef3c55258f9c0097e62d845584c3e475c6e86701",
+    "src/storage.rs": "a6c2607fc9586e27388b33b17c073252b922140ef20d459ce0e524c71f7dda63",
+    "src/video/mod.rs": "16b59173218247d69bfce583622fff6e8c69a76917e18d47b6f01f5b067fdbcf",
+    "src/video/http.rs": "633a148181630734db2e9c2fe05d98a5c6bfa745c8297901964d3ecf8102c741",
+    "src/video/job.rs": "7f340f0d15602ffcfcea716b5d8bfec88115a991fbfc7dd9e4e04ede5b31568a",
+    "tests/h3_protocol.rs": "ed486ae3dc5fd8cdf538ee5f57aae0cabed609f2779faf42b1063a947af7afd2",
+    "tests/h3_pipe.rs": "f2b52398a7df2f7df3432664bbe58b480eb56804939c15fd62f8689c740a56d7",
+    "tests/short_av.rs": "859f343631561c864792bf88c1ec289d57500a809ef16a2e396c17ad284f17be"
+  },
+  "authorization": "Direct current human imperative: G\u00f6r produktkopplingen jag godk\u00e4nner. Implements product integration in this isolated worker checkout; preserves source checkout."
+}

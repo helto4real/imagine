@@ -24,6 +24,18 @@ async fn main() -> Result<()> {
         return Err(std::io::Error::last_os_error().into());
     }
     let raw = std::env::args().skip(1).collect::<Vec<_>>();
+    if raw.first().map(String::as_str) == Some("--prepare-h3-runtime") {
+        if raw.len() != 4 {
+            anyhow::bail!(
+                "--prepare-h3-runtime needs image manifest, H3 deployment and output manifest"
+            )
+        }
+        return imagine_server::rust_runtime::attach_h3(
+            Path::new(&raw[1]),
+            Path::new(&raw[2]),
+            Path::new(&raw[3]),
+        );
+    }
     if raw.first().map(String::as_str) == Some("--prepare-rust-runtime") {
         if raw.len() != 4 {
             anyhow::bail!(

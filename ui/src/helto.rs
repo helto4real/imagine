@@ -373,6 +373,10 @@ fn textarea_content(
                     .show(ui)
             })
             .inner;
+        // Opacity hides pixels only; concealed text must also leave accessibility values.
+        if hidden && !keyboard_reveal {
+            redact_text_accessibility(ui.ctx(), output.response.id);
+        }
         // egui 0.36 moves the caret on any pointer press, including right-click.
         // Preserve the selection that the context-menu action should operate on.
         if output.response.hovered()
@@ -412,6 +416,21 @@ fn textarea_content(
         output.response.response
     })
     .inner
+}
+
+fn redact_text_accessibility(ctx: &egui::Context, id: egui::Id) {
+    let children = ctx
+        .accesskit_node_builder(id, |node| {
+            node.clear_value();
+            node.clear_text_selection();
+            node.children().to_vec()
+        })
+        .unwrap_or_default();
+    for child in children {
+        // These are IDs emitted by egui itself, preserving its nonzero high-entropy bits.
+        let id = unsafe { egui::Id::from_high_entropy_bits(child.0) };
+        redact_text_accessibility(ctx, id);
+    }
 }
 
 #[cfg(test)]

@@ -1,0 +1,3 @@
+    Checking imagine-server v0.1.0 (/home/thhel/.codex/worktrees/h3-product-worker/imagine)
+    Checking imagine-ui v0.1.0 (/home/thhel/.codex/worktrees/h3-product-worker/imagine/ui)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.17s

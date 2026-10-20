@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s
+     Running tests/h3_product_live.rs (comfyui/h3-product-20261020/target-product/debug/deps/h3_product_live-896e637a8367cd6b)
+
+running 1 test
+test own_prompt_uses_product_queue_publishes_complete_av_and_saves_only_explicitly has been running for over 60 seconds
+Product H3 PASS: UI client -> API -> canonical Ticket/FIFO -> real worker -> atomic AV -> explicit Save; 39 frames / 52000 stereo samples; one GPU job.
+test own_prompt_uses_product_queue_publishes_complete_av_and_saves_only_explicitly ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 205.52s
+

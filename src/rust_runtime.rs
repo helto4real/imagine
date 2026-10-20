@@ -9,6 +9,8 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct Runtime {
     pub schema: u32,
+    #[serde(default)]
+    pub h3: Option<H3>,
     pub reference_revision: String,
     pub binary: PathBuf,
     pub environment: BTreeMap<String, String>,
@@ -44,6 +46,9 @@ impl Runtime {
             bail!("Unknown Rust runtime environment option")
         }
         runtime.verify()?;
+        if let Some(h3) = &runtime.h3 {
+            h3.verify()?;
+        }
         for key in [
             "IMAGINE_KITCHEN_LIBRARY",
             "IMAGINE_AIMDO_LIBRARY",
@@ -127,4 +132,138 @@ pub fn prepare(root: &Path, site: &Path, output: &Path) -> Result<()> {
     std::fs::write(&temp, serde_json::to_vec_pretty(&value)?)?;
     std::fs::rename(temp, output)?;
     Ok(())
+}
+
+/// Explicit deployment configuration, never accepted from a generation request.
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct H3 {
+    pub dependency_map: PathBuf,
+    pub identity: crate::h3_protocol::Deployment,
+    pub binary: PathBuf,
+    pub model_root: PathBuf,
+    pub environment: BTreeMap<String, String>,
+    pub files: BTreeMap<PathBuf, String>,
+}
+impl H3 {
+    pub fn verify(&self) -> Result<()> {
+        let allowed = [
+            "LD_LIBRARY_PATH",
+            "IMAGINE_KITCHEN_LIBRARY",
+            "IMAGINE_AIMDO_LIBRARY",
+            "IMAGINE_TRITON_COMPILER_PROFILE",
+            "IMAGINE_TRITON_DRIVER_LIBRARY",
+            "IMAGINE_TRITON_FRONTEND_CUBINS",
+            "OMP_NUM_THREADS",
+        ];
+        if !self.identity.valid()
+            || !self.binary.is_absolute()
+            || !self.model_root.is_absolute()
+            || self.files.get(&self.binary) != Some(&self.identity.worker_sha256)
+            || self
+                .environment
+                .keys()
+                .any(|k| !allowed.contains(&k.as_str()))
+        {
+            bail!("h3_deployment_mismatch");
+        }
+        for (path, expected) in &self.files {
+            if !path.is_absolute()
+                || path.components().any(|c| {
+                    !matches!(
+                        c,
+                        std::path::Component::RootDir | std::path::Component::Normal(_)
+                    )
+                })
+                || matches!(
+                    path.extension().and_then(|s| s.to_str()),
+                    Some("safetensors" | "gguf" | "pt" | "pth")
+                )
+                || !crate::h3_protocol::is_sha256(expected)
+                || hash_file(path)? != *expected
+            {
+                bail!("h3_deployment_mismatch");
+            }
+        }
+        let dependencies: BTreeMap<_, _> = self
+            .files
+            .iter()
+            .filter(|(p, _)| *p != &self.binary)
+            .collect();
+        if crate::storage::hash(&serde_json::to_vec(&dependencies)?)
+            != self.identity.dependencies_sha256
+        {
+            bail!("h3_deployment_mismatch");
+        }
+        if !self.dependency_map.is_absolute() || self.files.contains_key(&self.dependency_map) {
+            bail!("h3_deployment_mismatch");
+        }
+        let map_file = std::fs::File::open(&self.dependency_map)?;
+        if map_file.metadata()?.len() > 1024 * 1024 {
+            bail!("h3_deployment_mismatch");
+        }
+        let supplied: BTreeMap<PathBuf, String> = serde_json::from_reader(map_file)?;
+        let expected: BTreeMap<PathBuf, String> = dependencies
+            .into_iter()
+            .map(|(p, s)| (p.clone(), s.clone()))
+            .collect();
+        if supplied != expected {
+            bail!("h3_deployment_mismatch");
+        }
+        for key in ["IMAGINE_KITCHEN_LIBRARY", "IMAGINE_AIMDO_LIBRARY"] {
+            let path = self
+                .environment
+                .get(key)
+                .context("H3 runtime environment incomplete")?;
+            if !self.files.contains_key(Path::new(path)) {
+                bail!("h3_deployment_mismatch");
+            }
+        }
+        Ok(())
+    }
+}
+
+fn hash_file(path: &Path) -> Result<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    let mut file = std::fs::File::open(path).context("H3 dependency missing")?;
+    let mut buffer = [0u8; 65536];
+    let mut hash = Sha256::new();
+    loop {
+        let n = file.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        hash.update(&buffer[..n]);
+    }
+    Ok(format!("{:x}", hash.finalize()))
+}
+
+/// Explicit CPU-only assembly; never selects a deployment or changes a running service.
+pub fn attach_h3(image_runtime: &Path, h3_deployment: &Path, output: &Path) -> Result<()> {
+    Runtime::load(image_runtime)?;
+    let h3_value: serde_json::Value = serde_json::from_slice(&std::fs::read(h3_deployment)?)?;
+    let h3: H3 = serde_json::from_value(h3_value.clone())?;
+    h3.verify()?;
+    let mut value: serde_json::Value = serde_json::from_slice(&std::fs::read(image_runtime)?)?;
+    value["h3"] = h3_value;
+    let parent = output.parent().context("Manifest parent")?;
+    std::fs::create_dir_all(parent)?;
+    let temp = parent.join(format!(".h3-runtime-{}.json", uuid::Uuid::new_v4()));
+    use std::{io::Write, os::unix::fs::OpenOptionsExt};
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&temp)?;
+    let result = (|| -> Result<()> {
+        file.write_all(&serde_json::to_vec_pretty(&value)?)?;
+        file.sync_all()?;
+        std::fs::rename(&temp, output)?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    result
 }

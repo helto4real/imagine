@@ -27,6 +27,7 @@ pub mod execution;
 mod execution_bindings;
 pub mod execution_value;
 pub mod fp8_ops;
+pub mod h3_product;
 pub mod int4_linear;
 pub mod int8_eager_ops;
 pub mod int8_linear;

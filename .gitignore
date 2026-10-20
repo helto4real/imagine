@@ -45,3 +45,6 @@
 
 # Local acceptance inputs, result evidence and optimization controls.
 /test-generations/
+
+# Manual H3 test settings and session data are never source artifacts.
+/.h3-manual-test/

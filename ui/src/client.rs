@@ -126,6 +126,13 @@ fn job_progress(value: &Value) -> Progress {
         _ => match value["phase"].as_str() {
             Some("verifying_profile") => "Verifying model",
             Some("loading_model") => "Loading model",
+            Some("loading_text") => "Loading text encoder",
+            Some("encoding_text") => "Encoding prompt",
+            Some("loading_dit") => "Loading video model",
+            Some("loading_video_vae") => "Loading video decoder",
+            Some("decoding_video") => "Decoding video",
+            Some("loading_audio_vae") => "Loading audio decoder",
+            Some("decoding_audio") => "Decoding audio",
             Some("preparing" | "preparing_inputs") => "Preparing inputs",
             Some("sampling") => "Sampling",
             Some("finishing_image") => "Finishing image",
@@ -138,6 +145,7 @@ fn job_progress(value: &Value) -> Progress {
             Some("portrait") => format!("Portrait · {label}"),
             Some("turnaround") => format!("Views · {label}"),
             Some("compose") => "Composing".into(),
+            Some("encoding_video") => "Encoding video".into(),
             _ => label.into(),
         }
     } else {
@@ -261,26 +269,13 @@ impl Client {
         Self::json(self.post(&format!("/v1/jobs/{job}/cancel")).send().await).await?;
         Ok(())
     }
-    pub async fn generate(
+    async fn wait_for_job(
         &self,
-        submission: Submission,
-        mut progress: impl FnMut(Progress),
-    ) -> std::result::Result<Completed, Failure> {
-        let destination = submission
-            .upscale_source
-            .as_deref()
-            .and_then(Path::parent)
-            .unwrap_or(&submission.folder);
-        check_output_folder(destination).map_err(|e| {
-            Failure::retry(if submission.upscale_source.is_some() {
-                "Cannot write beside the original image. Restore access to that folder and retry."
-                    .into()
-            } else {
-                e.to_string()
-            })
-        })?;
-        let job = match submission.job {
-            Some(id) => id,
+        submission: &mut Submission,
+        progress: &mut impl FnMut(Progress),
+    ) -> std::result::Result<Value, Failure> {
+        let job = match &submission.job {
+            Some(id) => id.clone(),
             None => {
                 let body = Self::json(
                     self.post("/v1/jobs")
@@ -293,6 +288,7 @@ impl Client {
                 identifier(&body["id"])?
             }
         };
+        submission.job = Some(job.clone());
         progress(Progress::Submitted(job.clone()));
         let result = loop {
             let value = Self::json(self.get(&format!("/v1/jobs/{job}")).send().await).await?;
@@ -316,6 +312,27 @@ impl Client {
             }
             tokio::time::sleep(Duration::from_millis(400)).await;
         };
+        Ok(result)
+    }
+    pub async fn generate(
+        &self,
+        mut submission: Submission,
+        mut progress: impl FnMut(Progress),
+    ) -> std::result::Result<Completed, Failure> {
+        let destination = submission
+            .upscale_source
+            .as_deref()
+            .and_then(Path::parent)
+            .unwrap_or(&submission.folder);
+        check_output_folder(destination).map_err(|e| {
+            Failure::retry(if submission.upscale_source.is_some() {
+                "Cannot write beside the original image. Restore access to that folder and retry."
+                    .into()
+            } else {
+                e.to_string()
+            })
+        })?;
+        let result = self.wait_for_job(&mut submission, &mut progress).await?;
         progress(Progress::Status {
             label: "Saving".into(),
             sampling: None,
@@ -1032,3 +1049,7 @@ mod tests {
         assert!(make_request("Synthetic", "", &[], &library_meta, &settings).is_err());
     }
 }
+
+#[path = "video_client.rs"]
+mod video;
+pub use video::{VideoCompleted, video_request};

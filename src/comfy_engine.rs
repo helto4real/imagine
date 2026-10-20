@@ -21,6 +21,8 @@ use tokio::{
     sync::watch,
 };
 
+mod h3;
+
 const MAX_HEADER: usize = 1024 * 1024;
 const MAX_PAYLOAD: usize = 256 * 1024 * 1024;
 const ATTENTION: &str = "comfy_kitchen_int8";
@@ -58,6 +60,7 @@ pub struct PipeBackend {
     script: PathBuf,
     rust_runtime: Option<crate::rust_runtime::Runtime>,
     child: Option<Child>,
+    h3_active: bool,
     input: Option<ChildStdin>,
     output: Option<BufReader<ChildStdout>>,
     state: watch::Sender<EngineState>,
@@ -88,6 +91,7 @@ impl PipeBackend {
             script,
             rust_runtime: None,
             child: None,
+            h3_active: false,
             input: None,
             output: None,
             state,
@@ -99,6 +103,7 @@ impl PipeBackend {
         manifest: &Path,
     ) -> Result<Self> {
         let runtime = crate::rust_runtime::Runtime::load(manifest)?;
+        state.send_modify(|s| s.h3_available = runtime.h3.is_some());
         Ok(Self {
             config,
             python: runtime.binary.clone(),
@@ -106,6 +111,7 @@ impl PipeBackend {
             script: PathBuf::new(),
             rust_runtime: Some(runtime),
             child: None,
+            h3_active: false,
             input: None,
             output: None,
             state,
@@ -130,7 +136,38 @@ impl PipeBackend {
             s.pid = self.child.as_ref().and_then(Child::id);
         });
     }
+    async fn launch(&mut self, mut command: Command) -> Result<()> {
+        command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .kill_on_drop(true);
+        let parent = std::process::id() as libc::pid_t;
+        // Match the native worker's ownership, including abrupt server death.
+        unsafe {
+            command.pre_exec(move || {
+                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                if libc::getppid() != parent {
+                    return Err(std::io::Error::other("parent exited"));
+                }
+                Ok(())
+            });
+        }
+        let child = command
+            .spawn()
+            .context(self.error("comfy_startup_failed"))?;
+        self.child = Some(child);
+        let child = self.child.as_mut().unwrap();
+        self.input = child.stdin.take();
+        self.output = child.stdout.take().map(BufReader::new);
+        Ok(())
+    }
     async fn ready(&mut self) -> Result<()> {
+        if self.h3_active {
+            self.stop().await?;
+        }
         if let Some(child) = self.child.as_mut() {
             if child.try_wait()?.is_none() {
                 return Ok(());
@@ -157,31 +194,7 @@ impl PipeBackend {
                 .arg(&self.root)
                 .current_dir(&self.root);
         }
-        command
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .kill_on_drop(true);
-        let parent = std::process::id() as libc::pid_t;
-        // Match the native worker's ownership, including abrupt server death.
-        unsafe {
-            command.pre_exec(move || {
-                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) != 0 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                if libc::getppid() != parent {
-                    return Err(std::io::Error::other("parent exited"));
-                }
-                Ok(())
-            });
-        }
-        let child = command
-            .spawn()
-            .context(self.error("comfy_startup_failed"))?;
-        self.child = Some(child);
-        let child = self.child.as_mut().unwrap();
-        self.input = child.stdin.take();
-        self.output = child.stdout.take().map(BufReader::new);
+        self.launch(command).await?;
         self.phase("loading_model");
         let (event, body) = tokio::time::timeout(
             Duration::from_secs(300),
@@ -393,6 +406,16 @@ impl PipeBackend {
     }
 }
 impl Backend for PipeBackend {
+    fn generate_video<'a>(
+        &'a mut self,
+        request: &'a crate::h3_protocol::Request,
+    ) -> EngineFuture<'a, crate::short_av::Av> {
+        Box::pin(async move {
+            tokio::time::timeout(Duration::from_secs(3600), self.run_video(request))
+                .await
+                .map_err(|_| EngineError("generation_timeout"))?
+        })
+    }
     fn generate<'a>(&'a mut self, request: &'a ImagePass) -> EngineFuture<'a, Vec<u8>> {
         Box::pin(async move {
             tokio::time::timeout(Duration::from_secs(3600), self.run(request))
@@ -449,6 +472,7 @@ impl Backend for PipeBackend {
                 child.wait().await?;
             }
             self.child = None;
+            self.h3_active = false;
             self.input = None;
             self.output = None;
             self.state.send_modify(|s| s.progress = None);

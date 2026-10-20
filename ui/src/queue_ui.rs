@@ -32,6 +32,12 @@ impl ImagineApp {
                     .iter()
                     .filter(|j| j.working && !matches!(j.status.as_str(), "Queued" | "Submitting"))
                     .count();
+                let video_pending = usize::from(
+                    self.video.working
+                        && matches!(self.video.status.as_str(), "Queued" | "Submitting"),
+                );
+                let pending = pending + video_pending;
+                let active = active + usize::from(self.video.working) - video_pending;
                 ui.label(
                     RichText::new(format!("{active} active · {pending} waiting"))
                         .small()
@@ -82,6 +88,23 @@ impl ImagineApp {
                 .id_salt("queue-rows")
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
+                    if self.video.working || self.video.error.is_some() {
+                        ui.horizontal(|ui| {
+                            ui.label(if revealed {
+                                self.video.prompt.lines().next().unwrap_or("Video")
+                            } else {
+                                "Hidden prompt"
+                            });
+                            ui.weak(format!("Video · {}", self.video.status));
+                            if self.video.working
+                                && !self.video.cancelling
+                                && self.video.pending.as_ref().is_some_and(|s| s.job.is_some())
+                                && helto::select_button(ui, "Cancel video", false).clicked()
+                            {
+                                self.cancel_video(ui.ctx());
+                            }
+                        });
+                    }
                     for (index, job) in self
                         .queue
                         .jobs

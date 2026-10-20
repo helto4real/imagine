@@ -1,0 +1,98 @@
+{
+  "audio_samples": 52000,
+  "case": "baseline",
+  "child_reaped": true,
+  "complete": true,
+  "elapsed_seconds": 127.822321444,
+  "error": null,
+  "events": [
+    {
+      "kind": "ready",
+      "seconds": 1.032025911
+    },
+    {
+      "kind": "phase",
+      "phase": "loading_text",
+      "seconds": 1.032471699
+    },
+    {
+      "kind": "phase",
+      "phase": "encoding_text",
+      "seconds": 72.267570692
+    },
+    {
+      "kind": "phase",
+      "phase": "loading_dit",
+      "seconds": 84.12446813
+    },
+    {
+      "kind": "phase",
+      "phase": "sampling",
+      "seconds": 109.059384472
+    },
+    {
+      "completed": 1,
+      "elapsed_seconds": 111.729750235,
+      "kind": "progress",
+      "total": 4
+    },
+    {
+      "completed": 2,
+      "elapsed_seconds": 112.561630126,
+      "kind": "progress",
+      "total": 4
+    },
+    {
+      "completed": 3,
+      "elapsed_seconds": 113.395204276,
+      "kind": "progress",
+      "total": 4
+    },
+    {
+      "completed": 4,
+      "elapsed_seconds": 114.216958303,
+      "kind": "progress",
+      "total": 4
+    },
+    {
+      "kind": "phase",
+      "phase": "loading_video_vae",
+      "seconds": 120.407210235
+    },
+    {
+      "kind": "phase",
+      "phase": "decoding_video",
+      "seconds": 123.934405522
+    },
+    {
+      "kind": "phase",
+      "phase": "loading_audio_vae",
+      "seconds": 125.826780493
+    },
+    {
+      "kind": "phase",
+      "phase": "decoding_audio",
+      "seconds": 126.553139356
+    }
+  ],
+  "exit_code": 0,
+  "finish_sent_after_reap": true,
+  "forced_stop": false,
+  "frames": 39,
+  "media_retained": false,
+  "pcm_f32le_sha256": "b0875d7e1810c7c9f79982dca697f1a0cfe617d5348d7207c2960d5a450af4a5",
+  "prompt_source": "frozen source profile fixture",
+  "result": "passed",
+  "schema": 1,
+  "ticket_socket": "/home/thhel/ChatGPT/imagine/.imagine/gpu.sock",
+  "video_rgb8_sha256": "a023b21cdc5da27612a08162a39bb54bd61074ee4b6325afdd21fc6694425dfa",
+  "worker": {
+    "core_revision": "40ff91114a6d71782aa1a79a76df6940546570bb",
+    "dependencies_sha256": "42ba7fcc9e18721e5a5bf62f124728b6a183a7823221cc4072b42e1c9c6a26ee",
+    "model_lock_sha256": "9cb461e3b118be5775602a81e4ddbd7e727b178f45aba9ce8fab0a3917c296b4",
+    "profile": "h3-short-av-noref-v1",
+    "protocol": 1,
+    "worker_sha256": "31294b34e1472409fa6a3c7a829c2fb4088fc4028e83799e3c603118c4e122a0"
+  },
+  "worker_pid": 3659491
+}
