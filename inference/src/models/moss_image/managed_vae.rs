@@ -47,6 +47,6 @@ impl ImageVaeServices for ManagedFlux2Vae<'_, '_> {
         }
     }
     fn is_oom(&mut self, error: &Error) -> Result<bool, Error> {
-        Ok(image_vae_is_oom(&self.runtime.native, self.device, error))
+        image_vae_is_oom(&self.runtime.native, self.device, error)
     }
 }

@@ -61,6 +61,12 @@ fn original_w4a8_unpack_keys_complete_binaries_and_cache_restoration() {
                 .iter()
                 .map(|b| format!("{b:02x}"))
                 .collect::<String>();
+            if hash != expected {
+                eprintln!(
+                    "W4A8_ASSEMBLY_DIAGNOSTIC {}",
+                    serde_json::json!({"case":c["index"],"metadata":image.metadata,"assembly":image.assembly.iter().filter(|(name,_)|name!="cubin").map(|(name,bytes)|(name.clone(),String::from_utf8_lossy(bytes).into_owned())).collect::<std::collections::BTreeMap<_,_>>()})
+                );
+            }
             assert_eq!(hash, expected);
             assert!(Arc::ptr_eq(&image, &unsafe {
                 compiler.w4a8_unpack(0, &s).unwrap()

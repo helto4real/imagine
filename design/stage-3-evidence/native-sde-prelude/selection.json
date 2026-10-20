@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "c1e9453287430df64753416c1f6866fa2da42464868f8dbf49be5f19f89c2317",
+  "tests": [
+    {
+      "name": "shared_sde_prelude_tests::original_sde_preludes_preserve_scalar_length_errors_unconditional_bounds_custom_gpu_wrappers_constructor_order_and_invalid_solver_precedence",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/c1e9453287430df64753416c1f6866fa2da42464868f8dbf49be5f19f89c2317/runs/b2ea86ce704d45a6bc4b9831c622379e/00-original_sde_preludes_preserve_scalar_length_errors_unconditional_bounds_custom_gpu_wrappers_constructor_order_and_invalid_solver_precedence.log",
+      "evidence": "00-original_sde_preludes_preserve_scalar_length_errors_unconditional_bounds_custom_gpu_wrappers_constructor_order_and_invalid_solver_precedence.json"
+    },
+    {
+      "name": "shared_sampling_tests::shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/c1e9453287430df64753416c1f6866fa2da42464868f8dbf49be5f19f89c2317/runs/b2ea86ce704d45a6bc4b9831c622379e/01-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.log",
+      "evidence": "01-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.json"
+    },
+    {
+      "name": "shared_sampling_tests::original_advanced_sampler_providers_preserve_cfg_flags_stage_geometry_sde_overrides_tau_scaler_calls_failures_and_rng",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/c1e9453287430df64753416c1f6866fa2da42464868f8dbf49be5f19f89c2317/runs/b2ea86ce704d45a6bc4b9831c622379e/02-original_advanced_sampler_providers_preserve_cfg_flags_stage_geometry_sde_overrides_tau_scaler_calls_failures_and_rng.log",
+      "evidence": "02-original_advanced_sampler_providers_preserve_cfg_flags_stage_geometry_sde_overrides_tau_scaler_calls_failures_and_rng.json"
+    }
+  ],
+  "result": "passed"
+}

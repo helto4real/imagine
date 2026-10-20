@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "b42532e55d0132e8c743c9d214becd2616be53333079ccb61aa316c1ad697876",
+  "tests": [
+    {
+      "name": "shared_mma_codec_tests::original_mma_packed_records_preserve_codes_scales_strides_empty_shapes_and_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/b42532e55d0132e8c743c9d214becd2616be53333079ccb61aa316c1ad697876/00-original_mma_packed_records_preserve_codes_scales_strides_empty_shapes_and_errors.log",
+      "evidence": "00-original_mma_packed_records_preserve_codes_scales_strides_empty_shapes_and_errors.json"
+    },
+    {
+      "name": "shared_mma_codec_tests::original_packed_and_canonical_w4a8_linear_preserve_activation_residual_and_allocation_context",
+      "returncode": 1,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/b42532e55d0132e8c743c9d214becd2616be53333079ccb61aa316c1ad697876/01-original_packed_and_canonical_w4a8_linear_preserve_activation_residual_and_allocation_context.log"
+    }
+  ],
+  "result": "failed"
+}

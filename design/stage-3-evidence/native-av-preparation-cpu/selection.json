@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "c2e8cbcc67fb8a2a0b114309409cf6ba18b521bb0c629c27a9b9e9bf632ec31d",
+  "execution_root": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "native_av_preprocessing_tests::h3_video_block_matches_original_two_frame_patches_and_default_dtype",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/c2e8cbcc67fb8a2a0b114309409cf6ba18b521bb0c629c27a9b9e9bf632ec31d/runs/adc86f54b2e04781be32f6056c237266/00-h3_video_block_matches_original_two_frame_patches_and_default_dtype.log",
+      "evidence": "00-h3_video_block_matches_original_two_frame_patches_and_default_dtype.json"
+    },
+    {
+      "name": "native_av_preprocessing_tests::h3_empty_streams_preserve_original_five_token_frame_cycle_and_independent_video_storage",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/c2e8cbcc67fb8a2a0b114309409cf6ba18b521bb0c629c27a9b9e9bf632ec31d/runs/adc86f54b2e04781be32f6056c237266/01-h3_empty_streams_preserve_original_five_token_frame_cycle_and_independent_video_storage.log",
+      "evidence": "01-h3_empty_streams_preserve_original_five_token_frame_cycle_and_independent_video_storage.json"
+    },
+    {
+      "name": "native_av_preprocessing_tests::h3_packed_audio_scale_keeps_identity_shortcut_clone_slice_and_original_dtype_errors",
+      "returncode": 1,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/c2e8cbcc67fb8a2a0b114309409cf6ba18b521bb0c629c27a9b9e9bf632ec31d/runs/adc86f54b2e04781be32f6056c237266/02-h3_packed_audio_scale_keeps_identity_shortcut_clone_slice_and_original_dtype_errors.log"
+    }
+  ],
+  "result": "failed"
+}

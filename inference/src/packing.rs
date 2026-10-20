@@ -1,4 +1,5 @@
 //! W4A8/W6A8 code planes from the frozen eager backend, in ATen order.
+pub mod mma;
 use crate::native::Error;
 use tch::{Kind, Tensor};
 

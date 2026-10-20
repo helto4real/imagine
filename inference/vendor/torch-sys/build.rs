@@ -251,6 +251,18 @@ impl SystemInfo {
             env_var_rerun("LIBTORCH_CXX11_ABI").unwrap_or_else(|_| "1".to_owned())
         };
         let libtorch_lib_dir = libtorch_lib_dir.expect("no libtorch lib dir found");
+        // The pinned compiler contributes the CRT headers omitted by the
+        // PyTorch runtime wheel. The standalone Kitchen build uses this same tree.
+        if libtorch_lib_dir.join("libtorch_cuda.so").is_file() {
+            let cuda = PathBuf::from(env_var_rerun("IMAGINE_CUDA_INCLUDE")
+                .context("Set IMAGINE_CUDA_INCLUDE to the locked compiler include tree (including crt/host_config.h)")?);
+            anyhow::ensure!(cuda.join("crt/host_config.h").is_file(), "IMAGINE_CUDA_INCLUDE is missing the locked CUDA CRT headers");
+            if let Some(site) = libtorch_lib_dir.parent().and_then(|torch| torch.parent()) {
+                let runtime = site.join("nvidia/cu13/include");
+                if runtime.is_dir() { libtorch_include_dirs.push(runtime); }
+            }
+            libtorch_include_dirs.push(cuda);
+        }
         let link_type = match env_var_rerun("LIBTORCH_STATIC").as_deref() {
             Err(_) | Ok("0") | Ok("false") | Ok("FALSE") => LinkType::Dynamic,
             Ok(_) => LinkType::Static,
@@ -356,6 +368,15 @@ impl SystemInfo {
     }
 
     fn make(&self) {
+        println!("cargo:rerun-if-changed=libtch/imagine_quadpack.c");
+        println!("cargo:rerun-if-changed=../../native/scipy_quadpack/original.c");
+        cc::Build::new()
+            .pic(true)
+            .opt_level(3)
+            .flag_if_supported("-ffp-contract=off")
+            .file("libtch/imagine_quadpack.c")
+            .file("../../native/scipy_quadpack/original.c")
+            .compile("imagine_quadpack");
         println!("cargo:rerun-if-changed=libtch/torch_python.cpp");
         println!("cargo:rerun-if-changed=libtch/torch_python.h");
         println!("cargo:rerun-if-changed=libtch/torch_api_generated.cpp");
@@ -367,6 +388,7 @@ impl SystemInfo {
         println!("cargo:rerun-if-changed=libtch/stb_image.h");
         let mut c_files = vec!["libtch/torch_api.cpp", "libtch/torch_api_generated.cpp"];
         println!("cargo:rerun-if-changed=libtch/imagine_inference_mode.cpp");
+        println!("cargo:rerun-if-changed=libtch/nlohmann/json.hpp");
         c_files.push("libtch/imagine_inference_mode.cpp");
         println!("cargo:rerun-if-changed=libtch/imagine_test_errors.cpp");
         if cfg!(feature = "imagine-test-errors") {
@@ -387,6 +409,7 @@ impl SystemInfo {
                     .pic(true)
                     .warnings(false)
                     .includes(&self.libtorch_include_dirs)
+                    .include("libtch")
                     .flag(format!("-Wl,-rpath={}", self.libtorch_lib_dir.display()))
                     .flag("-std=c++17")
                     .flag(format!("-D_GLIBCXX_USE_CXX11_ABI={}", self.cxx11_abi))
@@ -463,7 +486,16 @@ fn main() -> anyhow::Result<()> {
 
         println!("cargo:rustc-link-lib=static=tch");
         if use_cuda {
-            system_info.link("torch_cuda")
+            system_info.link("torch_cuda");
+            // ATen's original stream-capture helper calls these direct ABIs.
+            system_info.link("c10_cuda");
+            if let Some(site) = si_lib.parent().and_then(|torch| torch.parent()) {
+                let cuda = site.join("nvidia/cu13/lib");
+                if cuda.join("libcudart.so.13").is_file() {
+                    println!("cargo:rustc-link-search=native={}", cuda.display());
+                    println!("cargo:rustc-link-lib=dylib:+verbatim=libcudart.so.13");
+                }
+            }
         }
         if use_cuda_cu {
             system_info.link("torch_cuda_cu")

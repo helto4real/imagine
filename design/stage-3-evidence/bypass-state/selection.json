@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "160d5cf049c7adbeab94fce99bbd5d1c11cd79707ebd8350f8e98bd37dac4c30",
+  "tests": [
+    {
+      "name": "shared_bypass_state_tests::bypass_module_metadata_constructor_aliases_and_original_tensor_movement_match",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/160d5cf049c7adbeab94fce99bbd5d1c11cd79707ebd8350f8e98bd37dac4c30/runs/625dc85a92e14843932eb798fb4d941c/00-bypass_module_metadata_constructor_aliases_and_original_tensor_movement_match.log",
+      "evidence": "00-bypass_module_metadata_constructor_aliases_and_original_tensor_movement_match.json"
+    }
+  ],
+  "result": "passed"
+}

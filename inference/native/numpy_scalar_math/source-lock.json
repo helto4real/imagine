@@ -1,0 +1,28 @@
+{
+  "version": "2.3.5",
+  "sources": {
+    "loops_exponent_log.dispatch.c.src": {
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/_core/src/umath/loops_exponent_log.dispatch.c.src",
+      "sha256": "01320349e7e80c9bfd8e0e4fd0f24599b95da0bcf94f991e9989b97b2e7e7059"
+    },
+    "npy_simd_data.h": {
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/_core/src/umath/npy_simd_data.h",
+      "sha256": "befa536863dadeddec0dff116dea5412e685000e2842a9a9907e8aee35bfea7c"
+    },
+    "loops_umath_fp.dispatch.c.src": {
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/_core/src/umath/loops_umath_fp.dispatch.c.src",
+      "sha256": "29f1e5dd72a95995ee121a8eac833be5f832f420fc9fe3cdf961108c5d064a0b"
+    },
+    "npy_math_internal.h.src": {
+      "url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/_core/src/npymath/npy_math_internal.h.src",
+      "sha256": "a613046e6c56f3d9d134421d9f934d9517abd38116d799eb6b0e451e42fdd470"
+    }
+  },
+  "initial_target_dispatch": {
+    "float32": "AVX2/FMA3",
+    "float64": "baseline libm in AVX2 dispatcher",
+    "float16": "baseline libm"
+  },
+  "purpose": "Rust port of original scalar-lane log arithmetic for DEIS; no alternative approximation or tolerance",
+  "context_log2": "Original baseline loop and installed npy_log2 direct libm relocation retained; runtime dispatch still needs paired admission."
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Original registered Python signatures and binding-only synthetic failures."""
 from reference_paths import reference_dir
-import argparse,hashlib,inspect,json,subprocess,sys
+import argparse,collections,hashlib,inspect,json,subprocess,sys
 from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--site',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--rust-output',type=Path);p.add_argument('--check-rust',type=Path);a=p.parse_args();project=Path(__file__).resolve().parents[2];manifest=json.loads((reference_dir(project)/'source-manifest.json').read_text());hashes={e['path']:e['sha256']for e in manifest if e['root']=='site'}
 for name,expected in hashes.items():
@@ -28,7 +28,8 @@ for backend,module in [('eager',eager),('cuda',cuda),('triton',triton)]:
   for omitted in required:
    if any(p.kind==inspect.Parameter.POSITIONAL_ONLY for p in params):continue
    kw={p.name:None for p in required if p.name!=omitted.name};record([],kw,'missing_'+omitted.name)
-assert len(signatures)==135 and not unresolved
+expected_counts={'eager':56,'cuda':59,'triton':28}
+assert dict(collections.Counter(s['backend']for s in signatures))==expected_counts and not unresolved
 if a.rust_output or a.check_rust:
  out=['//! Generated from the locked registered Python function signatures.','//! Validation only; each body still owns its original defaults and operations.',"pub(crate) fn signature(backend:&str,operation:&str)->Option<(&'static [&'static str],usize)>{","Some(match (backend,operation){"]
  for s in signatures:

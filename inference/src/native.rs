@@ -27,6 +27,7 @@ pub enum Error {
         message: String,
     },
     Torch(tch::TchError),
+    Retained(std::rc::Rc<crate::source_exception::Exception>),
 }
 /// LibTorch's exact thread-local InferenceMode context. Guards must be dropped
 /// on their creating thread and nested in the same order as Python contexts.
@@ -38,6 +39,310 @@ pub struct InferenceMode {
 unsafe extern "C" {
     fn at_imagine_inference_mode_new(enabled: i32) -> *mut c_void;
     fn at_imagine_inference_mode_free(value: *mut c_void);
+    fn at_imagine_storage_info(value: *const c_void, identity: *mut usize, bytes: *mut u64);
+    fn at_imagine_weak_storage_new(value: *const c_void) -> *mut c_void;
+    fn at_imagine_weak_storage_expired(value: *mut c_void) -> i32;
+    fn at_imagine_weak_storage_free(value: *mut c_void);
+    fn at_imagine_source_normal(
+        source: *const torch_sys::C_tensor,
+        handle: *mut c_void,
+    ) -> *mut torch_sys::C_tensor;
+    fn at_imagine_index_copy_to(
+        target: *const torch_sys::C_tensor,
+        source: *const torch_sys::C_tensor,
+    );
+    fn at_imagine_context_index(
+        full: *const torch_sys::C_tensor,
+        values: *const i64,
+        count: i64,
+        dim: i64,
+    ) -> *mut torch_sys::C_tensor;
+    fn at_imagine_context_index_put(
+        full: *const torch_sys::C_tensor,
+        values: *const i64,
+        count: i64,
+        dim: i64,
+        source: *const torch_sys::C_tensor,
+    );
+    fn at_imagine_context_size(full: *const torch_sys::C_tensor, dim: i64) -> i64;
+    fn at_imagine_context_scalar_at(
+        full: *const torch_sys::C_tensor,
+        index: i64,
+        dim: i64,
+    ) -> *mut torch_sys::C_tensor;
+    fn at_imagine_context_scalar_at_put(
+        full: *const torch_sys::C_tensor,
+        index: i64,
+        dim: i64,
+        source: *const torch_sys::C_tensor,
+    );
+    fn at_imagine_context_slice(
+        full: *const torch_sys::C_tensor,
+        dim: i64,
+        start: i64,
+        end: i64,
+    ) -> *mut torch_sys::C_tensor;
+    fn at_imagine_context_scalar_index(
+        full: *const torch_sys::C_tensor,
+        values: *const i64,
+        count: i64,
+    ) -> *mut torch_sys::C_tensor;
+    fn at_imagine_global_rng_state(device: i32) -> *mut torch_sys::C_tensor;
+    fn at_imagine_clone(value: *const torch_sys::C_tensor) -> *mut torch_sys::C_tensor;
+    fn at_imagine_current_stream_capturing() -> i32;
+    fn at_imagine_generator_randperm(handle: *mut c_void, n: i64) -> *mut torch_sys::C_tensor;
+}
+/// The original Tensor indexing assignment copy/broadcast boundary. Calling
+/// plain copy_ omits its prefix-unit view and expand step (and changes errors).
+pub fn index_copy_to(target: &Tensor, source: &Tensor) -> Result<()> {
+    unsafe {
+        at_imagine_index_copy_to(target.as_ptr(), source.as_ptr());
+    }
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    Ok(())
+}
+pub fn context_index(full: &Tensor, indices: &[i64], dim: i64) -> Result<Tensor> {
+    let value = unsafe {
+        at_imagine_context_index(full.as_ptr(), indices.as_ptr(), indices.len() as i64, dim)
+    };
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    if value.is_null() {
+        return Err(Error::Native("Null context index result".into()));
+    }
+    Ok(unsafe { Tensor::from_ptr(value) })
+}
+pub fn context_index_put(full: &Tensor, indices: &[i64], dim: i64, source: &Tensor) -> Result<()> {
+    unsafe {
+        at_imagine_context_index_put(
+            full.as_ptr(),
+            indices.as_ptr(),
+            indices.len() as i64,
+            dim,
+            source.as_ptr(),
+        );
+    }
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    Ok(())
+}
+pub fn context_slice(full: &Tensor, dim: i64, start: i64, end: i64) -> Result<Tensor> {
+    let value = unsafe { at_imagine_context_slice(full.as_ptr(), dim, start, end) };
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    if value.is_null() {
+        return Err(Error::Native("Null context slice result".into()));
+    }
+    Ok(unsafe { Tensor::from_ptr(value) })
+}
+pub fn context_size(full: &Tensor, dim: i64) -> Result<i64> {
+    let value = unsafe { at_imagine_context_size(full.as_ptr(), dim) };
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    Ok(value)
+}
+pub fn context_scalar_at(full: &Tensor, index: i64, dim: i64) -> Result<Tensor> {
+    let value = unsafe { at_imagine_context_scalar_at(full.as_ptr(), index, dim) };
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    if value.is_null() {
+        return Err(Error::Native("Null scalar-at context index result".into()));
+    }
+    Ok(unsafe { Tensor::from_ptr(value) })
+}
+pub fn context_scalar_at_put(full: &Tensor, index: i64, dim: i64, source: &Tensor) -> Result<()> {
+    unsafe {
+        at_imagine_context_scalar_at_put(full.as_ptr(), index, dim, source.as_ptr());
+    }
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    Ok(())
+}
+pub fn context_scalar_index(full: &Tensor, indices: &[i64]) -> Result<Tensor> {
+    let value = unsafe {
+        at_imagine_context_scalar_index(full.as_ptr(), indices.as_ptr(), indices.len() as i64)
+    };
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    if value.is_null() {
+        return Err(Error::Native("Null scalar context index result".into()));
+    }
+    Ok(unsafe { Tensor::from_ptr(value) })
+}
+/// torch.cuda.is_current_stream_capturing, including its no-context fast path.
+pub fn current_stream_capturing() -> Result<bool> {
+    let value = unsafe { at_imagine_current_stream_capturing() };
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    Ok(value != 0)
+}
+/// The original out-of-place aten::clone, including its autograd operation.
+pub fn clone_tensor(value: &Tensor) -> Result<Tensor> {
+    let value = unsafe { at_imagine_clone(value.as_ptr()) };
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    if value.is_null() {
+        return Err(Error::Native("Null cloned tensor".into()));
+    }
+    Ok(unsafe { Tensor::from_ptr(value) })
+}
+/// State of the ordinary global stream; used to validate source reseeding/draws.
+pub fn global_rng_state(device: Device) -> Result<Tensor> {
+    let index = match device {
+        Device::Cpu => -1,
+        Device::Cuda(index) => index as i32,
+        _ => {
+            return Err(Error::Native(
+                "Initial-platform RNG device must be CPU or CUDA".into(),
+            ));
+        }
+    };
+    let value = unsafe { at_imagine_global_rng_state(index) };
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    if value.is_null() {
+        return Err(Error::Native("Null global RNG state".into()));
+    }
+    Ok(unsafe { Tensor::from_ptr(value) })
+}
+/// Storage identity is process-local and only meaningful while its tensor lives.
+/// Views retain their complete allocation, including storage outside the view.
+pub fn storage_info(value: &Tensor) -> Result<(usize, u64)> {
+    let (mut identity, mut bytes) = (0, 0);
+    unsafe {
+        at_imagine_storage_info(value.as_ptr().cast(), &mut identity, &mut bytes);
+    }
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    Ok((identity, bytes))
+}
+/// ATen's original weak StorageImpl owner. This does not retain an allocation's
+/// payload; it permits exact allocation-lifetime checks without reading data.
+pub struct WeakStorage(NonNull<c_void>);
+impl WeakStorage {
+    pub fn new(value: &Tensor) -> Result<Self> {
+        let handle = unsafe { at_imagine_weak_storage_new(value.as_ptr().cast()) };
+        let error = unsafe { torch_sys::get_and_reset_last_err() };
+        if !error.is_null() {
+            let message = unsafe { CStr::from_ptr(error) }
+                .to_string_lossy()
+                .into_owned();
+            unsafe {
+                libc::free(error.cast());
+            }
+            return Err(tch::TchError::Torch(message).into());
+        }
+        Ok(Self(NonNull::new(handle).ok_or_else(|| {
+            Error::Native("Null ATen weak storage".into())
+        })?))
+    }
+    pub fn expired(&self) -> bool {
+        unsafe { at_imagine_weak_storage_expired(self.0.as_ptr()) != 0 }
+    }
+}
+impl Drop for WeakStorage {
+    fn drop(&mut self) {
+        unsafe {
+            at_imagine_weak_storage_free(self.0.as_ptr());
+        }
+    }
 }
 pub fn inference_mode(enabled: bool) -> Result<InferenceMode> {
     let handle = unsafe { at_imagine_inference_mode_new(i32::from(enabled)) };
@@ -74,6 +379,7 @@ impl std::fmt::Display for Error {
             Self::ReferenceException { message, .. } => f.write_str(message),
             Self::AcceleratorException { message, .. } => f.write_str(message),
             Self::Torch(error) => error.fmt(f),
+            Self::Retained(error) => error.source().fmt(f),
         }
     }
 }
@@ -85,7 +391,40 @@ impl From<crate::registry::SelectionError> for Error {
 }
 impl From<tch::TchError> for Error {
     fn from(error: tch::TchError) -> Self {
+        let error = match error {
+            tch::TchError::Torch(message) => {
+                tch::TchError::Torch(crate::python_error_messages::translate(message))
+            }
+            error => error,
+        };
         if let tch::TchError::Torch(message) = &error {
+            for (tag, class) in [
+                ("value", "ValueError"),
+                ("type", "TypeError"),
+                ("not-implemented", "NotImplementedError"),
+                ("buffer", "BufferError"),
+                ("syntax", "SyntaxError"),
+                ("runtime", "RuntimeError"),
+            ] {
+                if let Some(message) = message.strip_prefix(&format!("[imagine-c10:{tag}]\n")) {
+                    return Self::ReferenceException {
+                        class,
+                        message: message.into(),
+                    };
+                }
+            }
+            if let Some(message) = message.strip_prefix("[imagine-c10:linalg]\n") {
+                return Self::ReferenceException {
+                    class: "_LinAlgError",
+                    message: message.into(),
+                };
+            }
+            if let Some(message) = message.strip_prefix("[imagine-c10:index]\n") {
+                return Self::ReferenceException {
+                    class: "IndexError",
+                    message: message.into(),
+                };
+            }
             if let Some(message) = message.strip_prefix("[imagine-c10:oom]\n") {
                 return Self::ReferenceException {
                     class: "OutOfMemoryError",
@@ -576,26 +915,92 @@ impl Kitchen {
             .check(unsafe { call(index as i64, values.as_mut_ptr()) })?;
         Ok(values)
     }
-    pub fn host_registration(&self, tensor: &Tensor, pin: bool) -> Result<bool> {
-        type Call = unsafe extern "C" fn(*const c_void, i64, *mut i64) -> i32;
+    /// Calls the CUDA registration operation without tensor guards or recovery.
+    ///
+    /// # Safety
+    /// The caller must retain the live CPU allocation covering pointer/bytes
+    /// throughout registration, its use and the corresponding unregistration.
+    pub unsafe fn host_registration_raw(
+        &self,
+        pointer: usize,
+        bytes: usize,
+        pin: bool,
+    ) -> Result<bool> {
+        type Call = unsafe extern "C" fn(u64, u64, i64, *mut i64) -> i32;
         let sym = unsafe {
             libc::dlsym(
                 self.library.handle.as_ptr(),
-                c"imagine_host_registration".as_ptr(),
+                c"imagine_host_registration_raw".as_ptr(),
             )
         };
         if sym.is_null() {
             return Err(Error::BindingGap {
                 backend: "CUDA".into(),
-                operation: "imagine_host_registration".into(),
+                operation: "imagine_host_registration_raw".into(),
             });
         }
         let call: Call = unsafe { std::mem::transmute(sym) };
         let mut success = 0;
         self.library
-            .check(unsafe { call(tensor.as_ptr().cast(), i64::from(pin), &mut success) })?;
+            .check(unsafe { call(pointer as u64, bytes as u64, i64::from(pin), &mut success) })?;
         Ok(success != 0)
     }
+    /// Original output[:, :, start:end] = value, including setitem's leading
+    /// unit-dimension stripping, broadcasting and native error dispatch.
+    pub fn set_video_frames(
+        &self,
+        output: &mut Tensor,
+        start: i64,
+        end: i64,
+        value: &Tensor,
+    ) -> Result<()> {
+        type Call = unsafe extern "C" fn(*mut c_void, i64, i64, *const c_void) -> i32;
+        let symbol = unsafe {
+            libc::dlsym(
+                self.library.handle.as_ptr(),
+                c"imagine_tensor_video_slice_assign".as_ptr(),
+            )
+        };
+        if symbol.is_null() {
+            return Err(Error::BindingGap {
+                backend: "ATen".into(),
+                operation: "imagine_tensor_video_slice_assign".into(),
+            });
+        }
+        let call: Call = unsafe { std::mem::transmute(symbol) };
+        self.check_aten_result(unsafe {
+            call(
+                output.as_mut_ptr().cast(),
+                start,
+                end,
+                value.as_ptr().cast(),
+            )
+        })
+    }
+    pub fn host_registration(&self, tensor: &Tensor, pin: bool) -> Result<bool> {
+        if tensor.device() != tch::Device::Cpu {
+            return Ok(false);
+        }
+        if pin && (tensor.f_is_pinned(tch::Device::Cuda(0))? || !tensor.is_contiguous()) {
+            return Ok(false);
+        }
+        let pointer = tensor.data_ptr() as usize;
+        if pin && pointer == 0 {
+            return Ok(false);
+        }
+        let size = tensor.numel() * tensor.kind().elt_size_in_bytes();
+        // The caller retains tensor storage through registration and unpin.
+        let success = unsafe { self.host_registration_raw(pointer, size, pin) }?;
+        if !success {
+            eprintln!(
+                "WARNING:root:{}",
+                if pin { "Pin error." } else { "Unpin error." }
+            );
+            crate::memory::exceptions::discard_native_cuda_async_error(self, tch::Device::Cuda(0))?;
+        }
+        Ok(success)
+    }
+
     pub fn comfy_math_state(&self) -> Result<[i64; 3]> {
         let mut state = [0; 3];
         self.comfy_math_state_raw(&mut state, false)?;
@@ -968,7 +1373,7 @@ impl Kitchen {
             .check(unsafe { (self.library.cuda_device_properties)(index.into(), &mut output) })?;
         Ok(output)
     }
-    fn aten_tensor_result(&self, code: i32, output: *mut c_void) -> Result<Tensor> {
+    fn check_aten_result(&self, code: i32) -> Result<()> {
         if code != 0 {
             let message = unsafe { CStr::from_ptr((self.library.error)()) }
                 .to_string_lossy()
@@ -986,6 +1391,10 @@ impl Kitchen {
             };
             return Err(self.library.exception(class, message));
         }
+        Ok(())
+    }
+    fn aten_tensor_result(&self, code: i32, output: *mut c_void) -> Result<Tensor> {
+        self.check_aten_result(code)?;
         if output.is_null() {
             return Err(Error::Native("Null ATen result".into()));
         }
@@ -1429,6 +1838,30 @@ pub struct Generator {
     device: Device,
     handle: NonNull<c_void>,
 }
+/// Original torch.randn(size, dtype, layout, device, generator) using the live
+/// captured tensor metadata, including native generator/device mismatch errors.
+pub fn normal_from_source(source: &Tensor, generator: Option<&mut Generator>) -> Result<Tensor> {
+    let value = unsafe {
+        at_imagine_source_normal(
+            source.as_ptr(),
+            generator.map_or(std::ptr::null_mut(), |g| g.handle.as_ptr()),
+        )
+    };
+    let error = unsafe { torch_sys::get_and_reset_last_err() };
+    if !error.is_null() {
+        let message = unsafe { CStr::from_ptr(error) }
+            .to_string_lossy()
+            .into_owned();
+        unsafe {
+            libc::free(error.cast());
+        }
+        return Err(tch::TchError::Torch(message).into());
+    }
+    if value.is_null() {
+        return Err(Error::Native("Null source normal result".into()));
+    }
+    Ok(unsafe { Tensor::from_ptr(value) })
+}
 impl Drop for Generator {
     fn drop(&mut self) {
         unsafe {
@@ -1437,6 +1870,23 @@ impl Drop for Generator {
     }
 }
 impl Generator {
+    pub fn randperm(&mut self, n: i64) -> Result<Tensor> {
+        let value = unsafe { at_imagine_generator_randperm(self.handle.as_ptr(), n) };
+        let error = unsafe { torch_sys::get_and_reset_last_err() };
+        if !error.is_null() {
+            let message = unsafe { CStr::from_ptr(error) }
+                .to_string_lossy()
+                .into_owned();
+            unsafe {
+                libc::free(error.cast());
+            }
+            return Err(tch::TchError::Torch(message).into());
+        }
+        if value.is_null() {
+            return Err(Error::Native("Null generator randperm result".into()));
+        }
+        Ok(unsafe { Tensor::from_ptr(value) })
+    }
     fn tensor_result(&self, code: i32, ptr: *mut c_void) -> Result<Tensor> {
         self.library.check(code)?;
         if ptr.is_null() {

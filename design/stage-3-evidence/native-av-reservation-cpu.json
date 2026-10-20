@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "scope": "Standalone development reservation controller, fake temporary coordinators and own harmless ELF children; no GPU/production socket contact",
+  "implementation": {
+    "inference/tools/gpu-reservation/Cargo.lock": "9292c62f931a845c73a0b8bcaa505837abe30c9332b62015dcd4adcde892cf68",
+    "inference/tools/gpu-reservation/Cargo.toml": "785c5d84bfa9a8f13e1ae222c15a4eeeb93f87834d35dd95f73a359aa5fed987",
+    "inference/tools/gpu-reservation/README.md": "545b9e83672bb792f7c2accc7133ba10ff6a90f9f5d6fdf7635c11f110f63692",
+    "inference/tools/gpu-reservation/src/lib.rs": "1ef5568246e2323aab1a709c4a0b5fff524a512acbe6fad6cf2d25928e110382",
+    "inference/tools/gpu-reservation/src/main.rs": "86e77aa086f7d0150ff1ac925be40e7b6607c81b2c832e84856b459e80faf614",
+    "inference/tools/gpu-reservation/tests/launcher_signals.rs": "e6dc662047d8f91f5c2859071e7c1561976f71bfa3dd1975189ab724e4ce7769",
+    "inference/tools/gpu-reservation/tests/reservation.rs": "40652381d79e465a1206c1ea3f636b4a67324958dd2ea4d4e56b843b1dac5867",
+    "inference/tools/gpu_reserved_job.rs": "e0804c8f7eb63cb5a414ec4dec045c8a47138348d3011fd6acb1393ac0bf015d",
+    "src/coordination.rs": "189f23c1cfa35287932043001fb9bd355be1456feb00882d61e01e82db4218fe"
+  },
+  "tests_passed": 8,
+  "clippy": "all targets -D warnings passed",
+  "logs": [
+    {
+      "path": "/tmp/imagine-native-av-reservation-standalone.log",
+      "sha256": "9c2ddcaef56b968f049475f5037d98c15f28e565e45bd86b3ea2b05c7e0778cb",
+      "tail": "Compiling imagine-native-gpu-reservation v0.1.0 (/home/thhel/ChatGPT/imagine/inference/tools/gpu-reservation)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.83s\n     Running unittests src/lib.rs (comfyui/native-av-20261020/target-reservation/debug/deps/imagine_native_gpu_reservation-aeb22af09cf327e0)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running unittests src/main.rs (comfyui/native-av-20261020/target-reservation/debug/deps/imagine_native_gpu_reservation-0e0602c2436cb5ce)\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n     Running tests/launcher_signals.rs (comfyui/native-av-20261020/target-reservation/debug/deps/launcher_signals-d6d6955acfacec7b)\n\nrunning 2 tests\ntest launcher_sigint_reaps_direct_native_worker_before_finished ... Error: Reserved worker failed: cancelled\nok\ntest launcher_sigterm_reaps_direct_native_worker_before_finished ... Error: Reserved worker failed: cancelled\nok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s\n\n     Running tests/reservation.rs (comfyui/native-av-20261020/target-reservation/debug/deps/reservation-b8c94c16945969d5)\n\nrunning 6 tests\ntest cancellation_while_queued_never_starts_a_worker ... ok\ntest coordinator_loss_reaps_the_owned_child_without_standalone_fallback ... ok\ntest explicit_cancellation_reaps_the_owned_child_before_finished ... ok\ntest gpu_entry_requires_a_direct_native_worker_instead_of_a_script_or_launcher ... ok\ntest rejection_or_missing_coordinator_never_starts_a_worker ... ok\ntest shared_ticket_grants_before_worker_start_and_finishes_after_real_exit ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s\n\n   Doc-tests imagine_native_gpu_reservation\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n"
+    },
+    {
+      "path": "/tmp/imagine-native-av-reservation-standalone-clippy.log",
+      "sha256": "f324b98a1d14a6026b30e29ac52391f9703e2c76240b882b039aa7d9c4374816",
+      "tail": "    Checking libc v0.2.190\n    Checking cfg-if v1.0.5\n    Checking smallvec v1.16.3\n    Checking scopeguard v1.2.0\n    Checking lock_api v0.4.14\n    Checking serde_core v1.0.229\n    Checking parking_lot_core v0.9.12\n    Checking errno v0.3.14\n    Checking signal-hook-registry v1.4.8\n    Checking parking_lot v0.12.5\n    Checking socket2 v0.6.5\n    Checking mio v1.2.4\n    Checking zmij v1.0.23\n    Checking itoa v1.0.18\n    Checking pin-project-lite v0.2.17\n    Checking bytes v1.12.1\n    Checking memchr v2.8.3\n    Checking serde_json v1.0.154\n    Checking tokio v1.53.3\n    Checking serde v1.0.229\n    Checking anyhow v1.0.104\n    Checking linux-raw-sys v0.12.1\n    Checking bitflags v2.13.2\n    Checking rustix v1.1.5\n    Checking getrandom v0.4.3\n    Checking once_cell v1.21.4\n    Checking fastrand v2.5.0\n    Checking tempfile v3.27.0\n    Checking imagine-native-gpu-reservation v0.1.0 (/home/thhel/ChatGPT/imagine/inference/tools/gpu-reservation)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.63s\n"
+    }
+  ]
+}

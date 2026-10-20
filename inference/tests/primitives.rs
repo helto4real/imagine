@@ -1,3 +1,13 @@
+#[path = "support/native_av_composed.rs"]
+mod native_av_composed_tests;
+#[path = "support/native_av_payload.rs"]
+mod native_av_payload_tests;
+#[path = "support/native_av_preprocessing.rs"]
+mod native_av_preprocessing_tests;
+#[path = "support/native_av_streams.rs"]
+mod native_av_streams_tests;
+#[path = "support/native_av_tokenizer.rs"]
+mod native_av_tokenizer_tests;
 use imagine_inference::{
     eager,
     native::{KernelArg, Kitchen},
@@ -5,6 +15,250 @@ use imagine_inference::{
 use serde_json::Value;
 use std::path::Path;
 use tch::{Device, Kind, Tensor};
+#[path = "support/native_av_component.rs"]
+mod native_av_component_tests;
+#[path = "support/shared_ar_video.rs"]
+mod shared_ar_video_tests;
+#[path = "support/shared_checkpoint_headers.rs"]
+mod shared_checkpoint_headers_tests;
+#[path = "support/shared_dpm_call.rs"]
+mod shared_dpm_call_tests;
+#[path = "support/shared_exception_roots.rs"]
+mod shared_exception_roots_tests;
+#[path = "support/shared_inpaint_state.rs"]
+mod shared_inpaint_state_tests;
+#[path = "support/shared_lora_host_metadata.rs"]
+mod shared_lora_host_metadata_tests;
+#[path = "support/shared_max_denoise.rs"]
+mod shared_max_denoise_tests;
+#[path = "support/shared_memory_gc.rs"]
+mod shared_memory_gc_tests;
+#[path = "support/shared_numeric_hash.rs"]
+mod shared_numeric_hash_tests;
+#[path = "support/shared_pad_values.rs"]
+mod shared_pad_values_tests;
+#[path = "support/shared_patch_binding_gap.rs"]
+mod shared_patch_binding_gap_tests;
+#[path = "support/shared_public_sample.rs"]
+mod shared_public_sample_tests;
+#[path = "support/shared_rebuild_versions.rs"]
+mod shared_rebuild_versions_tests;
+#[path = "support/shared_runtime_errors.rs"]
+mod shared_runtime_errors_tests;
+#[path = "support/shared_sampler_argument_roots.rs"]
+mod shared_sampler_argument_roots_tests;
+#[path = "support/shared_sampler_factory.rs"]
+mod shared_sampler_factory_tests;
+#[path = "support/shared_sampler_state.rs"]
+mod shared_sampler_state_tests;
+#[path = "support/shared_sde_prelude.rs"]
+mod shared_sde_prelude_tests;
+#[path = "support/shared_shape_metadata.rs"]
+mod shared_shape_metadata_tests;
+#[path = "support/shared_storage_rebuild.rs"]
+mod shared_storage_rebuild_tests;
+#[path = "support/shared_tensor_host.rs"]
+mod shared_tensor_host_tests;
+#[path = "support/shared_torch_archive.rs"]
+mod shared_torch_archive_tests;
+#[path = "support/shared_unicode_decode.rs"]
+mod shared_unicode_decode_tests;
+#[path = "support/shared_weights_globals.rs"]
+mod shared_weights_globals_tests;
+#[path = "support/shared_weights_only.rs"]
+mod shared_weights_only_tests;
+
+#[path = "support/shared_pin_registry.rs"]
+mod shared_pin_registry_tests;
+#[path = "support/shared_pinned_key_set.rs"]
+mod shared_pinned_key_set_tests;
+
+#[path = "support/own_mapping_keys.rs"]
+mod own_mapping_keys;
+#[path = "support/shared_advanced_guidance.rs"]
+mod shared_advanced_guidance_tests;
+#[path = "support/shared_async_discard.rs"]
+mod shared_async_discard_tests;
+#[path = "support/shared_bypass_state.rs"]
+mod shared_bypass_state_tests;
+#[path = "support/shared_bypass.rs"]
+mod shared_bypass_tests;
+#[path = "support/shared_cond_batch.rs"]
+mod shared_cond_batch_tests;
+#[path = "support/shared_cond_preprocess.rs"]
+mod shared_cond_preprocess_tests;
+#[path = "support/shared_condition_owners.rs"]
+mod shared_condition_owner_tests;
+#[path = "support/shared_conditioning.rs"]
+mod shared_conditioning_tests;
+#[path = "support/shared_context_build_state.rs"]
+mod shared_context_build_state_tests;
+#[path = "support/shared_context_callback_owners.rs"]
+mod shared_context_callback_owner_tests;
+#[path = "support/shared_context_conditioning.rs"]
+mod shared_context_conditioning_tests;
+#[path = "support/shared_context_evaluation.rs"]
+mod shared_context_evaluation_tests;
+#[path = "support/shared_context_execute.rs"]
+mod shared_context_execute_tests;
+#[path = "support/shared_context_freenoise.rs"]
+mod shared_context_freenoise_tests;
+#[path = "support/shared_context_handler.rs"]
+mod shared_context_handler_tests;
+#[path = "support/shared_context_metadata.rs"]
+mod shared_context_metadata_tests;
+#[path = "support/shared_context_prepare_wrapper.rs"]
+mod shared_context_prepare_wrapper_tests;
+#[path = "support/shared_context_resizing.rs"]
+mod shared_context_resizing_tests;
+#[path = "support/shared_context_sampler_wrapper.rs"]
+mod shared_context_sampler_wrapper_tests;
+#[path = "support/shared_context_shape_metadata.rs"]
+mod shared_context_shape_metadata_tests;
+#[path = "support/shared_context_should_use.rs"]
+mod shared_context_should_use_tests;
+#[path = "support/shared_context_state.rs"]
+mod shared_context_state_tests;
+#[path = "support/shared_context_window_objects.rs"]
+mod shared_context_window_object_tests;
+#[path = "support/shared_context_windows.rs"]
+mod shared_context_window_tests;
+#[path = "support/shared_context_wrapper_registration.rs"]
+mod shared_context_wrapper_registration_tests;
+#[path = "support/shared_control_hooks.rs"]
+mod shared_control_hook_tests;
+#[path = "support/shared_deepclone.rs"]
+mod shared_deepclone_tests;
+#[path = "support/shared_deepcopy.rs"]
+mod shared_deepcopy_tests;
+#[path = "support/shared_deis.rs"]
+mod shared_deis_tests;
+#[path = "support/shared_detection.rs"]
+mod shared_detection_tests;
+#[path = "support/shared_dict_iteration.rs"]
+mod shared_dict_iteration_tests;
+#[path = "support/shared_diffusers_detection.rs"]
+mod shared_diffusers_detection_tests;
+#[path = "support/shared_dtype_size.rs"]
+mod shared_dtype_size_tests;
+#[path = "support/shared_ejection.rs"]
+mod shared_ejection_tests;
+#[path = "support/shared_extensions.rs"]
+mod shared_extension_tests;
+#[path = "support/shared_free_owners.rs"]
+mod shared_free_owner_tests;
+#[path = "support/shared_free_queries.rs"]
+mod shared_free_query_tests;
+#[path = "support/shared_general_dict_iteration.rs"]
+mod shared_general_dict_iteration_tests;
+#[path = "support/shared_general_dict.rs"]
+mod shared_general_dict_tests;
+#[path = "support/shared_guidance_owners.rs"]
+mod shared_guidance_owner_tests;
+#[path = "support/shared_guidance.rs"]
+mod shared_guidance_tests;
+#[path = "support/shared_guider_inner.rs"]
+mod shared_guider_inner_tests;
+#[path = "support/shared_guider_outer.rs"]
+mod shared_guider_outer_tests;
+#[path = "support/shared_guider_prediction.rs"]
+mod shared_guider_prediction_tests;
+#[path = "support/shared_guider_sample.rs"]
+mod shared_guider_sample_tests;
+#[path = "support/shared_guider_state.rs"]
+mod shared_guider_state_tests;
+#[path = "support/shared_hook_patches.rs"]
+mod shared_hook_patches_tests;
+#[path = "support/shared_hooks.rs"]
+mod shared_hooks_tests;
+#[path = "support/shared_injections.rs"]
+mod shared_injection_tests;
+#[path = "support/shared_ksampler.rs"]
+mod shared_ksampler_tests;
+#[path = "support/shared_latent_packing.rs"]
+mod shared_latent_packing_tests;
+#[path = "support/shared_lifecycle.rs"]
+mod shared_lifecycle_tests;
+#[path = "support/shared_load_completion.rs"]
+mod shared_load_completion_tests;
+#[path = "support/shared_load_selection.rs"]
+mod shared_load_selection_tests;
+#[path = "support/shared_loaded_errors.rs"]
+mod shared_loaded_error_tests;
+#[path = "support/shared_loaded_load.rs"]
+mod shared_loaded_load_tests;
+#[path = "support/shared_loaded_query.rs"]
+mod shared_loaded_query_tests;
+#[path = "support/shared_loaded_unload.rs"]
+mod shared_loaded_unload_tests;
+#[path = "support/shared_memory_helpers.rs"]
+mod shared_memory_helper_tests;
+#[path = "support/shared_memory_queries.rs"]
+mod shared_memory_query_tests;
+#[path = "support/shared_mesh.rs"]
+mod shared_mesh_tests;
+#[path = "support/shared_mma_codec.rs"]
+mod shared_mma_codec_tests;
+#[path = "support/shared_model_access.rs"]
+mod shared_model_access_tests;
+#[path = "support/shared_model_detection.rs"]
+mod shared_model_detection_tests;
+#[path = "support/shared_model_pinning.rs"]
+mod shared_model_pinning_tests;
+#[path = "support/shared_model_registry.rs"]
+mod shared_model_registry_tests;
+#[path = "support/shared_model_relationships.rs"]
+mod shared_model_relationship_tests;
+#[path = "support/shared_model_sampling.rs"]
+mod shared_model_sampling_tests;
+#[path = "support/shared_nested_copy.rs"]
+mod shared_nested_copy_tests;
+#[path = "support/shared_noise.rs"]
+mod shared_noise_tests;
+#[path = "support/shared_oom_dispatch.rs"]
+mod shared_oom_dispatch_tests;
+#[path = "support/shared_patch_calls.rs"]
+mod shared_patch_calls_tests;
+#[path = "support/shared_patcher_constructor.rs"]
+mod shared_patcher_constructor_tests;
+#[path = "support/shared_perp_guider.rs"]
+mod shared_perp_guider_tests;
+#[path = "support/shared_physical_cleanup.rs"]
+mod shared_physical_cleanup_tests;
+#[path = "support/shared_preparation.rs"]
+mod shared_preparation_tests;
+#[path = "support/shared_prepare_sampling.rs"]
+mod shared_prepare_sampling_tests;
+#[path = "support/shared_quant_metadata.rs"]
+mod shared_quant_metadata_tests;
+#[path = "support/shared_real_finalizers.rs"]
+mod shared_real_finalizer_tests;
+#[path = "support/shared_registry_fields.rs"]
+mod shared_registry_fields_tests;
+#[path = "support/shared_registry_lists.rs"]
+mod shared_registry_list_tests;
+#[path = "support/shared_relationship_clone.rs"]
+mod shared_relationship_clone_tests;
+#[path = "support/shared_sampler_locals.rs"]
+mod shared_sampler_locals_tests;
+#[path = "support/shared_sampler_plan.rs"]
+mod shared_sampler_plan_tests;
+#[path = "support/shared_sampling.rs"]
+mod shared_sampling_tests;
+#[path = "support/shared_sigma_ops.rs"]
+mod shared_sigma_ops_tests;
+#[path = "support/shared_state_dict.rs"]
+mod shared_state_dict_tests;
+#[path = "support/shared_table_schedules.rs"]
+mod shared_table_schedules_tests;
+#[path = "support/shared_unet_names.rs"]
+mod shared_unet_names_tests;
+#[path = "support/shared_unicode.rs"]
+mod shared_unicode_tests;
+#[path = "support/shared_weak_finalizers.rs"]
+mod shared_weak_finalizers_tests;
+#[path = "support/shared_whole_clone.rs"]
+mod shared_whole_clone_tests;
 
 #[path = "support/attention_attributes.rs"]
 mod attention_attribute_tests;
@@ -125,6 +379,9 @@ mod qwen_vae_tests;
 mod qwen_vision_geometry_tests;
 
 fn bits(tensor: &Tensor) -> Vec<u8> {
+    if tensor.numel() == 0 {
+        return Vec::new();
+    }
     let cpu = tensor
         .detach()
         .contiguous()
@@ -181,7 +438,42 @@ fn fixtures() -> &'static Value {
     FIXTURES.get_or_init(|| {
         let path = std::env::var("IMAGINE_PRIMITIVE_FIXTURES")
             .expect("Explicit synthetic fixture path required");
-        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+        let mut data: Value =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        // Retain the original baseline corpus while refreshing only categories
+        // affected by the source-locked Kitchen 0.2.38 upgrade.
+        let zero: Value =
+            serde_json::from_str(include_str!("../fixtures/kitchen-0238-zero-k.json")).unwrap();
+        data["controlled_cuda_int8_linear_zero_k"] = zero["runs"].clone();
+        let activation: Value = serde_json::from_str(include_str!(
+            "../fixtures/kitchen-0238-activation-values.json"
+        ))
+        .unwrap();
+        data["input_activation_values"] = activation["input_activation_values"].clone();
+        let signatures: Value =
+            serde_json::from_str(include_str!("../fixtures/kitchen-0238-signatures.json")).unwrap();
+        data["backend_signature_errors"] = signatures["cases"].clone();
+        let registry: Value =
+            serde_json::from_str(include_str!("../fixtures/kitchen-0238-registry.json")).unwrap();
+        data["binding_tables"]["backends"] = registry["backends"].clone();
+        let w4a8: Value =
+            serde_json::from_str(include_str!("../fixtures/kitchen-0238-w4a8-frontend.json"))
+                .unwrap();
+        data["triton_w4a8_specialization"] = w4a8["cases"].clone();
+        data["triton_w4a8_function_cache_keys"] = w4a8["function_cache_keys"].clone();
+        let diagnostics: Value =
+            serde_json::from_str(include_str!("../fixtures/kitchen-0238-diagnostics.json"))
+                .unwrap();
+        let diagnostic = &diagnostics["triton_int8_unsupported"];
+        let case = data["triton_int8_bindings"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|c| c["label"] == "unsupported_act")
+            .unwrap();
+        case["error"] = diagnostic["error"].clone();
+        case["message"] = diagnostic["message"].clone();
+        data
     })
 }
 fn kitchen() -> Kitchen {
@@ -2151,7 +2443,7 @@ fn convrot_empty_width_preserves_own_controlled_scale_storage() {
 
 fn assert_reference_error(error: imagine_inference::native::Error, case: &Value) {
     use imagine_inference::native::Error;
-    let (class, message) = match &error {
+    let (class, message) = match error.root() {
         Error::ReferenceException { class, message } => (*class, message.as_str()),
         Error::Torch(tch::TchError::Torch(message)) => {
             // C++ stack locations belong to the language binding, not the
@@ -2812,8 +3104,11 @@ fn cuda_int8_zero_k_family_guards_all_consumers_and_matches_reference() {
         } else {
             known("output", output_kind, &[m, 4])
         };
-        let explicit =
-            int8_linear::apply_residual(&base, residual.as_ref(), residual_scale.as_ref()).unwrap();
+        let explicit = if case["fused_residual"].as_bool().unwrap_or(false) {
+            base
+        } else {
+            int8_linear::apply_residual(&base, residual.as_ref(), residual_scale.as_ref()).unwrap()
+        };
         assert_eq!(bits(&output), expected(&case["payload"]), "{case}");
         assert_eq!(bits(&output), bits(&explicit), "{case}");
         assert_eq!(output.size(), [m, 4]);

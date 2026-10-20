@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "5d05ceb81d3c565c75b47b516a399924df54a397ff2409ea55adb9f90892cee1",
+  "tests": [
+    {
+      "name": "shared_context_state_tests::original_multimodal_window_state_preserves_mapping_aliases_guide_injection_stripping_and_partial_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/5d05ceb81d3c565c75b47b516a399924df54a397ff2409ea55adb9f90892cee1/runs/84524f1497dd406f8b3f90ffaae91db3/00-original_multimodal_window_state_preserves_mapping_aliases_guide_injection_stripping_and_partial_errors.log",
+      "evidence": "00-original_multimodal_window_state_preserves_mapping_aliases_guide_injection_stripping_and_partial_errors.json"
+    },
+    {
+      "name": "shared_latent_packing_tests::original_multimodal_latent_packing_preserves_shapes_single_modality_shortcut_views_and_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/5d05ceb81d3c565c75b47b516a399924df54a397ff2409ea55adb9f90892cee1/runs/84524f1497dd406f8b3f90ffaae91db3/01-original_multimodal_latent_packing_preserves_shapes_single_modality_shortcut_views_and_errors.log",
+      "evidence": "01-original_multimodal_latent_packing_preserves_shapes_single_modality_shortcut_views_and_errors.json"
+    },
+    {
+      "name": "shared_context_freenoise_tests::handler_freenoise_preserves_guide_suffixes_multimodal_scaling_aliases_partial_errors_and_private_rng",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/5d05ceb81d3c565c75b47b516a399924df54a397ff2409ea55adb9f90892cee1/runs/84524f1497dd406f8b3f90ffaae91db3/02-handler_freenoise_preserves_guide_suffixes_multimodal_scaling_aliases_partial_errors_and_private_rng.log",
+      "evidence": "02-handler_freenoise_preserves_guide_suffixes_multimodal_scaling_aliases_partial_errors_and_private_rng.json"
+    }
+  ],
+  "result": "passed"
+}

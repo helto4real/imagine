@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "83bc598845b6388f38ab2ddd1e44fc95852620c5a09f193ac88c9cdc3d811cdd",
+  "tests": [
+    {
+      "name": "shared_loaded_query_tests::original_loaded_models_query_preserves_expired_weak_positions_used_filter_order_and_registration_count",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/83bc598845b6388f38ab2ddd1e44fc95852620c5a09f193ac88c9cdc3d811cdd/runs/5fcf901dfed24c40bbed27dd7e852a8f/00-original_loaded_models_query_preserves_expired_weak_positions_used_filter_order_and_registration_count.log",
+      "evidence": "00-original_loaded_models_query_preserves_expired_weak_positions_used_filter_order_and_registration_count.json"
+    },
+    {
+      "name": "model_management_tests::qwen_image21_original_shared_model_manager_order_pressure_weak_owners_and_failures_match",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/83bc598845b6388f38ab2ddd1e44fc95852620c5a09f193ac88c9cdc3d811cdd/runs/5fcf901dfed24c40bbed27dd7e852a8f/01-qwen_image21_original_shared_model_manager_order_pressure_weak_owners_and_failures_match.log",
+      "evidence": "01-qwen_image21_original_shared_model_manager_order_pressure_weak_owners_and_failures_match.json"
+    },
+    {
+      "name": "model_management_tests::shared_memory_policy_preserves_vram_modes_smart_memory_reserves_ratios_and_load_free_order",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/83bc598845b6388f38ab2ddd1e44fc95852620c5a09f193ac88c9cdc3d811cdd/runs/5fcf901dfed24c40bbed27dd7e852a8f/02-shared_memory_policy_preserves_vram_modes_smart_memory_reserves_ratios_and_load_free_order.log",
+      "evidence": "02-shared_memory_policy_preserves_vram_modes_smart_memory_reserves_ratios_and_load_free_order.json"
+    }
+  ],
+  "result": "passed"
+}

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "23259fff8a9340eb7447de27e6903b909fb1837ce53f0982041cd9de06517928",
+  "tests": [
+    {
+      "name": "shared_ar_video_tests::original_auxiliary_ar_video_preserves_block_cache_rollback_i2v_priming_seed_rng_callback_scaling_and_finally_error_boundaries",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/23259fff8a9340eb7447de27e6903b909fb1837ce53f0982041cd9de06517928/runs/7723406d0ec54cc5967df918a8d03fa2/00-original_auxiliary_ar_video_preserves_block_cache_rollback_i2v_priming_seed_rng_callback_scaling_and_finally_error_boundaries.log",
+      "evidence": "00-original_auxiliary_ar_video_preserves_block_cache_rollback_i2v_priming_seed_rng_callback_scaling_and_finally_error_boundaries.json"
+    }
+  ],
+  "result": "passed"
+}

@@ -46,7 +46,7 @@ impl FluxVaeAttentionServices for Services<'_> {
         }
     }
     fn is_oom(&mut self, device: Device, error: &Error) -> Result<bool, Error> {
-        Ok(image_vae_is_oom(&self.0.native, device, error))
+        image_vae_is_oom(&self.0.native, device, error)
     }
     fn empty_cache(&mut self, device: Device) -> Result<(), Error> {
         if let Device::Cuda(i) = device {

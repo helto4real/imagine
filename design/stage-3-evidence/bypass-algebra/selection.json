@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "c62063776fe05dbd4ec75378fe809597c66e52e25aa95aba18c061a4a83e394d",
+  "tests": [
+    {
+      "name": "shared_bypass_tests::inference_bypass_adapter_algebra_preserves_six_families_linear_convolutions_dtype_errors_and_base_calls",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/c62063776fe05dbd4ec75378fe809597c66e52e25aa95aba18c061a4a83e394d/runs/83ec28ff914d4d98b5dbe49ca3d84eea/00-inference_bypass_adapter_algebra_preserves_six_families_linear_convolutions_dtype_errors_and_base_calls.log",
+      "evidence": "00-inference_bypass_adapter_algebra_preserves_six_families_linear_convolutions_dtype_errors_and_base_calls.json"
+    }
+  ],
+  "result": "passed"
+}

@@ -24,18 +24,25 @@
     "src/python.rs": "1f11411d6f1f8664f85a48d10957dfbf79667af2ccb9bd548f749cd597df5f8c",
     "src/traits.rs": "c986a2595e1ee98545579e9b46f14e0059aab4d7c02554c9d53c47d74af15ae0"
   },
-  "adaptation": "Preserve typed c10 errors and provide an owned thread-local InferenceMode context through the C ABI; original tensor operation bodies unchanged",
+  "adaptation": "Preserve typed c10 errors; bind original InferenceMode, clone, storage, typed host item/tolist conversion, RNG, tensor index assignment, CUDA capture and randperm operations; standalone original SciPy QUADPACK C shim. Original upstream tensor operation bodies unchanged.",
   "licenses_from": "same locked tch 0.26.0 release",
   "patched_files": {
     "Cargo.toml": "56944c2393ce7ed601ad107fce09f44449f873d8fd1aeeb0eb6c464196192ae6",
-    "build.rs": "dedfca2994c0ef657af2100a81efd92b28f4dcbd1fa153150e7b5f9aac60d7c0",
-    "libtch/torch_api.h": "b729295ed6213a84b4dfd8a2672d22a5cb9d4753fdf31dda64e3d583a70b875c"
+    "build.rs": "ead89c7c1b505522d48b18cf944918c78e5670c3428fc07fdc81ac007938aa97",
+    "libtch/torch_api.h": "80b8bfcc746867923fded19dcca75fe799cbeee8d3a7a449085297d806c4b388"
   },
   "added_files": {
     "LICENSE-APACHE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
     "LICENSE-MIT": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3",
-    "libtch/imagine_test_errors.cpp": "27860c10ed3537e16a7b5ae44d34de675a74d919ba5f701f52416928183b0428",
-    "libtch/imagine_inference_mode.cpp": "230d2e9c645364df0f6c065f66ab6608eb4a6fc0b56e1513f8cc9d20ba963723"
+    "libtch/imagine_inference_mode.cpp": "2dd063740714493e776df712bada2fa3048cd6cb85f8f4d5775da21dc23a4286",
+    "libtch/imagine_quadpack.c": "28e735bfccb70f8d7d6e2b44b0771f82fafc920bdb6ad8c10e00b771c386cab2",
+    "libtch/imagine_test_errors.cpp": "6d0d612e18dce4038940ed757e3cdb464172ef0831917a72ebb82f3f89db313c",
+    "libtch/nlohmann/LICENSE.MIT": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14",
+    "libtch/nlohmann/json.hpp": "21efa2f26ffa8b14b87f67ff8371fde142f237dae48bdb1efb5ffc3b364afc4d"
   },
-  "patch_sha256": "5a466f920ffb7538dfc112fe989463a41fd40c6c67e562dff0641e3113e632da"
+  "patch_sha256": "0b8aea04ea559b84b2378b3588c091a8fdfd6e968a1ac1caab43654ebd0f0f20",
+  "excluded_upstream_files": {
+    "Cargo.lock": "f0030335da2628cb47a87830544480dfc76cf1632533b0a9e12ea4e1307b3b5e"
+  },
+  "upstream_exclusion_reason": "The upstream standalone Cargo.lock is not used by this workspace path dependency; inference/Cargo.lock owns resolution."
 }

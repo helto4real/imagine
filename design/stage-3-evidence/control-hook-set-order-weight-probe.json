@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "sources": {
+    "comfy/hooks.py": "af4d31e1f70f4e66e145f92d71807649444acdc4bc92bc10e58ba7626a2c38a2",
+    "comfy/weight_adapter/base.py": "484f0d83a96e700f80c793e4bcc6a897d633233e51a59191d91da5e59da345c7",
+    "comfy/model_management.py": "045ab96003386a43e647c8ab96f22fbf3be6c577e2fc578ea31c6faa22facbd5",
+    "comfy/model_patcher.py": "7edc88d9eae6a88637625d257dc73684cfc012a29446bf88e70d22e3a6be3994",
+    "comfy/lora.py": "56a6a56897a7fcc16e67fb0e24dff5606b1c847ff2a205a6fd0c428d4eccab39"
+  },
+  "torch_version": "2.13.0+cu130",
+  "torch_git": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+  "orders_sha256": "a03aaa669069dd303769cb63bb4f02f5c21335bd58063d723e6432eeb0c1db39",
+  "trained_model_weights": 0,
+  "fixture_tensor_shape": [
+    1
+  ],
+  "input_diff_float_values": 2,
+  "base_float_values_per_calculation": 1,
+  "device": "cpu",
+  "dtype": "torch.float32",
+  "base_value": 1.0,
+  "diff_values": [
+    16777216.0,
+    -16777216.0
+  ],
+  "results": [
+    {
+      "order": [
+        0,
+        1
+      ],
+      "values": [
+        0.0
+      ],
+      "payload_hex": "00000000"
+    },
+    {
+      "order": [
+        1,
+        0
+      ],
+      "values": [
+        1.0
+      ],
+      "payload_hex": "0000803f"
+    }
+  ],
+  "rust_policy_changed": false
+}

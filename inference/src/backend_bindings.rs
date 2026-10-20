@@ -3,6 +3,10 @@ use super::*;
 use crate::{cuda_linear, int8_eager_ops, int8_linear, native::KernelArg};
 #[path = "backend_conv.rs"]
 mod conv;
+#[path = "backend_delaunay.rs"]
+mod delaunay;
+#[path = "backend_mesh.rs"]
+mod mesh;
 #[path = "backend_na.rs"]
 mod na;
 #[path = "backend_nvfp4.rs"]
@@ -23,6 +27,8 @@ pub(crate) mod sol_cuda;
 mod w4a4_linear;
 #[path = "backend_w4a8.rs"]
 pub(crate) mod w4a8;
+#[path = "backend_w4a8_packed.rs"]
+mod w4a8_packed;
 #[path = "backend_w4a8_quant.rs"]
 mod w4a8_quant;
 
@@ -251,6 +257,8 @@ fn input_epsilon(rt: &Runtime, fused: bool, a: &[Value], k: &Kwargs) -> Result<V
 }
 pub(super) fn install(rt: &Runtime) {
     na::install(rt);
+    mesh::install(rt);
+    delaunay::install(rt);
     rope::install(rt);
     conv::install(rt);
     quant::install(rt);
@@ -258,6 +266,7 @@ pub(super) fn install(rt: &Runtime) {
     w4a4_linear::install(rt);
     w4a8::install(rt);
     w4a8_quant::install(rt);
+    w4a8_packed::install(rt);
     nvfp4::install(rt);
     sol_cuda::install(rt);
     for backend in ["eager", "cuda"] {

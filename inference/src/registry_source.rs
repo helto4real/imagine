@@ -20,7 +20,7 @@ impl std::fmt::Debug for SourceArgument<'_> {
     }
 }
 pub(crate) fn failure(e: Error) -> Failure {
-    match e {
+    match e.root() {
         Error::ReferenceException { class, message } => Failure::raised(class, message),
         Error::AcceleratorException { message, .. } => Failure::raised("AcceleratorError", message),
         e => Failure::raised("RuntimeError", e.to_string()),
@@ -32,6 +32,15 @@ impl SourceArgument<'_> {
             Value::List(v) | Value::Tuple(v) => v
                 .iter()
                 .map(|v| match v {
+                    Value::Int(n) => Some(*n),
+                    Value::Bool(b) => Some(i64::from(*b)),
+                    _ => None,
+                })
+                .collect(),
+            Value::NamedTuple(v) => v
+                .fields
+                .iter()
+                .map(|(_, v)| match v {
                     Value::Int(n) => Some(*n),
                     Value::Bool(b) => Some(i64::from(*b)),
                     _ => None,
@@ -76,6 +85,7 @@ impl SourceArgument<'_> {
     pub(crate) fn len(&self) -> Result<usize, Failure> {
         match &self.value {
             Value::Tuple(v) | Value::List(v) => Ok(v.len()),
+            Value::NamedTuple(v) => Ok(v.fields.len()),
             Value::Dict(v) => Ok(v.len()),
             Value::Text(v) => Ok(v.chars().count()),
             Value::Tensor(_) | Value::Quantized(_) => {
@@ -94,6 +104,7 @@ impl SourceArgument<'_> {
     pub(crate) fn items(&self) -> Result<Vec<Value>, Failure> {
         match &self.value {
             Value::List(v) | Value::Tuple(v) => Ok(v.clone()),
+            Value::NamedTuple(v) => Ok(v.fields.iter().map(|(_, v)| v.clone()).collect()),
             Value::Dict(v) => Ok(v.iter().map(|(k, _)| Value::Text(k.clone())).collect()),
             Value::Text(v) => Ok(v.chars().map(|c| Value::Text(c.to_string())).collect()),
             Value::Tensor(_) | Value::Quantized(_) => {

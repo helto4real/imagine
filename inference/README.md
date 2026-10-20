@@ -4,6 +4,91 @@ separates preservation, changed source paths, bounded tests and trained controls
 Full upgraded registry/model parity is still in progress. The completed-stage
 claims below describe the preserved `ba994879` / `c0d291c` baseline.
 
+The active [Stage 3 ledger](../design/stage-3-shared-algorithms.md) records the
+shared algorithms and the remaining exit work. Commit `24317e9` preserves the
+accepted upgraded Stage 2 baseline. Stage 3 is not complete; successful bounded
+selections do not imply full registry/interaction or trained-model acceptance.
+The [shared AV baseline plan](../design/native-av-baseline-plan-20261020.md)
+records the approved priority change, selected local H3 files, common-core/video
+file ownership and remaining trained-forward gates. `models::minimax_h3` contains
+source-mapped typed preprocessing, raw tokenizer, payload and AV stream/flow
+helpers; these do not establish trained H3 support. New retained `native-av-*`
+fixtures have original-source generators under `tools/reference_native_av_*.py`.
+
+With prepared track-local Cargo homes and immutable pinned dependencies, replay
+the bounded shared CPU gate without GPU devices or model weights:
+
+```bash
+export IMAGINE_PARITY_ROOT=/home/thhel/ChatGPT/imagine/comfyui/moss-20261018
+export IMAGINE_REFERENCE_SITE=/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages
+export IMAGINE_REFERENCE_PYTHON=/home/thhel/.pyenv/versions/3.12.13/bin/python3.12
+export IMAGINE_AV_ROOT=/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020
+bash inference/tools/check_native_av.sh /tmp/imagine-av-FRESH_EVIDENCE
+```
+
+The standalone [reservation tool](tools/gpu-reservation/README.md) reuses the
+product Ticket protocol for later GPU jobs. Its eight tests use own fake sockets
+and harmless children. The CPU gate never contacts the active product socket.
+Actual GPU orchestration remains a separate isolation/lease composition gate.
+
+To build and validate the retained synthetic Stage 3 selection with prepared
+local dependencies:
+
+```bash
+export IMAGINE_PARITY_ROOT=/home/thhel/ChatGPT/imagine/comfyui/moss-20261018
+export IMAGINE_REFERENCE_SITE=/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages
+bash inference/tools/check_stage3.sh /tmp/imagine-stage3-NEW_EVIDENCE
+```
+
+This uses a separate `target-stage3` directory and an immutable copy of the test
+executable. `IMAGINE_STAGE3_TARGET_DIR` can select another candidate target.
+The existing check/driver scripts export `IMAGINE_CUDA_INCLUDE` from the locked
+compiler include tree; direct Cargo builds must set it as well. The stream
+capture binding uses those original CUDA/ATen headers and the locked runtime
+ELFs. The controller runs one exact Python-free test per namespace and never
+mounts trained weights. Python remains a development controller/oracle only.
+
+The Stage 3 upgrade fixtures retain their original-code generators. With the
+locked ComfyUI tree and site directory, these development oracles take
+`--comfy`, `--site` and `--output` and generate only initialized synthetic data:
+
+| Generator under `tools/` | Retained fixture under `fixtures/` |
+| --- | --- |
+| `reference_shared_bypass_alpha.py` | `shared-bypass-alpha.json` |
+| `reference_shared_merged_alpha.py` | `shared-merged-alpha.json` |
+| `reference_shared_merged_constraints.py` | `shared-merged-constraints.json` |
+| `reference_shared_adapter_shapes.py` | `shared-adapter-shapes.json` |
+| `reference_shared_integer_alpha.py` | `shared-integer-alpha.json` |
+| `reference_shared_tensor_host.py` | `shared-tensor-host.json` |
+| `reference_shared_lora_host_metadata.py` | `shared-lora-host-metadata.json` |
+| `reference_shared_pad_values.py` | `shared-pad-values.json` |
+| `reference_shared_shape_metadata.py` | `shared-shape-metadata.json` |
+| `reference_shared_weights_only.py` | `shared-weights-only.json` |
+| `reference_shared_weights_globals.py` | `shared-weights-globals.json` |
+| `reference_shared_unicode_decode.py` | `shared-unicode-decode.json` |
+| `reference_shared_storage_rebuild.py` | `shared-storage-rebuild.json` |
+| `reference_shared_checkpoint_headers.py` | `shared-checkpoint-headers.json` |
+
+`reference_shared_pad_values.py` retains `shared-pad-values.json`: the selected
+native raw-shape matrix passes 584 histories against both original helpers. Its
+size-overflow diagnostic uses only the explicitly approved
+[bounded stack criterion](../design/decisions/D-05-LoRA-shape-overflow-backtrace.md).
+Both original raw diagnostics are retained; other exact error assertions remain
+unchanged. Subsequent shape-metadata integration has separate validation.
+
+The adapter oracles cover exact outputs, original dtype/device/broadcast errors,
+diagnostics, DoRA and partial weight mutations. The restricted-pickle oracles
+separately cover byte/stack/memo and global lookup contracts; their acceptance
+does not establish concrete tensor/storage reconstruction or whole-file loading. Run one GPU oracle/controller at a time. The archive-reader feasibility tools
+are CPU-only development probes and are not linked into the inference worker.
+`reference_shared_memory_gc.py` takes `--comfy` and `--output`; its metadata
+fixture is also checked by `check_generated_sources.py`. Physical-target tests
+separately validate native weak registration cleanup. These coordinator tests
+do not substitute for a runtime cycle collector. Source fingerprints and the
+precise accepted candidate/selection are recorded in the Stage 3 ledger; a
+passing historical selection must not be attributed to subsequently edited code.
+
+
 Selected upgrade regressions, with prepared local dependencies and no weights
 mounted, run through `tools/check_reference_upgrade.sh`. Fresh .38 kernel
 captures are retained in `fixtures/kitchen-038-upgrade.json.gz` and verified

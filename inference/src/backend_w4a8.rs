@@ -2,7 +2,7 @@
 use super::*;
 use crate::{convrot, packing};
 
-fn err(class: &'static str, message: impl Into<String>) -> Error {
+pub(super) fn err(class: &'static str, message: impl Into<String>) -> Error {
     Error::ReferenceException {
         class,
         message: message.into(),
@@ -179,8 +179,32 @@ pub(crate) fn run(
     a: &[Value],
     k: &Kwargs,
 ) -> Result<Value, Error> {
+    if linear {
+        let residual = get(a, k, 13, "residual").unwrap_or(&Value::None);
+        if !matches!(residual, Value::None) {
+            let scale = get(a, k, 14, "residual_scale").unwrap_or(&Value::None);
+            let inner_args = a.iter().take(13).cloned().collect::<Vec<_>>();
+            let inner_kwargs = k
+                .iter()
+                .filter(|(name, _)| name != "residual" && name != "residual_scale")
+                .cloned()
+                .collect();
+            let out = run(rt, cuda, true, &inner_args, &inner_kwargs)?;
+            return crate::backend_triton_int8::apply_residual(rt, out, residual, scale);
+        }
+    }
     let x = if linear {
-        Some(tensor(a, k, 0, "x")?)
+        let input = get(a, k, 0, "x").unwrap();
+        Some(
+            crate::backend_triton_int8::apply_input(
+                rt,
+                input,
+                get(a, k, 10, "input_act").unwrap_or(&Value::None),
+                get(a, k, 11, "input_act_weight").unwrap_or(&Value::None),
+                get(a, k, 12, "input_act_eps").unwrap_or(&Value::Float(0.)),
+            )?
+            .as_tensor()?,
+        )
     } else {
         None
     };
@@ -224,7 +248,7 @@ pub(crate) fn run(
             if matches!(output, Some(Value::None)) {
                 return Err(err("KeyError", "None"));
             }
-            return cuda_linear(rt, &w, &x, b.as_ref(), kind);
+            return cuda_linear(rt, &w, &x, b.as_ref(), kind, false);
         }
         if w.correction.is_some() {
             let decoded = w.floating(rt, false, x.kind())?;
@@ -246,12 +270,13 @@ pub(crate) fn run(
     }
     Ok(Value::tensor(w.floating(rt, cuda, kind)?))
 }
-fn cuda_linear(
+pub(super) fn cuda_linear(
     rt: &Runtime,
     w: &Weight,
     x: &Tensor,
     original_bias: Option<&Tensor>,
     kind: Kind,
+    packed: bool,
 ) -> Result<Value, Error> {
     use KernelArg::{Bool, Int, Tensor as T};
     let (n, width, _) = w.geometry;
@@ -269,7 +294,8 @@ fn cuda_linear(
     let mut result_shape = x.size();
     *result_shape.last_mut().unwrap() = n;
     let fp8 = w.rel.kind() == Kind::Float8e4m3fn;
-    if rt.w4a8_chunked
+    if !packed
+        && rt.w4a8_chunked
         && m <= 8
         && w.correction.is_none()
         && fp8
@@ -303,7 +329,7 @@ fn cuda_linear(
             return Ok(Value::tensor(out.f_reshape(result_shape.as_slice())?));
         }
     }
-    let chunked = rt.w4a8_chunked && w.correction.is_none() && fp8;
+    let chunked = packed || rt.w4a8_chunked && w.correction.is_none() && fp8;
     if chunked {
         let device = if let tch::Device::Cuda(i) = x.device() {
             i
@@ -361,6 +387,7 @@ fn cuda_linear(
                         Int(chunk),
                         Int(code),
                         Int(stream),
+                        Bool(packed), // original nb::arg("mma_packed") default
                     ],
                 )?
             }
@@ -386,6 +413,7 @@ fn cuda_linear(
                         Int(chunk),
                         Int(code),
                         Int(stream),
+                        Bool(packed), // original nb::arg("mma_packed") default
                     ],
                 )?
             }
@@ -394,6 +422,12 @@ fn cuda_linear(
         };
         if used {
             return Ok(Value::tensor(out.f_reshape(result_shape.as_slice())?));
+        }
+        if packed {
+            return Err(err(
+                "RuntimeError",
+                "Packed W4A8 prefill is unsupported by the INT8 GEMM",
+            ));
         }
     } else {
         unsafe {

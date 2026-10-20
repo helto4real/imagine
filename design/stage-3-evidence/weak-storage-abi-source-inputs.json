@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "torch": "2.13.0+cu130",
+  "purpose": "Original ATen weak StorageImpl lifetime observer; no payload retention or kernel arithmetic changes",
+  "files": [
+    {
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/c10/core/Storage.h",
+      "sha256": "9c41cf6f5dcc5ae06ace0b1d19577d8fdc886f4c6d7837a846c488ae4915f7b2"
+    },
+    {
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/c10/core/StorageImpl.h",
+      "sha256": "74f18a38c64f04bd65d706e76d9d6fda593d90b69a4b7ca73f06aae5c9a04057"
+    },
+    {
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/c10/util/intrusive_ptr.h",
+      "sha256": "eb93119fa708bf441ff2de5d1d069a21bb68499c21debcbc48d5c0f044f5efa9"
+    }
+  ]
+}

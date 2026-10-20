@@ -49,6 +49,29 @@ fn qwen_image21_original_lora_registry_patch_math_dora_offsets_and_rounding_matc
     let native = kitchen();
     let _grad = tch::no_grad_guard();
     let f = fixture();
+    run_math(&native, &f);
+}
+#[test]
+fn original_merged_additive_adapter_tensor_alpha_dora_broadcasting_zero_ranks_and_source_errors_match()
+ {
+    let native = kitchen();
+    let _grad = tch::no_grad_guard();
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../fixtures/shared-merged-alpha.json")).unwrap();
+    assert_eq!(fixture["math"].as_array().unwrap().len(), 5760);
+    run_math(&native, &fixture);
+}
+#[test]
+fn original_rank_three_adapter_integer_alpha_preserves_division_rounding_unsigned_limits_dora_and_exact_float64_results()
+ {
+    let native = kitchen();
+    let _grad = tch::no_grad_guard();
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../fixtures/shared-integer-alpha.json")).unwrap();
+    assert_eq!(fixture["math"].as_array().unwrap().len(), 576);
+    run_math(&native, &fixture);
+}
+fn run_math(native: &imagine_inference::native::Kitchen, f: &Value) {
     for c in f["math"].as_array().unwrap() {
         let dev = if c["weight"]["device"].as_str().unwrap().starts_with("cuda") {
             Device::Cuda(0)
@@ -83,21 +106,25 @@ fn qwen_image21_original_lora_registry_patch_math_dora_offsets_and_rounding_matc
         });
         let mut diagnostics = p::Diagnostics::default();
         let result = p::calculate_weight(
-            &native,
+            native,
             &patches,
             weight.shallow_clone(),
             "unit.weight",
             kind(c["intermediate"].as_str().unwrap()),
             originals.as_ref(),
             &mut diagnostics,
-        )
-        .unwrap_or_else(|e| panic!("{}: {e}", c["label"]));
-        check(
-            &V::tensor(result),
-            &c["output"],
-            dev,
-            c["label"].as_str().unwrap(),
         );
+        if c["error"].is_string() {
+            super::binding_tests::reference_error(result.expect_err("original merge error"), c);
+        } else {
+            let result = result.unwrap_or_else(|e| panic!("{}: {e}", c["label"]));
+            check(
+                &V::tensor(result),
+                &c["output"],
+                dev,
+                c["label"].as_str().unwrap(),
+            );
+        }
         check(
             &V::tensor(weight),
             &c["post_weight"],
@@ -140,6 +167,27 @@ fn qwen_image21_original_lora_registry_patch_math_dora_offsets_and_rounding_matc
             c["label"]
         );
     }
+}
+#[test]
+fn original_adapter_reshape_lists_tuples_sizes_padding_partial_mutations_and_eager_dimension_errors_match()
+ {
+    let native = kitchen();
+    let _grad = tch::no_grad_guard();
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../fixtures/shared-adapter-shapes.json")).unwrap();
+    assert_eq!(fixture["math"].as_array().unwrap().len(), 1728);
+    run_math(&native, &fixture);
+}
+#[test]
+fn original_merged_oft_boft_tensor_constraints_dora_dtype_truth_errors_and_diagnostics_match() {
+    let native = kitchen();
+    let _grad = tch::no_grad_guard();
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../fixtures/shared-merged-constraints.json"
+    ))
+    .unwrap();
+    assert_eq!(fixture["math"].as_array().unwrap().len(), 1440);
+    run_math(&native, &fixture);
 }
 fn assert_patch(actual: &p::PatchValue, expected: &Value) {
     match actual {

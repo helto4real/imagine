@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "sources": {
+    "comfy_kitchen/backends/_activations.py": "ed51bf8955ebe505cfd6d5e3fe9090e61aa054cc2ba9c8ae990101fd6636c0f1"
+  },
+  "triton_int8_unsupported": {
+    "error": "ValueError",
+    "message": "unsupported input_act: 'unsupported' (expected one of ['gelu_tanh', 'none', 'rms_norm', 'situ', 'swiglu'])"
+  }
+}

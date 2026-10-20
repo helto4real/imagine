@@ -11,6 +11,7 @@ cd "$project_root"
 driver_profile=${4:-$project_root/inference/profiles/qwen21-first-int8.json}
 export CARGO_HOME="$parity_root/cargo" CARGO_TARGET_DIR="$parity_root/target" CARGO_INCREMENTAL=0
 export LIBTORCH="$reference_site/torch" LIBTORCH_CXX11_ABI=1 CXX=clang++ CARGO_BUILD_JOBS=2
+export IMAGINE_CUDA_INCLUDE="$parity_root/cuda13/nvidia/cu13/include"
 unset LIBTORCH_USE_PYTORCH LIBTORCH_BYPASS_VERSION_CHECK
 export LD_LIBRARY_PATH="$reference_site/torch/lib"
 cargo fmt --manifest-path inference/Cargo.toml --check

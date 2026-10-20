@@ -53,7 +53,7 @@ def capture(torch, native, bits):
             own=[torch.full((64,),pattern,dtype=torch.uint8,device=x.device) for _ in range(5)]
             ranges=[(t.data_ptr(),t.numel()) for t in own]
             torch.cuda.synchronize();del own
-            events=[];calls=[];saved={};written=False;temporaries=[];locations={}
+            events=[];calls=[];saved={};written=False;temporaries=[];locations={};fused_residual=False
             def guard(tensor,shape,kind):
                 pointer=tensor.data_ptr();size=tensor.numel()*tensor.element_size()
                 if not (tuple(tensor.shape)==shape and tensor.dtype==kind and tensor.device==x.device
@@ -61,8 +61,8 @@ def capture(torch, native, bits):
                     raise GuardFailure(f'Refusing unmatched controlled storage for {case}')
             for name in names:
                 saved[name]=getattr(native._C,name)
-                def traced(*args,_name=name):
-                    nonlocal written
+                def traced(*args,_name=name,**kwargs):
+                    nonlocal written,fused_residual
                     item=dict(name=_name);calls.append(item)
                     if _name=='dequantize_int8_linear':
                         acc=torch.utils.dlpack.from_dlpack(args[0]);scale=torch.utils.dlpack.from_dlpack(args[1])
@@ -71,7 +71,18 @@ def capture(torch, native, bits):
                         locations['scale']=(scale.data_ptr(),scale.numel()*scale.element_size())
                         events.append('dequantize')
                         args=list(args);args[0]=native._wrap_for_dlpack(acc);args[1]=native._wrap_for_dlpack(scale)
-                    value=saved[_name](*args)
+                    if _name in ['int8_linear_m1','int8_gemv_dequant'] and kwargs.get('residual') is not None:
+                        fused_residual=True
+                        # The current source skips _apply_residual after a fused
+                        # GEMV. K=0 writes nothing, so guard that native output
+                        # using only its pointer/shape/type before reading it.
+                        index=6 if _name=='int8_linear_m1' else 5
+                        try:output=torch.utils.dlpack.from_dlpack(args[index])
+                        except Exception as e:raise GuardFailure('Own observer capsule conversion failed')from e
+                        args=list(args);args[index]=native._wrap_for_dlpack(output)
+                        guard(output,(m,4),out);events.append('unwritten_output')
+                        locations['output']=(output.data_ptr(),output.numel()*output.element_size())
+                    value=saved[_name](*args,**kwargs)
                     if _name.startswith('cutlass_'):item['returned']=value
                     if _name=='dequantize_int8_linear':written=True
                     return value
@@ -119,7 +130,7 @@ def capture(torch, native, bits):
                         native.DTYPE_TO_CODE[out],torch.cuda.current_stream(x.device).cuda_stream)
                 else:
                     expected=known('output',out,(m,4))
-                expected=apply(expected,r,rs)
+                if not fused_residual:expected=apply(expected,r,rs)
                 payload=bits(output);known=bits(expected)
                 if payload!=known:raise GuardFailure(f'Known-state output mismatch: {case}')
                 case.update(payload=payload,expected_bytes=known,output_shape=list(output.shape),strides=list(output.stride()),written_by_dequant=written,rms_defined_overwrite=overlays)
@@ -127,7 +138,7 @@ def capture(torch, native, bits):
             finally:
                 for name,value in saved.items():setattr(native._C,name,value)
                 native._apply_residual=apply
-            case.update(consumer_events=events,native_calls=calls,raw_hidden_bytes_read_by_observer=False)
+            case.update(consumer_events=events,native_calls=calls,fused_residual=fused_residual,raw_hidden_bytes_read_by_observer=False)
             runs.append(case)
     finally:native._DISABLE_CUTLASS_INT8=policy
     assert len(runs)==3456

@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "sources": {
+    "comfy/ldm/qwen_image21/model.py": {
+      "sha256": "a69dff15ff6fa369fab5ca0d3261f8aaf19aaedd3fc66414e20a1cf7df0aa5ac",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/qwen_image21/model.py"
+    },
+    "comfy/model_management.py": {
+      "sha256": "045ab96003386a43e647c8ab96f22fbf3be6c577e2fc578ea31c6faa22facbd5",
+      "path": "/home/thhel/git/ComfyUI/comfy/model_management.py"
+    },
+    "comfy/rmsnorm.py": {
+      "sha256": "e8dfbebe9272587038f504538f72fe7e82261307f2c7fbd6f0b05cce28172fdd",
+      "path": "/home/thhel/git/ComfyUI/comfy/rmsnorm.py"
+    },
+    "comfy/latent_formats.py": {
+      "sha256": "8f012cea828736e9fe1ac1753f67dfdbeade79cfeba48d5bc26d4c58549ed759",
+      "path": "/home/thhel/git/ComfyUI/comfy/latent_formats.py"
+    },
+    "comfy/model_detection.py": {
+      "sha256": "b0f615387a1808eb01edf92bc301bb79e02c42112b566cf6826b67c45e7d71ed",
+      "path": "/home/thhel/git/ComfyUI/comfy/model_detection.py"
+    },
+    "comfy/ldm/flux/math.py": {
+      "sha256": "142d86d8e87792eaf06606ef86665874ce2476d155db678f2b0ee994549b4354",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/flux/math.py"
+    },
+    "comfy/ldm/flux/layers.py": {
+      "sha256": "d7ee59e51234766a03834471eee4adc2152cd39248fc39d4e70bb1b3ba8b6a5e",
+      "path": "/home/thhel/git/ComfyUI/comfy/ldm/flux/layers.py"
+    },
+    "comfy_kitchen/tensor/base.py": {
+      "sha256": "48cacf3a869f52c517ede27aa69f222ad23e54847d0d9007e1ce6ae9960a5332",
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/tensor/base.py"
+    },
+    "comfy_kitchen/tensor/int8.py": {
+      "sha256": "4ff4d4df1cacff1f5e671a84e5efbcfbcef01a4f41358f6075680efc17f64b92",
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/tensor/int8.py"
+    },
+    "comfy/lora.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/lora.py",
+      "sha256": "56a6a56897a7fcc16e67fb0e24dff5606b1c847ff2a205a6fd0c428d4eccab39"
+    },
+    "comfy/weight_adapter/base.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/weight_adapter/base.py",
+      "sha256": "484f0d83a96e700f80c793e4bcc6a897d633233e51a59191d91da5e59da345c7"
+    },
+    "comfy/weight_adapter/__init__.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/weight_adapter/__init__.py",
+      "sha256": "d9fe388a6bd3b93212a5e04b8921759841e2cf88939cfcc3a7bf59e16505edd0"
+    },
+    "comfy/model_patcher.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/model_patcher.py",
+      "sha256": "7edc88d9eae6a88637625d257dc73684cfc012a29446bf88e70d22e3a6be3994"
+    },
+    "comfy/ops.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/ops.py",
+      "sha256": "2a5e52fe5176be3ac48becebf1678509867f769c1467fa7c7115d1897c16a429"
+    },
+    "comfy/utils.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/utils.py",
+      "sha256": "9320cf5c624e96acc1d9ec92ff120ed6387a2142707f3194cb21dd0d11ac2500"
+    },
+    "comfy/float.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/float.py",
+      "sha256": "3a6e6c6fb306b5827378f8b2a551984d89b2b9719c24cff39abc423fc1f37c01"
+    },
+    "comfy/weight_adapter/lora.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/weight_adapter/lora.py",
+      "sha256": "e506062b4eb189be4c36f88270e0fd4dcce038c79a98f7163604ed6b44efe4b5"
+    },
+    "comfy/weight_adapter/loha.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/weight_adapter/loha.py",
+      "sha256": "579ca1e33e0d244e0d7eedd30fb727913341f8e7bfbd74b51221f567612286d5"
+    },
+    "comfy/weight_adapter/lokr.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/weight_adapter/lokr.py",
+      "sha256": "b4763cc32215a47e4d906cfa6cbad9cf893f6a1329ada2225fda81fd99fcfeb4"
+    },
+    "comfy/weight_adapter/glora.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/weight_adapter/glora.py",
+      "sha256": "31cdd03f5b0beaa0df055512560128930f4f26b219ba57602d21abb086425b09"
+    },
+    "comfy/weight_adapter/oft.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/weight_adapter/oft.py",
+      "sha256": "88be3c32f610478bc6900a10009eaadf6fe2af973ed4861731e4f21e1afacf89"
+    },
+    "comfy/weight_adapter/boft.py": {
+      "path": "/home/thhel/git/ComfyUI/comfy/weight_adapter/boft.py",
+      "sha256": "2850e0b4c2295cd87445415e287061fa3bfd69e88bd0aeb3eb16064864bd078d"
+    }
+  },
+  "trained_model_weights": 0,
+  "device": "cpu",
+  "allocated_input_elements": 0,
+  "shape": [
+    18446744073709551615,
+    8
+  ],
+  "result": {
+    "error": "TypeError",
+    "message": "zeros(): argument 'size' failed to unpack the object at pos 1 with error \"Overflow when unpacking long long\nException raised from THPUtils_unpackLong at /__w/pytorch/pytorch/torch/csrc/utils/python_numbers.h:79 (most recent call first):\nframe #0: c10::Error::Error(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x9d (0x7f979d49abfd in /home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)\nframe #1: c10::ValueError::ValueError(c10::SourceLocation, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >) + 0x72 (0x7f979d49b122 in /home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib/libc10.so)\nframe #2: <unknown function> + 0x4b14fe (0x7f97138b14fe in /home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib/libtorch_python.so)\nframe #3: <unknown function> + 0x4cb65b (0x7f97138cb65b in /home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib/libtorch_python.so)\nframe #4: <unknown function> + 0x4ea52a (0x7f97138ea52a in /home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/lib/libtorch_python.so)\n<omitting python frames>\nframe #16: <unknown function> + 0x27781 (0x7f979f627781 in /usr/lib/libc.so.6)\nframe #17: __libc_start_main + 0x89 (0x7f979f6278b9 in /usr/lib/libc.so.6)\nframe #18: _start + 0x25 (0x5590d281b075 in /home/thhel/.pyenv/versions/3.12.13/bin/python3.12)\n\""
+  }
+}

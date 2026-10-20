@@ -20,6 +20,8 @@ parser=argparse.ArgumentParser()
 parser.add_argument('--root',type=Path,required=True)
 parser.add_argument('--site',type=Path,required=True)
 parser.add_argument('--binary',type=Path,required=True)
+parser.add_argument('--runtime-root',type=Path,help='Separate writable development manifests/output; frozen dependencies still come from --root')
+parser.add_argument('--cpu-only',action='store_true',help='Do not expose NVIDIA devices; prohibit GPU execution in this validation')
 parser.add_argument('--aot-library',type=Path,required=True)
 parser.add_argument('--aot-fixture',type=Path,required=True)
 parser.add_argument('--int8-library',type=Path,required=True)
@@ -33,6 +35,8 @@ parser.add_argument('--qwen-model-root','--model-root',dest='qwen_model_root',ty
 parser.add_argument('--qwen-mode','--driver-mode',dest='qwen_mode',choices=['preflight','load-check','run'],default='preflight')
 parser.add_argument('--qwen-run-name','--run-name',dest='qwen_run_name',default='qwen21-first-image',help='Fresh isolated output directory name; no paths')
 args=parser.parse_args()
+runtime_root=(args.runtime_root or args.root/'runtime').resolve();runtime_root.mkdir(parents=True,exist_ok=True)
+binary_sha256=hashlib.file_digest(args.binary.open('rb'),'sha256').hexdigest()
 project=Path(__file__).resolve().parents[2]
 driver_mounts=[];driver_args=None;model_files=[];reference_files=[]
 if args.qwen_driver_profile is not None:
@@ -65,7 +69,7 @@ if args.qwen_driver_profile is not None:
         driver_mounts+=['--ro-bind',str(source),target,'--setenv',f'IMAGINE_QWEN_REFERENCE_{index}',target]
         reference_files.append(dict(source=str(source),target=target,bytes=source.stat().st_size,sha256=spec['tensor_sha256']))
     assert re.fullmatch(r'[a-zA-Z0-9_-]+',args.qwen_run_name)
-    work=args.root/'runtime'/args.qwen_run_name;work.mkdir(parents=True,exist_ok=True)
+    work=runtime_root/args.qwen_run_name;work.mkdir(parents=True,exist_ok=True)
     driver_mounts+=['--ro-bind',str(args.qwen_driver_profile),'/runtime/qwen21-profile.json','--bind',str(work),'/qwen-work']
     driver_args=['--model-root','/models','--profile','/runtime/qwen21-profile.json','--own-root','/qwen-work']
     if args.qwen_mode=='load-check':driver_args+=['--load-check']
@@ -167,7 +171,7 @@ for path in sorted(system|{Path('/usr/lib/libcuda.so.1')}):
 devices=[]
 for name in ['nvidia0','nvidiactl','nvidia-uvm','nvidia-uvm-tools']:
     path=Path('/dev')/name
-    if path.exists():devices+=['--dev-bind',str(path),str(path)]
+    if not args.cpu_only and path.exists():devices+=['--dev-bind',str(path),str(path)]
 command=['bwrap','--unshare-all','--die-with-parent','--new-session','--clearenv',
     '--proc','/proc','--dev','/dev','--tmpfs','/tmp','--dir','/bin','--dir','/usr/bin',
     '--symlink','usr/lib','/lib','--symlink','usr/lib64','/lib64',
@@ -193,7 +197,7 @@ command=['bwrap','--unshare-all','--die-with-parent','--new-session','--clearenv
     '--setenv','IMAGINE_INT8_PROBE_FIXTURE','/runtime/int8-probe.json',
     '--setenv','IMAGINE_BACKEND_CONTRACT_FIXTURE','/runtime/backend-contract.json',
     '--setenv','CUDA_CACHE_PATH','/tmp/cuda',
-    *driver_mounts,'--chdir','/tmp','/runtime/primitives',*(driver_args if driver_args is not None else ['--test-threads=1'])]
+    *driver_mounts,*(['--setenv','CUDA_VISIBLE_DEVICES','']if args.cpu_only else []),'--chdir','/tmp','/runtime/primitives',*(driver_args if driver_args is not None else ['--test-threads=1'])]
 if args.test_filter:
     command += [args.test_filter,'--exact']
     completed=subprocess.run(command,capture_output=True,text=True)
@@ -204,7 +208,9 @@ if args.test_filter:
         raise RuntimeError('Filtered isolation must execute exactly one passing test')
 else:
     subprocess.run(command,check=True)
-report={'schema':1,'result':'passed','interpreter_available':False,'comfyui_tree_available':False,'comfyui_installation_available':False,'compiler_only_files_at_reference_paths':comfy_files,'runtime_compiler_elf_files':compiler_files,'compiler_profile_sha256':hashlib.file_digest(compiler_profile_path.open('rb'),'sha256').hexdigest(),
+if hashlib.file_digest(args.binary.open('rb'),'sha256').hexdigest()!=binary_sha256:
+    raise RuntimeError('Test binary changed during execution; refusing mismatched evidence')
+report={'schema':1,'result':'passed','cpu_only':args.cpu_only,'runtime_root':str(runtime_root),'interpreter_available':False,'comfyui_tree_available':False,'comfyui_installation_available':False,'compiler_only_files_at_reference_paths':comfy_files,'runtime_compiler_elf_files':compiler_files,'compiler_profile_sha256':hashlib.file_digest(compiler_profile_path.open('rb'),'sha256').hexdigest(),
     'network_namespace':'isolated','test_filter':args.test_filter,'package_elf_files':records,
     'driver_mode':args.qwen_mode if driver_args is not None else None,'authorized_model_files':model_files,'authorized_reference_files':reference_files,
     'system_elf_files':[str(p) for p in sorted(system)],
@@ -213,7 +219,7 @@ report={'schema':1,'result':'passed','interpreter_available':False,'comfyui_tree
     'triton_driver_sha256':hashlib.file_digest(triton_driver.open('rb'),'sha256').hexdigest(),
     'triton_frontend_cubin_sha256':triton_cubin_hashes,
     'bridge_sha256':hashlib.file_digest(bridge.open('rb'),'sha256').hexdigest(),
-    'binary_sha256':hashlib.file_digest(args.binary.open('rb'),'sha256').hexdigest(),
+    'binary_sha256':binary_sha256,
     'aot_binary_sha256':hashlib.file_digest(args.aot_library.open('rb'),'sha256').hexdigest(),
     'aot_fixture_sha256':hashlib.file_digest(args.aot_fixture.open('rb'),'sha256').hexdigest(),
     'int8_binary_sha256':hashlib.file_digest(args.int8_library.open('rb'),'sha256').hexdigest(),
@@ -222,4 +228,4 @@ report={'schema':1,'result':'passed','interpreter_available':False,'comfyui_tree
     'fixture_sha256':hashlib.file_digest(fixture.open('rb'),'sha256').hexdigest()}
 report_name='isolation-filtered-result.json' if args.test_filter else 'isolation-result.json'
 if driver_args is not None:report_name=('moss-'if profile.get('purpose','').startswith('Bounded trained MOSS')else'qwen21-')+args.qwen_mode+'-isolation.json'
-(args.root/'runtime'/report_name).write_text(json.dumps(report,indent=2)+'\n')
+(runtime_root/report_name).write_text(json.dumps(report,indent=2)+'\n')

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "1d9a7df29dfc5ede7eae13be64d9d782c5ff08b9762e1b1643899a7c98dbf25b",
+  "tests": [
+    {
+      "name": "shared_state_dict_tests::ordered_checkpoint_helpers_preserve_collisions_partial_mutation_qkv_storage_and_detection",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/1d9a7df29dfc5ede7eae13be64d9d782c5ff08b9762e1b1643899a7c98dbf25b/runs/44b8bcd0dbae4d468f55d2f4604c1083/00-ordered_checkpoint_helpers_preserve_collisions_partial_mutation_qkv_storage_and_detection.log",
+      "evidence": "00-ordered_checkpoint_helpers_preserve_collisions_partial_mutation_qkv_storage_and_detection.json"
+    }
+  ],
+  "result": "passed"
+}

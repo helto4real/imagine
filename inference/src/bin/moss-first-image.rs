@@ -159,6 +159,7 @@ fn execute(
     let text = q::StaticModel::new(
         m::static_moss_component(rt, "text", params)?.with_shared_pins(pins.clone()),
         rt,
+        None,
     );
     let text_patcher = text.patcher();
     manager.load(
@@ -244,6 +245,7 @@ fn execute(
     let model = q::StaticModel::new(
         m::static_moss_component(rt, "dit", params)?.with_shared_pins(pins.clone()),
         rt,
+        Some(tch::Kind::BFloat16),
     );
     let patcher = model.patcher();
     manager.load(
@@ -343,6 +345,7 @@ fn execute(
     let model = q::StaticModel::new(
         m::static_moss_component(rt, "vae", params)?.with_shared_pins(pins.clone()),
         rt,
+        None,
     );
     let patcher = model.patcher();
     manager.load(

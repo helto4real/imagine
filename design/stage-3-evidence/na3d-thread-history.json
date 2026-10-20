@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "sources": {
+    "comfy_kitchen/backends/eager/na.py": "4f1d82fe02af995d395969667f6cfd8d10635c3144eec8ca78fe37c103803995"
+  },
+  "default_threads": 23,
+  "baseline_sha256": "47b61491238861a3ef4c619049eba366f147c8a2b969a68b4d6bae8875b918ae",
+  "cases": [
+    {
+      "threads": 23,
+      "sha256": "836d1c5445ff5d1544a1a360a6293e0f0b3bacdc3ac847fd5783a667fc6e0ea6",
+      "baseline_exact": false
+    },
+    {
+      "threads": 2,
+      "sha256": "a90fc433583e470cb14d681dc66b9ad2dbde2032e3cd6806a0780daca851cbf0",
+      "baseline_exact": false
+    },
+    {
+      "threads": 23,
+      "sha256": "836d1c5445ff5d1544a1a360a6293e0f0b3bacdc3ac847fd5783a667fc6e0ea6",
+      "baseline_exact": false
+    },
+    {
+      "threads": 1,
+      "sha256": "47b61491238861a3ef4c619049eba366f147c8a2b969a68b4d6bae8875b918ae",
+      "baseline_exact": true
+    },
+    {
+      "threads": 23,
+      "sha256": "836d1c5445ff5d1544a1a360a6293e0f0b3bacdc3ac847fd5783a667fc6e0ea6",
+      "baseline_exact": false
+    }
+  ],
+  "model_weights": 0
+}

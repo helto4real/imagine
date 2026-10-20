@@ -37,6 +37,7 @@ fn dtype(name: &str) -> AllowedType {
     use AllowedType::{DType as D, Scalar as S, ShellDType as H};
     match name {
         "torch.float32" => D(Kind::Float),
+        "torch.float64" => D(Kind::Double),
         "torch.float16" => D(Kind::Half),
         "torch.bfloat16" => D(Kind::BFloat16),
         "torch.float8_e4m3fn" => D(Kind::Float8e4m3fn),

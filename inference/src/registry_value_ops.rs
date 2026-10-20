@@ -1,4 +1,5 @@
 //! Lazy Python operations used by the original Sol validation predicates.
+use crate::python_numbers::int_float_cmp;
 use crate::{
     execution_value::Value,
     registry::{Argument, Failure},
@@ -57,6 +58,7 @@ impl<'a, 'rt> Operand<'a, 'rt> {
             Value::Float(n) => *n != 0.,
             Value::Text(s) => !s.is_empty(),
             Value::List(v) | Value::Tuple(v) => !v.is_empty(),
+            Value::NamedTuple(v) => !v.fields.is_empty(),
             Value::Dict(v) => !v.is_empty(),
             Value::Tensor(_) | Value::Quantized(_) => match self.op(
                 "aten::is_nonzero.default",
@@ -96,6 +98,7 @@ impl<'a, 'rt> Operand<'a, 'rt> {
         }
         match &self.value {
             Value::Tuple(v) | Value::List(v) => Ok(v.len()),
+            Value::NamedTuple(v) => Ok(v.fields.len()),
             Value::Text(s) => Ok(s.chars().count()),
             _ => Err(Failure::raised(
                 "TypeError",
@@ -112,6 +115,7 @@ impl<'a, 'rt> Operand<'a, 'rt> {
         } else {
             match &self.value {
                 Value::Tuple(v) | Value::List(v) => v.clone(),
+                Value::NamedTuple(v) => v.fields.iter().map(|(_, v)| v.clone()).collect(),
                 Value::Text(s) => s.chars().map(|c| Value::Text(c.to_string())).collect(),
                 _ => unreachable!("Only iterable source values reach unpacking"),
             }
@@ -208,27 +212,6 @@ impl<'a, 'rt> Operand<'a, 'rt> {
             _ => unreachable!("Only numeric operands pass the token budget comparisons"),
         })
     }
-}
-fn int_float_cmp(a: i128, b: f64) -> Option<Ordering> {
-    if b.is_nan() {
-        return None;
-    }
-    if b >= i128::MAX as f64 {
-        return Some(Ordering::Less);
-    }
-    if b < i128::MIN as f64 {
-        return Some(Ordering::Greater);
-    }
-    let truncated = b as i128;
-    Some(a.cmp(&truncated).then_with(|| {
-        if b.fract() > 0. {
-            Ordering::Less
-        } else if b.fract() < 0. {
-            Ordering::Greater
-        } else {
-            Ordering::Equal
-        }
-    }))
 }
 
 fn self_compare_gt(a: &Operand, b: &Operand) -> Result<bool, Failure> {

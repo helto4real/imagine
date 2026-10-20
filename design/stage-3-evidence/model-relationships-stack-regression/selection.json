@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "a954d872d32dbc33607a9ea3e56238229f118aff6e81d0f5f53b1b6a0beeb1c2",
+  "tests": [
+    {
+      "name": "shared_model_relationship_tests::original_nested_model_dependencies_preserve_cycles_first_level_duplicates_hash_calls_live_lists_frames_and_failures",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/a954d872d32dbc33607a9ea3e56238229f118aff6e81d0f5f53b1b6a0beeb1c2/runs/255b8effac204f768daa222850b9ba53/00-original_nested_model_dependencies_preserve_cycles_first_level_duplicates_hash_calls_live_lists_frames_and_failures.log",
+      "evidence": "00-original_nested_model_dependencies_preserve_cycles_first_level_duplicates_hash_calls_live_lists_frames_and_failures.json"
+    },
+    {
+      "name": "shared_model_relationship_tests::original_model_attachments_and_additional_groups_preserve_aliases_root_replacement_fresh_defaults_and_sequence_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/a954d872d32dbc33607a9ea3e56238229f118aff6e81d0f5f53b1b6a0beeb1c2/runs/255b8effac204f768daa222850b9ba53/01-original_model_attachments_and_additional_groups_preserve_aliases_root_replacement_fresh_defaults_and_sequence_errors.log",
+      "evidence": "01-original_model_attachments_and_additional_groups_preserve_aliases_root_replacement_fresh_defaults_and_sequence_errors.json"
+    },
+    {
+      "name": "shared_injection_tests::whole_model_injection_and_ejection_preserve_live_maps_lists_callbacks_partial_flags_owners_errors_and_with_protocol",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/a954d872d32dbc33607a9ea3e56238229f118aff6e81d0f5f53b1b6a0beeb1c2/runs/255b8effac204f768daa222850b9ba53/02-whole_model_injection_and_ejection_preserve_live_maps_lists_callbacks_partial_flags_owners_errors_and_with_protocol.log",
+      "evidence": "02-whole_model_injection_and_ejection_preserve_live_maps_lists_callbacks_partial_flags_owners_errors_and_with_protocol.json"
+    },
+    {
+      "name": "shared_control_hook_tests::original_control_identity_set_and_extra_hook_collection_preserve_hashes_probes_resize_chains_aliases_and_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/a954d872d32dbc33607a9ea3e56238229f118aff6e81d0f5f53b1b6a0beeb1c2/runs/255b8effac204f768daa222850b9ba53/03-original_control_identity_set_and_extra_hook_collection_preserve_hashes_probes_resize_chains_aliases_and_errors.log",
+      "evidence": "03-original_control_identity_set_and_extra_hook_collection_preserve_hashes_probes_resize_chains_aliases_and_errors.json"
+    },
+    {
+      "name": "shared_unet_names_tests::original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/a954d872d32dbc33607a9ea3e56238229f118aff6e81d0f5f53b1b6a0beeb1c2/runs/255b8effac204f768daa222850b9ba53/04-original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases.log",
+      "evidence": "04-original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases.json"
+    },
+    {
+      "name": "shared_unet_names_tests::original_diffusers_import_preserves_exact_cpu_tensor_payloads_views_offsets_dtype_and_object_storage_aliases",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/a954d872d32dbc33607a9ea3e56238229f118aff6e81d0f5f53b1b6a0beeb1c2/runs/255b8effac204f768daa222850b9ba53/05-original_diffusers_import_preserves_exact_cpu_tensor_payloads_views_offsets_dtype_and_object_storage_aliases.log",
+      "evidence": "05-original_diffusers_import_preserves_exact_cpu_tensor_payloads_views_offsets_dtype_and_object_storage_aliases.json"
+    }
+  ],
+  "result": "passed"
+}

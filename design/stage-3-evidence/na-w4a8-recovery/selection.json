@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "b9e230dda080771f329643e77e63d0e6e80129e948b5a1758ade12861857810d",
+  "tests": [
+    {
+      "name": "quant_binding_tests::na3d_bindings_preserve_original_tiling_mask_sdpa_and_fused_cuda_paths",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/b9e230dda080771f329643e77e63d0e6e80129e948b5a1758ade12861857810d/runs/d22a6bec9a644e1f9c095337043ab140/00-na3d_bindings_preserve_original_tiling_mask_sdpa_and_fused_cuda_paths.log",
+      "evidence": "00-na3d_bindings_preserve_original_tiling_mask_sdpa_and_fused_cuda_paths.json"
+    },
+    {
+      "name": "triton_w4a8_tests::original_w4a8_unpack_keys_complete_binaries_and_cache_restoration",
+      "returncode": 1,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/b9e230dda080771f329643e77e63d0e6e80129e948b5a1758ade12861857810d/runs/d22a6bec9a644e1f9c095337043ab140/01-original_w4a8_unpack_keys_complete_binaries_and_cache_restoration.log"
+    }
+  ],
+  "result": "failed"
+}

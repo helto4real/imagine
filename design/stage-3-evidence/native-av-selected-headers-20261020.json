@@ -1,0 +1,249 @@
+{
+  "schema": 1,
+  "scope": "selected static checkpoint headers and bounded quant metadata only",
+  "torch_imported": false,
+  "gpu_work": false,
+  "trained_weight_tensors_allocated": 0,
+  "components": [
+    {
+      "role": "dit",
+      "path": "/mnt/media/gemensam/AI/ComfyUI/models/diffusion_models/minimax_h3/minimax_h3_ref2va_pruned_int8_convrot.safetensors",
+      "file_bytes": 20970379616,
+      "mtime_ns": 1785821554512934600,
+      "header_bytes": 95416,
+      "header_sha256": "c1a65ff59085cbed8a6ea7c935ae7e58b1d2f870239df54c58a68fb7989e1cd8",
+      "tensor_entries": 932,
+      "dtypes": {
+        "F32": 210,
+        "BF16": 220,
+        "F16": 102,
+        "I8": 200,
+        "U8": 200
+      },
+      "metadata_keys": [],
+      "legacy_quantization": false,
+      "legacy_layers": 0,
+      "legacy_quantization_profiles": {},
+      "embedded_quantization_profiles": {
+        "{\"convrot\":true,\"convrot_groupsize\":256,\"format\":\"int8_tensorwise\"}": 200
+      },
+      "embedded_quant_metadata_bytes_read": 14400,
+      "trained_weight_payload_bytes_read": 0,
+      "shape_probes": {
+        "video_patch_proj.weight": {
+          "dtype": "F32",
+          "shape": [
+            5376,
+            96
+          ],
+          "data_offsets": [
+            15702624,
+            17767008
+          ]
+        },
+        "audio_patch_proj.weight": {
+          "dtype": "F32",
+          "shape": [
+            5376,
+            32
+          ],
+          "data_offsets": [
+            54304,
+            742432
+          ]
+        },
+        "condition_proj.weight": {
+          "dtype": "BF16",
+          "shape": [
+            5376,
+            5120
+          ],
+          "data_offsets": [
+            18878560,
+            73928800
+          ]
+        }
+      },
+      "first_tensor_names": [
+        "adaln_t_table",
+        "audio_patch_proj.bias",
+        "audio_patch_proj.weight",
+        "blocks.0.attn.out_proj.weight_scale",
+        "blocks.0.attn.qkv_proj.weight_scale",
+        "blocks.0.mlp.fc1.weight_scale",
+        "blocks.0.mlp.fc2.weight_scale",
+        "blocks.1.attn.out_proj.weight_scale",
+        "blocks.1.attn.qkv_proj.weight_scale",
+        "blocks.1.mlp.fc1.weight_scale",
+        "blocks.1.mlp.fc2.weight_scale",
+        "blocks.10.attn.out_proj.weight_scale"
+      ]
+    },
+    {
+      "role": "text",
+      "path": "/mnt/media/gemensam/AI/ComfyUI/models/text_encoders/minimax_h3/qwen3vl_32b_h3_ultra_uncensored_heretic_int8_convrot.safetensors",
+      "file_bytes": 26363476151,
+      "mtime_ns": 1786377363770414500,
+      "header_bytes": 221440,
+      "header_sha256": "c96da5bad1827e9b02615a1f2d997c14a07f45798db80bdb62b29016dd3b0f36",
+      "tensor_entries": 1604,
+      "dtypes": {
+        "F32": 351,
+        "BF16": 551,
+        "I8": 351,
+        "U8": 351
+      },
+      "metadata_keys": [
+        "minimax_h3_language_layers",
+        "source_revision",
+        "source_architecture",
+        "minimax_h3_lm_head",
+        "format",
+        "minimax_h3_final_norm",
+        "_quantization_metadata",
+        "source_repo"
+      ],
+      "legacy_quantization": true,
+      "legacy_layers": 351,
+      "legacy_quantization_profiles": {
+        "{\"format\":\"int8_tensorwise\"}": 1,
+        "{\"convrot\":true,\"convrot_groupsize\":256,\"format\":\"int8_tensorwise\"}": 350
+      },
+      "embedded_quantization_profiles": {
+        "{\"format\":\"int8_tensorwise\"}": 1,
+        "{\"convrot\":true,\"convrot_groupsize\":256,\"format\":\"int8_tensorwise\",\"per_row\":true}": 350
+      },
+      "embedded_quant_metadata_bytes_read": 31179,
+      "trained_weight_payload_bytes_read": 0,
+      "shape_probes": {
+        "model.embed_tokens.weight": {
+          "dtype": "I8",
+          "shape": [
+            151936,
+            5120
+          ],
+          "data_offsets": [
+            1205919204,
+            1983831524
+          ]
+        }
+      },
+      "first_tensor_names": [
+        "model.embed_tokens.weight_scale",
+        "model.layers.0.mlp.down_proj.weight_scale",
+        "model.layers.0.mlp.gate_proj.weight_scale",
+        "model.layers.0.mlp.up_proj.weight_scale",
+        "model.layers.0.self_attn.k_proj.weight_scale",
+        "model.layers.0.self_attn.o_proj.weight_scale",
+        "model.layers.0.self_attn.q_proj.weight_scale",
+        "model.layers.0.self_attn.v_proj.weight_scale",
+        "model.layers.1.mlp.down_proj.weight_scale",
+        "model.layers.1.mlp.gate_proj.weight_scale",
+        "model.layers.1.mlp.up_proj.weight_scale",
+        "model.layers.1.self_attn.k_proj.weight_scale"
+      ]
+    },
+    {
+      "role": "video_vae",
+      "path": "/mnt/media/gemensam/AI/ComfyUI/models/vae/minimax_h3/minimax_h3_video_vae_int8_convrot.safetensors",
+      "file_bytes": 3171670912,
+      "mtime_ns": 1786129246314563900,
+      "header_bytes": 99672,
+      "header_sha256": "477645c40a694550c3232c90edf24e52c896f8dedb7fd43309a63b52d0d03ef4",
+      "tensor_entries": 850,
+      "dtypes": {
+        "F32": 562,
+        "I8": 144,
+        "U8": 144
+      },
+      "metadata_keys": [
+        "minimax_h3_video_vae"
+      ],
+      "legacy_quantization": false,
+      "legacy_layers": 0,
+      "legacy_quantization_profiles": {},
+      "embedded_quantization_profiles": {
+        "{\"convrot\":true,\"convrot_groupsize\":256,\"format\":\"int8_tensorwise\"}": 144
+      },
+      "embedded_quant_metadata_bytes_read": 10368,
+      "trained_weight_payload_bytes_read": 0,
+      "shape_probes": {
+        "encoder.conv_in.weight": {
+          "dtype": "F32",
+          "shape": [
+            128,
+            3,
+            3,
+            3,
+            3
+          ],
+          "data_offsets": [
+            34288128,
+            34329600
+          ]
+        }
+      },
+      "first_tensor_names": [
+        "decoder.mask_token",
+        "decoder.norm_out.bias",
+        "decoder.norm_out.weight",
+        "decoder.proj_out.bias",
+        "decoder.proj_out.weight",
+        "decoder.register_tokens",
+        "decoder.transformer_blocks.0.attn.to_out.bias",
+        "decoder.transformer_blocks.0.attn.to_out.weight_scale",
+        "decoder.transformer_blocks.0.attn.to_qkv.bias",
+        "decoder.transformer_blocks.0.attn.to_qkv.weight_scale",
+        "decoder.transformer_blocks.0.ff.w1.bias",
+        "decoder.transformer_blocks.0.ff.w1.weight_scale"
+      ]
+    },
+    {
+      "role": "audio_vae",
+      "path": "/mnt/media/gemensam/AI/ComfyUI/models/vae/minimax_h3/minimax_h3_audio_vae_fp32.safetensors",
+      "file_bytes": 605254808,
+      "mtime_ns": 1785778522115889600,
+      "header_bytes": 105520,
+      "header_sha256": "23fb27ab02c45d7c6f5dfe5c3255ef956a5a13853c869b784bf8de4a1537d06b",
+      "tensor_entries": 917,
+      "dtypes": {
+        "F32": 917
+      },
+      "metadata_keys": [
+        "minimax_h3_audio_vae"
+      ],
+      "legacy_quantization": false,
+      "legacy_layers": 0,
+      "legacy_quantization_profiles": {},
+      "embedded_quantization_profiles": {},
+      "embedded_quant_metadata_bytes_read": 0,
+      "trained_weight_payload_bytes_read": 0,
+      "shape_probes": {
+        "pre_block.attn.zero_k_bias": {
+          "dtype": "F32",
+          "shape": [
+            2048
+          ],
+          "data_offsets": [
+            604820320,
+            604828512
+          ]
+        }
+      },
+      "first_tensor_names": [
+        "latents_mean",
+        "latents_std",
+        "dec_in_proj.bias",
+        "dec_in_proj.weight",
+        "decoder.activation_post.act.alpha",
+        "decoder.activation_post.act.beta",
+        "decoder.activation_post.downsample.lowpass.filter",
+        "decoder.activation_post.upsample.filter",
+        "decoder.conv_post.weight",
+        "decoder.conv_pre.bias",
+        "decoder.conv_pre.weight",
+        "decoder.resblocks.0.activations.0.act.alpha"
+      ]
+    }
+  ]
+}

@@ -1,7 +1,30 @@
 //! Frozen comfy.lora and weight_adapter inference behavior. No Python runtime.
+mod adapter_scalar;
 mod adapters;
+pub mod attributes;
+pub mod bypass;
+pub mod bypass_state;
+pub mod deepcopy;
+pub mod ejection;
+pub mod injections;
 mod loader;
+pub mod model_access;
+pub mod model_clone;
+pub mod model_deepclone;
+pub mod model_lifecycle;
+pub mod model_patch_calls;
+pub mod model_patcher;
+pub mod model_pinning;
+pub mod model_registry;
+pub(crate) mod options_iterator;
 mod owner;
+mod pad_values;
+pub use pad_values::pad_to_value_shape;
+mod shape_metadata;
+pub use shape_metadata::{calculate_shape_metadata, shape_metadata_matches, size_metadata};
+pub mod pinned_key_set;
+pub mod relationships;
+mod tensor_scalar;
 use crate::{
     execution_value::Value,
     native::{Error, Kitchen},
@@ -118,18 +141,22 @@ pub fn string_to_seed(s: &str) -> u64 {
     crc ^ 0xffff_ffff
 }
 pub fn pad_to_shape(t: &Tensor, shape: &[i64]) -> Result<Tensor, Error> {
+    let mut smaller = false;
     for (i, n) in shape.iter().enumerate() {
         let old = t
             .size()
             .get(i)
             .copied()
             .ok_or_else(|| exception("IndexError", "tuple index out of range"))?;
-        if *n < old {
-            return Err(exception(
-                "ValueError",
-                "The new shape must be larger than the original tensor in all dimensions",
-            ));
-        }
+        smaller |= *n < old;
+    }
+    // any([ ... ]) first builds the entire source list. A later bad index
+    // therefore takes precedence over an earlier shrinking dimension.
+    if smaller {
+        return Err(exception(
+            "ValueError",
+            "The new shape must be larger than the original tensor in all dimensions",
+        ));
     }
     if shape.len() != t.dim() {
         return Err(exception(
@@ -252,29 +279,11 @@ pub fn calculate_weight(
 pub fn calculate_shape(patches: &[Patch], weight: &Tensor) -> Result<Vec<i64>, Error> {
     calculate_shape_from_shape(patches, weight.size())
 }
-pub fn calculate_shape_from_shape(
-    patches: &[Patch],
-    mut shape: Vec<i64>,
-) -> Result<Vec<i64>, Error> {
-    for p in patches {
-        if p.offset.is_some() || matches!(p.value, PatchValue::Nested { .. }) {
-            continue;
-        }
-        match &p.value {
-            PatchValue::Adapter(a) if a.name == "lora" => {
-                if let Value::List(v) = &a.weights[5] {
-                    shape = v
-                        .iter()
-                        .map(|n| match n {
-                            Value::Int(n) => Ok(*n),
-                            _ => Err(gap("Noninteger reshape metadata")),
-                        })
-                        .collect::<Result<_, _>>()?;
-                }
-            }
-            PatchValue::Diff { weight, pad: true } => shape = weight.as_tensor()?.size(),
-            _ => {}
-        }
-    }
-    Ok(shape)
+pub fn calculate_shape_from_shape(patches: &[Patch], shape: Vec<i64>) -> Result<Vec<i64>, Error> {
+    shape_metadata::integer_dimensions(&calculate_shape_metadata(patches, size_metadata(&shape))?)
 }
+pub mod extensions;
+pub mod options;
+
+pub mod hook_patches;
+pub mod hooks;

@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "source_sha256": "ab6d2e6109385b3dd5eccb3085472bd02703ce78645e92c2220bde456ee871d6",
+  "cpp_sha256": "cef49bb55d9eaeb17d43e7ec11ee317f25c4ed4e3ae59464648bf5b702780e68",
+  "library_sha256": "726ad47d9c9388d4b088ceca8e632efa40ed7b7c3579b2c61de2a7a95ddc3cab",
+  "trained_model_weights": 0,
+  "torch_python_imported": false,
+  "cases": [
+    {
+      "input": "",
+      "output": ""
+    },
+    {
+      "input": "own bounded error\nsecond line",
+      "output": "own bounded error\nsecond line"
+    },
+    {
+      "input": "own Type keyword",
+      "output": "own Type keyword"
+    },
+    {
+      "input": "SparseCUDAByteType SparseCUDACharType SparseCUDADoubleType SparseCUDAFloatType SparseCUDAIntType SparseCUDALongType SparseCUDAShortType SparseCUDAHalfType SparseCPUByteType SparseCPUCharType SparseCPUDoubleType SparseCPUFloatType SparseCPUIntType SparseCPULongType SparseCPUShortType SparseCPUHalfType CUDAByteType CUDACharType CUDADoubleType CUDAFloatType CUDAIntType CUDALongType CUDAShortType CUDAHalfType CPUByteType CPUCharType CPUDoubleType CPUFloatType CPUIntType CPULongType CPUShortType CPUHalfType",
+      "output": "torch.cuda.sparse.ByteTensor torch.cuda.sparse.CharTensor torch.cuda.sparse.DoubleTensor torch.cuda.sparse.FloatTensor torch.cuda.sparse.IntTensor torch.cuda.sparse.LongTensor torch.cuda.sparse.ShortTensor torch.cuda.sparse.HalfTensor torch.sparse.ByteTensor torch.sparse.CharTensor torch.sparse.DoubleTensor torch.sparse.FloatTensor torch.sparse.IntTensor torch.sparse.LongTensor torch.sparse.ShortTensor torch.sparse.HalfTensor torch.cuda.ByteTensor torch.cuda.CharTensor torch.cuda.DoubleTensor torch.cuda.FloatTensor torch.cuda.IntTensor torch.cuda.LongTensor torch.cuda.ShortTensor torch.cuda.HalfTensor torch.ByteTensor torch.CharTensor torch.DoubleTensor torch.FloatTensor torch.IntTensor torch.LongTensor torch.ShortTensor torch.HalfTensor"
+    },
+    {
+      "input": "åäö SparseCUDAByteTypeSparseCUDACharTypeSparseCUDADoubleTypeSparseCUDAFloatTypeSparseCUDAIntTypeSparseCUDALongTypeSparseCUDAShortTypeSparseCUDAHalfTypeSparseCPUByteTypeSparseCPUCharTypeSparseCPUDoubleTypeSparseCPUFloatTypeSparseCPUIntTypeSparseCPULongTypeSparseCPUShortTypeSparseCPUHalfTypeCUDAByteTypeCUDACharTypeCUDADoubleTypeCUDAFloatTypeCUDAIntTypeCUDALongTypeCUDAShortTypeCUDAHalfTypeCPUByteTypeCPUCharTypeCPUDoubleTypeCPUFloatTypeCPUIntTypeCPULongTypeCPUShortTypeCPUHalfType 終",
+      "output": "åäö torch.cuda.sparse.ByteTensortorch.cuda.sparse.CharTensortorch.cuda.sparse.DoubleTensortorch.cuda.sparse.FloatTensortorch.cuda.sparse.IntTensortorch.cuda.sparse.LongTensortorch.cuda.sparse.ShortTensortorch.cuda.sparse.HalfTensortorch.sparse.ByteTensortorch.sparse.CharTensortorch.sparse.DoubleTensortorch.sparse.FloatTensortorch.sparse.IntTensortorch.sparse.LongTensortorch.sparse.ShortTensortorch.sparse.HalfTensortorch.cuda.ByteTensortorch.cuda.CharTensortorch.cuda.DoubleTensortorch.cuda.FloatTensortorch.cuda.IntTensortorch.cuda.LongTensortorch.cuda.ShortTensortorch.cuda.HalfTensortorch.ByteTensortorch.CharTensortorch.DoubleTensortorch.FloatTensortorch.IntTensortorch.LongTensortorch.ShortTensortorch.HalfTensor 終"
+    },
+    {
+      "input": "own SparseCUDAByteType SparseCUDAByteType\nSparseCUDAByteTypeSuffix",
+      "output": "own torch.cuda.sparse.ByteTensor torch.cuda.sparse.ByteTensor\ntorch.cuda.sparse.ByteTensorSuffix"
+    },
+    {
+      "input": "own SparseCUDACharType SparseCUDACharType\nSparseCUDACharTypeSuffix",
+      "output": "own torch.cuda.sparse.CharTensor torch.cuda.sparse.CharTensor\ntorch.cuda.sparse.CharTensorSuffix"
+    },
+    {
+      "input": "own SparseCUDADoubleType SparseCUDADoubleType\nSparseCUDADoubleTypeSuffix",
+      "output": "own torch.cuda.sparse.DoubleTensor torch.cuda.sparse.DoubleTensor\ntorch.cuda.sparse.DoubleTensorSuffix"
+    },
+    {
+      "input": "own SparseCUDAFloatType SparseCUDAFloatType\nSparseCUDAFloatTypeSuffix",
+      "output": "own torch.cuda.sparse.FloatTensor torch.cuda.sparse.FloatTensor\ntorch.cuda.sparse.FloatTensorSuffix"
+    },
+    {
+      "input": "own SparseCUDAIntType SparseCUDAIntType\nSparseCUDAIntTypeSuffix",
+      "output": "own torch.cuda.sparse.IntTensor torch.cuda.sparse.IntTensor\ntorch.cuda.sparse.IntTensorSuffix"
+    },
+    {
+      "input": "own SparseCUDALongType SparseCUDALongType\nSparseCUDALongTypeSuffix",
+      "output": "own torch.cuda.sparse.LongTensor torch.cuda.sparse.LongTensor\ntorch.cuda.sparse.LongTensorSuffix"
+    },
+    {
+      "input": "own SparseCUDAShortType SparseCUDAShortType\nSparseCUDAShortTypeSuffix",
+      "output": "own torch.cuda.sparse.ShortTensor torch.cuda.sparse.ShortTensor\ntorch.cuda.sparse.ShortTensorSuffix"
+    },
+    {
+      "input": "own SparseCUDAHalfType SparseCUDAHalfType\nSparseCUDAHalfTypeSuffix",
+      "output": "own torch.cuda.sparse.HalfTensor torch.cuda.sparse.HalfTensor\ntorch.cuda.sparse.HalfTensorSuffix"
+    },
+    {
+      "input": "own SparseCPUByteType SparseCPUByteType\nSparseCPUByteTypeSuffix",
+      "output": "own torch.sparse.ByteTensor torch.sparse.ByteTensor\ntorch.sparse.ByteTensorSuffix"
+    },
+    {
+      "input": "own SparseCPUCharType SparseCPUCharType\nSparseCPUCharTypeSuffix",
+      "output": "own torch.sparse.CharTensor torch.sparse.CharTensor\ntorch.sparse.CharTensorSuffix"
+    },
+    {
+      "input": "own SparseCPUDoubleType SparseCPUDoubleType\nSparseCPUDoubleTypeSuffix",
+      "output": "own torch.sparse.DoubleTensor torch.sparse.DoubleTensor\ntorch.sparse.DoubleTensorSuffix"
+    },
+    {
+      "input": "own SparseCPUFloatType SparseCPUFloatType\nSparseCPUFloatTypeSuffix",
+      "output": "own torch.sparse.FloatTensor torch.sparse.FloatTensor\ntorch.sparse.FloatTensorSuffix"
+    },
+    {
+      "input": "own SparseCPUIntType SparseCPUIntType\nSparseCPUIntTypeSuffix",
+      "output": "own torch.sparse.IntTensor torch.sparse.IntTensor\ntorch.sparse.IntTensorSuffix"
+    },
+    {
+      "input": "own SparseCPULongType SparseCPULongType\nSparseCPULongTypeSuffix",
+      "output": "own torch.sparse.LongTensor torch.sparse.LongTensor\ntorch.sparse.LongTensorSuffix"
+    },
+    {
+      "input": "own SparseCPUShortType SparseCPUShortType\nSparseCPUShortTypeSuffix",
+      "output": "own torch.sparse.ShortTensor torch.sparse.ShortTensor\ntorch.sparse.ShortTensorSuffix"
+    },
+    {
+      "input": "own SparseCPUHalfType SparseCPUHalfType\nSparseCPUHalfTypeSuffix",
+      "output": "own torch.sparse.HalfTensor torch.sparse.HalfTensor\ntorch.sparse.HalfTensorSuffix"
+    },
+    {
+      "input": "own CUDAByteType CUDAByteType\nCUDAByteTypeSuffix",
+      "output": "own torch.cuda.ByteTensor torch.cuda.ByteTensor\ntorch.cuda.ByteTensorSuffix"
+    },
+    {
+      "input": "own CUDACharType CUDACharType\nCUDACharTypeSuffix",
+      "output": "own torch.cuda.CharTensor torch.cuda.CharTensor\ntorch.cuda.CharTensorSuffix"
+    },
+    {
+      "input": "own CUDADoubleType CUDADoubleType\nCUDADoubleTypeSuffix",
+      "output": "own torch.cuda.DoubleTensor torch.cuda.DoubleTensor\ntorch.cuda.DoubleTensorSuffix"
+    },
+    {
+      "input": "own CUDAFloatType CUDAFloatType\nCUDAFloatTypeSuffix",
+      "output": "own torch.cuda.FloatTensor torch.cuda.FloatTensor\ntorch.cuda.FloatTensorSuffix"
+    },
+    {
+      "input": "own CUDAIntType CUDAIntType\nCUDAIntTypeSuffix",
+      "output": "own torch.cuda.IntTensor torch.cuda.IntTensor\ntorch.cuda.IntTensorSuffix"
+    },
+    {
+      "input": "own CUDALongType CUDALongType\nCUDALongTypeSuffix",
+      "output": "own torch.cuda.LongTensor torch.cuda.LongTensor\ntorch.cuda.LongTensorSuffix"
+    },
+    {
+      "input": "own CUDAShortType CUDAShortType\nCUDAShortTypeSuffix",
+      "output": "own torch.cuda.ShortTensor torch.cuda.ShortTensor\ntorch.cuda.ShortTensorSuffix"
+    },
+    {
+      "input": "own CUDAHalfType CUDAHalfType\nCUDAHalfTypeSuffix",
+      "output": "own torch.cuda.HalfTensor torch.cuda.HalfTensor\ntorch.cuda.HalfTensorSuffix"
+    },
+    {
+      "input": "own CPUByteType CPUByteType\nCPUByteTypeSuffix",
+      "output": "own torch.ByteTensor torch.ByteTensor\ntorch.ByteTensorSuffix"
+    },
+    {
+      "input": "own CPUCharType CPUCharType\nCPUCharTypeSuffix",
+      "output": "own torch.CharTensor torch.CharTensor\ntorch.CharTensorSuffix"
+    },
+    {
+      "input": "own CPUDoubleType CPUDoubleType\nCPUDoubleTypeSuffix",
+      "output": "own torch.DoubleTensor torch.DoubleTensor\ntorch.DoubleTensorSuffix"
+    },
+    {
+      "input": "own CPUFloatType CPUFloatType\nCPUFloatTypeSuffix",
+      "output": "own torch.FloatTensor torch.FloatTensor\ntorch.FloatTensorSuffix"
+    },
+    {
+      "input": "own CPUIntType CPUIntType\nCPUIntTypeSuffix",
+      "output": "own torch.IntTensor torch.IntTensor\ntorch.IntTensorSuffix"
+    },
+    {
+      "input": "own CPULongType CPULongType\nCPULongTypeSuffix",
+      "output": "own torch.LongTensor torch.LongTensor\ntorch.LongTensorSuffix"
+    },
+    {
+      "input": "own CPUShortType CPUShortType\nCPUShortTypeSuffix",
+      "output": "own torch.ShortTensor torch.ShortTensor\ntorch.ShortTensorSuffix"
+    },
+    {
+      "input": "own CPUHalfType CPUHalfType\nCPUHalfTypeSuffix",
+      "output": "own torch.HalfTensor torch.HalfTensor\ntorch.HalfTensorSuffix"
+    }
+  ]
+}

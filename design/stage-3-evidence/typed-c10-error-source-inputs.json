@@ -1,0 +1,16 @@
+{
+  "scope": "Locked dependency source/header only; original Python exception classes and pure error formatter",
+  "torch_git_version": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+  "sources": {
+    "installed:torch/csrc/Exceptions.h": "b54a3df0afadd45bf85ee64ada27025b0ed33625b25b7479ff9b08447304e2d2",
+    "source:torch/csrc/Exceptions.h": "065db177fe56725d547d1055d2a3a6a5b1dbcd5cd33c5fb15379157ed7f60869",
+    "source:torch/csrc/Exceptions.cpp": "ab6d2e6109385b3dd5eccb3085472bd02703ce78645e92c2220bde456ee871d6"
+  },
+  "header_byte_identical": false,
+  "header_body_byte_identical_after_exact_packaging_guard_removal": true,
+  "installed_packaging_guard": {
+    "prefix": "#if !defined(TORCH_STABLE_ONLY) && !defined(TORCH_TARGET_VERSION)\n",
+    "suffix": "\n#else\n#error \"This file should not be included when either TORCH_STABLE_ONLY or TORCH_TARGET_VERSION is defined.\"\n#endif  // !defined(TORCH_STABLE_ONLY) && !defined(TORCH_TARGET_VERSION)\n"
+  },
+  "exception_mapping_body_unchanged": true
+}

@@ -142,6 +142,12 @@ impl Boxed {
                         ati_generic_list(pointers.as_ptr(), len)
                     }
                 }
+                Value::NamedTuple(object) => {
+                    return Self::pack(
+                        native,
+                        &Value::Tuple(object.fields.iter().map(|(_, v)| v.clone()).collect()),
+                    );
+                }
                 Value::Dict(v) => {
                     let mut items = Vec::new();
                     for (k, v) in v {

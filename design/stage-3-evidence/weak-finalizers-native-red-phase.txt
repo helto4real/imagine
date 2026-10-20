@@ -1,0 +1,22 @@
+Development red-phase reproduction before immediate native parent finalizers. Direct own metadata test; no frozen-executable/isolation provenance. Not acceptance evidence.
+
+
+running 1 test
+test shared_weak_finalizers_tests::original_weak_parent_finalizers_switch_immediately_before_next_registry_read_and_preserve_expired_parent_device ... FAILED
+
+failures:
+
+---- shared_weak_finalizers_tests::original_weak_parent_finalizers_switch_immediately_before_next_registry_read_and_preserve_expired_parent_device stdout ----
+
+thread 'shared_weak_finalizers_tests::original_weak_parent_finalizers_switch_immediately_before_next_registry_read_and_preserve_expired_parent_device' (3) panicked at tests/support/shared_weak_finalizers.rs:102:13:
+assertion `left == right` failed: immediate events 1/1
+  left: Array []
+ right: Array [Number(0)]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    shared_weak_finalizers_tests::original_weak_parent_finalizers_switch_immediately_before_next_registry_read_and_preserve_expired_parent_device
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 301 filtered out; finished in 0.01s
+

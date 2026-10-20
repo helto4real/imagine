@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "49823e6fe433d4d43e9889d525073bf132233e4f23aa65f8f8a8df02513a8120",
+  "tests": [
+    {
+      "name": "shared_sampler_locals_tests::original_stochastic_adams_and_pece_retain_prediction_lists_stacked_buffers_corrector_history_tau_frames_and_early_aliases",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/49823e6fe433d4d43e9889d525073bf132233e4f23aa65f8f8a8df02513a8120/runs/039643f894d946bdb8333a1fc86fd811/00-original_stochastic_adams_and_pece_retain_prediction_lists_stacked_buffers_corrector_history_tau_frames_and_early_aliases.log",
+      "evidence": "00-original_stochastic_adams_and_pece_retain_prediction_lists_stacked_buffers_corrector_history_tau_frames_and_early_aliases.json"
+    },
+    {
+      "name": "shared_sampling_tests::original_advanced_sampler_providers_preserve_cfg_flags_stage_geometry_sde_overrides_tau_scaler_calls_failures_and_rng",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/49823e6fe433d4d43e9889d525073bf132233e4f23aa65f8f8a8df02513a8120/runs/039643f894d946bdb8333a1fc86fd811/01-original_advanced_sampler_providers_preserve_cfg_flags_stage_geometry_sde_overrides_tau_scaler_calls_failures_and_rng.log",
+      "evidence": "01-original_advanced_sampler_providers_preserve_cfg_flags_stage_geometry_sde_overrides_tau_scaler_calls_failures_and_rng.json"
+    },
+    {
+      "name": "shared_sampling_tests::shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/49823e6fe433d4d43e9889d525073bf132233e4f23aa65f8f8a8df02513a8120/runs/039643f894d946bdb8333a1fc86fd811/02-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.log",
+      "evidence": "02-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.json"
+    }
+  ],
+  "result": "passed"
+}

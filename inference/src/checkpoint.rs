@@ -11,8 +11,24 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tch::{Kind, Tensor};
+pub mod component;
+pub mod detection;
+mod detector_program;
+mod detector_values;
+mod diffusers_program;
 mod embedding;
+mod metadata_json;
+pub mod model_registry;
 mod prepared;
+pub mod rebuild_versions;
+mod registry_data;
+pub mod state_dict;
+pub mod storage_rebuild;
+pub mod torch_archive;
+pub mod unet_names;
+mod unet_names_program;
+pub mod weights_only;
+pub mod weights_only_globals;
 pub use embedding::load_quantized_embedding;
 mod quantized;
 pub use prepared::{LinearPolicy, PreparedParameters};
@@ -167,6 +183,9 @@ pub struct Safetensors {
     /// Preserve Python JSON/dict insertion order, including duplicate-key updates.
     pub tensors: Vec<(String, CheckpointTensor)>,
     pub metadata: Json,
+    // Keep source JSON order for native component consumers. The existing
+    // serde view remains available to the accepted product loader.
+    source_metadata: metadata_json::Json,
 }
 impl Safetensors {
     pub fn get(&self, name: &str) -> Option<&CheckpointTensor> {
@@ -197,7 +216,8 @@ impl Safetensors {
         if base > size {
             return Err(incomplete("The safetensors header is incomplete.", path));
         }
-        let header = parse_header(&mapping.bytes()[8..base], path)?;
+        let (header, source_metadata) =
+            parse_header_with_metadata(&mapping.bytes()[8..base], path)?;
         let source_path = std::fs::canonicalize(path).map_err(|e| Error::Native(e.to_string()))?;
         let mut tensors = vec![];
         let mut metadata = Json::Object(Default::default());
@@ -293,7 +313,11 @@ impl Safetensors {
                 },
             ));
         }
-        Ok(Self { tensors, metadata })
+        Ok(Self {
+            tensors,
+            metadata,
+            source_metadata,
+        })
     }
 }
 fn gap(operation: &str) -> Error {
@@ -371,27 +395,60 @@ impl<'de> Visitor<'de> for OrderedHeader {
 }
 /// Header-only parsing preserves Python dictionary order and duplicate updates.
 pub fn parse_header(bytes: &[u8], path: &Path) -> Result<Vec<(String, Json)>, Error> {
+    parse_header_with_metadata(bytes, path).map(|(header, _)| header)
+}
+type ParsedHeader = (Vec<(String, Json)>, metadata_json::Json);
+fn parse_header_with_metadata(bytes: &[u8], path: &Path) -> Result<ParsedHeader, Error> {
     use serde::de::Deserializer;
-    let text = std::str::from_utf8(bytes).map_err(|_| gap("Python UTF-8 decoder diagnostics"))?;
-    let mut decoder = serde_json::Deserializer::from_str(text);
-    let result = (&mut decoder).deserialize_map(OrderedHeader);
-    match result {
-        Ok(header) => {
-            decoder
-                .end()
-                .map_err(|_| gap("Python JSON extra-data diagnostics"))?;
-            Ok(header)
-        }
-        Err(_) => {
-            // Do not replace Python's syntax/error behavior with Serde's.
-            // Valid non-object JSON has an explicit original error.
-            if serde_json::from_str::<Json>(text).is_ok() {
-                Err(invalid("The safetensors header is invalid.", path))
-            } else {
-                Err(gap(
-                    "Python JSON decoder diagnostics and extended numeric/string values",
-                ))
-            }
-        }
+    let text = crate::python_unicode_codec::utf8(bytes, false)
+        .map_err(|error| header_decode_error(error, path))?;
+    let text = crate::patching::options::SourceText::get(&text)
+        .unwrap()
+        .utf8()
+        .unwrap();
+    let source = metadata_json::loads(&crate::patching::options::Options::Atom(
+        crate::execution_value::Value::Text(text.clone()),
+    ))
+    .map_err(|error| header_decode_error(error, path))?;
+    if !matches!(source, metadata_json::Json::Dict(_)) {
+        return Err(invalid("The safetensors header is invalid.", path));
     }
+    let source_metadata = match &source {
+        metadata_json::Json::Dict(values) => values
+            .iter()
+            .find(|(name, _)| name == &metadata_json::points("__metadata__"))
+            .map(|(_, value)| value.clone())
+            .unwrap_or_else(|| metadata_json::Json::Dict(vec![])),
+        _ => unreachable!(),
+    };
+    // The typed legacy header API admits ordinary finite JSON. Raw surrogate,
+    // arbitrary-integer and nonfinite metadata need their source-value binding;
+    // never coerce them or replace source syntax errors with Serde diagnostics.
+    let mut decoder = serde_json::Deserializer::from_str(&text);
+    let header = (&mut decoder)
+        .deserialize_map(OrderedHeader)
+        .map_err(|_| gap("Extended safetensors JSON requires the raw source-value binding"))?;
+    decoder
+        .end()
+        .map_err(|_| gap("Source-validated safetensors JSON representation"))?;
+    Ok((header, source_metadata))
+}
+fn header_decode_error(error: Error, path: &Path) -> Error {
+    if !matches!(
+        error.root(),
+        Error::ReferenceException {
+            class: "UnicodeDecodeError" | "JSONDecodeError",
+            ..
+        }
+    ) {
+        return error;
+    }
+    let cause = error.into_exception();
+    let raised = invalid(&cause.source().to_string(), path)
+        .during_handling(Error::Retained(cause.clone()))
+        .into_exception();
+    raised
+        .set_cause(crate::source_exception::ExceptionLink::Exception(cause))
+        .expect("an exception is a valid explicit cause");
+    Error::Retained(raised)
 }

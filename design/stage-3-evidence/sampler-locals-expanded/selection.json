@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "4ed0546e012e402dd6b84089c9896c4bd929274748b1bb8109734aee020f9645",
+  "tests": [
+    {
+      "name": "shared_sampler_locals_tests::source_sampler_locals_retain_exact_tensor_storages_through_model_and_callback_sites",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/4ed0546e012e402dd6b84089c9896c4bd929274748b1bb8109734aee020f9645/runs/13cde5b2adb044198a38226f566a099e/00-source_sampler_locals_retain_exact_tensor_storages_through_model_and_callback_sites.log",
+      "evidence": "00-source_sampler_locals_retain_exact_tensor_storages_through_model_and_callback_sites.json"
+    },
+    {
+      "name": "shared_sampling_tests::shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/4ed0546e012e402dd6b84089c9896c4bd929274748b1bb8109734aee020f9645/runs/13cde5b2adb044198a38226f566a099e/01-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.log",
+      "evidence": "01-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.json"
+    }
+  ],
+  "result": "passed"
+}

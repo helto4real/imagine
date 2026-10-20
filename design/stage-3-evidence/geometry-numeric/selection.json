@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "ecc64b57ec078c43783d4d5ef4c3149e1d857803a6775a15b1daa0a99b57d853",
+  "tests": [
+    {
+      "name": "shared_mesh_tests::original_geometry_wrappers_preserve_shapes_indices_namedtuple_fields_graph_results_and_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/ecc64b57ec078c43783d4d5ef4c3149e1d857803a6775a15b1daa0a99b57d853/00-original_geometry_wrappers_preserve_shapes_indices_namedtuple_fields_graph_results_and_errors.log",
+      "evidence": "00-original_geometry_wrappers_preserve_shapes_indices_namedtuple_fields_graph_results_and_errors.json"
+    },
+    {
+      "name": "signature_tests::all_original_registered_callables_preserve_1004_argument_binding_failures_before_body_execution",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/ecc64b57ec078c43783d4d5ef4c3149e1d857803a6775a15b1daa0a99b57d853/01-all_original_registered_callables_preserve_1004_argument_binding_failures_before_body_execution.log",
+      "evidence": "01-all_original_registered_callables_preserve_1004_argument_binding_failures_before_body_execution.json"
+    }
+  ],
+  "result": "passed"
+}

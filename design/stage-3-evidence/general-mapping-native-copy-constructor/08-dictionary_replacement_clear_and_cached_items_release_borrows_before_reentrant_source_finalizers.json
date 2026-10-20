@@ -1,0 +1,248 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "interpreter_available": false,
+  "comfyui_tree_available": false,
+  "comfyui_installation_available": false,
+  "compiler_only_files_at_reference_paths": {
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas": "c960a4f238b17d5c5d3c01ad2bbc1ebd2c5aecc459cb4d223bff10b45f9b8fca",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/triton/backends/nvidia/bin/cuobjdump": "8f240516056740fee62c40eec6e1ba5d3d5ab5a309fbba4b0fe26fd54c79767d",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/triton/backends/nvidia/lib/libdevice.10.bc": "5c2fae37c86e68c3a38605a95f512d7d12d5f3db986310be47f57304aa72a5ee",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/quantization.py": "fd7045ab8afaf7f92f6d7123a4483cdb6149ff1890defb709c6849af422e08ed",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/triton/language/standard.py": "7e3ef84c68c2804c3476dd3f1fccce432aaa1ea6ee367ed7d229f1902dd0a2aa",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/adaln.py": "889c37c6e98f0be5a316deb8e787096d3243ab12af790c743065ee0689885951",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/rope.py": "4a5b3fc6faded7691aa97f743c1ee56b1f5ffb82246804c3048c280d9b44a1b5",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/rms_rope.py": "68a5760334a9cfd72717374f2107d5260d3b86683b9b6205bbc2f00c1ad08e6e",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py": "6528efcf03ddc59e055033b8e7d78b51e4daf222e752abc3e7b1d323fa601cc8",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/na.py": "3cddc77d969e781cee51b06420dc09db68c560cfc57b9f0f0663cb5cf314a6be"
+  },
+  "runtime_compiler_elf_files": {
+    "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/triton-standalone/make/bin/triton-opt": "b7098718f198eea2bdea7e42d3fb370c47198435747f1584fd9138bc0f9ca895",
+    "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/llvm/llvm-1f126a6d-almalinux-x64-1/bin/mlir-translate": "a72c6662eb966743a14e29a7da88cde23d2e5ab5c8ce65fffb6ed0beea787d76",
+    "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/triton-standalone/make/bin/imagine-triton-llvm": "38e1ce125f8e4e9ed2bd36b0a2660cc57817a02ebf5b72ebabacdde81eda0bee",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/triton/backends/nvidia/bin/ptxas": "c960a4f238b17d5c5d3c01ad2bbc1ebd2c5aecc459cb4d223bff10b45f9b8fca",
+    "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/triton-driver/libimagine_triton_driver.so": "bd124a1b2de3c096e3df0e472699c8734b5f456f58f6201454d6aee566121aeb",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/triton/backends/nvidia/bin/cuobjdump": "8f240516056740fee62c40eec6e1ba5d3d5ab5a309fbba4b0fe26fd54c79767d",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/triton/backends/nvidia/lib/libdevice.10.bc": "5c2fae37c86e68c3a38605a95f512d7d12d5f3db986310be47f57304aa72a5ee",
+    "/opt/cuda/bin/nvdisasm": "fa719d636e2dcebdbce466e07ab69f144feabc2fdb3eda52380fbd4a5c189faf"
+  },
+  "compiler_profile_sha256": "f5c036937a02cc570fc9fb4e82fd8167a8d1720641cc0f9fa583a51d33e098e3",
+  "network_namespace": "isolated",
+  "test_filter": "shared_dict_iteration_tests::dictionary_replacement_clear_and_cached_items_release_borrows_before_reentrant_source_finalizers",
+  "package_elf_files": [
+    {
+      "target": "/runtime/aimdo.so",
+      "sha256": "8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59"
+    },
+    {
+      "target": "/runtime/libimagine_pillow.so",
+      "sha256": "095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libcublas.so.13",
+      "sha256": "25cde432108543626df85d887c730bf2cab96803ca16f9654e4abc8d2b45833e"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libcublasLt.so.13",
+      "sha256": "1489aeb75d55ee55782798343ac66f57771d561cc1fe1e0491568deefa0e6515"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libcudart.so.13",
+      "sha256": "96c42e418cec19054186b9429c321603cc190bf26a18104e19408117a2a817b0"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libcufft.so.12",
+      "sha256": "0933f68bb7e3bf90f86d70bc87cd2f69027f7757e89e5de5e19ec33a53fd8d3a"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libcufile.so.0",
+      "sha256": "1ecaf17d38957a41473a7fc8f29d569579e2a9079a26c4d9b89d8da330051483"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libcupti.so.13",
+      "sha256": "e2f9ed861fe27c492b8bb52b5e3220ef5120f3edcda36312e96b7fd8a186be3e"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libcurand.so.10",
+      "sha256": "b53732a66b302b11926e00f762e2c2ba67058347ff93cf4ae709de45e93e06da"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libcusparse.so.12",
+      "sha256": "09339f848f60bb1111a61ee0fe91ed0c25132b7ff63298244d7ac14e61b58466"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libnvJitLink.so.13",
+      "sha256": "3ba1e744347cd68617b862eccfd98b125482e882b7a6319f42abc9a768513db8"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libnvrtc.so.13",
+      "sha256": "a49e67e8e74590f1e98de55c39c6287efd3f59e3c3797464d7bbe0fe01349b11"
+    },
+    {
+      "target": "/runtime/nvidia/cudnn/lib/libcudnn.so.9",
+      "sha256": "b88025af76979b3f1af208790195093684fe01cb8d190528856058f988016660"
+    },
+    {
+      "target": "/runtime/nvidia/cusparselt/lib/libcusparseLt.so.0",
+      "sha256": "e2bcea98434bdfc6399b5e0d1db14178079df62f9527c183c835a7ae196d5685"
+    },
+    {
+      "target": "/runtime/nvidia/nccl/lib/libnccl.so.2",
+      "sha256": "aa957cdfb91b516eae0d54a28e9ee5db52730d02e0ab45580efc3c19a68327a4"
+    },
+    {
+      "target": "/runtime/nvidia/nvshmem/lib/libnvshmem_host.so.3",
+      "sha256": "c43004bb93053aa70603a204fe0c9052bdd29f38822d3048599183f8d5930d8f"
+    },
+    {
+      "target": "/runtime/torch/lib/libc10.so",
+      "sha256": "b83ea50e9171c7e3455c19f9ff2c7d21d457a7b8231e9c4ea1b6e032ae1156d5"
+    },
+    {
+      "target": "/runtime/torch/lib/libc10_cuda.so",
+      "sha256": "54da13d79545600a1822a72b179a58295c1915f8ea0194a89066437c3ac48c1a"
+    },
+    {
+      "target": "/runtime/torch/lib/libgomp.so.1",
+      "sha256": "e28fb2896a3d612b46a27d7f8ef840d34c9efbc29b70a044c42095fb94856890"
+    },
+    {
+      "target": "/runtime/torch/lib/libtorch.so",
+      "sha256": "29c72a63050601514ff9af6399bb027ee8b4030b97017579458d16ceac90d999"
+    },
+    {
+      "target": "/runtime/torch/lib/libtorch_cpu.so",
+      "sha256": "9b8ecee6ebc8419142714302c8a7b61b2e1e52a2882bce6ab1e1587ed39c07e9"
+    },
+    {
+      "target": "/runtime/torch/lib/libtorch_cuda.so",
+      "sha256": "181dfc4fe86bf8eb4726604ea13b18581b15cf4d5f6e52f538daa41016edc19a"
+    },
+    {
+      "target": "/runtime/torch/lib/libtorch_nvshmem.so",
+      "sha256": "badf5e3f9fbb9f7b13e198318ffb6ff019808aacf46488ec09843f90a310541a"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libcusolver.so.12",
+      "sha256": "c571d524fc5571e6c8a5784d51f75fbe8cf17590463c397a06e48428cb926c48"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0",
+      "sha256": "1c26e0ff9a9eecdf1faae6a10f036b50641b1da8964e137001efc18b85e19d66"
+    },
+    {
+      "target": "/runtime/nvidia/cu13/lib/libnvrtc-builtins.so.13.0",
+      "sha256": "91dcd944d01da9c0f08fff5d779db136a47f6d62bdb63bae900d2f481e92c3a2"
+    },
+    {
+      "target": "/runtime/nvidia/cudnn/lib/libcudnn_adv.so.9",
+      "sha256": "7702094a50dbea5b8244df01af8e9d3565309d3996bbc8ca96b6c7a207d2d6bd"
+    },
+    {
+      "target": "/runtime/nvidia/cudnn/lib/libcudnn_cnn.so.9",
+      "sha256": "e830c5cba875ebeb8ed3cfde5cc038a2703692ce714a8a4ff28666ac8e2c5732"
+    },
+    {
+      "target": "/runtime/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9",
+      "sha256": "e5133109f710c215d72fdc8f1d9be187f4760f5f32e57cc8c57515ea9e91455e"
+    },
+    {
+      "target": "/runtime/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9",
+      "sha256": "28db2a6f433a184e264d927b183c47ecaf72dc65ed58245a6d2380f980e29cd3"
+    },
+    {
+      "target": "/runtime/nvidia/cudnn/lib/libcudnn_graph.so.9",
+      "sha256": "35c099d318433a88d292775676a51a07d2dd152c3ae799b1c21a75b40f78e456"
+    },
+    {
+      "target": "/runtime/nvidia/cudnn/lib/libcudnn_heuristic.so.9",
+      "sha256": "a41eb9baa9ccc9e2d6c9f2ca226021b54c8ee2df4abf3a91e41687847b481228"
+    },
+    {
+      "target": "/runtime/nvidia/cudnn/lib/libcudnn_ops.so.9",
+      "sha256": "705d3dcf9b209fdbeeecd8aaec5fcd0f6f55de5661e1c1388b5a4b8fd29db7c3"
+    },
+    {
+      "target": "/runtime/torch/lib/libtorch_cuda_linalg.so",
+      "sha256": "83a9ea9e7c8f82029eb1328e6e68ec45e578864ae0c4c2a3d235e64b07175fe2"
+    }
+  ],
+  "driver_mode": null,
+  "authorized_model_files": [],
+  "authorized_reference_files": [],
+  "system_elf_files": [
+    "/usr/lib/libc.so.6",
+    "/usr/lib/libcuda.so.1",
+    "/usr/lib/libdl.so.2",
+    "/usr/lib/libgcc_s.so.1",
+    "/usr/lib/libm.so.6",
+    "/usr/lib/libpthread.so.0",
+    "/usr/lib/librt.so.1",
+    "/usr/lib/libstdc++.so.6",
+    "/usr/lib/libutil.so.1",
+    "/usr/lib/libz.so.1",
+    "/usr/lib64/ld-linux-x86-64.so.2"
+  ],
+  "system_elf_hashes": {
+    "/usr/lib/libc.so.6": "02c8c3d06180beee9c7d0392aa85736c7d19f274a81e7f8f0b3d9e28e0641524",
+    "/usr/lib/libcuda.so.1": "85a8cc8cf00419ceb295ec62c481d05b4cdbdab10f25c5375d6d24bdbe00b4d9",
+    "/usr/lib/libdl.so.2": "9b3812e7f6b766e2d0a1d9eeca1a58c1272392859e8b04f708b2f86b2256d03c",
+    "/usr/lib/libgcc_s.so.1": "e618cb9c90c2eb3a1dad1cfea5b6c1eebcf2e799ad805976f4ae47bdd61c716a",
+    "/usr/lib/libm.so.6": "965106704753eefe8c31ae7da6daba3ead3d18c52b19b5fcc41178bcc4aa999d",
+    "/usr/lib/libpthread.so.0": "839b91403f89fa4c6888d50deb2b59cd0612f8cfe3d57dd9d6314832b4cb31ab",
+    "/usr/lib/librt.so.1": "e06e12b8a78494908d08376838c380fb3817bfd7d54f6a86ef050016f7ade5f8",
+    "/usr/lib/libstdc++.so.6": "f5fc7380f2ae46fa4053a64be04e7b98109f1066a4bbfff3c37042488aa0be0e",
+    "/usr/lib/libutil.so.1": "8c2cbf01f52acb42478b9ab10506af9878b7e8d47aefacc8896bb5b37384c222",
+    "/usr/lib/libz.so.1": "9ba92a0b85dc9b659e8f5e596a69452cec801def6ece0883a8a2c1f032e52397",
+    "/usr/lib64/ld-linux-x86-64.so.2": "f5e11cc62f8f2c24dff532982559f4303dba3b17e7450551372a88c8e7ea8757"
+  },
+  "lazy_package_elf_files": [
+    "/runtime/nvidia/cu13/lib/libcusolver.so.12",
+    "/runtime/nvidia/cu13/lib/libnvrtc-builtins.alt.so.13.0",
+    "/runtime/nvidia/cu13/lib/libnvrtc-builtins.so.13.0",
+    "/runtime/nvidia/cudnn/lib/libcudnn.so.9",
+    "/runtime/nvidia/cudnn/lib/libcudnn_adv.so.9",
+    "/runtime/nvidia/cudnn/lib/libcudnn_cnn.so.9",
+    "/runtime/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9",
+    "/runtime/nvidia/cudnn/lib/libcudnn_engines_runtime_compiled.so.9",
+    "/runtime/nvidia/cudnn/lib/libcudnn_graph.so.9",
+    "/runtime/nvidia/cudnn/lib/libcudnn_heuristic.so.9",
+    "/runtime/nvidia/cudnn/lib/libcudnn_ops.so.9",
+    "/runtime/torch/lib/libtorch_cuda_linalg.so"
+  ],
+  "triton_driver_sha256": "bd124a1b2de3c096e3df0e472699c8734b5f456f58f6201454d6aee566121aeb",
+  "triton_frontend_cubin_sha256": {
+    "case-0.cubin": "724fcb7fb7dd65031e2d7d8fc06212c27d28da2320dc676a5db81171cbece8e7",
+    "case-112.cubin": "b084789032a4cbf0f854aa8e397aa6f87d62651b214ab50f29dc1ae756637a9c",
+    "case-128.cubin": "3445c057adecef6c8dc855281d1e17e403d803a15f3f632dc86f9ec7a0d3ce08",
+    "case-144.cubin": "50ae511eef3e48c496a28041f4fc6b53425d3ba707688157907553d596bbf1f3",
+    "case-16.cubin": "dd00ab73f47a83d1c6ecb4cfc17023e217060880ef6c0e729a8a321d167fb52c",
+    "case-160.cubin": "750edb07476fe9c026335db9d669a5e0e2a8dcdbd3a0d171654926e121e2eede",
+    "case-176.cubin": "7bb0a6fe83f4ff31688d1df9f79f03f3b6c4e841c4575366f3b2a747cacf3e27",
+    "case-192.cubin": "d2ff1f0eabaf6599d126ec9bdb11c31a1eea5fc8005be5a8fae9d88ee9c8ef3e",
+    "case-208.cubin": "f66372edac43a8c6b8d25340acfe225f89c10361a6b17199118f65b2ba04a5c8",
+    "case-224.cubin": "41455fa212456ed10abd89b2fb1ad891f84c7c3ad91f8a0f8a071508ae2dd3d0",
+    "case-240.cubin": "30d3d0e366caac848c79f00266abb74af2384e56b3e54e2ca744d53203e8e79b",
+    "case-256.cubin": "1d6ddd4fa053ac42d951c302089733238c3ff8e1f8ce69b3815d684b3eb34f4a",
+    "case-272.cubin": "2f1680c7f648fab76ab17ea91970ceff4dacf9261324b1604bcf63cb6ff091f5",
+    "case-288.cubin": "1b26935ce3d0cba594024259bfa36f00e4502cc5a04e9807ea2cee7f0bbedace",
+    "case-304.cubin": "9d7bd998c1593a720ef52b86f1973b970a30f18b3124e0a72d096b1e4d992126",
+    "case-32.cubin": "6598b63c9036b4146a0493a30fef6bbcc87364a8ea78dca2b85a9864ec776458",
+    "case-320.cubin": "920da462547fb48b38cce048b8217e25b5cec2c70eccd7136dbace0c97d4c8ba",
+    "case-336.cubin": "03aed808f019cdced383ee727dc71fea454ebae69718d374d1473ffd6128647d",
+    "case-352.cubin": "71606298b5220fc5e002588eeb1d7cccf89c19d22f853d395726bd0682ca8cb4",
+    "case-368.cubin": "5de296bb2ed170fec6eac8af3d4ed48ddcf43628ff1e6c410d42ed1a63d793f8",
+    "case-48.cubin": "edbe405bb3d696f5a1bd39bedd6d986791f42218aa5d04189031ef834f0aa224",
+    "case-64.cubin": "a516bb42bff477b3bca83bc047cd0b20c4145a46ef82acb959ee42cba65d5f9e",
+    "case-80.cubin": "2b068a74f90f043fee43091d8f3d82e258370e626948af73d95676db73d89ecd",
+    "case-96.cubin": "3c220ecf7ce8eba5e3512e03547af8618d27e85dd29601fec2e2f04727e7c2f7"
+  },
+  "bridge_sha256": "f8c0e344949a9283ff5e0c5bb392f8c30e40b0e07b1a079e64266afe6908a898",
+  "binary_sha256": "39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036",
+  "aot_binary_sha256": "8171618ef9b69de5c5b9715fd060d851ee8f553065df3d62dd715f5f42eb8700",
+  "aot_fixture_sha256": "d36dd7f70f4eac38972f8156f7efbd5ae333d2cc109bd7c3370bc6caeabe643d",
+  "int8_binary_sha256": "89a7a0897236db557aa4ab20c0b0349cefa52f9573bee866d8430f71760e73f1",
+  "int8_fixture_sha256": "cef33289d156ee64aea6f1a9ca53d8000781432716302b0d662438552e6878e0",
+  "backend_fixture_sha256": "a41e894146fe9598ad8891bcb0f2c4208fe9c208dd91a14ea45397b07a19e16f",
+  "fixture_sha256": "3de0621e0cceb14f85e5ac44a8bcf3583954c2e59a755edfbc57792adcacb27a"
+}

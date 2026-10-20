@@ -21,6 +21,22 @@ typedef torch::jit::IValue *ivalue;
       torch_last_err = strdup((std::string("[imagine-c10:oom]\n") + e.what_without_backtrace()).c_str()); \
   } catch (const c10::AcceleratorError& e) { \
       torch_last_err = strdup((std::string("[imagine-c10:accelerator:") + std::to_string(e.get_error_code()) + "]\n" + e.what_without_backtrace()).c_str()); \
+  } catch (const c10::LinAlgError& e) { \
+      torch_last_err = strdup((std::string("[imagine-c10:linalg]\n") + e.what_without_backtrace()).c_str()); \
+  } catch (const c10::IndexError& e) { \
+      torch_last_err = strdup((std::string("[imagine-c10:index]\n") + e.what_without_backtrace()).c_str()); \
+  } catch (const c10::ValueError& e) { \
+      torch_last_err = strdup((std::string("[imagine-c10:value]\n") + e.what_without_backtrace()).c_str()); \
+  } catch (const c10::TypeError& e) { \
+      torch_last_err = strdup((std::string("[imagine-c10:type]\n") + e.what_without_backtrace()).c_str()); \
+  } catch (const c10::NotImplementedError& e) { \
+      torch_last_err = strdup((std::string("[imagine-c10:not-implemented]\n") + e.what_without_backtrace()).c_str()); \
+  } catch (const c10::BufferError& e) { \
+      torch_last_err = strdup((std::string("[imagine-c10:buffer]\n") + e.what_without_backtrace()).c_str()); \
+  } catch (const c10::SyntaxError& e) { \
+      torch_last_err = strdup((std::string("[imagine-c10:syntax]\n") + e.what_without_backtrace()).c_str()); \
+  } catch (const c10::Error& e) { \
+      torch_last_err = strdup((std::string("[imagine-c10:runtime]\n") + e.what_without_backtrace()).c_str()); \
   } catch (const exception& e) { \
       torch_last_err = strdup(e.what()); \
   }
@@ -35,6 +51,45 @@ typedef void *ivalue;
 char *get_and_reset_last_err(); // thread-local
 void* at_imagine_inference_mode_new(int enabled);
 void at_imagine_inference_mode_free(void* value);
+void at_imagine_storage_info(tensor value, uintptr_t* identity, uint64_t* bytes);
+void at_imagine_tensor_item(tensor value, int* kind, int64_t* integer, uint64_t* unsigned_integer, double* real, double* imaginary);
+int64_t at_imagine_shape_unsigned_extent(uint64_t value, int64_t position);
+int64_t at_imagine_shape_tensor_extent(tensor value);
+tensor at_imagine_rebuild_storage_tensor(tensor source, int dtype, int64_t offset, const int64_t* sizes, const int64_t* strides, int64_t dimensions, int64_t stride_dimensions);
+tensor at_imagine_rebuild_empty(tensor storage, int dtype, int requires_grad);
+void at_imagine_rebuild_set_storage(tensor value, tensor storage, int64_t offset, const int64_t* sizes, const int64_t* strides, int64_t dimensions, int64_t stride_dimensions);
+void at_imagine_rebuild_requires_grad(tensor value, int requires_grad);
+void at_imagine_rebuild_metadata_flags(tensor value, int conjugate_present, int negative_present);
+void* at_imagine_archive_open(const uint8_t* path, size_t size);
+void at_imagine_archive_free(void* reader);
+int at_imagine_archive_has(void* reader, const uint8_t* key, size_t size);
+void* at_imagine_archive_record(void* reader, const uint8_t* key, size_t size);
+const uint8_t* at_imagine_archive_data(void* record, size_t* size);
+void at_imagine_archive_record_free(void* record);
+void* at_imagine_archive_records(void* reader, size_t* size);
+const uint8_t* at_imagine_archive_record_name(void* names, size_t index, size_t* size);
+void at_imagine_archive_records_free(void* names);
+uint64_t at_imagine_archive_offset(void* reader, const uint8_t* key, size_t size);
+tensor at_imagine_archive_storage(void* reader, const uint8_t* key, size_t size, size_t numel, int dtype);
+int at_imagine_storage_resizable(tensor value);
+tensor at_imagine_tolist_data(tensor value);
+void at_imagine_tolist_scalar(tensor value, int64_t offset, int* kind, int64_t* integer, uint64_t* unsigned_integer, double* real, double* imaginary);
+void* at_imagine_weak_storage_new(tensor value);
+int at_imagine_weak_storage_expired(void* value);
+void at_imagine_weak_storage_free(void* value);
+tensor at_imagine_source_normal(tensor source, void* handle);
+void at_imagine_index_copy_to(tensor target, tensor source);
+tensor at_imagine_context_index(tensor full, const int64_t* values, int64_t count, int64_t dim);
+void at_imagine_context_index_put(tensor full, const int64_t* values, int64_t count, int64_t dim, tensor source);
+int64_t at_imagine_context_size(tensor full, int64_t dim);
+tensor at_imagine_context_scalar_index(tensor full, const int64_t* values, int64_t count);
+tensor at_imagine_context_slice(tensor full, int64_t dim, int64_t start, int64_t end);
+tensor at_imagine_context_scalar_at(tensor full, int64_t index, int64_t dim);
+void at_imagine_context_scalar_at_put(tensor full, int64_t index, int64_t dim, tensor source);
+tensor at_imagine_global_rng_state(int device);
+tensor at_imagine_clone(tensor value);
+int at_imagine_current_stream_capturing();
+tensor at_imagine_generator_randperm(void* handle, int64_t n);
 void at_manual_seed(int64_t);
 tensor at_new_tensor();
 tensor at_tensor_of_blob(void *data, int64_t *dims, size_t ndims, int64_t *strides, size_t nstrides, int type, int device);

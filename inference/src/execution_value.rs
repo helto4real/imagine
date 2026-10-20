@@ -16,6 +16,15 @@ impl std::ops::Deref for TensorObject {
 }
 
 pub type Kwargs = Vec<(String, Value)>;
+pub struct NamedTupleClass {
+    pub name: &'static str,
+}
+/// Class identity of the original immutable tuple subtype used by Tensor.shape.
+pub(crate) static TORCH_SIZE_CLASS: NamedTupleClass = NamedTupleClass { name: "Size" };
+pub struct NamedTupleObject {
+    pub class: &'static NamedTupleClass,
+    pub fields: Vec<(&'static str, Value)>,
+}
 #[derive(Clone)]
 pub enum Value {
     None,
@@ -29,10 +38,18 @@ pub enum Value {
     Tensor(Arc<Mutex<TensorObject>>),
     Quantized(Arc<Mutex<QuantizedStorage>>),
     Tuple(Vec<Value>),
+    NamedTuple(Arc<NamedTupleObject>),
     List(Vec<Value>),
     Dict(Kwargs),
 }
 impl Value {
+    pub fn named_tuple(
+        class: &'static NamedTupleClass,
+        fields: Vec<(&'static str, Value)>,
+    ) -> Self {
+        Self::NamedTuple(Arc::new(NamedTupleObject { class, fields }))
+    }
+
     pub fn tensor(t: Tensor) -> Self {
         Self::Tensor(Arc::new(Mutex::new(TensorObject {
             tensor: t,
@@ -87,6 +104,7 @@ impl Value {
         match (self, other) {
             (Self::Tensor(a), Self::Tensor(b)) => Arc::ptr_eq(a, b),
             (Self::Quantized(a), Self::Quantized(b)) => Arc::ptr_eq(a, b),
+            (Self::NamedTuple(a), Self::NamedTuple(b)) => Arc::ptr_eq(a, b),
             _ => false,
         }
     }
@@ -111,6 +129,7 @@ impl Value {
                 | Self::Quantized(_)
                 | Self::Device(_)
                 | Self::Tuple(_)
+                | Self::NamedTuple(_)
                 | Self::List(_)
                 | Self::Dict(_)
         ) {
@@ -168,7 +187,11 @@ impl Value {
                     shape: q.params.original_shape.clone(),
                 }
             }
-            Self::Tuple(_) | Self::List(_) | Self::Dict(_) | Self::Device(_) => return Ok(None),
+            Self::Tuple(_)
+            | Self::NamedTuple(_)
+            | Self::List(_)
+            | Self::Dict(_)
+            | Self::Device(_) => return Ok(None),
         }))
     }
 }
@@ -196,12 +219,12 @@ pub fn get<'a>(
         .or_else(|| kwargs.iter().find(|(k, _)| k == name).map(|(_, v)| v))
 }
 
-pub(crate) fn bind_arguments(
+pub(crate) fn bind_arguments<T>(
     name: &str,
     names: &[&str],
     required: usize,
-    args: &[Value],
-    kwargs: &Kwargs,
+    args: &[T],
+    kwargs: &[(String, T)],
 ) -> Result<(), Error> {
     let mut provided = (0..names.len()).map(|i| i < args.len()).collect::<Vec<_>>();
     for (name_kw, _) in kwargs {
@@ -264,6 +287,7 @@ pub(crate) fn small_unsigned(value: &Value) -> bool {
     match value {
         Value::UInt(n) => *n <= i64::MAX as u64,
         Value::List(v) | Value::Tuple(v) => v.iter().any(small_unsigned),
+        Value::NamedTuple(v) => v.fields.iter().any(|(_, v)| small_unsigned(v)),
         Value::Dict(v) => v.iter().any(|(_, v)| small_unsigned(v)),
         _ => false,
     }
@@ -271,6 +295,13 @@ pub(crate) fn small_unsigned(value: &Value) -> bool {
 pub(crate) fn python_integer_value(value: &Value) -> Value {
     match value {
         Value::UInt(n) if *n <= i64::MAX as u64 => Value::Int(*n as i64),
+        Value::NamedTuple(v) if small_unsigned(value) => Value::named_tuple(
+            v.class,
+            v.fields
+                .iter()
+                .map(|(name, v)| (*name, python_integer_value(v)))
+                .collect(),
+        ),
         Value::Tuple(v) => Value::Tuple(v.iter().map(python_integer_value).collect()),
         Value::List(v) => Value::List(v.iter().map(python_integer_value).collect()),
         Value::Dict(v) => Value::Dict(

@@ -99,6 +99,7 @@ def statement(n):
   emit(f'b.end_int8_loop(&{frame},&[a_ptrs,b_ptrs,accumulator],{pos(n.body[-1])});');emit('}');emit(f'let accumulator={frame}.results[2].clone();')
  else:raise ValueError(ast.dump(n))
 for fn,label in zip(functions,['tensorwise','per_row']if a.family=='int8'else['w4a8']):
+ if a.family=='w4a8':out.append(f'pub const FUNCTION_DEFINITION:u32={fn.lineno};')
  emit(f'fn lower_{label}(b:&mut Builder,s:&Specialization<\'_>,pointers:&[Value],scalars:&[Value])'+'{')
  for i,n in enumerate(fn.args.args[:pointer_count]):emit(f'let {n.arg}=pointers[{i}].clone();')
  for i,name in enumerate(scalars):emit(f'let {name}=scalars[{i}].clone();')

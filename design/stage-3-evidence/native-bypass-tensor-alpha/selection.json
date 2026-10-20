@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "027302d479629d51b914011c11581813df00085adc9fe36b78489c598940e88c",
+  "tests": [
+    {
+      "name": "shared_bypass_tests::original_bypass_tensor_alpha_constraints_broadcasting_zero_ranks_dtypes_and_errors_match",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/027302d479629d51b914011c11581813df00085adc9fe36b78489c598940e88c/runs/8ba954ab2eae49e9ad5332602214dd44/00-original_bypass_tensor_alpha_constraints_broadcasting_zero_ranks_dtypes_and_errors_match.log",
+      "evidence": "00-original_bypass_tensor_alpha_constraints_broadcasting_zero_ranks_dtypes_and_errors_match.json"
+    },
+    {
+      "name": "shared_bypass_tests::inference_bypass_adapter_algebra_preserves_six_families_linear_convolutions_dtype_errors_and_base_calls",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/027302d479629d51b914011c11581813df00085adc9fe36b78489c598940e88c/runs/8ba954ab2eae49e9ad5332602214dd44/01-inference_bypass_adapter_algebra_preserves_six_families_linear_convolutions_dtype_errors_and_base_calls.log",
+      "evidence": "01-inference_bypass_adapter_algebra_preserves_six_families_linear_convolutions_dtype_errors_and_base_calls.json"
+    },
+    {
+      "name": "shared_memory_gc_tests::original_gc_coordinator_preserves_live_registration_ranges_collection_cache_diagnostics_mutations_errors_and_partial_state",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/027302d479629d51b914011c11581813df00085adc9fe36b78489c598940e88c/runs/8ba954ab2eae49e9ad5332602214dd44/02-original_gc_coordinator_preserves_live_registration_ranges_collection_cache_diagnostics_mutations_errors_and_partial_state.log",
+      "evidence": "02-original_gc_coordinator_preserves_live_registration_ranges_collection_cache_diagnostics_mutations_errors_and_partial_state.json"
+    },
+    {
+      "name": "shared_memory_gc_tests::native_gc_coordinator_observes_actual_dead_patchers_cyclic_physical_targets_and_immediate_weak_registration_cleanup",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/027302d479629d51b914011c11581813df00085adc9fe36b78489c598940e88c/runs/8ba954ab2eae49e9ad5332602214dd44/03-native_gc_coordinator_observes_actual_dead_patchers_cyclic_physical_targets_and_immediate_weak_registration_cleanup.log",
+      "evidence": "03-native_gc_coordinator_observes_actual_dead_patchers_cyclic_physical_targets_and_immediate_weak_registration_cleanup.json"
+    }
+  ],
+  "result": "passed"
+}

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "1effbc8b585870a9bd30fb3e30e25cfd392b1d776332d95b452387359db3f805",
+  "tests": [
+    {
+      "name": "shared_memory_helper_tests::original_memory_helpers_preserve_live_list_removal_append_duplicates_device_filter_negative_freed_breaks_and_failure_prefixes",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/1effbc8b585870a9bd30fb3e30e25cfd392b1d776332d95b452387359db3f805/runs/d06ff376eb8942998a5bcd13938b59bc/00-original_memory_helpers_preserve_live_list_removal_append_duplicates_device_filter_negative_freed_breaks_and_failure_prefixes.log",
+      "evidence": "00-original_memory_helpers_preserve_live_list_removal_append_duplicates_device_filter_negative_freed_breaks_and_failure_prefixes.json"
+    },
+    {
+      "name": "shared_load_completion_tests::original_load_completion_preserves_loaded_before_free_cached_budget_and_post_load_getters_errors_before_registration",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/1effbc8b585870a9bd30fb3e30e25cfd392b1d776332d95b452387359db3f805/runs/d06ff376eb8942998a5bcd13938b59bc/01-original_load_completion_preserves_loaded_before_free_cached_budget_and_post_load_getters_errors_before_registration.log",
+      "evidence": "01-original_load_completion_preserves_loaded_before_free_cached_budget_and_post_load_getters_errors_before_registration.json"
+    },
+    {
+      "name": "qwen_component_tests::qwen_image21_original_component_nonleaf_parameters_buffers_and_dtype_policies_match",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/1effbc8b585870a9bd30fb3e30e25cfd392b1d776332d95b452387359db3f805/runs/d06ff376eb8942998a5bcd13938b59bc/02-qwen_image21_original_component_nonleaf_parameters_buffers_and_dtype_policies_match.log",
+      "evidence": "02-qwen_image21_original_component_nonleaf_parameters_buffers_and_dtype_policies_match.json"
+    }
+  ],
+  "result": "passed"
+}

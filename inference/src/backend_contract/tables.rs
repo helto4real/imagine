@@ -1628,6 +1628,66 @@ pub(super) fn eager() -> BTreeMap<String, FunctionConstraints> {
                 &[],
             ),
         ),
+        (
+            "w4a8_packed_linear".into(),
+            f(
+                vec![
+                    p(
+                        "x",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p(
+                        "qdata",
+                        Some(&["torch.int8"]),
+                        None,
+                        vec![ShapeRule::ExactDims(1)],
+                    ),
+                    p(
+                        "s_rel",
+                        Some(&["torch.float32", "torch.float8_e4m3fn"]),
+                        None,
+                        vec![ShapeRule::ExactDims(1)],
+                    ),
+                    p(
+                        "s_channel",
+                        Some(&["torch.float32"]),
+                        None,
+                        vec![ShapeRule::ExactDims(1)],
+                    ),
+                    p(
+                        "codebook",
+                        Some(&["torch.float32"]),
+                        None,
+                        vec![ShapeRule::ExactDims(1)],
+                    ),
+                    p(
+                        "correction",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![ShapeRule::ExactDims(2)],
+                    ),
+                    p(
+                        "bias",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p("group_size", Some(&["int"]), None, vec![]),
+                    p("convrot_groupsize", Some(&["int"]), None, vec![]),
+                    p(
+                        "out_dtype",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                ],
+                &["*", "cpu", "cuda", "hpu", "meta", "mps", "xpu"],
+                None,
+                &[],
+            ),
+        ),
     ])
 }
 pub(super) fn triton() -> BTreeMap<String, FunctionConstraints> {
@@ -2480,6 +2540,130 @@ pub(super) fn cuda() -> BTreeMap<String, FunctionConstraints> {
                 &["cuda"],
                 Some((8, 0)),
                 &["cuda_na3d"],
+            ),
+        ),
+        (
+            "delaunay3d".into(),
+            f(
+                vec![p(
+                    "points",
+                    Some(&["torch.float32", "torch.float64"]),
+                    None,
+                    vec![ShapeRule::ExactDims(2)],
+                )],
+                &["cuda"],
+                Some((7, 5)),
+                &[],
+            ),
+        ),
+        (
+            "mesh_bvh".into(),
+            f(
+                vec![p(
+                    "triangles",
+                    Some(&["torch.float32"]),
+                    None,
+                    vec![ShapeRule::ExactDims(3)],
+                )],
+                &["cuda"],
+                Some((7, 5)),
+                &[],
+            ),
+        ),
+        (
+            "closest_point_on_mesh".into(),
+            f(
+                vec![p(
+                    "points",
+                    Some(&["torch.float32"]),
+                    None,
+                    vec![ShapeRule::ExactDims(2)],
+                )],
+                &["cuda"],
+                Some((7, 5)),
+                &[],
+            ),
+        ),
+        (
+            "connected_components".into(),
+            f(
+                vec![p(
+                    "edges",
+                    Some(&["torch.int32", "torch.int64"]),
+                    None,
+                    vec![ShapeRule::ExactDims(2)],
+                )],
+                &["cuda"],
+                Some((7, 5)),
+                &[],
+            ),
+        ),
+        (
+            "edge_collapse_checks".into(),
+            f(
+                vec![
+                    p(
+                        "vertices",
+                        Some(&["torch.float32"]),
+                        None,
+                        vec![ShapeRule::ExactDims(2)],
+                    ),
+                    p(
+                        "faces",
+                        Some(&["torch.int32", "torch.int64"]),
+                        None,
+                        vec![ShapeRule::ExactDims(2)],
+                    ),
+                    p(
+                        "edges",
+                        Some(&["torch.int32", "torch.int64"]),
+                        None,
+                        vec![ShapeRule::ExactDims(2)],
+                    ),
+                    p(
+                        "positions",
+                        Some(&["torch.float32"]),
+                        None,
+                        vec![ShapeRule::ExactDims(2)],
+                    ),
+                ],
+                &["cuda"],
+                Some((7, 5)),
+                &[],
+            ),
+        ),
+        (
+            "min_cut".into(),
+            f(
+                vec![
+                    p(
+                        "nbr",
+                        Some(&["torch.int32", "torch.int64"]),
+                        None,
+                        vec![ShapeRule::ExactDims(2)],
+                    ),
+                    p(
+                        "cap",
+                        Some(&["torch.float32"]),
+                        None,
+                        vec![ShapeRule::ExactDims(2)],
+                    ),
+                    p(
+                        "s_cap",
+                        Some(&["torch.float32"]),
+                        None,
+                        vec![ShapeRule::ExactDims(1)],
+                    ),
+                    p(
+                        "t_cap",
+                        Some(&["torch.float32"]),
+                        None,
+                        vec![ShapeRule::ExactDims(1)],
+                    ),
+                ],
+                &["cuda"],
+                Some((7, 5)),
+                &[],
             ),
         ),
         (
@@ -3844,6 +4028,66 @@ pub(super) fn cuda() -> BTreeMap<String, FunctionConstraints> {
                 ],
                 &["cuda"],
                 None,
+                &[],
+            ),
+        ),
+        (
+            "w4a8_packed_linear".into(),
+            f(
+                vec![
+                    p(
+                        "x",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p(
+                        "qdata",
+                        Some(&["torch.int8"]),
+                        None,
+                        vec![ShapeRule::ExactDims(1)],
+                    ),
+                    p(
+                        "s_rel",
+                        Some(&["torch.float32", "torch.float8_e4m3fn"]),
+                        None,
+                        vec![ShapeRule::ExactDims(1)],
+                    ),
+                    p(
+                        "s_channel",
+                        Some(&["torch.float32"]),
+                        None,
+                        vec![ShapeRule::ExactDims(1)],
+                    ),
+                    p(
+                        "codebook",
+                        Some(&["torch.float32"]),
+                        None,
+                        vec![ShapeRule::ExactDims(1)],
+                    ),
+                    p(
+                        "correction",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![ShapeRule::ExactDims(2)],
+                    ),
+                    p(
+                        "bias",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p("group_size", Some(&["int"]), None, vec![]),
+                    p("convrot_groupsize", Some(&["int"]), None, vec![]),
+                    p(
+                        "out_dtype",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                ],
+                &["cuda"],
+                Some((8, 0)),
                 &[],
             ),
         ),

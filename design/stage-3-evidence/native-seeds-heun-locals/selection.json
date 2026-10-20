@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "bf0b5e7a6ac63a253f26ce321f021b512470ee46e35b9ddc8a7e848ec6d29781",
+  "tests": [
+    {
+      "name": "shared_sampler_locals_tests::original_seeds_and_exponential_heun_retain_stochastic_stages_history_sigma_offsets_and_exact_tensor_storage_aliases",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/bf0b5e7a6ac63a253f26ce321f021b512470ee46e35b9ddc8a7e848ec6d29781/runs/05ba90acbc8648eea0aaea8ae7c71ee9/00-original_seeds_and_exponential_heun_retain_stochastic_stages_history_sigma_offsets_and_exact_tensor_storage_aliases.log",
+      "evidence": "00-original_seeds_and_exponential_heun_retain_stochastic_stages_history_sigma_offsets_and_exact_tensor_storage_aliases.json"
+    },
+    {
+      "name": "shared_sampling_tests::original_advanced_sampler_providers_preserve_cfg_flags_stage_geometry_sde_overrides_tau_scaler_calls_failures_and_rng",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/bf0b5e7a6ac63a253f26ce321f021b512470ee46e35b9ddc8a7e848ec6d29781/runs/05ba90acbc8648eea0aaea8ae7c71ee9/01-original_advanced_sampler_providers_preserve_cfg_flags_stage_geometry_sde_overrides_tau_scaler_calls_failures_and_rng.log",
+      "evidence": "01-original_advanced_sampler_providers_preserve_cfg_flags_stage_geometry_sde_overrides_tau_scaler_calls_failures_and_rng.json"
+    },
+    {
+      "name": "shared_sampling_tests::shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/bf0b5e7a6ac63a253f26ce321f021b512470ee46e35b9ddc8a7e848ec6d29781/runs/05ba90acbc8648eea0aaea8ae7c71ee9/02-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.log",
+      "evidence": "02-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.json"
+    }
+  ],
+  "result": "passed"
+}

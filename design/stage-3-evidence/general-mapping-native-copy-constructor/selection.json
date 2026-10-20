@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036",
+  "tests": [
+    {
+      "name": "shared_general_dict_iteration_tests::original_general_dictionary_items_preserve_none_tuple_keys_mutations_resize_cached_tuple_identity_and_value_lifetimes",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/00-original_general_dictionary_items_preserve_none_tuple_keys_mutations_resize_cached_tuple_identity_and_value_lifetimes.log",
+      "evidence": "00-original_general_dictionary_items_preserve_none_tuple_keys_mutations_resize_cached_tuple_identity_and_value_lifetimes.json"
+    },
+    {
+      "name": "shared_general_dict_iteration_tests::original_general_dictionary_keys_preserve_native_key_identity_mutations_sticky_errors_and_value_release",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/01-original_general_dictionary_keys_preserve_native_key_identity_mutations_sticky_errors_and_value_release.log",
+      "evidence": "01-original_general_dictionary_keys_preserve_native_key_identity_mutations_sticky_errors_and_value_release.json"
+    },
+    {
+      "name": "shared_general_dict_iteration_tests::original_general_dictionary_values_preserve_mutations_exhaustion_errors_and_uncached_owners",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/02-original_general_dictionary_values_preserve_mutations_exhaustion_errors_and_uncached_owners.log",
+      "evidence": "02-original_general_dictionary_values_preserve_mutations_exhaustion_errors_and_uncached_owners.json"
+    },
+    {
+      "name": "shared_general_dict_tests::original_general_dictionary_preserves_mixed_keys_collisions_rich_comparisons_layout_holes_compacting_copies_and_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/03-original_general_dictionary_preserves_mixed_keys_collisions_rich_comparisons_layout_holes_compacting_copies_and_errors.log",
+      "evidence": "03-original_general_dictionary_preserves_mixed_keys_collisions_rich_comparisons_layout_holes_compacting_copies_and_errors.json"
+    },
+    {
+      "name": "shared_dict_iteration_tests::source_live_dictionary_items_preserve_mutations_resize_copy_tuple_identity_cached_owners_and_sticky_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/04-source_live_dictionary_items_preserve_mutations_resize_copy_tuple_identity_cached_owners_and_sticky_errors.log",
+      "evidence": "04-source_live_dictionary_items_preserve_mutations_resize_copy_tuple_identity_cached_owners_and_sticky_errors.json"
+    },
+    {
+      "name": "shared_dict_iteration_tests::source_live_dictionary_keys_preserve_mutations_resize_copy_exhaustion_and_value_owners",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/05-source_live_dictionary_keys_preserve_mutations_resize_copy_exhaustion_and_value_owners.log",
+      "evidence": "05-source_live_dictionary_keys_preserve_mutations_resize_copy_exhaustion_and_value_owners.json"
+    },
+    {
+      "name": "shared_dict_iteration_tests::source_live_dictionary_values_preserve_mutations_resize_copy_exhaustion_aliases_and_uncached_value_owners",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/06-source_live_dictionary_values_preserve_mutations_resize_copy_exhaustion_aliases_and_uncached_value_owners.log",
+      "evidence": "06-source_live_dictionary_values_preserve_mutations_resize_copy_exhaustion_aliases_and_uncached_value_owners.json"
+    },
+    {
+      "name": "shared_dict_iteration_tests::dictionary_value_iterator_releases_its_dictionary_before_reentrant_finalizers_at_exhaustion_and_drop",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/07-dictionary_value_iterator_releases_its_dictionary_before_reentrant_finalizers_at_exhaustion_and_drop.log",
+      "evidence": "07-dictionary_value_iterator_releases_its_dictionary_before_reentrant_finalizers_at_exhaustion_and_drop.json"
+    },
+    {
+      "name": "shared_dict_iteration_tests::dictionary_replacement_clear_and_cached_items_release_borrows_before_reentrant_source_finalizers",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/08-dictionary_replacement_clear_and_cached_items_release_borrows_before_reentrant_source_finalizers.log",
+      "evidence": "08-dictionary_replacement_clear_and_cached_items_release_borrows_before_reentrant_source_finalizers.json"
+    },
+    {
+      "name": "shared_patcher_constructor_tests::original_whole_patcher_constructor_preserves_partial_fields_attribute_reaccess_factories_model_changes_and_shared_relationship_slots",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/09-original_whole_patcher_constructor_preserves_partial_fields_attribute_reaccess_factories_model_changes_and_shared_relationship_slots.log",
+      "evidence": "09-original_whole_patcher_constructor_preserves_partial_fields_attribute_reaccess_factories_model_changes_and_shared_relationship_slots.json"
+    },
+    {
+      "name": "shared_relationship_clone_tests::original_hasattr_releases_temporary_descriptor_before_last_receiver_after_reentrant_root_replacement",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/10-original_hasattr_releases_temporary_descriptor_before_last_receiver_after_reentrant_root_replacement.log",
+      "evidence": "10-original_hasattr_releases_temporary_descriptor_before_last_receiver_after_reentrant_root_replacement.json"
+    },
+    {
+      "name": "shared_unet_names_tests::original_diffusers_checkpoint_loop_preserves_alias_selection_live_iteration_logging_failures_and_partial_shared_mutations",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/11-original_diffusers_checkpoint_loop_preserves_alias_selection_live_iteration_logging_failures_and_partial_shared_mutations.log",
+      "evidence": "11-original_diffusers_checkpoint_loop_preserves_alias_selection_live_iteration_logging_failures_and_partial_shared_mutations.json"
+    },
+    {
+      "name": "shared_deepcopy_tests::original_list_dict_copy_preserves_postorder_memo_aliases_opaque_tuples_key_substitution_and_partial_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/12-original_list_dict_copy_preserves_postorder_memo_aliases_opaque_tuples_key_substitution_and_partial_errors.log",
+      "evidence": "12-original_list_dict_copy_preserves_postorder_memo_aliases_opaque_tuples_key_substitution_and_partial_errors.json"
+    },
+    {
+      "name": "shared_deepcopy_tests::source_cyclic_copy_is_not_repaired_and_required_context_denial_preserves_completed_memo_and_balances_frames",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/13-source_cyclic_copy_is_not_repaired_and_required_context_denial_preserves_completed_memo_and_balances_frames.log",
+      "evidence": "13-source_cyclic_copy_is_not_repaired_and_required_context_denial_preserves_completed_memo_and_balances_frames.json"
+    },
+    {
+      "name": "shared_deepcopy_tests::original_general_dictionary_copy_preserves_none_tuple_object_keys_aliases_postorder_memo_substitution_and_partial_failures",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/14-original_general_dictionary_copy_preserves_none_tuple_object_keys_aliases_postorder_memo_substitution_and_partial_failures.log",
+      "evidence": "14-original_general_dictionary_copy_preserves_none_tuple_object_keys_aliases_postorder_memo_substitution_and_partial_failures.json"
+    },
+    {
+      "name": "shared_deepcopy_tests::general_dictionary_copy_context_denial_keeps_completed_memo_and_does_not_repair_source_cycles",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/15-general_dictionary_copy_context_denial_keeps_completed_memo_and_does_not_repair_source_cycles.log",
+      "evidence": "15-general_dictionary_copy_context_denial_keeps_completed_memo_and_does_not_repair_source_cycles.json"
+    },
+    {
+      "name": "shared_relationship_clone_tests::original_clone_relationship_blocks_preserve_descriptor_reaccess_live_maps_lists_root_changes_aliases_and_partial_failures",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/16-original_clone_relationship_blocks_preserve_descriptor_reaccess_live_maps_lists_root_changes_aliases_and_partial_failures.log",
+      "evidence": "16-original_clone_relationship_blocks_preserve_descriptor_reaccess_live_maps_lists_root_changes_aliases_and_partial_failures.json"
+    },
+    {
+      "name": "shared_unet_names_tests::original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/39fa8137652fce03b13f4d8a7a61f7cb7c1ce6b9918923c446f55f67275f9036/runs/6056ef3d502e44c6beb6e02a092f1737/17-original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases.log",
+      "evidence": "17-original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases.json"
+    }
+  ],
+  "result": "passed"
+}

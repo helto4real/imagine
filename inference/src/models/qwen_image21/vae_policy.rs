@@ -162,38 +162,15 @@ pub trait ImageVaeServices {
 /// Frozen CUDA `model_management.is_oom`, without classifying ordinary error
 /// strings as allocation failures. The asynchronous-error clearing uses the
 /// same two initialized byte tensors as the original helper.
-pub fn image_vae_is_oom(native: &crate::native::Kitchen, device: Device, error: &Error) -> bool {
-    if matches!(
-        error,
-        Error::ReferenceException {
-            class: "OutOfMemoryError",
-            ..
-        }
-    ) {
-        return true;
-    }
-    let accelerator = match error {
-        Error::AcceleratorException { code, message } => {
-            *code == 2 || message.to_lowercase().contains("out of memory")
-        }
-        Error::ReferenceException {
-            class: "AcceleratorError",
-            message,
-        } => message.to_lowercase().contains("out of memory"),
-        _ => false,
-    };
-    if accelerator {
-        let _ = (|| -> Result<(), Error> {
-            let a = Tensor::f_from_slice(&[1_u8])?.f_to_device(device)?;
-            let b = Tensor::f_from_slice(&[1_u8])?.f_to_device(device)?;
-            let _ = a.f_add(&b)?;
-            if let Device::Cuda(index) = device {
-                native.synchronize_device(index)?;
-            }
-            Ok(())
-        })();
-    }
-    accelerator
+pub fn image_vae_is_oom(
+    native: &crate::native::Kitchen,
+    device: Device,
+    error: &Error,
+) -> Result<bool, Error> {
+    let mut bindings = crate::memory::exceptions::NativeOomBindings(|| {
+        crate::memory::exceptions::discard_native_cuda_async_error(native, device)
+    });
+    crate::memory::exceptions::is_oom(error, &mut bindings)
 }
 #[derive(Clone, Copy)]
 pub enum ImageVaeMemory {

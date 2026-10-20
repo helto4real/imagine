@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f",
+  "execution_root": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "native_av_composed_tests::h3_composed_latent_pack_global_noise_original_flow_and_unpack_match_without_learned_weights",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f/runs/05c19fa2f88e4a1c8c4491d23fd75b3d/00-h3_composed_latent_pack_global_noise_original_flow_and_unpack_match_without_learned_weights.log",
+      "evidence": "00-h3_composed_latent_pack_global_noise_original_flow_and_unpack_match_without_learned_weights.json"
+    },
+    {
+      "name": "native_av_composed_tests::h3_zero_audio_scale_preserves_original_process_out_exception_before_any_latent_operation",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f/runs/05c19fa2f88e4a1c8c4491d23fd75b3d/01-h3_zero_audio_scale_preserves_original_process_out_exception_before_any_latent_operation.log",
+      "evidence": "01-h3_zero_audio_scale_preserves_original_process_out_exception_before_any_latent_operation.json"
+    },
+    {
+      "name": "shared_loaded_load_tests::original_loaded_load_preserves_bound_receivers_dtype_device_moves_zero_budget_rebind_failures_and_real_finalizers",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f/runs/05c19fa2f88e4a1c8c4491d23fd75b3d/02-original_loaded_load_preserves_bound_receivers_dtype_device_moves_zero_budget_rebind_failures_and_real_finalizers.log",
+      "evidence": "02-original_loaded_load_preserves_bound_receivers_dtype_device_moves_zero_budget_rebind_failures_and_real_finalizers.json"
+    },
+    {
+      "name": "shared_loaded_unload_tests::original_loaded_unload_and_use_more_preserve_cached_load_explicit_offload_targets_partial_boundaries_errors_and_dead_state",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f/runs/05c19fa2f88e4a1c8c4491d23fd75b3d/03-original_loaded_unload_and_use_more_preserve_cached_load_explicit_offload_targets_partial_boundaries_errors_and_dead_state.log",
+      "evidence": "03-original_loaded_unload_and_use_more_preserve_cached_load_explicit_offload_targets_partial_boundaries_errors_and_dead_state.json"
+    },
+    {
+      "name": "shared_load_selection_tests::original_load_selection_interleaves_dynamic_device_reads_and_retains_reused_candidate_parent_finalizers",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f/runs/05c19fa2f88e4a1c8c4491d23fd75b3d/04-original_load_selection_interleaves_dynamic_device_reads_and_retains_reused_candidate_parent_finalizers.log",
+      "evidence": "04-original_load_selection_interleaves_dynamic_device_reads_and_retains_reused_candidate_parent_finalizers.json"
+    },
+    {
+      "name": "shared_load_completion_tests::original_load_completion_preserves_loaded_before_free_cached_budget_and_post_load_getters_errors_before_registration",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f/runs/05c19fa2f88e4a1c8c4491d23fd75b3d/05-original_load_completion_preserves_loaded_before_free_cached_budget_and_post_load_getters_errors_before_registration.log",
+      "evidence": "05-original_load_completion_preserves_loaded_before_free_cached_budget_and_post_load_getters_errors_before_registration.json"
+    },
+    {
+      "name": "shared_physical_cleanup_tests::original_physical_model_finalizers_cleanup_immediately_before_fields_for_all_release_orders_without_polling",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f/runs/05c19fa2f88e4a1c8c4491d23fd75b3d/06-original_physical_model_finalizers_cleanup_immediately_before_fields_for_all_release_orders_without_polling.log",
+      "evidence": "06-original_physical_model_finalizers_cleanup_immediately_before_fields_for_all_release_orders_without_polling.json"
+    },
+    {
+      "name": "shared_prepare_sampling_tests::whole_prepare_sampling_preserves_order_duplicates_memory_arguments_and_partial_failures",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f/runs/05c19fa2f88e4a1c8c4491d23fd75b3d/07-whole_prepare_sampling_preserves_order_duplicates_memory_arguments_and_partial_failures.log",
+      "evidence": "07-whole_prepare_sampling_preserves_order_duplicates_memory_arguments_and_partial_failures.json"
+    },
+    {
+      "name": "native_av_component_tests::selected_av_component_metadata_preserves_original_precedence_order_custom_operations_and_all_weight_owners_without_allocating_weights",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f/runs/05c19fa2f88e4a1c8c4491d23fd75b3d/08-selected_av_component_metadata_preserves_original_precedence_order_custom_operations_and_all_weight_owners_without_allocating_weights.log",
+      "evidence": "08-selected_av_component_metadata_preserves_original_precedence_order_custom_operations_and_all_weight_owners_without_allocating_weights.json"
+    },
+    {
+      "name": "native_av_component_tests::native_storage_source_annotations_follow_views_reassignment_empty_storage_and_physical_release_without_owning_data",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f/runs/05c19fa2f88e4a1c8c4491d23fd75b3d/09-native_storage_source_annotations_follow_views_reassignment_empty_storage_and_physical_release_without_owning_data.log",
+      "evidence": "09-native_storage_source_annotations_follow_views_reassignment_empty_storage_and_physical_release_without_owning_data.json"
+    },
+    {
+      "name": "native_av_component_tests::tiny_aimdo_component_keeps_ordered_metadata_normalizes_legacy_markers_and_releases_mapped_storage",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/native-av-20261020/stage3-validation/b2b98fd54aacd744655795f1760f52433b3a483850ff6b474d6dc7d63790a62f/runs/05c19fa2f88e4a1c8c4491d23fd75b3d/10-tiny_aimdo_component_keeps_ordered_metadata_normalizes_legacy_markers_and_releases_mapped_storage.log",
+      "evidence": "10-tiny_aimdo_component_keeps_ordered_metadata_normalizes_legacy_markers_and_releases_mapped_storage.json"
+    }
+  ],
+  "result": "passed"
+}

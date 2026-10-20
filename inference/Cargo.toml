@@ -11,6 +11,8 @@ publish = false
 tch = "=0.26.0"
 torch-sys = "=0.26.0"
 libc = "0.2"
+# Already locked through tch; used for NumPy float16 scalar arithmetic in LMS.
+half = "=2.7.1"
 serde_json = { version = "1", features = ["float_roundtrip"] }
 serde = "=1.0.229"
 

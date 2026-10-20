@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "result": "passed_for_recorded_scopes",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "checks": [
+    {
+      "evidence": "design/stage-3-evidence/full-primitives-owner-copy-regression/selection.json",
+      "sha256": "9b92edc925176d9e15701206d34ecaba42ac599ebeea0a1b75b465ef0726794f",
+      "binary_sha256": "54f33f03710038c511072753db2ec15a498a0a9f90125640128fbd7d22c08643",
+      "tests_passed": 290
+    },
+    {
+      "evidence": "design/stage-3-evidence/model-owner-copy-runtime-integration/selection.json",
+      "sha256": "aa7bc0f7684ebea86cd6d360d060c353dfc15c148e7c5a8b8f526f397421ce2b",
+      "binary_sha256": "f0e317d92ea2886cd6f312cef829b4207feb2db7200a8dcc77072b238df41d4b",
+      "tests_passed": 7
+    },
+    {
+      "evidence": "design/stage-3-evidence/model-owned-runtime-original-transitions/selection.json",
+      "sha256": "f71c4f8024522707fa2eea5f3363e8b74d690d05542183762b4e7ceb7d4f3813",
+      "binary_sha256": "e47497a447544ecd6b7c5207bd3d8922ffefdd29d0f4897e628d9e4c5f8f3246",
+      "tests_passed": 1
+    }
+  ],
+  "scope_notes": [
+    "The 290-test whole executable predates the final descriptor-release correction and owned-runtime bridge.",
+    "Seven subsequent exact/representation/regression selectors cover the final library changes.",
+    "The final extra selector extends the retained two original transition histories across both runtime ownership constructors; only tests changed after the seven-test executable.",
+    "53 cyclic cases exercise an explicitly supplied test recursion budget; source execution-context budget, traceback and GC closure are not claimed."
+  ],
+  "source_sha256": {
+    "inference/src/patching/deepcopy.rs": "a2d0944bd35729fa499c65edc7c86f1f0ff775e3216278d37f4eddb2216e4943",
+    "inference/src/patching/relationships.rs": "154721c620ad52e9487235ae8d886b07121b64d1b771114eb4d22c01c644016e",
+    "inference/src/models/qwen_image21/ownership.rs": "bbd4f3338492f9c38a28e7ae350ddae1c17c815d2ddfee3415906b053caf82b0",
+    "inference/tests/support/shared_deepcopy.rs": "bfbbca2e487649384e272b79feee1e3292d4b27a94b709204d82ffe4ada7b7f5",
+    "inference/tests/support/shared_relationship_clone.rs": "301c6b957ce37c0818f38ab322f2d93f66133fe1ab2ba47f7c1e35c5def9a33c",
+    "inference/tests/support/model_management.rs": "cd2991965e1526f59443b09092683f604666d6eab84af6bcbc63eecbf01eb7eb",
+    "inference/tools/reference_shared_deepcopy.py": "9be58a0486f094ca9e1356b33e1cb3c288d47f0d67479f4ecee11553dfc40fdb",
+    "inference/tools/reference_shared_relationship_clone.py": "2047317a4e72494d7c3aaeb387877fbb1086e80191e545ba3c0fb607fbf7c9ed",
+    "inference/tools/validate_stage3.py": "0da5619eb347207f9d6aafb534c9b6ae76fa2c726f080f7a70c5f4b07cd0edcd",
+    "inference/fixtures/shared-deepcopy.json": "4f35b865efcfbe1850b7bfefdd3c5a708d6c74223708abce32f1ca5927f05898",
+    "inference/fixtures/shared-relationship-clone.json": "275df9b8c457ef0c7e25e181c7ca4a312d0b7b21fdf67765a93c784958dc9766"
+  },
+  "static_checks": {
+    "format": "passed",
+    "clippy": "all targets; warnings denied; passed",
+    "changed_python_tools_parse": "passed",
+    "diff_whitespace": "passed",
+    "source_inventory_restoration": "40 modules / 1327 definitions; byte-identical"
+  },
+  "deployed_worker_replaced": false
+}

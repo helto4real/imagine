@@ -510,8 +510,11 @@ pub fn prepare_component_patched_modules(
                 let (shape, kind, quantized) = parameter_shape_kind(value)?;
                 let elements = shape.iter().product::<i64>() as u64;
                 if let Some(patches) = owner.patches.get(name) {
-                    if crate::patching::calculate_shape_from_shape(patches, shape.clone())? != shape
-                    {
+                    let metadata = crate::patching::calculate_shape_metadata(
+                        patches,
+                        crate::patching::size_metadata(&shape),
+                    )?;
+                    if !crate::patching::shape_metadata_matches(&metadata, &shape)? {
                         return Err(gap("Static offload forced shape-changing patch lifecycle"));
                     }
                     module.offload_bytes = patched_module_offload_bytes(
@@ -585,7 +588,8 @@ pub struct StaticOffload<B: ModelBuffers = super::FluxSampling> {
     /// Original ModelPatcher caches module_size before patch/load transitions.
     model_size: u64,
     pub model_lowvram: bool,
-    pins: BTreeMap<String, Tensor>,
+    pins: crate::patching::pinned_key_set::PinnedKeySet,
+    native_patcher_lifecycle: bool,
     native: Kitchen,
     pin_limit: f64,
     shared_pins: Option<super::HostPins>,
@@ -624,7 +628,10 @@ impl<B: ModelBuffers> StaticOffload<B> {
             force_cast_weights: false,
             model_size,
             model_lowvram: false,
-            pins: BTreeMap::new(),
+            native_patcher_lifecycle: false,
+            pins: crate::patching::pinned_key_set::PinnedKeySet::new(
+                crate::python_hash::HashState::shared_random()?,
+            ),
             pin_limit: host_pin_limit()?,
             shared_pins: None,
             forced_lowvram: BTreeSet::new(),
@@ -725,14 +732,7 @@ impl<B: ModelBuffers> StaticOffload<B> {
     }
     /// Original unpatch_model(offload_device, unpatch_weights=True).
     pub fn unload(&mut self) -> Result<(), Error> {
-        for (_, t) in std::mem::take(&mut self.pins) {
-            if let Some(pins) = &self.shared_pins {
-                pins.unpin(&t)?;
-            } else {
-                self.native.host_registration(&t, false)?;
-            }
-        }
-        self.pinned_bytes = 0;
+        self.unpin_all_weights()?;
         self.patch_owner.restore(&mut self.parameters)?;
         self.forced_lowvram.clear();
         for value in self.parameters.values.values_mut() {
@@ -862,14 +862,14 @@ impl<B: ModelBuffers> StaticOffload<B> {
                         continue;
                     }
                     for name in &m.parameters {
-                        if let Some(t) = self.pins.remove(name) {
-                            if let Some(pins) = &self.shared_pins {
-                                pins.unpin(&t)?;
-                            } else {
-                                self.native.host_registration(&t, false)?;
-                            }
-                            self.pinned_bytes -= (t.numel() * t.kind().elt_size_in_bytes()) as u64;
-                        }
+                        Self::unpin_parameter(
+                            &self.parameters,
+                            &self.pins,
+                            &mut self.pinned_bytes,
+                            &self.native,
+                            self.shared_pins.as_ref(),
+                            name,
+                        )?;
                         if let Some(patches) = self.patch_owner.patches.get(name) {
                             let base = self.parameters[name].clone();
                             let patched = unsafe {
@@ -915,25 +915,75 @@ impl<B: ModelBuffers> StaticOffload<B> {
         self.placement = next;
         Ok(())
     }
-    fn pin_parameter(&mut self, name: &str) -> Result<(), Error> {
-        if self.pins.contains_key(name) {
-            return Ok(());
+    fn parameter_payload(parameters: &PreparedParameters, name: &str) -> Result<Tensor, Error> {
+        match &parameters[name] {
+            Value::Quantized(_) => Ok(parameters[name].as_quantized()?.payload),
+            value => value.as_tensor(),
         }
-        // QuantizedTensor.nbytes/data_ptr describe only its packed payload.
-        let t = match &self.parameters[name] {
-            Value::Quantized(_) => self.parameters[name].as_quantized()?.payload,
-            value => value.as_tensor()?,
+    }
+    fn key(name: &str) -> crate::patching::options::Options {
+        crate::patching::options::SourceText::from_utf8(name)
+    }
+    fn unpin_parameter(
+        parameters: &PreparedParameters,
+        pins: &crate::patching::pinned_key_set::PinnedKeySet,
+        pinned_bytes: &mut u64,
+        native: &Kitchen,
+        shared_pins: Option<&super::HostPins>,
+        name: &str,
+    ) -> Result<(), Error> {
+        let key = Self::key(name);
+        if pins.contains(&key)? {
+            let tensor = Self::parameter_payload(parameters, name)?;
+            if let Some(pins) = shared_pins {
+                pins.unpin(&tensor)?;
+            } else {
+                native.host_registration(&tensor, false)?;
+            }
+            // Source removes the key after unpin returns, even when false.
+            pins.discard(&key)?;
+            *pinned_bytes -= (tensor.numel() * tensor.kind().elt_size_in_bytes()) as u64;
+        }
+        Ok(())
+    }
+    pub(crate) fn bind_native_patcher_lifecycle(&mut self) {
+        self.native_patcher_lifecycle = true;
+    }
+    pub fn unpin_all_weights(&mut self) -> Result<(), Error> {
+        let crate::patching::options::Options::List(keys) = self.pins.snapshot()? else {
+            unreachable!("native key snapshot is a list")
         };
-        let bytes = (t.numel() * t.kind().elt_size_in_bytes()) as u64;
+        for key in keys.borrow().iter() {
+            let name = crate::patching::options::SourceText::get(key)
+                .and_then(|key| key.utf8())
+                .expect("parameter names are UTF-8");
+            Self::unpin_parameter(
+                &self.parameters,
+                &self.pins,
+                &mut self.pinned_bytes,
+                &self.native,
+                self.shared_pins.as_ref(),
+                &name,
+            )?;
+        }
+        Ok(())
+    }
+    fn pin_parameter(&mut self, name: &str) -> Result<(), Error> {
+        let key = Self::key(name);
+        // QuantizedTensor.nbytes/data_ptr describe only its packed payload.
+        let tensor = Self::parameter_payload(&self.parameters, name)?;
+        let bytes = (tensor.numel() * tensor.kind().elt_size_in_bytes()) as u64;
         let pinned = if let Some(pins) = &self.shared_pins {
-            pins.pin(&t)?
+            pins.pin(&tensor)?
         } else {
             self.pinned_bytes as f64 + bytes as f64 <= self.pin_limit
-                && self.native.host_registration(&t, true)?
+                && self.native.host_registration(&tensor, true)?
         };
         if pinned {
-            self.pinned_bytes += bytes;
-            self.pins.insert(name.to_owned(), t);
+            if !self.pins.contains(&key)? {
+                self.pinned_bytes += bytes;
+            }
+            self.pins.add(&key)?;
         }
         Ok(())
     }
@@ -972,13 +1022,13 @@ impl<B: ModelBuffers> StaticOffload<B> {
 }
 impl<B: ModelBuffers> Drop for StaticOffload<B> {
     fn drop(&mut self) {
-        let _ = self.native.synchronize_device(0);
-        for t in self.pins.values() {
-            if let Some(pins) = &self.shared_pins {
-                let _ = pins.unpin(t);
-            } else {
-                let _ = self.native.host_registration(t, false);
-            }
+        // Constructed standalone owners have no enclosing Patcher destructor.
+        // Canonical patchers have already cleared the shared source key set.
+        if self.native_patcher_lifecycle {
+            return;
+        }
+        if let Err(error) = self.unpin_all_weights() {
+            eprintln!("Exception ignored in standalone ModelPatcher.__del__: {error}");
         }
     }
 }

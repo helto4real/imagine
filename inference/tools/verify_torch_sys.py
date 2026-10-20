@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import tarfile
 
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--registry-archive',type=Path)
@@ -30,6 +31,10 @@ with tempfile.TemporaryDirectory(prefix='imagine-torch-sys-restore-')as tmp:
   assert sha(tmp/name)==digest,('Original source restoration failed',name)
 if a.registry_archive:
  assert sha(a.registry_archive)==manifest['registry_archive_sha256'],'Cached registry crate differs'
+ prefix=f"{manifest['crate']}-{manifest['version']}/"
+ with tarfile.open(a.registry_archive)as archive:
+  archive_hashes={m.name[len(prefix):]:hashlib.sha256(archive.extractfile(m).read()).hexdigest()for m in archive.getmembers()if m.isfile()and m.name.startswith(prefix)}
+ assert archive_hashes=={**manifest['upstream_files'],**manifest.get('excluded_upstream_files',{})},'Original archive source hashes differ'
 report=dict(schema=1,crate=manifest['crate'],version=manifest['version'],original_files=len(manifest['upstream_files']),patched_files=sorted(manifest['patched_files']),added_files=sorted(manifest['added_files']),reverse_patch_restores_all_original_hashes=True,registry_archive_verified=bool(a.registry_archive),registry_archive_sha256=manifest['registry_archive_sha256'])
 if a.output:a.output.write_text(json.dumps(report,indent=2)+'\n')
 print(json.dumps(report,indent=2))

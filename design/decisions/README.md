@@ -1,5 +1,13 @@
 # Parity decisions
 
+2026-10-20: [D-05-LORA-SHAPE-OVERFLOW-BACKTRACE](D-05-LoRA-shape-overflow-backtrace.md)
+was **explicitly approved by Tomas (“Ja”), 2026-10-20**; implementation and
+validation remain in progress. Two independent original CPU
+processes produce different embedded C++ stacks for the same invalid unsigned
+padding extent. Only the numbered bounded diagnostic comparison is approved; no numerical,
+algorithmic, tuning or other error criterion changes. The approval stop is lifted. Stage 3 remains incomplete; ordinary compatibility
+work continues without renewed permission.
+
 Consult this ledger and the exact record before tuning or changing acceptance.
 An approval applies only to its recorded reference, operation and conditions.
 Performance findings do not authorize altered arithmetic, kernels or policy.
@@ -99,3 +107,25 @@ approved type-set ordering criterion, retaining raw and approved strings. No
 NA3d controlled-state exception, tolerance, alternate route, new D-05 approval
 or tuning change is introduced. Full validation passes 88 crate / 80 Python-free
 tests; remaining development gaps retain the full parity requirement.
+
+2026-10-19: Tomas explicitly approved
+[D-05-CONTROL-HOOK-SET-ORDER](D-05-ControlNet-hook-identity-set-order.md)
+by replying “Ja jag accepterar” to the bounded proposal. Preserve CPython
+control identity-set construction/iteration and exact bytes for matched
+hash/order inputs. Independent source-valid address orders may differ and
+are labeled inherited nondeterminism; no other set or numerical/tuning
+policy is covered. The scoped port and controlled-order checks now pass
+194 source/synthetic cases, both numerical orders and eight focused/regression
+tests; concrete full owner/registry binding remains open.
+
+2026-10-19: The separate
+[D-05-DIFFUSERS-UNET-SET-HASH-ORDER](D-05-Diffusers-UNet-set-hash-order.md)
+was **explicitly approved by Tomas (“Ja”), 2026-10-19**. The original set-based name map can choose different
+external aliases for an internal weight across hash seeds. Twenty source-only
+runs retain that evidence with scalar sentinels and no tensors/weights. The
+ControlNet approval does not apply; this is a separate bounded decision.
+The scoped native implementation now passes 912 name-map cases, 90 conversion
+histories, six marshalled cases and 64 byte-exact CPU tensor cases. Ten
+integration/regression tests, 22 source-restoration files and warnings-denied
+Clippy pass; full consumer/bootstrap/owner integration remains open. Original
+hash/set/alias policy and exact matched-state results remain required.

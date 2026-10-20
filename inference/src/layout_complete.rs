@@ -655,7 +655,7 @@ fn scalar_one(v: Option<&Value>) -> bool {
     }
 }
 fn source_catches(e: &Error) -> bool {
-    match e {
+    match e.root() {
         Error::ReferenceException { class, .. } => matches!(
             *class,
             "RuntimeError"

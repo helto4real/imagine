@@ -57,6 +57,29 @@ fn repr_inner(v: &Value, native: Option<&crate::native::Kitchen>) -> Result<Stri
                 .join(", "),
             if v.len() == 1 { "," } else { "" }
         ),
+        Value::NamedTuple(object)
+            if std::ptr::eq(object.class, &crate::execution_value::TORCH_SIZE_CLASS) =>
+        {
+            format!(
+                "torch.Size([{}])",
+                object
+                    .fields
+                    .iter()
+                    .map(|(_, v)| repr_inner(v, native))
+                    .collect::<Result<Vec<_>, Error>>()?
+                    .join(", ")
+            )
+        }
+        Value::NamedTuple(object) => format!(
+            "{}({})",
+            object.class.name,
+            object
+                .fields
+                .iter()
+                .map(|(name, v)| Ok(format!("{name}={}", repr_inner(v, native)?)))
+                .collect::<Result<Vec<_>, Error>>()?
+                .join(", ")
+        ),
         Value::Dict(values) => format!(
             "{{{}}}",
             values
@@ -125,6 +148,9 @@ pub(crate) fn constexpr_key(
                 serde_json::to_string(&items.iter().map(memory).collect::<Result<Vec<_>, _>>()?)
                     .unwrap()
             ),
+            Value::NamedTuple(object) => memory(&Value::Tuple(
+                object.fields.iter().map(|(_, v)| v.clone()).collect(),
+            ))?,
             Value::List(_) | Value::Dict(_) => {
                 return Err(crate::execution_value::type_error(format!(
                     "unhashable type: '{}'",
@@ -152,6 +178,12 @@ pub(crate) fn ensure_hashable(value: &Value) -> Result<(), Error> {
             "unhashable type: '{}'",
             crate::backend_triton_fp8::typename(value)
         ))),
+        Value::NamedTuple(v) => {
+            for (_, v) in &v.fields {
+                ensure_hashable(v)?;
+            }
+            Ok(())
+        }
         Value::Tuple(v) => {
             for value in v {
                 ensure_hashable(value)?;

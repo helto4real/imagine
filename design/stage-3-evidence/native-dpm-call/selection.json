@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "80a164c5c7169dee976045e2a3fd3a00c69ca4a717f7039e975ce5b0668d8687",
+  "tests": [
+    {
+      "name": "shared_dpm_call_tests::original_nested_dpm_calls_preserve_keyword_binding_advanced_option_forwarding_early_aliases_module_lookup_and_failure_prefixes",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/80a164c5c7169dee976045e2a3fd3a00c69ca4a717f7039e975ce5b0668d8687/runs/55737bd2d150465f8f1e2fb9ab0a9959/00-original_nested_dpm_calls_preserve_keyword_binding_advanced_option_forwarding_early_aliases_module_lookup_and_failure_prefixes.log",
+      "evidence": "00-original_nested_dpm_calls_preserve_keyword_binding_advanced_option_forwarding_early_aliases_module_lookup_and_failure_prefixes.json"
+    }
+  ],
+  "result": "passed"
+}

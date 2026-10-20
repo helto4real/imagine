@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "b77cb02180913d9bc5797c30892f3732ddfd389e6f39c9e9ef300d8291ccd01a",
+  "tests": [
+    {
+      "name": "shared_rebuild_versions_tests::original_v2_v3_tensor_construction_preserves_gradient_order_native_errors_storage_aliases_and_defined_bytes",
+      "returncode": 1,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/b77cb02180913d9bc5797c30892f3732ddfd389e6f39c9e9ef300d8291ccd01a/runs/3623efd3c6d345699c29cc6e84bc804d/00-original_v2_v3_tensor_construction_preserves_gradient_order_native_errors_storage_aliases_and_defined_bytes.log"
+    }
+  ],
+  "result": "failed"
+}

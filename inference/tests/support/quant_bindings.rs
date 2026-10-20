@@ -146,6 +146,28 @@ fn eager_convrot_w4a4_linear_preserves_original_rotation_int4_math_and_validatio
 
 #[test]
 fn na3d_bindings_preserve_original_tiling_mask_sdpa_and_fused_cuda_paths() {
+    // The retained original corpus was captured with one CPU thread. This
+    // matters for the unchanged large CPU SDPA tile; other synthetic model
+    // tests may have initialized OpenMP with a different count beforehand.
+    struct Threads(i32);
+    impl Drop for Threads {
+        fn drop(&mut self) {
+            tch::set_num_threads(self.0);
+        }
+    }
+    let _threads = Threads(tch::get_num_threads());
+    let reference: Value = serde_json::from_str(include_str!(
+        "../../fixtures/kitchen-0238-na3d-threads.json"
+    ))
+    .unwrap();
+    assert!(
+        reference["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["threads"] == 1 && c["baseline_exact"] == true)
+    );
+    tch::set_num_threads(1);
     run_category("na3d_backend_bindings");
 }
 

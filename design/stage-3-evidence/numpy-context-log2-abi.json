@@ -1,0 +1,6 @@
+{
+  "numpy_static_library": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/numpy/_core/lib/libnpymath.a",
+  "sha256": "a177921ab332dcbff30db9e3e7c6acd618a17c515fb4759bef76a1dca3de093e",
+  "npy_log2_disassembly": "In archive /home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/numpy/_core/lib/libnpymath.a:\n\nmeson-generated_ieee754.c.o:     file format elf64-x86-64\n\n\nDisassembly of section .text:\n\nmeson-generated_npy_math_complex.c.o:     file format elf64-x86-64\n\n\nDisassembly of section .text:\n\nsrc_npymath_halffloat.cpp.o:     file format elf64-x86-64\n\n\nDisassembly of section .text:\n\nsrc_npymath_npy_math.c.o:     file format elf64-x86-64\n\n\nDisassembly of section .text:\n\n0000000000000000 <npy_log2>:\n       0:\te9 00 00 00 00       \tjmp    5 <npy_log2+0x5>\n\t\t\t1: R_X86_64_PLT32\tlog2-0x4\n",
+  "scope": "installed dependency object metadata only; no runtime or model data"
+}

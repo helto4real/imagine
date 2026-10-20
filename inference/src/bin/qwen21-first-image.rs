@@ -373,7 +373,7 @@ fn generate(
                         .map_err(|e| Error::Native(e.to_string()))?;
                     let owner =
                         q::static_component(rt, "vae", params)?.with_shared_pins(pins.clone());
-                    let model = q::StaticModel::new(owner, rt);
+                    let model = q::StaticModel::new(owner, rt, None);
                     let patcher = model.patcher();
                     memory_manager.load(
                         std::slice::from_ref(&patcher),
@@ -530,7 +530,7 @@ fn generate(
             let owner = q::static_component(rt, "text", params)?
                 .with_shared_pins(pins.clone())
                 .with_patches(patches)?;
-            let model = q::StaticModel::new(owner, rt);
+            let model = q::StaticModel::new(owner, rt, None);
             let patcher = model.patcher();
             memory_services.phase = "text_initial";
             memory_manager.load(
@@ -693,7 +693,7 @@ fn generate(
             let owner = q::StaticOffload::new(params, rt.native.clone())?
                 .with_shared_pins(pins.clone())
                 .with_patches(patches)?;
-            Some(q::StaticModel::new(owner, rt))
+            Some(q::StaticModel::new(owner, rt, Some(tch::Kind::BFloat16)))
         } else {
             None
         };
@@ -927,7 +927,7 @@ fn generate(
         let schema = q::constructor_schema()?;
         if offload {
             let owner = q::static_component(rt, "vae", params)?.with_shared_pins(pins.clone());
-            let model = q::StaticModel::new(owner, rt);
+            let model = q::StaticModel::new(owner, rt, None);
             let patcher = model.patcher();
             let mut exec =
                 q::ResidentExecution::bind(rt, &PreparedParameters::default(), 0, attention(dev))?;

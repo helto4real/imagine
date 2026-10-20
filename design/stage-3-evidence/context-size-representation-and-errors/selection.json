@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "f38a9e7bdb83587f0ab6496522058e7b5a282935c921aae54853b3020c8031bc",
+  "tests": [
+    {
+      "name": "context_windows::shapes::tests::original_size_metadata_representation_matches_torch_tuple_subtype",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/f38a9e7bdb83587f0ab6496522058e7b5a282935c921aae54853b3020c8031bc/runs/de16b05d89ad4526b16f76b55c0aceaa/00-original_size_metadata_representation_matches_torch_tuple_subtype.log",
+      "evidence": "00-original_size_metadata_representation_matches_torch_tuple_subtype.json"
+    }
+  ],
+  "result": "passed"
+}

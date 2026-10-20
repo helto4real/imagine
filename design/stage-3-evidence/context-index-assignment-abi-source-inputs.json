@@ -1,0 +1,7 @@
+{
+  "scope": "locked dependency headers only; source indexing copy_to boundary",
+  "sources": {
+    "ATen/TensorIndexing.h": "6d87067c5d5256ab286527b2513b453cfc6a135e3f13b18daf65d8a8ec3ee2d8",
+    "ATen/ExpandUtils.h": "c392717f1ed3d62d6d398166c75e48864c66315dda3be6e3a412b6963292ba68"
+  }
+}

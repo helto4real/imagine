@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "766b6c5f87e12263053a0bdb698f263f1feea819d9af4d605de955238a7de50b",
+  "tests": [
+    {
+      "name": "shared_latent_packing_tests::typed_c10_value_type_not_implemented_buffer_and_syntax_errors_survive_the_native_abi",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/766b6c5f87e12263053a0bdb698f263f1feea819d9af4d605de955238a7de50b/runs/7170db4278ad4b50a05bb1223b766c6e/00-typed_c10_value_type_not_implemented_buffer_and_syntax_errors_survive_the_native_abi.log",
+      "evidence": "00-typed_c10_value_type_not_implemented_buffer_and_syntax_errors_survive_the_native_abi.json"
+    },
+    {
+      "name": "shared_latent_packing_tests::original_multimodal_latent_packing_preserves_shapes_single_modality_shortcut_views_and_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/766b6c5f87e12263053a0bdb698f263f1feea819d9af4d605de955238a7de50b/runs/7170db4278ad4b50a05bb1223b766c6e/01-original_multimodal_latent_packing_preserves_shapes_single_modality_shortcut_views_and_errors.log",
+      "evidence": "01-original_multimodal_latent_packing_preserves_shapes_single_modality_shortcut_views_and_errors.json"
+    },
+    {
+      "name": "shared_context_state_tests::original_multimodal_window_state_preserves_mapping_aliases_guide_injection_stripping_and_partial_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/766b6c5f87e12263053a0bdb698f263f1feea819d9af4d605de955238a7de50b/runs/7170db4278ad4b50a05bb1223b766c6e/02-original_multimodal_window_state_preserves_mapping_aliases_guide_injection_stripping_and_partial_errors.log",
+      "evidence": "02-original_multimodal_window_state_preserves_mapping_aliases_guide_injection_stripping_and_partial_errors.json"
+    }
+  ],
+  "result": "passed"
+}

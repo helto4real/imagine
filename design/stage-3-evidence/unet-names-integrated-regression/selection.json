@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500",
+  "tests": [
+    {
+      "name": "shared_unet_names_tests::original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/71f5a719c98e4d09a0e22f32256eadc4/00-original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases.log",
+      "evidence": "00-original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases.json"
+    },
+    {
+      "name": "shared_unet_names_tests::original_diffusers_checkpoint_loop_preserves_alias_selection_live_iteration_logging_failures_and_partial_shared_mutations",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/71f5a719c98e4d09a0e22f32256eadc4/01-original_diffusers_checkpoint_loop_preserves_alias_selection_live_iteration_logging_failures_and_partial_shared_mutations.log",
+      "evidence": "01-original_diffusers_checkpoint_loop_preserves_alias_selection_live_iteration_logging_failures_and_partial_shared_mutations.json"
+    },
+    {
+      "name": "shared_unet_names_tests::original_marshaled_unet_constants_preserve_reconstruction_order_and_duplicate_alias_weight_selection",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/71f5a719c98e4d09a0e22f32256eadc4/02-original_marshaled_unet_constants_preserve_reconstruction_order_and_duplicate_alias_weight_selection.log",
+      "evidence": "02-original_marshaled_unet_constants_preserve_reconstruction_order_and_duplicate_alias_weight_selection.json"
+    },
+    {
+      "name": "shared_control_hook_tests::original_control_identity_set_and_extra_hook_collection_preserve_hashes_probes_resize_chains_aliases_and_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/71f5a719c98e4d09a0e22f32256eadc4/03-original_control_identity_set_and_extra_hook_collection_preserve_hashes_probes_resize_chains_aliases_and_errors.log",
+      "evidence": "03-original_control_identity_set_and_extra_hook_collection_preserve_hashes_probes_resize_chains_aliases_and_errors.json"
+    },
+    {
+      "name": "shared_control_hook_tests::approved_control_hook_orders_keep_exact_combined_patch_bytes_for_both_reference_orders",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/71f5a719c98e4d09a0e22f32256eadc4/04-approved_control_hook_orders_keep_exact_combined_patch_bytes_for_both_reference_orders.log",
+      "evidence": "04-approved_control_hook_orders_keep_exact_combined_patch_bytes_for_both_reference_orders.json"
+    },
+    {
+      "name": "shared_model_detection_tests::whole_model_detector_matches_original_shape_only_checkpoints_and_tiny_learned_std_fields",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/71f5a719c98e4d09a0e22f32256eadc4/05-whole_model_detector_matches_original_shape_only_checkpoints_and_tiny_learned_std_fields.log",
+      "evidence": "05-whole_model_detector_matches_original_shape_only_checkpoints_and_tiny_learned_std_fields.json"
+    },
+    {
+      "name": "shared_diffusers_detection_tests::diffusers_unet_detection_preserves_all_source_config_variants_dtypes_key_gaps_and_shape_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/71f5a719c98e4d09a0e22f32256eadc4/06-diffusers_unet_detection_preserves_all_source_config_variants_dtypes_key_gaps_and_shape_errors.log",
+      "evidence": "06-diffusers_unet_detection_preserves_all_source_config_variants_dtypes_key_gaps_and_shape_errors.json"
+    },
+    {
+      "name": "shared_model_registry_tests::model_registry_preserves_all_class_predicates_source_order_constructor_binding_and_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/71f5a719c98e4d09a0e22f32256eadc4/07-model_registry_preserves_all_class_predicates_source_order_constructor_binding_and_errors.log",
+      "evidence": "07-model_registry_preserves_all_class_predicates_source_order_constructor_binding_and_errors.json"
+    },
+    {
+      "name": "shared_state_dict_tests::ordered_checkpoint_helpers_preserve_collisions_partial_mutation_qkv_storage_and_detection",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/71f5a719c98e4d09a0e22f32256eadc4/08-ordered_checkpoint_helpers_preserve_collisions_partial_mutation_qkv_storage_and_detection.log",
+      "evidence": "08-ordered_checkpoint_helpers_preserve_collisions_partial_mutation_qkv_storage_and_detection.json"
+    },
+    {
+      "name": "shared_hook_patches_tests::hook_patch_clones_combinations_shared_mutations_and_strict_memory_budget_match_original",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/71f5a719c98e4d09a0e22f32256eadc4/09-hook_patch_clones_combinations_shared_mutations_and_strict_memory_budget_match_original.log",
+      "evidence": "09-hook_patch_clones_combinations_shared_mutations_and_strict_memory_budget_match_original.json"
+    }
+  ],
+  "result": "passed"
+}

@@ -1,0 +1,13 @@
+{
+  "source_url": "https://raw.githubusercontent.com/scipy/scipy/v1.17.1/scipy/integrate/__quadpack.c",
+  "version": "1.17.1",
+  "source_sha256": "81e791fc77c443c3de107ea9adc1da38f0dd20275fac1e9d7ca29d15c939bbde",
+  "function_sha256": {
+    "dqagse": "257540cee3bc69913759bec427ed101bbcbbf7f28dd273a9192442b51e03a729",
+    "dqelg": "90f8c69d06e95c8b62cb0b549179a72519fe4c2a0025998254705266b43eea4b",
+    "dqk21": "40d346b99a7066360c1ea10d81b8fbae5691f39291fdb600bd8386ba6ce54f5e",
+    "dqpsrt": "b410922abc397409ec05f4d34c9cc4599eb0b16c87f7fb286474bc32ddb153dd"
+  },
+  "changes": "unchanged numerical bodies; Python header replaced with C declarations",
+  "output_sha256": "95cb63bbca372d34f27b42a4de294ea6a0c526e6fff6742a219894855cec5d07"
+}

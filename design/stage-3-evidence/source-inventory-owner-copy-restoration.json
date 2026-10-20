@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "result": "passed",
+  "scope": "static source inventory restoration; not executable support",
+  "modules": 40,
+  "definitions": 1327,
+  "source_inventory_sha256": "0ac989ae3f0e1ea83351fe29a21d4d951bd7437db08298332aeaf46b516faa0f",
+  "generated_inventory_sha256": "0ac989ae3f0e1ea83351fe29a21d4d951bd7437db08298332aeaf46b516faa0f",
+  "production_runtime_read": false
+}

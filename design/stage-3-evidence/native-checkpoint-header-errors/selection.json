@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "e47cedda29ee363f4fd994d8f643e3b157477735cdefb0a44c0480b0a920aaae",
+  "tests": [
+    {
+      "name": "shared_checkpoint_headers_tests::original_safetensors_header_unicode_json_syntax_extra_data_integer_limit_errors_preserve_wrapping_causes_context_identity_and_valid_ordered_entries",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/e47cedda29ee363f4fd994d8f643e3b157477735cdefb0a44c0480b0a920aaae/runs/dcb078c66ddd4fc3b0eabaf423c5d683/00-original_safetensors_header_unicode_json_syntax_extra_data_integer_limit_errors_preserve_wrapping_causes_context_identity_and_valid_ordered_entries.log",
+      "evidence": "00-original_safetensors_header_unicode_json_syntax_extra_data_integer_limit_errors_preserve_wrapping_causes_context_identity_and_valid_ordered_entries.json"
+    },
+    {
+      "name": "checkpoint_tests::qwen_image21_original_checkpoint_aimdo_types_offsets_errors_and_storage_lifetime_match",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/e47cedda29ee363f4fd994d8f643e3b157477735cdefb0a44c0480b0a920aaae/runs/dcb078c66ddd4fc3b0eabaf423c5d683/01-qwen_image21_original_checkpoint_aimdo_types_offsets_errors_and_storage_lifetime_match.log",
+      "evidence": "01-qwen_image21_original_checkpoint_aimdo_types_offsets_errors_and_storage_lifetime_match.json"
+    },
+    {
+      "name": "shared_unicode_decode_tests::original_cpython_utf8_strict_surrogatepass_and_ascii_preserve_codepoints_and_complete_error_messages_at_all_byte_boundaries",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/e47cedda29ee363f4fd994d8f643e3b157477735cdefb0a44c0480b0a920aaae/runs/dcb078c66ddd4fc3b0eabaf423c5d683/02-original_cpython_utf8_strict_surrogatepass_and_ascii_preserve_codepoints_and_complete_error_messages_at_all_byte_boundaries.log",
+      "evidence": "02-original_cpython_utf8_strict_surrogatepass_and_ascii_preserve_codepoints_and_complete_error_messages_at_all_byte_boundaries.json"
+    }
+  ],
+  "result": "passed"
+}

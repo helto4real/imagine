@@ -38,6 +38,7 @@ pub(super) fn generate(
                 q::static_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", false)?)?
                     .with_shared_pins(pins.clone()),
                 rt,
+                None,
             ))
         })?;
         let mut encode = |pixels: &Tensor| {
@@ -74,6 +75,7 @@ pub(super) fn generate(
                 .with_shared_pins(pins.clone())
                 .with_patches(patches)?,
             rt,
+            None,
         ))
     })?;
     let patcher = text.patcher();
@@ -138,6 +140,7 @@ pub(super) fn generate(
                 .with_shared_pins(pins.clone())
                 .with_patches(patches)?,
             rt,
+            Some(tch::Kind::BFloat16),
         ))
     })?;
     let patcher = model.patcher();
@@ -258,6 +261,7 @@ pub(super) fn generate(
             q::static_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", false)?)?
                 .with_shared_pins(pins.clone()),
             rt,
+            None,
         ))
     })?;
     let pixels = qwen_vae(

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "c094dc0251853eb75d8d8b52be80bfdabb7bc353e2cae8076e2dc6ea996f1180",
+  "tests": [
+    {
+      "name": "shared_weights_only_tests::original_restricted_unpickler_byte_machine_preserves_primitives_memo_cycles_stack_mark_partial_errors_warnings_positions_and_repeated_loads",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/c094dc0251853eb75d8d8b52be80bfdabb7bc353e2cae8076e2dc6ea996f1180/runs/1d62102f314b449286eb0750eac7f39e/00-original_restricted_unpickler_byte_machine_preserves_primitives_memo_cycles_stack_mark_partial_errors_warnings_positions_and_repeated_loads.log",
+      "evidence": "00-original_restricted_unpickler_byte_machine_preserves_primitives_memo_cycles_stack_mark_partial_errors_warnings_positions_and_repeated_loads.json"
+    },
+    {
+      "name": "shared_shape_metadata_tests::original_patch_shape_metadata_preserves_tuple_conversion_tensor_views_raw_values_offset_skips_diff_order_size_aliases_and_equality_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/c094dc0251853eb75d8d8b52be80bfdabb7bc353e2cae8076e2dc6ea996f1180/runs/1d62102f314b449286eb0750eac7f39e/01-original_patch_shape_metadata_preserves_tuple_conversion_tensor_views_raw_values_offset_skips_diff_order_size_aliases_and_equality_errors.log",
+      "evidence": "01-original_patch_shape_metadata_preserves_tuple_conversion_tensor_views_raw_values_offset_skips_diff_order_size_aliases_and_equality_errors.json"
+    },
+    {
+      "name": "shared_pad_values_tests::original_padding_raw_shape_values_preserve_eager_comparisons_truth_dimension_guards_size_parser_errors_and_approved_overflow_stacks",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/c094dc0251853eb75d8d8b52be80bfdabb7bc353e2cae8076e2dc6ea996f1180/runs/1d62102f314b449286eb0750eac7f39e/02-original_padding_raw_shape_values_preserve_eager_comparisons_truth_dimension_guards_size_parser_errors_and_approved_overflow_stacks.log",
+      "evidence": "02-original_padding_raw_shape_values_preserve_eager_comparisons_truth_dimension_guards_size_parser_errors_and_approved_overflow_stacks.json"
+    }
+  ],
+  "result": "passed"
+}

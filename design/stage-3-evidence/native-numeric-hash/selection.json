@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "aa43c010cc1a55d2b81b140001dc9ded4621a60a2856ba93a7b5f4bbcc3733b1",
+  "tests": [
+    {
+      "name": "shared_numeric_hash_tests::original_numeric_hashes_preserve_arbitrary_width_signed_integers_all_float_exponents_and_complex_owner_nan_hashes",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/aa43c010cc1a55d2b81b140001dc9ded4621a60a2856ba93a7b5f4bbcc3733b1/runs/b59b0bcedde54c32b3dc848e4396b1ec/00-original_numeric_hashes_preserve_arbitrary_width_signed_integers_all_float_exponents_and_complex_owner_nan_hashes.log",
+      "evidence": "00-original_numeric_hashes_preserve_arbitrary_width_signed_integers_all_float_exponents_and_complex_owner_nan_hashes.json"
+    }
+  ],
+  "result": "passed"
+}

@@ -6,6 +6,7 @@ project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$project_root"
 export CARGO_HOME="$parity_root/cargo" CARGO_TARGET_DIR="$parity_root/target"
 export LIBTORCH="$reference_site/torch" LIBTORCH_CXX11_ABI=1 CXX=clang++ CARGO_BUILD_JOBS=2
+export IMAGINE_CUDA_INCLUDE="$parity_root/cuda13/nvidia/cu13/include"
 unset LIBTORCH_USE_PYTORCH LIBTORCH_BYPASS_VERSION_CHECK
 export LD_LIBRARY_PATH="$reference_site/torch/lib"
 export XDG_CACHE_HOME="$parity_root/runtime/cache" TORCH_HOME="$parity_root/runtime/torch"
@@ -28,7 +29,7 @@ python3 -S -B inference/tools/test_reference_checks.py
 "$parity_root/venv/bin/python" -S -B inference/tools/generate_triton_scalar_sources.py \
     --site "$reference_site" --output inference/src/triton_scalar_sources.rs --check
 python3 -S -B inference/tools/generate_triton_environment_names.py \
-    --source "$parity_root/sources/triton-candidate" --output inference/src/triton_environment_names.rs --check
+    --source "$project_root/inference/native/triton" --output inference/src/triton_environment_names.rs --check
 "$parity_root/venv/bin/python" -S -B inference/tools/generate_native_argument_signatures.py \
     --site "$reference_site" --output inference/src/native_argument_signatures.rs --check
 bash inference/tools/build_native.sh

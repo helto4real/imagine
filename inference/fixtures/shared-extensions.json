@@ -1,0 +1,476 @@
+{
+  "schema": 1,
+  "source_sha256": "1c7b3b855278d0b95d1c1a705fa0b3c91a265f320e2f97bdeb9d15469d6d4ac7",
+  "callbacks": [
+    "on_clone",
+    "on_deepclone_multigpu",
+    "on_match_multigpu_clones",
+    "on_load_after",
+    "on_detach_after",
+    "on_cleanup",
+    "on_pre_run",
+    "on_prepare_state",
+    "on_apply_hooks",
+    "on_register_all_hook_patches",
+    "on_inject_model",
+    "on_eject_model"
+  ],
+  "wrappers_registry": [
+    "outer_sample",
+    "prepare_sampling",
+    "sampler_sample",
+    "predict_noise",
+    "calc_cond_batch",
+    "apply_model",
+    "diffusion_model"
+  ],
+  "wrappers": [
+    {
+      "class_obj": null,
+      "idx": 0,
+      "trace": [
+        [
+          "before-first",
+          0,
+          null,
+          4
+        ],
+        [
+          "before-second",
+          1,
+          null,
+          5
+        ],
+        [
+          "original",
+          7,
+          7
+        ],
+        [
+          "original",
+          8,
+          7
+        ],
+        [
+          "after-second",
+          59
+        ],
+        [
+          "after-first",
+          79
+        ]
+      ],
+      "output": 89
+    },
+    {
+      "class_obj": null,
+      "idx": 1,
+      "trace": [
+        [
+          "before-second",
+          1,
+          null,
+          4
+        ],
+        [
+          "original",
+          6,
+          5
+        ],
+        [
+          "original",
+          7,
+          5
+        ],
+        [
+          "after-second",
+          49
+        ]
+      ],
+      "output": 69
+    },
+    {
+      "class_obj": null,
+      "idx": 2,
+      "trace": [
+        [
+          "original",
+          4,
+          5
+        ]
+      ],
+      "output": 17
+    },
+    {
+      "class_obj": null,
+      "idx": 3,
+      "trace": [],
+      "error": "IndexError",
+      "message": "list index out of range"
+    },
+    {
+      "class_obj": "own-instance",
+      "idx": 0,
+      "trace": [
+        [
+          "before-first",
+          0,
+          "own-instance",
+          4
+        ],
+        [
+          "before-second",
+          1,
+          "own-instance",
+          5
+        ],
+        [
+          "original",
+          7,
+          7
+        ],
+        [
+          "original",
+          8,
+          7
+        ],
+        [
+          "after-second",
+          59
+        ],
+        [
+          "after-first",
+          79
+        ]
+      ],
+      "output": 89
+    },
+    {
+      "class_obj": "own-instance",
+      "idx": 1,
+      "trace": [
+        [
+          "before-second",
+          1,
+          "own-instance",
+          4
+        ],
+        [
+          "original",
+          6,
+          5
+        ],
+        [
+          "original",
+          7,
+          5
+        ],
+        [
+          "after-second",
+          49
+        ]
+      ],
+      "output": 69
+    },
+    {
+      "class_obj": "own-instance",
+      "idx": 2,
+      "trace": [
+        [
+          "original",
+          4,
+          5
+        ]
+      ],
+      "output": 17
+    },
+    {
+      "class_obj": "own-instance",
+      "idx": 3,
+      "trace": [],
+      "error": "IndexError",
+      "message": "list index out of range"
+    }
+  ],
+  "next_error": {
+    "error": "Exception",
+    "message": "Wrapper idx exceeded available wrappers; something went very wrong."
+  },
+  "registries": [
+    {
+      "variant": "callback",
+      "model_options": false,
+      "all": [
+        1,
+        5,
+        2,
+        4,
+        3
+      ],
+      "none": [
+        1,
+        5
+      ],
+      "b": [
+        2,
+        4
+      ],
+      "missing": []
+    },
+    {
+      "variant": "callback",
+      "model_options": true,
+      "all": [
+        1,
+        5,
+        2,
+        4,
+        3
+      ],
+      "none": [
+        1,
+        5
+      ],
+      "b": [
+        2,
+        4
+      ],
+      "missing": []
+    },
+    {
+      "variant": "wrapper",
+      "model_options": false,
+      "all": [
+        1,
+        5,
+        2,
+        4,
+        3
+      ],
+      "none": [
+        1,
+        5
+      ],
+      "b": [
+        2,
+        4
+      ],
+      "missing": []
+    },
+    {
+      "variant": "wrapper",
+      "model_options": true,
+      "all": [
+        1,
+        5,
+        2,
+        4,
+        3
+      ],
+      "none": [
+        1,
+        5
+      ],
+      "b": [
+        2,
+        4
+      ],
+      "missing": []
+    }
+  ],
+  "options": [
+    {
+      "copy_left": false,
+      "left_before": {
+        "nested": {
+          "values": [
+            1,
+            2
+          ],
+          "keep": "own"
+        },
+        "list": [
+          [
+            3,
+            4
+          ]
+        ],
+        "scalar": 1
+      },
+      "right": {
+        "nested": {
+          "values": [
+            5
+          ],
+          "new": 6
+        },
+        "list": [
+          [
+            7
+          ]
+        ],
+        "scalar": 9,
+        "added": true
+      },
+      "output": {
+        "nested": {
+          "values": [
+            1,
+            2,
+            5
+          ],
+          "keep": "own",
+          "new": 6
+        },
+        "list": [
+          [
+            3,
+            4
+          ],
+          [
+            7
+          ]
+        ],
+        "scalar": 9,
+        "added": true
+      },
+      "left_after": {
+        "nested": {
+          "values": [
+            1,
+            2,
+            5
+          ],
+          "keep": "own",
+          "new": 6
+        },
+        "list": [
+          [
+            3,
+            4
+          ],
+          [
+            7
+          ]
+        ],
+        "scalar": 9,
+        "added": true
+      },
+      "root_same": true,
+      "nested_same": true,
+      "list_same": true,
+      "child_same": true
+    },
+    {
+      "copy_left": true,
+      "left_before": {
+        "nested": {
+          "values": [
+            1,
+            2
+          ],
+          "keep": "own"
+        },
+        "list": [
+          [
+            3,
+            4
+          ]
+        ],
+        "scalar": 1
+      },
+      "right": {
+        "nested": {
+          "values": [
+            5
+          ],
+          "new": 6
+        },
+        "list": [
+          [
+            7
+          ]
+        ],
+        "scalar": 9,
+        "added": true
+      },
+      "output": {
+        "nested": {
+          "values": [
+            1,
+            2,
+            5
+          ],
+          "keep": "own",
+          "new": 6
+        },
+        "list": [
+          [
+            3,
+            4
+          ],
+          [
+            7
+          ]
+        ],
+        "scalar": 9,
+        "added": true
+      },
+      "left_after": {
+        "nested": {
+          "values": [
+            1,
+            2
+          ],
+          "keep": "own"
+        },
+        "list": [
+          [
+            3,
+            4
+          ]
+        ],
+        "scalar": 1
+      },
+      "root_same": false,
+      "nested_same": false,
+      "list_same": false,
+      "child_same": true
+    }
+  ],
+  "copy_aliases": {
+    "root_same": false,
+    "nested_same": false,
+    "list_same": false,
+    "child_same": true,
+    "tuple_same": true
+  },
+  "collisions": [
+    {
+      "left": {
+        "x": 3
+      },
+      "right": {
+        "x": [
+          1
+        ]
+      },
+      "error": "AttributeError",
+      "message": "'int' object has no attribute 'extend'"
+    },
+    {
+      "left": {
+        "x": [
+          1
+        ]
+      },
+      "right": {
+        "x": {
+          "y": 2
+        }
+      },
+      "error": "AttributeError",
+      "message": "'list' object has no attribute 'items'"
+    }
+  ]
+}

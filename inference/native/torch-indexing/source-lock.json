@@ -1,0 +1,18 @@
+{
+  "torch_git_version": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+  "sources": {
+    "python_variable_indexing.cpp": {
+      "url": "https://raw.githubusercontent.com/pytorch/pytorch/cf30153c4c131c8164ee7798e5022d810682e2cb/torch/csrc/autograd/python_variable_indexing.cpp",
+      "sha256": "fef519f02608a68dd0f641b953c351eb4cd8f670f30a15cfd1d351f9fe82577c"
+    },
+    "tensor_new.cpp": {
+      "url": "https://raw.githubusercontent.com/pytorch/pytorch/cf30153c4c131c8164ee7798e5022d810682e2cb/torch/csrc/utils/tensor_new.cpp",
+      "sha256": "cd753c8a617ee283c430f586a613709c288f185828548a0653c3f14d4c67a547"
+    },
+    "LICENSE": {
+      "url": "https://raw.githubusercontent.com/pytorch/pytorch/cf30153c4c131c8164ee7798e5022d810682e2cb/LICENSE",
+      "sha256": "bd018feef8825e88181c84eb7e3aa4eafb8f08a20d9fd6ef948569610c4a3e43"
+    }
+  },
+  "purpose": "Audit original Python frontend construction and TensorIndexing native path. These Python-dependent C++ source files are not compiled or linked into inference."
+}

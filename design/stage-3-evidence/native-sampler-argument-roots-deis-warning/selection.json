@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "c4c7fa3dd044f8f96d2ee9aec9b0d94ec4d3bbfcaef4652b2f7ac9ed31aa4253",
+  "tests": [
+    {
+      "name": "shared_sampler_argument_roots_tests::original_default_kernels_preserve_decorator_arguments_undecorated_aliases_unipc_rebinding_temporary_input_storage_release_outputs_and_rng",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/c4c7fa3dd044f8f96d2ee9aec9b0d94ec4d3bbfcaef4652b2f7ac9ed31aa4253/runs/981390e9708c424ba734db889afd01fe/00-original_default_kernels_preserve_decorator_arguments_undecorated_aliases_unipc_rebinding_temporary_input_storage_release_outputs_and_rng.log",
+      "evidence": "00-original_default_kernels_preserve_decorator_arguments_undecorated_aliases_unipc_rebinding_temporary_input_storage_release_outputs_and_rng.json"
+    },
+    {
+      "name": "shared_sampling_tests::shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/c4c7fa3dd044f8f96d2ee9aec9b0d94ec4d3bbfcaef4652b2f7ac9ed31aa4253/runs/981390e9708c424ba734db889afd01fe/01-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.log",
+      "evidence": "01-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.json"
+    },
+    {
+      "name": "shared_sampling_tests::original_advanced_adaptive_dpm_preserves_controller_tolerances_custom_noise_info_early_returns_predictions_callbacks_and_rng",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/c4c7fa3dd044f8f96d2ee9aec9b0d94ec4d3bbfcaef4652b2f7ac9ed31aa4253/runs/981390e9708c424ba734db889afd01fe/02-original_advanced_adaptive_dpm_preserves_controller_tolerances_custom_noise_info_early_returns_predictions_callbacks_and_rng.log",
+      "evidence": "02-original_advanced_adaptive_dpm_preserves_controller_tolerances_custom_noise_info_early_returns_predictions_callbacks_and_rng.json"
+    },
+    {
+      "name": "shared_ksampler_tests::whole_ksampler_ddim_mask_hooks_callbacks_and_global_rng_match",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/c4c7fa3dd044f8f96d2ee9aec9b0d94ec4d3bbfcaef4652b2f7ac9ed31aa4253/runs/981390e9708c424ba734db889afd01fe/03-whole_ksampler_ddim_mask_hooks_callbacks_and_global_rng_match.log",
+      "evidence": "03-whole_ksampler_ddim_mask_hooks_callbacks_and_global_rng_match.json"
+    }
+  ],
+  "result": "passed"
+}

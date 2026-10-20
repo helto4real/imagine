@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "4a939f8631a8799641f442bbbcbbb111acff68da1047f499864cb8ad7415a085",
+  "tests": [
+    {
+      "name": "shared_dict_iteration_tests::source_live_dictionary_keys_preserve_mutations_resize_copy_exhaustion_and_value_owners",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/4a939f8631a8799641f442bbbcbbb111acff68da1047f499864cb8ad7415a085/runs/4266cf5e21534d2c9ac6842da15e8959/00-source_live_dictionary_keys_preserve_mutations_resize_copy_exhaustion_and_value_owners.log",
+      "evidence": "00-source_live_dictionary_keys_preserve_mutations_resize_copy_exhaustion_and_value_owners.json"
+    },
+    {
+      "name": "shared_dict_iteration_tests::source_live_dictionary_items_preserve_mutations_resize_copy_tuple_identity_cached_owners_and_sticky_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/4a939f8631a8799641f442bbbcbbb111acff68da1047f499864cb8ad7415a085/runs/4266cf5e21534d2c9ac6842da15e8959/01-source_live_dictionary_items_preserve_mutations_resize_copy_tuple_identity_cached_owners_and_sticky_errors.log",
+      "evidence": "01-source_live_dictionary_items_preserve_mutations_resize_copy_tuple_identity_cached_owners_and_sticky_errors.json"
+    },
+    {
+      "name": "shared_dict_iteration_tests::dictionary_replacement_clear_and_cached_items_release_borrows_before_reentrant_source_finalizers",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/4a939f8631a8799641f442bbbcbbb111acff68da1047f499864cb8ad7415a085/runs/4266cf5e21534d2c9ac6842da15e8959/02-dictionary_replacement_clear_and_cached_items_release_borrows_before_reentrant_source_finalizers.log",
+      "evidence": "02-dictionary_replacement_clear_and_cached_items_release_borrows_before_reentrant_source_finalizers.json"
+    }
+  ],
+  "result": "passed"
+}

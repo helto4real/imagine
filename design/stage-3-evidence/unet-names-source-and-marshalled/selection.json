@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500",
+  "tests": [
+    {
+      "name": "shared_unet_names_tests::original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/3a6bc24513ee4f9ca44b52ff49cf7378/00-original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases.log",
+      "evidence": "00-original_unet_hashes_set_compilation_and_name_maps_preserve_seeded_and_random_states_order_errors_and_input_aliases.json"
+    },
+    {
+      "name": "shared_unet_names_tests::original_diffusers_checkpoint_loop_preserves_alias_selection_live_iteration_logging_failures_and_partial_shared_mutations",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/3a6bc24513ee4f9ca44b52ff49cf7378/01-original_diffusers_checkpoint_loop_preserves_alias_selection_live_iteration_logging_failures_and_partial_shared_mutations.log",
+      "evidence": "01-original_diffusers_checkpoint_loop_preserves_alias_selection_live_iteration_logging_failures_and_partial_shared_mutations.json"
+    },
+    {
+      "name": "shared_unet_names_tests::original_marshaled_unet_constants_preserve_reconstruction_order_and_duplicate_alias_weight_selection",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/919f6c2314e0aebdfd4e59c780911579bfd5a652565ed027b732f90cbfe42500/runs/3a6bc24513ee4f9ca44b52ff49cf7378/02-original_marshaled_unet_constants_preserve_reconstruction_order_and_duplicate_alias_weight_selection.log",
+      "evidence": "02-original_marshaled_unet_constants_preserve_reconstruction_order_and_duplicate_alias_weight_selection.json"
+    }
+  ],
+  "result": "passed"
+}

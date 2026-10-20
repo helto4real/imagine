@@ -15,6 +15,7 @@ pub(super) fn generate(
             m::static_moss_component(rt, "text", load(rt, aimdo, &r.text_encoder, "text", true)?)?
                 .with_shared_pins(pins.clone()),
             rt,
+            None,
         ))
     })?;
     let patcher = text.patcher();
@@ -61,6 +62,7 @@ pub(super) fn generate(
             m::static_moss_component(rt, "dit", load(rt, aimdo, &r.diffusion_model, "dit", true)?)?
                 .with_shared_pins(pins.clone()),
             rt,
+            Some(tch::Kind::BFloat16),
         ))
     })?;
     let patcher = model.patcher();
@@ -158,6 +160,7 @@ pub(super) fn generate(
             m::static_moss_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", true)?)?
                 .with_shared_pins(pins.clone()),
             rt,
+            None,
         ))
     })?;
     let patcher = model.patcher();

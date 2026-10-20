@@ -27,6 +27,7 @@ pub(crate) fn truthy(rt: &Runtime, value: &Value) -> Result<bool, Error> {
         Value::Float(n) => *n != 0.,
         Value::Text(s) => !s.is_empty(),
         Value::List(v) | Value::Tuple(v) => !v.is_empty(),
+        Value::NamedTuple(v) => !v.fields.is_empty(),
         Value::Dict(v) => !v.is_empty(),
         Value::DType(_) | Value::Device(_) => true,
         Value::Tensor(_) | Value::Quantized(_) => match unsafe {

@@ -22,6 +22,7 @@ pub(crate) fn typename(v: &Value) -> &'static str {
         Value::Quantized(_) => "QuantizedTensor",
         Value::List(_) => "list",
         Value::Tuple(_) => "tuple",
+        Value::NamedTuple(value) => value.class.name,
         Value::Dict(_) => "dict",
     }
 }

@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "76f819f1de3236d6688dba95c9e4369226cab338e62143f5923273fcf2fd8850",
+  "tests": [
+    {
+      "name": "shared_torch_archive_tests::original_torch_zip_reader_preserves_records_order_bytes_offsets_storage_size_errors_and_independent_allocation_lifetime",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/76f819f1de3236d6688dba95c9e4369226cab338e62143f5923273fcf2fd8850/runs/c57aaeca39874814af54f6943a7ce132/00-original_torch_zip_reader_preserves_records_order_bytes_offsets_storage_size_errors_and_independent_allocation_lifetime.log",
+      "evidence": "00-original_torch_zip_reader_preserves_records_order_bytes_offsets_storage_size_errors_and_independent_allocation_lifetime.json"
+    },
+    {
+      "name": "shared_storage_rebuild_tests::original_storage_tensor_rebuild_preserves_twenty_one_dtypes_views_offsets_strides_storage_aliases_payloads_native_errors_and_physical_storage_release",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/76f819f1de3236d6688dba95c9e4369226cab338e62143f5923273fcf2fd8850/runs/c57aaeca39874814af54f6943a7ce132/01-original_storage_tensor_rebuild_preserves_twenty_one_dtypes_views_offsets_strides_storage_aliases_payloads_native_errors_and_physical_storage_release.log",
+      "evidence": "01-original_storage_tensor_rebuild_preserves_twenty_one_dtypes_views_offsets_strides_storage_aliases_payloads_native_errors_and_physical_storage_release.json"
+    },
+    {
+      "name": "shared_runtime_errors_tests::original_default_c10_runtime_errors_transport_exact_display_text_without_test_side_backtrace_normalization",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/76f819f1de3236d6688dba95c9e4369226cab338e62143f5923273fcf2fd8850/runs/c57aaeca39874814af54f6943a7ce132/02-original_default_c10_runtime_errors_transport_exact_display_text_without_test_side_backtrace_normalization.log",
+      "evidence": "02-original_default_c10_runtime_errors_transport_exact_display_text_without_test_side_backtrace_normalization.json"
+    }
+  ],
+  "result": "passed"
+}

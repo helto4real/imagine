@@ -21,6 +21,8 @@ int imagine_comfy_sdpa(const void*,const void*,const void*,const void*,int64_t,d
 int imagine_sdpa_state(int64_t*,int64_t);
 int imagine_cuda_memory(int64_t,uint64_t*);
 int imagine_host_registration(const void*,int64_t,int64_t*);
+int imagine_host_registration_raw(uint64_t,uint64_t,int64_t,int64_t*);
+int imagine_tensor_video_slice_assign(void*,int64_t,int64_t,const void*);
 int imagine_cuda_soft_empty_cache(int64_t);
 int imagine_comfy_math_state(int64_t*,int64_t);
 int imagine_kitchen_call(const char*,const KitchenArg*,size_t,int64_t*);

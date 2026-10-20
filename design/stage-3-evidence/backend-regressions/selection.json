@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "1663f3a7312803472c72362c2adf72af2d62f76e483197051bf7d510cfe93d67",
+  "tests": [
+    {
+      "name": "cuda_int8_zero_k_family_guards_all_consumers_and_matches_reference",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/1663f3a7312803472c72362c2adf72af2d62f76e483197051bf7d510cfe93d67/00-cuda_int8_zero_k_family_guards_all_consumers_and_matches_reference.log",
+      "evidence": "00-cuda_int8_zero_k_family_guards_all_consumers_and_matches_reference.json"
+    },
+    {
+      "name": "dynamic_argument_tests::original_input_activation_values_preserve_lazy_weights_fused_hashing_and_scalar_error_order",
+      "returncode": 1,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/1663f3a7312803472c72362c2adf72af2d62f76e483197051bf7d510cfe93d67/01-original_input_activation_values_preserve_lazy_weights_fused_hashing_and_scalar_error_order.log"
+    }
+  ],
+  "result": "failed"
+}

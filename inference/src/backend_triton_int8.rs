@@ -80,7 +80,7 @@ pub(crate) fn eps(rt: &Runtime, v: &Value) -> Result<Value, Error> {
         _ => return Err(invalid()),
     })
 }
-fn apply_input(
+pub(crate) fn apply_input(
     rt: &Runtime,
     x: &Value,
     mode: &Value,
@@ -219,7 +219,7 @@ fn scalar_scale(value: &Value, dev: tch::Device) -> Result<Value, Error> {
         Tensor::f_from_slice(&[n as f32])?.f_to_device(dev)?,
     ))
 }
-fn apply_residual(
+pub(crate) fn apply_residual(
     rt: &Runtime,
     out: Value,
     residual: &Value,
@@ -416,7 +416,7 @@ fn matmul(
                 },
                 || run_candidate(rt, compiler, per_row, index, &operands, values, has_bias),
             )
-            .map_err(|e| match &e {
+            .map_err(|e| match e.root() {
                 Error::ReferenceException {
                     class: "OutOfResources",
                     ..

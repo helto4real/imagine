@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "scope": "whole retained synthetic primitive executable; not the complete Stage 3 registry",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "713f6ec3377027f586473bf330545cf40c6d6230e887166e2fcc343394289932",
+  "tests": [
+    {
+      "name": "full-primitives",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/713f6ec3377027f586473bf330545cf40c6d6230e887166e2fcc343394289932/runs/44fce55e9207413bb497f0383d01df07/full-primitives.log"
+    }
+  ],
+  "result": "passed",
+  "tests_passed": 271
+}

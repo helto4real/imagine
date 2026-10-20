@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "9fda5410b02afa9271af9d3f26c4be5d0f3c5b8931f8e7bab6f264b7074c9992",
+  "tests": [
+    {
+      "name": "shared_sampler_locals_tests::original_dpmpp_3m_sde_inner_frames_retain_bounds_prediction_and_step_history_gpu_custom_noise_and_exact_rng",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/9fda5410b02afa9271af9d3f26c4be5d0f3c5b8931f8e7bab6f264b7074c9992/runs/e26bcabff3d147df8138ea5b13a78014/00-original_dpmpp_3m_sde_inner_frames_retain_bounds_prediction_and_step_history_gpu_custom_noise_and_exact_rng.log",
+      "evidence": "00-original_dpmpp_3m_sde_inner_frames_retain_bounds_prediction_and_step_history_gpu_custom_noise_and_exact_rng.json"
+    },
+    {
+      "name": "shared_sde_prelude_tests::original_sde_preludes_preserve_scalar_length_errors_unconditional_bounds_custom_gpu_wrappers_constructor_order_and_invalid_solver_precedence",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/9fda5410b02afa9271af9d3f26c4be5d0f3c5b8931f8e7bab6f264b7074c9992/runs/e26bcabff3d147df8138ea5b13a78014/01-original_sde_preludes_preserve_scalar_length_errors_unconditional_bounds_custom_gpu_wrappers_constructor_order_and_invalid_solver_precedence.log",
+      "evidence": "01-original_sde_preludes_preserve_scalar_length_errors_unconditional_bounds_custom_gpu_wrappers_constructor_order_and_invalid_solver_precedence.json"
+    },
+    {
+      "name": "shared_sampling_tests::shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/9fda5410b02afa9271af9d3f26c4be5d0f3c5b8931f8e7bab6f264b7074c9992/runs/e26bcabff3d147df8138ea5b13a78014/02-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.log",
+      "evidence": "02-shared_solvers_preserve_original_predictions_callbacks_noise_and_rng_draws.json"
+    }
+  ],
+  "result": "passed"
+}

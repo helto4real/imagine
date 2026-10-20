@@ -1,6 +1,7 @@
 #include "bridge.hpp"
 #include "tensor_view.hpp"
 #include <ATen/CPUGeneratorImpl.h>
+#include <ATen/TensorIndexing.h>
 #include <c10/core/DefaultDtype.h>
 #include <ATen/cuda/CUDAGeneratorImpl.h>
 #include <ATen/cuda/CUDAContext.h>
@@ -140,6 +141,15 @@ extern "C" int imagine_host_registration(const void* input,int64_t pin,int64_t* 
     }
     });
 }
+extern "C" int imagine_host_registration_raw(uint64_t pointer,uint64_t bytes,int64_t pin,int64_t* success) {
+    return protect([&] {
+        // torch.cuda.cudart() performs _lazy_init before the registration call.
+        at::globalContext().lazyInitDevice(c10::DeviceType::CUDA);
+        const auto status = pin ? cudaHostRegister(reinterpret_cast<void*>(pointer),bytes,1)
+                                : cudaHostUnregister(reinterpret_cast<void*>(pointer));
+        *success = status == cudaSuccess;
+    });
+}
 extern "C" int imagine_last_accelerator_code() { return last_accelerator_code; }
 extern "C" const char* imagine_last_error() { return last_error.c_str(); }
 extern "C" const char* imagine_last_metadata() { return last_metadata.c_str(); }
@@ -203,9 +213,9 @@ extern "C" int imagine_cuda_device_properties(int64_t device,CudaDevicePropertie
 }
 namespace {
 #include "pytorch_error_message.inc"
-template<class F> int aten_tensor_result(F&& fn,void** output) noexcept {
+template<class F> int aten_operation(F&& fn) noexcept {
     try {
-        *output=new at::Tensor(fn());last_error.clear();return 0;
+        fn();last_error.clear();return 0;
     } catch(const c10::ValueError& e) {last_error=processErrorMsg(e.what_without_backtrace());return -2;}
       catch(const c10::IndexError& e) {last_error=processErrorMsg(e.what_without_backtrace());return -3;}
       catch(const c10::BufferError& e) {last_error=processErrorMsg(e.what_without_backtrace());return -4;}
@@ -218,6 +228,17 @@ template<class F> int aten_tensor_result(F&& fn,void** output) noexcept {
       catch(const std::exception& e) {last_error=processErrorMsg(e.what());return -1;}
       catch(...) {last_error="Unknown native exception";return -6;}
 }
+template<class F> int aten_tensor_result(F&& fn,void** output) noexcept {
+    return aten_operation([&]{*output=new at::Tensor(fn());});
+}
+}
+extern "C" int imagine_tensor_video_slice_assign(void* output,int64_t start,int64_t end,const void* value) {
+    return aten_operation([&] {
+        using at::indexing::Slice;
+        at::indexing::set_item(*static_cast<at::Tensor*>(output),
+                              {Slice(),Slice(),Slice(start,end)},
+                              *static_cast<const at::Tensor*>(value));
+    });
 }
 extern "C" int imagine_embedding(const void* weight,const void* indices,void** output) {
     return aten_tensor_result([&]{return at::embedding(*static_cast<const at::Tensor*>(weight),

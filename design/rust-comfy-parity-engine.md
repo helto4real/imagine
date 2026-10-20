@@ -439,6 +439,34 @@ Work order may change without reducing the target. A partial implementation may 
 
 D-01 through D-03 and D-07 record Tomas's approved scope/data decisions. Cloud inference is excluded by explicit instruction. D-05 has fourteen separately scoped approved criteria, recorded above; none is a general numerical or algorithmic exception. D-04, other D-05 cases, D-06 and D-08 remain risks or decisions if triggered. Implementation and final parity acceptance are not complete.
 
+Stage 3 has now reproduced a separate source-nondeterminism case:
+[D-05-CONTROL-HOOK-SET-ORDER](decisions/D-05-ControlNet-hook-identity-set-order.md).
+Tomas explicitly approved this bounded criterion on 2026-10-19 by replying
+**“Ja jag accepterar”** to its explicit approval question. Original ControlNet
+identity-set order varies across otherwise identical processes and can affect
+patch numerics. Preserve the original CPython identity-set algorithm and exact
+bytes at matched hash/order inputs; independent source-valid address orders
+may differ and must be labeled reference-inherited nondeterminism. This
+approval covers only `get_hooks_from_cond` control-set/extra-hook traversal.
+Other sets, precision, numerical tolerance and autotuning remain unchanged.
+The scoped port/controlled-order verification passes 194 cases, both
+one-float numerical orders and eight focused/regression tests; full owner and
+registry binding remains open. Earlier scoped counts above
+are historical and do not include this newly approved Stage 3 criterion.
+
+The separate Stage 3
+[Diffusers UNet hash/set-order criterion](decisions/D-05-Diffusers-UNet-set-hash-order.md)
+was explicitly approved by Tomas (“Ja”) on 2026-10-19. Original name-map set traversal can select different
+external aliases for one internal weight under different hash seeds. Its
+20-process source-only diagnostic uses scalar sentinels and no Torch/tensors.
+The approved ControlNet criterion explicitly excludes these other sets; this
+is a separate bounded approval. Preserve the source algorithm and exact
+controlled-hash-state outputs. The scoped native hash/map/conversion port
+passes 912 map cases, 90 conversion histories, six marshalled-constant cases
+and 64 byte-exact small CPU tensor cases; full consumer/owner binding remains
+open. Ten integration/regression tests, 22 source-restoration checks and
+warnings-denied Clippy pass.
+
 ## 17. Source map and document validation
 
 Primary public source anchors:

@@ -1,0 +1,14 @@
+{
+  "commit": "f797708c0626e5f9840ca5b0a98790e2c7cb09ad",
+  "files": {
+    "include/triton/Tools/Sys/GetEnv.hpp": {
+      "url": "https://raw.githubusercontent.com/triton-lang/triton/f797708c0626e5f9840ca5b0a98790e2c7cb09ad/include/triton/Tools/Sys/GetEnv.hpp",
+      "sha256": "5f2f634f28f1eac9138ba8a1294c7c18589a958063b12f9e9aa8d7a60492ccc9"
+    },
+    "LICENSE": {
+      "url": "https://raw.githubusercontent.com/triton-lang/triton/f797708c0626e5f9840ca5b0a98790e2c7cb09ad/LICENSE",
+      "sha256": "92640fb97222fd0a698ff28ce0c3782c172623f8d6c609b557636a80f28fb946"
+    }
+  },
+  "purpose": "Preserve original compiler configuration-name generation after cleanup of build-only source checkout"
+}

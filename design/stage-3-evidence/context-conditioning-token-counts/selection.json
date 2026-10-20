@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "2b6a43593ab70671c13ca45434be62aee4206edb153a5f3bddda31e9a40ef0a3",
+  "tests": [
+    {
+      "name": "shared_context_conditioning_tests::original_temporal_conditioning_and_guide_overlap_preserve_indices_scalar_types_copies_and_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/2b6a43593ab70671c13ca45434be62aee4206edb153a5f3bddda31e9a40ef0a3/runs/9af17026e3744907aded2329aa431dd9/00-original_temporal_conditioning_and_guide_overlap_preserve_indices_scalar_types_copies_and_errors.log",
+      "evidence": "00-original_temporal_conditioning_and_guide_overlap_preserve_indices_scalar_types_copies_and_errors.json"
+    }
+  ],
+  "result": "passed"
+}

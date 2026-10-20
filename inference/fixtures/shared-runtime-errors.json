@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "trained_model_weights": 0,
+  "cuda_access": false,
+  "cpp_stacktraces_enabled": false,
+  "source": {
+    "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/torch/csrc/Exceptions.h",
+    "sha256": "b54a3df0afadd45bf85ee64ada27025b0ed33625b25b7479ff9b08447304e2d2"
+  },
+  "cases": [
+    {
+      "name": "view",
+      "error": "RuntimeError",
+      "message": "shape '[5]' is invalid for input of size 6"
+    },
+    {
+      "name": "mm",
+      "error": "RuntimeError",
+      "message": "mat1 and mat2 shapes cannot be multiplied (2x3 and 4x2)"
+    },
+    {
+      "name": "min",
+      "error": "RuntimeError",
+      "message": "min(): Expected reduction dim to be specified for input.numel() == 0. Specify the reduction dim with the 'dim' argument."
+    },
+    {
+      "name": "truth",
+      "error": "RuntimeError",
+      "message": "Boolean value of Tensor with more than one value is ambiguous"
+    }
+  ]
+}

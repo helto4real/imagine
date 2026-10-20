@@ -265,6 +265,16 @@ pub(super) fn check(value: &V, expected: &Value, dev: Device, note: &str) {
                 check(v, e, dev, note);
             }
         }
+        V::NamedTuple(v) => {
+            assert_eq!(expected["type"], "namedtuple");
+            assert_eq!(expected["name"], v.class.name);
+            let items = expected["items"].as_array().unwrap();
+            assert_eq!(items.len(), v.fields.len());
+            for ((name, value), item) in v.fields.iter().zip(items) {
+                assert_eq!(*name, item[0].as_str().unwrap());
+                check(value, &item[1], dev, note);
+            }
+        }
         V::Dict(v) => {
             let items = expected["items"].as_array().unwrap();
             assert_eq!(v.len(), items.len());

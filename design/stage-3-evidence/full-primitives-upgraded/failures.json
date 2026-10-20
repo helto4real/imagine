@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "binary_sha256": "cfe42eaa3cd4d64e08d3f5e63d0596c4ad0ebf911bf3fbc0eceba81f45f6d837",
+  "result": "failed",
+  "passed": 229,
+  "failed": 3,
+  "elapsed_seconds": 509.08,
+  "failures": [
+    {
+      "test": "binding_tests::binding_full_tables_mro_first_argument_and_generic_precedence_match_source",
+      "diagnostic": "tests/support/binding.rs:495:5:\nassertion `left == right` failed\n  left: Object {\"ascend\": Object {\"available\": Bool(false), \"capabilities\": Array [], \"disabled\": Bool(false), \"unavailable_reason\": String(\"torch-npu is not installed: No module named 'torch_npu'\")}, \"cuda\": Object {\"available\": Bool(true), \"capabilities\": Array [String(\"adaln\"), String(\"apply_rope\"), String(\"apply_rope1\"), String(\"apply_rope1_\"), String(\"apply_rope_\"), String(\"apply_rope_split_half\"), String(\"apply_rope_split_half1\"), String(\"apply_rope_split_half1_\"), String(\"apply_rope_split_half_\"), String(\"closest_point_on_mesh\"), String(\"connected_components\"), String(\"convrot_w4a4_linear\"), String(\"delaunay3d\"), String(\"dequantize_convrot_w4a4_weight\"), String(\"dequantize_int8_convrot_weight\"), String(\"dequantize_int8_convrot_weight_dtype\"), String(\"dequantize_int8_simple\"), String(\"dequantize_int8_simple_dtype\"), String(\"dequantize_nvfp4\"), String(\"dequantize_per_tensor_fp8\"), String(\"dequantize_w4a8_int8_weight\"), String(\"edge_collapse_checks\"), String(\"fp16_conv3d\"), String(\"fp16_conv3d_out\"), String(\"fp16_linear\"), String(\"gemv_awq_w4a16\"), String(\"group_norm_silu_pad3d\"), String(\"group_norm_silu_pad3d_out\"), String(\"int8_linear\"), String(\"mesh_bvh\"), String(\"min_cut\"), String(\"na3d\"), String(\"prepare_int4_weight_for_int8_linear\"), String(\"quantize_and_rotate_rowwise\"), String(\"quantize_convrot_w4a4_weight\"), String(\"quantize_int8_convrot_weight\"), String(\"quantize_int8_rowwise\"), String(\"quantize_in"
+    },
+    {
+      "test": "quant_binding_tests::na3d_bindings_preserve_original_tiling_mask_sdpa_and_fused_cuda_paths",
+      "diagnostic": "tests/support/binding.rs:201:17:\nbackend binding 354 \"eager\" \"na3d\": exact output bytes\n"
+    },
+    {
+      "test": "triton_w4a8_tests::original_w4a8_unpack_keys_complete_binaries_and_cache_restoration",
+      "diagnostic": "tests/support/triton_w4a8.rs:64:13:\nassertion `left == right` failed\n  left: \"6051137fb2768e7ee7df656f659de617b21b08c85936626186311e93e4fe58b5\"\n right: \"bd88bc56fc02a4919fc4337bfe4a09ce48722f51b9f83ab935112cdd5ebac51f\"\n\n\nfailures:\n    binding_tests::binding_full_tables_mro_first_argument_and_generic_precedence_match_source\n    quant_binding_tests::na3d_bindings_preserve_original_tiling_mask_sdpa_and_fused_cuda_paths\n    triton_w4a8_tests::original_w4a8_unpack_keys_complete_binaries_and_cache_restoration\n\ntest result: FAILED. 229 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 509.08s\n\nTraceback (most recent call last):\n  File \"/home/thhel/ChatGPT/imagine/inference/tools/test_isolation.py\", line 207, in <module>\n    subprocess.run(command,check=True)\n  File \"/home/thhel/.pyenv/versions/3.12.13/lib/python3.12/subprocess.py\", line 571, in run\n    raise CalledProcessError(retcode, process.args,\nsubprocess.CalledProcessError: Command '['bwrap', '--unshare-all', '--die-with-parent', '--new-session', '--clearenv', '--proc', '/proc', '--dev', '/dev', '--tmpfs', '/tmp', '--dir', '/bin', '--dir', '/usr/bin', '--symlink', 'usr/lib', '/lib', '--symlink', 'usr/lib64', '/lib64', '--ro-bind', '/sys', '/sys', '--ro-bind', '/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/aimdo/aimdo.so', '/runtime/aimdo.so', '--setenv', 'IMAGINE_AIMDO_LIBRARY', '/runtime/aimdo.so', '--ro-bind', '/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/pillow/libimagine_pillow.so', '/runtime/li"
+    }
+  ]
+}

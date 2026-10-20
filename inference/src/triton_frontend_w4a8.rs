@@ -53,7 +53,7 @@ pub fn source_ttir(s: &Specialization<'_>) -> String {
         &s.pointer_divisibility_16,
         &s.scalars,
         &SCALAR_NAMES,
-        26,
+        FUNCTION_DEFINITION,
         "_dequant_int4_grouped_to_int8_kernel",
         |b, p, c| lower_w4a8(b, s, p, c),
     )

@@ -1622,7 +1622,7 @@ impl Compiler {
             if let Error::ReferenceException {
                 class: "PTXASError",
                 message,
-            } = &e
+            } = e.root()
             {
                 let diagnostic = message.strip_prefix("PTXAS error: ").unwrap_or(message);
                 let source = utf8(&read(&ptx)?)?;
@@ -1631,7 +1631,7 @@ impl Compiler {
                 );
             }
             work.1 = matches!(
-                &e,
+                e.root(),
                 Error::ReferenceException {
                     class: "PTXASError",
                     ..

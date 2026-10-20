@@ -124,5 +124,6 @@ if __name__=='__main__':
         if e['root']=='site' and e['path'].startswith('comfy_kitchen/') and Path(e['path']).suffix=='.py':
             h=hashlib.sha256((a.site/e['path']).read_bytes()).hexdigest();assert h==e['sha256'];hashes[e['path']]=h
     sys.path.insert(0,str(a.site));import torch
+    torch.set_num_threads(1)
     def bits(t):return t.detach().contiguous().reshape(-1).view(torch.uint8).cpu().tolist()
-    report=capture(torch,['cpu','cuda:0'],bits);report['source_hashes']=hashes;a.output.write_text(json.dumps(report,indent=2)+'\n');print(len(report['na3d_backend_bindings']),flush=True)
+    report=capture(torch,['cpu','cuda:0'],bits);report['source_hashes']=hashes;report['torch_num_threads']=torch.get_num_threads();a.output.write_text(json.dumps(report,indent=2)+'\n');print(len(report['na3d_backend_bindings']),flush=True)

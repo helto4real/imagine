@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "scope": "immediate native weak-parent finalizers and retained metadata regressions; isolated CPU selection passed",
+  "binary_sha256": "e60bb5738f33fee3187a7f7ec3bdcb389ea4f345425d34ed6af397a565175bd4",
+  "binary": "/home/thhel/ChatGPT/imagine/comfyui/moss-20261018/stage3-validation/e60bb5738f33fee3187a7f7ec3bdcb389ea4f345425d34ed6af397a565175bd4/primitives",
+  "inputs": {
+    "inference/src/memory.rs": "ea68254b590320229e5588846553fdee7fe59eddb5ece924eda6c33638f4ee15",
+    "inference/tests/support/shared_weak_finalizers.rs": "b7e6ff105aba9eb73201c4e1e6417efbeafe800ac87fc7e072fe3f478dd56b84",
+    "inference/fixtures/shared-weak-finalizers.json": "13ae99bb95e0f7a5cc4cfae886c45ecb90a502e2d8a1093317a7c6f99a06784a",
+    "inference/tools/reference_shared_weak_finalizers.py": "77052b0bad6aa0fb5864c152a438de81d1d05c37c8e184b371d425e6f8528d28"
+  },
+  "acceptance": "immediate-native-weak-finalizers/selection.json",
+  "acceptance_sha256": "dd8696b88a27332b4d0ebf15a27cdeaf6ff2d232a31fc7506c676d5ee380e24c",
+  "clippy": "all-targets warnings denied, passed"
+}

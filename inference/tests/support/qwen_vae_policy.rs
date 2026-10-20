@@ -257,7 +257,7 @@ fn qwen_image21_original_c10_oom_type_accelerator_code_and_plain_errors_remain_d
             _ => panic!("Lost original native error type: {error:?}"),
         }
         assert_eq!(
-            q::image_vae_is_oom(&native, Device::Cuda(0), &error),
+            q::image_vae_is_oom(&native, Device::Cuda(0), &error).unwrap(),
             expected
         );
         // An unrelated following tensor operation must remain usable.

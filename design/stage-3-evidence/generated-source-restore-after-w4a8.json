@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "source_kind": "frozen source and native module metadata only; no model or runtime data",
+  "files": {
+    "triton_frontend_int8_program.rs": "9ae3b1352db3cfc724e323a788adb5e555a8515b4419cb5fdf436c88bedb7789",
+    "triton_frontend_w4a8_program.rs": "a774bfa96a756ff9a58cbec1a3658932ca77d5a52e7fb226c90687a30089f26c",
+    "triton_frontend_mxfp8_program.rs": "46df423691728932516f9f26875255b4584b540aa8bf4bbef43e1a35ad9ae32f",
+    "triton_frontend_nvfp4_program.rs": "8a200ed58afe44ead3c59a9f200dd85f39dfb5fc57a4a4055e28dfa5245eaed0",
+    "triton_frontend_dequant_nvfp4_program.rs": "7da022ed3c4ff628874d7e2cbe2090977ee43d9106e7aef91e6383d524ac16a2",
+    "triton_frontend_rope_program.rs": "b681e2d8becdb822aeacd6b1302ab9a6f4294ab43721da85792a4accc26ec17b",
+    "triton_frontend_rms_rope_program.rs": "8594d5dd4b4c192883e166e76c50c6256a7a48705059122c386eb2453bcaa338",
+    "triton_frontend_na_program.rs": "df44b1858ea87da209dded2e683fa73500f2345f78673a7f618cd8406b5c7d66",
+    "triton_nvfp4_sources.rs": "f61278fb0d67ab0795ab5342ff6351d5d3b1ef6b3e521866e58860cecfdce8fa",
+    "python_decimal_digits.rs": "4ab7140c2d4f1e47b1aaddd15c3bb345a2b0dfaccfb575782ae1a4a04e70534a",
+    "triton_scalar_sources.rs": "6d03b6af439557e773cc9be499fe39ddf7d3927d29be8c3279cefb6d934ad04d",
+    "triton_environment_names.rs": "2f40dfab3f5f9473d5e3c233c965a6bf3b1913b5a9b58995857bba3de56f444f",
+    "native_argument_signatures.rs": "87f5f4b156600ecb364a7feda8642009994c66c9b48784ff9bf5a3f8c03d38aa",
+    "sampling/ipndm_v_formulas.rs": "0481d37e55c86ca71bda38e04a6bf54fc260ec586f9c76827300850e01d8f993",
+    "backend_signatures.rs": "783586273e152be1a6ed76f6e7908dcdc7b164619145d67095cfd245a6fa66f2",
+    "backend_contract/tables.rs": "4c54e476dd23317f95e49a42121bece25f7f3e29123112f1a73e36b39dd21ad7",
+    "resources/shared-schedule-tables.json": "c7453fe69733289769926e24c4fcf8983fbce4b5615b3729c3c5f5f248aebe69"
+  }
+}

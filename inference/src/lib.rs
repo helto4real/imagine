@@ -16,6 +16,9 @@ mod backend_triton_rowwise;
 pub mod block_scales;
 pub mod boxed_aten;
 pub mod checkpoint;
+pub mod conditioning;
+pub mod conditioning_preprocess;
+pub mod context_windows;
 pub mod convrot;
 pub mod convrot_w4a4;
 pub mod cuda_linear;
@@ -33,6 +36,7 @@ pub mod kitchen_sage;
 pub mod kitchen_sol;
 pub mod layouts;
 pub mod memory;
+pub mod memory_finalizers;
 pub mod models;
 pub mod native;
 pub mod packing;
@@ -41,8 +45,11 @@ pub mod quantization;
 pub mod registry;
 pub mod registry_source;
 pub mod rng_seed;
+pub mod sampling;
+pub mod source_exception;
 pub mod storage;
 pub mod svdquant;
+pub mod tensor_host;
 pub mod triton_arguments;
 pub mod triton_compilation_modes;
 pub mod triton_compiler;
@@ -86,10 +93,17 @@ mod triton_scalar_sources;
 
 mod python_value;
 
+mod python_error_messages;
 mod python_numbers;
+pub mod python_unicode_codec;
 
 mod registry_value_ops;
 
 mod python_tensor_repr;
 
 pub mod server;
+
+pub mod conditioning_batch;
+
+pub mod python_hash;
+mod source_set;

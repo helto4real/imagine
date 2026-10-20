@@ -1,0 +1,6 @@
+{
+  "version": "2.3.5",
+  "source_url": "https://raw.githubusercontent.com/numpy/numpy/v2.3.5/numpy/random/bit_generator.pyx",
+  "source_sha256": "1e2e991c929c318b9a424e2e8ec3f92525c6478c382b59731f3a83e1a7306821",
+  "purpose": "Rust port of SeedSequence mix_entropy/get_assembled_entropy/generate_state for TorchSDE Brownian noise"
+}

@@ -44,13 +44,18 @@ fn qwen_image21_original_component_nonleaf_parameters_buffers_and_dtype_policies
                 .collect(),
         );
         let owner = q::static_component_from_inventory(&rt, parameters, inventory).unwrap();
-        let shared = q::StaticModel::new(owner, &rt);
+        let shared = q::StaticModel::new(owner, &rt, None);
         let patcher = shared.patcher();
+        assert_eq!(patcher.model.model_dtype().unwrap(), None);
         for step in case["steps"].as_array().unwrap() {
             if step["command"] == "load" {
                 patcher
                     .model
-                    .partially_load(step["amount"].as_f64().unwrap(), false)
+                    .partially_load(
+                        tch::Device::Cuda(0),
+                        step["amount"].as_f64().unwrap(),
+                        false,
+                    )
                     .unwrap();
             } else {
                 patcher.model.detach(true).unwrap();
@@ -151,7 +156,10 @@ fn qwen_image21_original_boxed_aten_preserves_oom_and_accelerator_recovery_types
             _ => panic!("Lost boxed c10 exception: {error:?}"),
         }
         assert_eq!(error.to_string(), message);
-        assert_eq!(q::image_vae_is_oom(&native, Device::Cuda(0), &error), oom);
+        assert_eq!(
+            q::image_vae_is_oom(&native, Device::Cuda(0), &error).unwrap(),
+            oom
+        );
     }
 }
 

@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "torch": "2.13.0+cu130",
+  "purpose": "Original at::randn overload with explicit live source size/dtype/layout/device and optional original generator",
+  "files": [
+    {
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/ATen/ops/randn.h",
+      "sha256": "da287d77e4f9776ba71d375e14a5f4ce8259b151eaf187e1b90f9392f45a3047"
+    },
+    {
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/ATen/core/Generator.h",
+      "sha256": "c03ee5f80493743e0f66fbc6712efedf5ce98f76c0c8efc2fcb8fdf2cd779148"
+    },
+    {
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/include/ATen/core/TensorBase.h",
+      "sha256": "3b971634025854a7f627d6b34a8843098a2145e78091efa2cf9ca496c930a1e7"
+    }
+  ]
+}

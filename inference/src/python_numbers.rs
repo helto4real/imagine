@@ -1,13 +1,74 @@
 //! Original Python numeric conversion at the frozen host argument boundary.
 use crate::{execution::Runtime, execution_value::Value, native::Error};
+use std::cmp::Ordering;
 #[path = "python_decimal_digits.rs"]
 mod digits;
-fn decimal(c: char) -> Option<u8> {
+pub(crate) fn decimal(c: char) -> Option<u8> {
     let n = u32::from(c);
     digits::ZEROS
         .iter()
         .find_map(|zero| n.checked_sub(*zero).filter(|d| *d < 10).map(|d| d as u8))
 }
+pub(crate) fn int_float_cmp(a: i128, b: f64) -> Option<Ordering> {
+    if b.is_nan() {
+        return None;
+    }
+    if b >= i128::MAX as f64 {
+        return Some(Ordering::Less);
+    }
+    if b < i128::MIN as f64 {
+        return Some(Ordering::Greater);
+    }
+    let truncated = b as i128;
+    Some(a.cmp(&truncated).then_with(|| {
+        if b.fract() > 0. {
+            Ordering::Less
+        } else if b.fract() < 0. {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
+        }
+    }))
+}
+
+pub(crate) fn integer_ratio(a: i128, b: i128) -> Result<f64, Error> {
+    if b == 0 {
+        return Err(Error::ReferenceException {
+            class: "ZeroDivisionError",
+            message: "division by zero".into(),
+        });
+    }
+    let negative = (a < 0) != (b < 0);
+    let a = a.unsigned_abs();
+    let b = b.unsigned_abs();
+    if a > u128::from(u64::MAX) || b > u128::from(u64::MAX) {
+        return Err(Error::BindingGap {
+            backend: "integer arithmetic".into(),
+            operation: "integer true division exceeds admitted 64-bit operands".into(),
+        });
+    }
+    if a == 0 {
+        return Ok(if negative { -0. } else { 0. });
+    }
+    let mut exponent = (128 - a.leading_zeros()) as i32 - (128 - b.leading_zeros()) as i32;
+    if (exponent >= 0 && a < (b << exponent)) || (exponent < 0 && (a << -exponent) < b) {
+        exponent -= 1;
+    }
+    let shift = 52 - exponent;
+    let (numerator, denominator) = if shift >= 0 {
+        (a << shift, b)
+    } else {
+        (a, b << -shift)
+    };
+    let mut significand = numerator / denominator;
+    let remainder = numerator % denominator;
+    if remainder * 2 > denominator || (remainder * 2 == denominator && significand % 2 != 0) {
+        significand += 1;
+    }
+    let value = significand as f64 * 2_f64.powi(exponent - 52);
+    Ok(if negative { -value } else { value })
+}
+
 fn space(c: char) -> bool {
     matches!(c, ' ' | '\t' | '\n' | '\r' | '\x0b' | '\x0c') || (!c.is_ascii() && c.is_whitespace())
 }

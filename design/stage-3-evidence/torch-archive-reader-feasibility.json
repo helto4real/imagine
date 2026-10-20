@@ -1,0 +1,481 @@
+{
+  "schema": 1,
+  "scope": "CPU-only own-data feasibility, no exact tensor or complete loader acceptance",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "max_tensor_elements": 12,
+  "sources": {
+    "/home/thhel/ChatGPT/imagine/inference/tools/probe_torch_archives.py": "7f8559a9558ff567ba1e1aebf9bf54c30f71d59145c0249af2dcef820767236c",
+    "/home/thhel/ChatGPT/imagine/inference/tools/probe_torch_archive.cpp": "3efe97724503c277c1ea8d6b0577fe9a0c7b85ab5c93fa58c3eabf877b2a0250",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/serialization.py": "482d589d5164babc3da7b801598665a8d32ef22495bbd04cebcbe3ef808249b3",
+    "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/torch/_weights_only_unpickler.py": "d9fdcb14f255d60d440e158e006501447417db95480cdd73f66fb1880b84578b"
+  },
+  "binary_sha256": "6eea0721974500a27399d007dc57a961e0180d7e82ab7dadf5bba4ce83772bdd",
+  "cases": [
+    {
+      "name": "plain",
+      "protocol": 2,
+      "bytes": 1577,
+      "sha256": "3f08f440e8e8c040bb8d657fc83f6ee5d97c2638690afa2551d6a1f8b18b3e10",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 0,
+        "stdout": "{weight: -0.5000 -0.3750 -0.2500 -0.1250\n 0.0000  0.1250  0.2500  0.3750\n 0.5000  0.6250  0.7500  0.8750\n[ CPUFloatType{3,4} ]}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "plain",
+      "protocol": 4,
+      "bytes": 1577,
+      "sha256": "f00541270adbaf27a3bf0dfe4468478a833ad29fb458d1bff6cd6392c621cb86",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "state-dict",
+      "protocol": 2,
+      "bytes": 1676,
+      "sha256": "238f7db78b641cfe19a2669b5b9338b4c9c2fc3cac3ef2a9281954bd412f34a7",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 0,
+        "stdout": "{state_dict: {weight: -0.5000 -0.3750 -0.2500 -0.1250\n 0.0000  0.1250  0.2500  0.3750\n 0.5000  0.6250  0.7500  0.8750\n[ CPUFloatType{3,4} ]}, epoch: 7}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "state-dict",
+      "protocol": 4,
+      "bytes": 1676,
+      "sha256": "f6a2418bdec0569587556e93fdee88951bdef0a85417ff78efd6ed9d15a397a5",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "single-wrapper",
+      "protocol": 2,
+      "bytes": 1704,
+      "sha256": "1ff976ca744c76c8846525d60ac53f493f2b6a64cdc5155c71c8cc9e46891e27",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 0,
+        "stdout": "{model: {weight: -0.5000 -0.3750 -0.2500 -0.1250\n 0.0000  0.1250  0.2500  0.3750\n 0.5000  0.6250  0.7500  0.8750\n[ CPUFloatType{3,4} ]}}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "single-wrapper",
+      "protocol": 4,
+      "bytes": 1704,
+      "sha256": "014b6e79a9a7810af6797b3fec29caf3a1dc8764be4138a82fd5cfed68ba91ff",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "metadata",
+      "protocol": 2,
+      "bytes": 1726,
+      "sha256": "89421282ba828c97dd45e044c46a307db140c38cba0cf616043f2a86eea992f3",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 0,
+        "stdout": "{weight: -0.5000 -0.3750 -0.2500 -0.1250\n 0.0000  0.1250  0.2500  0.3750\n 0.5000  0.6250  0.7500  0.8750\n[ CPUFloatType{3,4} ], flag: True, name: own, epoch: 7, scale: 0.125, nothing: None}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "metadata",
+      "protocol": 4,
+      "bytes": 1662,
+      "sha256": "38777cd10b726333e97a2f47d378bfe05f3631596cb68197e5952bd0a44b226b",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "ordered",
+      "protocol": 2,
+      "bytes": 1719,
+      "sha256": "079a41eae6a7f71c2adcfa8f961546bdc32d24cecf03333fe46093f0465f2414",
+      "reference": {
+        "result": "loaded",
+        "type": "OrderedDict"
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "isGenericDict() INTERNAL ASSERT FAILED at \"/__w/pytorch/pytorch/aten/src/ATen/core/ivalue_inl.h\":2119, please report a bug to PyTorch. Expected GenericDict but got None\n"
+      }
+    },
+    {
+      "name": "ordered",
+      "protocol": 4,
+      "bytes": 1719,
+      "sha256": "95e50a7cc9d6eba844ebb140634b72cfb19dc6e19f9ffc9441705b3bffd38de4",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "aliases",
+      "protocol": 2,
+      "bytes": 1719,
+      "sha256": "f1823d3747e66f278c96a4419f86589f8253ab82886c6488b8daab41783b075c",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 0,
+        "stdout": "{a: -0.5000 -0.3750 -0.2500 -0.1250\n 0.0000  0.1250  0.2500  0.3750\n 0.5000  0.6250  0.7500  0.8750\n[ CPUFloatType{3,4} ], same: -0.5000 -0.3750 -0.2500 -0.1250\n 0.0000  0.1250  0.2500  0.3750\n 0.5000  0.6250  0.7500  0.8750\n[ CPUFloatType{3,4} ], view: -0.5000  0.0000  0.5000\n-0.3750  0.1250  0.6250\n-0.2500  0.2500  0.7500\n-0.1250  0.3750  0.8750\n[ CPUFloatType{4,3} ], slice:  0.0000  0.1250  0.2500  0.3750\n 0.5000  0.6250  0.7500  0.8750\n[ CPUFloatType{2,4} ]}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "aliases",
+      "protocol": 4,
+      "bytes": 1719,
+      "sha256": "82b6e96271fcf2677a5198f996eaa377d88609c33452a929366e97979c2a0bfc",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "parameter",
+      "protocol": 2,
+      "bytes": 1669,
+      "sha256": "f61f3e3657b705c2340a9b814ceb9c21322dcca1f85d4177fe9c316561dc0e40",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 0,
+        "stdout": "{weight: -0.5000 -0.3750 -0.2500 -0.1250\n 0.0000  0.1250  0.2500  0.3750\n 0.5000  0.6250  0.7500  0.8750\n[ CPUFloatType{3,4} ]}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "parameter",
+      "protocol": 4,
+      "bytes": 1669,
+      "sha256": "3f0468aab8a3fcd6aef9be51d3584faf49969a1c4cda7e9ed82a266346bef7da",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "size",
+      "protocol": 2,
+      "bytes": 1634,
+      "sha256": "6c7d0f476d2f5f046294a5735a7663c02b97bdf89447ec83b915a6bd00f160ce",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Unpickler found unknown torch global, 'torch.Size'\n"
+      }
+    },
+    {
+      "name": "size",
+      "protocol": 4,
+      "bytes": 1634,
+      "sha256": "dc7a6e1ce04ad7af9f2b2ce24acae9a0c29266e5b213a51ca7b791954e5b26e1",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "device",
+      "protocol": 2,
+      "bytes": 1648,
+      "sha256": "e4fac81da1cb61afd060d3690869e2c9f0f0433662d24fe3dfc7dabdae42a259",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 0,
+        "stdout": "{weight: -0.5000 -0.3750 -0.2500 -0.1250\n 0.0000  0.1250  0.2500  0.3750\n 0.5000  0.6250  0.7500  0.8750\n[ CPUFloatType{3,4} ], device: cpu}\n",
+        "stderr": ""
+      }
+    },
+    {
+      "name": "device",
+      "protocol": 4,
+      "bytes": 1648,
+      "sha256": "1fbe59efd0fcc83adf276841a4238ebd61e48de4d40ad229d6e7c15de8d4383d",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "dtype",
+      "protocol": 2,
+      "bytes": 1641,
+      "sha256": "4ea101cf937397038da370c9952c542d565db4f06dd09ab1fdfc1a44714fdd11",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Unpickler found unknown torch global, 'torch.bfloat16'\n"
+      }
+    },
+    {
+      "name": "dtype",
+      "protocol": 4,
+      "bytes": 1641,
+      "sha256": "efccd1d23532a3332dae2c8f24468009a2edce83b5ca9b8c814c6c2953df6ad3",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "set",
+      "protocol": 2,
+      "bytes": 1627,
+      "sha256": "85edff29b6f4dc0346337fa5caf6646ed97b4f638d33f5b1c9ad08d3f810968d",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Unpickler found unknown type __builtin__.set\n"
+      }
+    },
+    {
+      "name": "set",
+      "protocol": 4,
+      "bytes": 1563,
+      "sha256": "bae14118055d908c8e8b8ad83a58c3bc9ca43608760ab0ad6cc29be8eab71bba",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "complex",
+      "protocol": 2,
+      "bytes": 1655,
+      "sha256": "eb0af04fe4c2ddc8ce8b8c925334370720eee972614d9dda90ba0bd4c87266a2",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Unpickler found unknown type __builtin__.complex\n"
+      }
+    },
+    {
+      "name": "complex",
+      "protocol": 4,
+      "bytes": 1655,
+      "sha256": "a74cae856dbfb98327ce81c86de8af834c30b130f6146f238bf1df543c5fd8b6",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "quantized",
+      "protocol": 2,
+      "bytes": 1669,
+      "sha256": "5dbf4bb4efe92c133dd9cb72425e73c5c066d07b9ac4922ccc275d2bd0cafd8f",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 0,
+        "stdout": "{weight: -0.5000 -0.3750 -0.2500 -0.1250\n 0.0000  0.1250  0.2500  0.3750\n 0.5000  0.6250  0.7500  0.8750\n[ QuantizedCPUQInt8Type{3,4}, qscheme: per_tensor_affine, scale: 0.125, zero_point: 0 ]}\n",
+        "stderr": "[W1020 06:38:15.943988562 Quantizer.cpp:111] Warning: torch.quantize_per_tensor, torch.quantize_per_channel and other quantized tensor creation functions that produce tensors with dtype torch.quint8, torch.qint8, and torch.qint32 are deprecated and will be removed in a future PyTorch release. Please see https://github.com/pytorch/pytorch/issues/184982 for more information. (function operator())\n"
+      }
+    },
+    {
+      "name": "quantized",
+      "protocol": 4,
+      "bytes": 1669,
+      "sha256": "9b313f3b767834865bb4b5bb4c301f6bfe7637459787385c7da55927499c0ce5",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "sparse",
+      "protocol": 2,
+      "bytes": 2157,
+      "sha256": "bc68cc7f5f0cd1f5a497a97b440dfcf103ecce016ef5b8c42e99e038e4f2839b",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Unpickler found unknown type torch.serialization._get_layout\n"
+      }
+    },
+    {
+      "name": "sparse",
+      "protocol": 4,
+      "bytes": 2093,
+      "sha256": "9391e6de1ba458d994d352ab76532a7413127ff7d5309704807733fd9fc0f034",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    },
+    {
+      "name": "uint64",
+      "protocol": 2,
+      "bytes": 1648,
+      "sha256": "2cf8e67fb843f4743877add6b3cc3ec2eda8974754e794d384a5ebf6cc620af0",
+      "reference": {
+        "result": "loaded",
+        "type": "dict"
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Unpickler found unknown type torch._utils._rebuild_tensor_v3\n"
+      }
+    },
+    {
+      "name": "uint64",
+      "protocol": 4,
+      "bytes": 1648,
+      "sha256": "588c1e27f52200650dbb49eb6588ce68909c8eaea3f997cb611def25b8b1a4be",
+      "reference": {
+        "result": "failed",
+        "error": "UnpicklingError",
+        "message": "Weights only load failed. In PyTorch 2.6, we changed the default value of the `weights_only` argument in `torch.load` from `False` to `True`. Re-running `torch.load` with `weights_only` set to `False` will likely succeed, but it can result in arbitrary code execution. Do it only if you got the file from a trusted source.\nPlease file an issue with the following so that we can make `weights_only=True` compatible with your use case: WeightsUnpickler error: \n\nUnsupported operand 149\n\nCheck the documentation of torch.load to learn more about types accepted by default with weights_only https://pytorch.org/docs/stable/generated/torch.load.html."
+      },
+      "native": {
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Only Pickle protocol 2 is supported, found protocol = \u0004\n"
+      }
+    }
+  ]
+}

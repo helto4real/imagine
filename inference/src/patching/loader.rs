@@ -126,17 +126,20 @@ pub fn load_lora(
         missing_keys: vec![],
     };
     for (x, target) in mapping {
+        let alpha_name = format!("{x}.alpha");
+        let alpha = if let Some(value) = state.get(&alpha_name) {
+            let alpha = crate::tensor_host::scalar_value(&value.as_tensor()?)?;
+            loaded.loaded_keys.insert(alpha_name);
+            alpha
+        } else {
+            Value::None
+        };
         let mut get = |suffix: &str| -> Option<Value> {
             let key = format!("{x}{suffix}");
             state.get(&key).map(|v| {
                 loaded.loaded_keys.insert(key);
                 v.clone()
             })
-        };
-        let alpha = if let Some(v) = get(".alpha") {
-            Value::Float(v.as_tensor()?.f_double_value(&[])?)
-        } else {
-            Value::None
         };
         let dora = get(".dora_scale").unwrap_or(Value::None);
         let mut take = |suffix: &str, required: bool| -> Result<Value, Error> {
@@ -183,15 +186,20 @@ pub fn load_lora(
                     .transpose()?
                     .unwrap_or(Value::None);
                 let reshape = if let Some(v) = state.get(&format!("{x}.reshape_weight")) {
-                    let t = v.as_tensor()?;
-                    if t.dim() == 1 {
-                        let nums = (0..t.size()[0])
-                            .map(|i| t.f_int64_value(&[i]).map(Value::Int))
-                            .collect::<Result<Vec<_>, _>>()?;
-                        let _ = take(".reshape_weight", true)?;
-                        Value::List(nums)
-                    } else {
-                        Value::None
+                    match v
+                        .as_tensor()
+                        .and_then(|tensor| crate::tensor_host::tolist(&tensor)?.into_value())
+                    {
+                        Ok(shape) => {
+                            let _ = take(".reshape_weight", true)?;
+                            shape
+                        }
+                        Err(error) if matches!(error.root(), Error::BindingGap { .. }) => {
+                            return Err(error);
+                        }
+                        // Original bare except skips only the failed conversion;
+                        // it does not mark reshape_weight as consumed.
+                        Err(_) => Value::None,
                     }
                 } else {
                     Value::None

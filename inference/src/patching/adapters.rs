@@ -1,3 +1,4 @@
+use super::adapter_scalar::{self, Rank, Scale};
 use super::*;
 #[derive(Clone)]
 pub struct Adapter {
@@ -14,12 +15,8 @@ impl Adapter {
     fn has(&self, i: usize) -> bool {
         !matches!(self.weights[i], Value::None)
     }
-    fn alpha(&self, i: usize, rank: i64) -> f64 {
-        match self.weights[i] {
-            Value::Float(a) => a / rank as f64,
-            Value::Int(a) => a as f64 / rank as f64,
-            _ => 1.,
-        }
+    fn alpha(&self, i: usize, rank: i64) -> Result<Scale, Error> {
+        adapter_scalar::quotient(self, i, Some(Rank::Integer(i128::from(rank))))
     }
     pub fn calculate(
         &self,
@@ -34,17 +31,10 @@ impl Adapter {
             "lora" => {
                 let a = self.t(native, 0, &w, k)?;
                 let mut b = self.t(native, 1, &w, k)?;
-                if let Value::List(shape) = &self.weights[5] {
-                    let shape = shape
-                        .iter()
-                        .map(|x| match x {
-                            Value::Int(n) => Ok(*n),
-                            _ => Err(gap("Noninteger reshape")),
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    w = pad_to_shape(&w, &shape)?;
+                if !matches!(self.weights[5], Value::None) {
+                    w = pad_to_value_shape(&w, &self.weights[5])?;
                 }
-                let alpha = self.alpha(2, b.size()[0]);
+                let alpha = self.alpha(2, b.size()[0])?;
                 if self.has(3) {
                     let c = self.t(native, 3, &w, k)?;
                     b = b
@@ -63,6 +53,7 @@ impl Adapter {
                 )
             }
             "loha" => {
+                let alpha = self.alpha(2, self.weights[1].as_tensor()?.size()[0])?;
                 let (m1, m2) = if self.has(5) {
                     (
                         einsum(
@@ -88,11 +79,7 @@ impl Adapter {
                         self.t(native, 3, &w, k)?.f_mm(&self.t(native, 4, &w, k)?)?,
                     )
                 };
-                (
-                    m1.f_mul(&m2).and_then(|v| v.f_reshape(w.size())),
-                    self.alpha(2, self.weights[1].as_tensor()?.size()[0]),
-                    7,
-                )
+                (m1.f_mul(&m2).and_then(|v| v.f_reshape(w.size())), alpha, 7)
             }
             "lokr" => {
                 let mut dim = None;
@@ -122,11 +109,11 @@ impl Adapter {
                 if b.dim() == 4 {
                     a = a.f_unsqueeze(2)?.f_unsqueeze(2)?;
                 }
-                (
-                    a.f_kron(&b).and_then(|v| v.f_reshape(w.size())),
-                    dim.map_or(1., |n| self.alpha(2, n)),
-                    8,
-                )
+                let alpha = match dim {
+                    Some(n) => self.alpha(2, n)?,
+                    None => Scale::Scalar(1.),
+                };
+                (a.f_kron(&b).and_then(|v| v.f_reshape(w.size())), alpha, 8)
             }
             "glora" => {
                 let shapes = (0..4)
@@ -144,15 +131,16 @@ impl Adapter {
                     old = false;
                     rank = Some(shapes[1][0]);
                 }
+                let a = self.t(native, 0, &w, k)?.f_flatten(1, -1)?;
+                let b = self.t(native, 1, &w, k)?.f_flatten(1, -1)?;
+                let c = self.t(native, 2, &w, k)?.f_flatten(1, -1)?;
+                let e = self.t(native, 3, &w, k)?.f_flatten(1, -1)?;
                 let rank = if self.has(4) {
                     rank.ok_or_else(|| exception("UnboundLocalError", "cannot access local variable 'rank' where it is not associated with a value"))?
                 } else {
                     rank.unwrap_or(1)
                 };
-                let a = self.t(native, 0, &w, k)?.f_flatten(1, -1)?;
-                let b = self.t(native, 1, &w, k)?.f_flatten(1, -1)?;
-                let c = self.t(native, 2, &w, k)?.f_flatten(1, -1)?;
-                let e = self.t(native, 3, &w, k)?.f_flatten(1, -1)?;
+                let alpha = self.alpha(4, rank)?;
                 let delta = (|| {
                     if old {
                         return e
@@ -177,7 +165,7 @@ impl Adapter {
                     let _ = v.f_add_(&c.f_mm(&e)?.f_reshape(w.size())?)?;
                     Ok(v)
                 })();
-                (delta, self.alpha(4, rank), 5)
+                (delta, alpha, 5)
             }
             "oft" | "boft" => {
                 let blocks = self.t(native, 0, &w, k)?;
@@ -186,24 +174,30 @@ impl Adapter {
                 } else {
                     None
                 };
-                let alpha = match self.weights[2] {
-                    Value::Float(v) => v,
-                    Value::Int(v) => v as f64,
-                    _ => 0.,
-                };
+                let alpha = Scale::Constraint(
+                    if self.name == "oft" && matches!(self.weights[2], Value::None) {
+                        Value::Int(0)
+                    } else {
+                        self.weights[2].clone()
+                    },
+                );
                 let delta = (|| -> Result<Tensor, tch::TchError> {
-                    if self.name == "boft" && !self.has(2) {
-                        return Err(tch::TchError::Torch(
-                            "'>' not supported between instances of 'NoneType' and 'int'".into(),
-                        ));
-                    }
                     let size = *blocks.size().last().unwrap();
                     let eye = Tensor::f_eye(size, (blocks.kind(), blocks.device()))?;
                     let q = blocks.f_sub(&blocks.f_transpose(-1, -2)?)?;
-                    let normed = if alpha > 0. {
+                    let normed = if alpha
+                        .positive()
+                        .map_err(|error| tch::TchError::Torch(error.to_string()))?
+                    {
                         let norm = q.f_norm()?.f_add_scalar(1e-8)?;
-                        if norm.f_double_value(&[])? > alpha {
-                            q.f_mul_scalar(alpha)?.f_div(&norm)?
+                        if alpha
+                            .less_than(&norm)
+                            .map_err(|error| tch::TchError::Torch(error.to_string()))?
+                        {
+                            alpha
+                                .multiply(&q)
+                                .map_err(|error| tch::TchError::Torch(error.to_string()))?
+                                .f_div(&norm)?
                         } else {
                             q
                         }
@@ -268,11 +262,12 @@ impl Adapter {
         };
         match delta {
             Err(e) => {
+                let e: Error = e.into();
                 d.errors.push(format!(
                     "ERROR {} {key} {}",
                     self.name,
-                    match &e {
-                        tch::TchError::Torch(m) => m
+                    match e.root() {
+                        Error::Torch(tch::TchError::Torch(m)) => m
                             .lines()
                             .next()
                             .unwrap_or(m)
@@ -291,28 +286,29 @@ impl Adapter {
                             &self.weights[dora].as_tensor()?,
                             &mut w,
                             delta,
-                            alpha,
+                            &alpha,
                             p,
                             k,
                         )?;
                     } else {
                         let a = if self.name == "oft" || self.name == "boft" {
-                            p.strength
+                            Scale::Scalar(p.strength)
                         } else {
-                            p.strength * alpha
+                            alpha.scaled(p.strength)?
                         };
-                        let delta = delta.f_mul_scalar(a)?.f_to_kind(w.kind())?;
+                        let delta = a.multiply_left(&delta)?.f_to_kind(w.kind())?;
                         let _ = w.f_add_(&transform(p, &delta)?)?;
                     }
                     Ok(w.shallow_clone())
                 })();
                 match result {
                     Ok(w) => Ok(w),
+                    Err(e) if matches!(e.root(), Error::BindingGap { .. }) => Err(e),
                     Err(e) => {
                         d.errors.push(format!(
                             "ERROR {} {key} {}",
                             self.name,
-                            match &e {
+                            match e.root() {
                                 Error::Torch(tch::TchError::Torch(m)) => m
                                     .lines()
                                     .next()
@@ -334,12 +330,12 @@ fn decompose(
     scale: &Tensor,
     w: &mut Tensor,
     mut diff: Tensor,
-    alpha: f64,
+    alpha: &Scale,
     p: &Patch,
     k: Kind,
 ) -> Result<(), Error> {
     let scale = cast(native, scale, w, k)?;
-    let _ = diff.f_mul_scalar_(alpha)?;
+    alpha.multiply_in_place(&mut diff)?;
     let mut calc = w.f_add(&transform(p, &diff)?.f_to_kind(w.kind())?)?;
     let norm = if scale.size()[0] == calc.size()[0] {
         let mut shape = vec![w.size()[0]];
