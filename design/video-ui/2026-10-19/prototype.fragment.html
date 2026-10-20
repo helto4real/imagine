@@ -1,0 +1,361 @@
+<div id="imagine-video-prototypes">
+  <div class="viz-carousel" aria-label="Imagine video prototypes" data-previous-label="Föregående" data-next-label="Nästa">
+    <section data-variant="Timeline" aria-label="Timeline workspace">
+      <div class="iv-app" data-screen="timeline" aria-label="Imagine Video timeline">
+        <header class="iv-header"><div class="iv-brand">Imagine <span>MiniMax H3</span></div><div class="iv-workspaces" aria-label="Workspaces"><button class="iv-icon" disabled aria-label="Image"><i data-lucide="image" aria-hidden="true"></i></button><button class="iv-icon" disabled aria-label="Character sheets"><i data-lucide="contact" aria-hidden="true"></i></button><button class="iv-icon iv-active" aria-label="Video" aria-pressed="true"><i data-lucide="film" aria-hidden="true"></i></button></div><div class="iv-header-actions"><button class="iv-icon" data-action="privacy" aria-label="Hide previews" aria-pressed="false" data-tooltip="Hide previews"><i data-lucide="eye" aria-hidden="true"></i></button></div></header>
+        <div class="iv-toolbar"><span class="iv-project">The last light <span class="iv-dot"></span></span><span class="iv-separator"></span><button class="iv-icon" disabled aria-label="Add Scene" data-tooltip="Add Scene — not interactive in this prototype"><i data-lucide="clapperboard" aria-hidden="true"></i></button><button class="iv-icon" data-action="references" aria-label="Show references" data-tooltip="Show references"><i data-lucide="images" aria-hidden="true"></i></button><span class="iv-grow"></span><button class="iv-button" data-action="review"><i data-lucide="scan-text" aria-hidden="true"></i> Review</button><button class="iv-button iv-primary" data-action="generate"><i data-lucide="sparkles" aria-hidden="true"></i> Generate</button></div>
+        <div class="iv-editor">
+          <aside class="iv-panel iv-references"><div class="iv-panel-title">References <span class="iv-count">2</span></div><button class="iv-reference iv-private cursor-interaction" data-action="select-ref" aria-pressed="true"><div class="iv-thumb iv-character"><span class="iv-person"></span></div><span><strong>@elin</strong><small>Character · 1 image</small></span><i data-lucide="check" aria-hidden="true"></i></button><button class="iv-reference iv-private cursor-interaction" data-action="select-ref" aria-pressed="true"><div class="iv-thumb iv-location"><span></span></div><span><strong>@lighthouse</strong><small>Setting · 1 image</small></span><i data-lucide="check" aria-hidden="true"></i></button><div class="iv-side-divider"></div><div class="iv-panel-title">Scene media</div><div class="iv-anchor iv-private"><div class="iv-thumb iv-location"><span></span></div><div>Clifftop<small>First frame</small></div></div><div class="iv-side-bottom"><i data-lucide="link" aria-hidden="true"></i><span>3 bindings</span></div></aside>
+          <main class="iv-viewer iv-panel"><div class="iv-viewer-head"><span data-scene-title>02 · The signal</span><span class="iv-muted">Take 3</span></div><div class="iv-screen iv-private" data-art="signal" role="img" aria-label="Synthetic storyboard: a lighthouse above a dark sea"><div class="iv-sky"></div><div class="iv-moon"></div><div class="iv-water"></div><div class="iv-beam"></div><div class="iv-ridge"></div><div class="iv-tower"><div></div></div><div class="iv-figure"></div><div class="iv-frame-caption">STORYBOARD</div></div><div class="iv-transport"><button class="iv-icon" data-action="play" aria-label="Play storyboard preview"><i data-lucide="play" aria-hidden="true"></i></button><span class="iv-time" data-time>00:02.4</span><input type="range" min="0" max="100" value="30" aria-label="Preview position" class="iv-seek"><span class="iv-time">00:08.0</span></div><div class="iv-takes"><span class="iv-muted">Takes</span><button class="iv-take cursor-interaction" data-take="1" aria-pressed="false">1</button><button class="iv-take cursor-interaction" data-take="2" aria-pressed="false">2</button><button class="iv-take iv-active cursor-interaction" data-take="3" aria-pressed="true">3</button><span class="iv-grow"></span><span class="iv-status" data-take-status>Accepted</span><button class="iv-icon" data-action="accept" aria-label="Accept selected take" data-tooltip="Accept selected take"><i data-lucide="check" aria-hidden="true"></i></button></div></main>
+          <aside class="iv-panel iv-inspector"><div class="iv-panel-title" data-inspector-title>Scene 2 <span class="iv-muted">The signal</span></div><div data-scene-fields><label class="iv-label">Mode<select class="iv-field"><option>Reference</option><option>Image-to-Video</option></select></label><div class="iv-field-row"><label class="iv-label">Duration<input class="iv-field" value="8 s" aria-label="Duration"></label><label class="iv-label">Quality<select class="iv-field"><option>720p</option><option>1080p</option></select></label></div><label class="iv-label">Prompt<textarea class="iv-field iv-private" rows="4" data-prompt>@elin pauses on the cliff path. The lighthouse beam sweeps across the mist. Slow push in, wind moving her coat.</textarea></label><label class="iv-label">Audio<select class="iv-field"><option>Generated audio</option><option>Timeline mix</option><option>Combined mix</option></select></label><details class="iv-details"><summary>Sampling &amp; LoRAs</summary><div class="iv-field-row"><label class="iv-label">Steps<input type="number" class="iv-field" value="20" min="1" max="100"></label><label class="iv-label">Seed<input class="iv-field" value="418072"></label></div><label class="iv-label">LoRA<select class="iv-field"><option>Project defaults</option><option>Disabled</option></select></label></details></div><div data-boundary-fields hidden><label class="iv-label">Boundary<select class="iv-field"><option>Continuous Shot</option><option>Hard Cut</option><option>Blend Seam</option><option>Transition</option></select></label><label class="iv-label">Continuity<select class="iv-field"><option>Last Frame FirstFrame</option><option>Combo</option><option>Influence</option></select></label><label class="iv-label">Audio<select class="iv-field"><option>New scene audio</option><option>Reference previous audio</option></select></label><div class="iv-fact"><span>Source</span><strong>Scene 1 · Take 2</strong></div><div class="iv-fact"><span>Target</span><strong>Scene 2</strong></div></div></aside>
+        </div>
+        <section class="iv-timeline iv-panel" aria-label="Video timeline"><div class="iv-timeline-tools"><span>Timeline</span><span class="iv-muted">24 s · 24 fps</span><span class="iv-grow"></span><label class="iv-inline-label"><i data-lucide="magnet" aria-hidden="true"></i><select aria-label="Snap" class="iv-mini-select"><option>Frames</option><option>Seconds</option><option>None</option></select></label></div><div class="iv-ruler"><span>00:00</span><span>00:04</span><span>00:08</span><span>00:12</span><span>00:16</span><span>00:20</span><span>00:24</span></div><div class="iv-scenes"><button class="iv-scene cursor-interaction" data-scene="arrival" aria-pressed="false"><span>01 · Arrival</span><small><i data-lucide="check" aria-hidden="true"></i> 8 s</small></button><button class="iv-boundary cursor-interaction" data-action="boundary" aria-label="Edit boundary between Arrival and The signal" data-tooltip="Continuous Shot"><i data-lucide="link" aria-hidden="true"></i></button><button class="iv-scene iv-active cursor-interaction" data-scene="signal" aria-pressed="true"><span>02 · The signal</span><small><i data-lucide="check" aria-hidden="true"></i> 8 s</small></button><button class="iv-boundary cursor-interaction" data-action="boundary" aria-label="Edit boundary between The signal and Dawn" data-tooltip="Hard Cut"><i data-lucide="scissors" aria-hidden="true"></i></button><button class="iv-scene cursor-interaction" data-scene="dawn" aria-pressed="false"><span>03 · Dawn</span><small>Not generated · 8 s</small></button></div><div class="iv-sections"><span>Across the rocks</span><span>The light turns</span><span>At the railing</span><span>The horizon</span></div><div class="iv-audio"><i data-lucide="audio-lines" aria-hidden="true"></i><span>Coastal wind</span><div class="iv-wave"></div><span>−6 dB</span></div></section>
+        <footer class="iv-queue"><i data-lucide="list-video" aria-hidden="true"></i><span>Queue &amp; results</span><span class="iv-grow"></span><span data-queue-state class="iv-muted" aria-live="polite">No active jobs</span></footer>
+        <div class="iv-overlay" data-review hidden><section class="iv-dialog" role="dialog" aria-modal="true" aria-label="Plan Review"><div class="iv-dialog-title">Plan Review<button class="iv-icon" data-action="close-review" aria-label="Close Plan Review"><i data-lucide="x" aria-hidden="true"></i></button></div><div class="iv-fact"><span>Scene</span><strong data-review-scene>The signal</strong></div><div class="iv-fact"><span>Mode</span><strong>H3 Reference</strong></div><div class="iv-fact"><span>Output</span><strong>1280 × 704 · 24 fps</strong></div><div class="iv-fact"><span>Effective duration</span><strong>8.0 s · 192 frames</strong></div><div class="iv-fact"><span>References</span><strong>2 subjects · 3 pictures</strong></div><div class="iv-fact"><span>Audio</span><strong>Generated</strong></div><div class="iv-dialog-actions"><button class="iv-button" data-action="close-review">Back to edit</button><button class="iv-button iv-primary" data-action="generate">Generate</button></div></section></div>
+      </div>
+    </section>
+    <section data-variant="Story" aria-label="Story planning workspace" hidden>
+      <div class="iv-app" data-screen="story" aria-label="Imagine Story planning">
+        <header class="iv-header"><div class="iv-brand">Imagine <span>MiniMax H3</span></div><div class="iv-workspaces"><button class="iv-icon" disabled aria-label="Image"><i data-lucide="image" aria-hidden="true"></i></button><button class="iv-icon" disabled aria-label="Character sheets"><i data-lucide="contact" aria-hidden="true"></i></button><button class="iv-icon iv-active" aria-label="Video" aria-pressed="true"><i data-lucide="film" aria-hidden="true"></i></button></div><div class="iv-header-actions"><button class="iv-icon" data-action="privacy" aria-label="Hide previews" aria-pressed="false"><i data-lucide="eye" aria-hidden="true"></i></button></div></header>
+        <div class="iv-toolbar"><span class="iv-project">The last light</span><span class="iv-separator"></span><span class="iv-muted">Story</span><span class="iv-grow"></span><span class="iv-stage"><b data-step-a>Outline</b><i data-lucide="chevron-right" aria-hidden="true"></i><span data-step-b>Scenes</span></span></div>
+        <div class="iv-story-layout">
+          <aside class="iv-panel iv-story-brief"><div class="iv-panel-title">Story brief</div><label class="iv-label"><span class="iv-sr">Story brief</span><textarea class="iv-field iv-private" rows="6">A lighthouse keeper returns to the island after years away. At dusk, a familiar signal draws her up the cliff. She stays until the first light of morning.</textarea></label><div class="iv-field-row"><label class="iv-label">Duration<select class="iv-field"><option>24 seconds</option><option>36 seconds</option></select></label><label class="iv-label">Profile<select class="iv-field"><option>Normal</option><option>Cinematic</option></select></label></div><div class="iv-side-divider"></div><div class="iv-panel-title">Cast</div><label class="iv-cast iv-private"><div class="iv-thumb iv-character"><span class="iv-person"></span></div><span>@elin<small>Lighthouse keeper</small></span><input type="checkbox" checked aria-label="Include Elin"></label><div class="iv-panel-title iv-gap">Setting</div><label class="iv-cast iv-private"><div class="iv-thumb iv-location"><span></span></div><span>@lighthouse<small>Island · coastal dusk</small></span><input type="checkbox" checked aria-label="Include lighthouse"></label><div class="iv-side-bottom"><i data-lucide="wand-sparkles" aria-hidden="true"></i><span>Prompt Studio</span></div></aside>
+          <main class="iv-panel iv-outline"><div class="iv-panel-title"><span data-story-heading>Outline</span><span class="iv-muted">3 scenes · 24 s</span></div><div class="iv-story-cards">
+            <button class="iv-story-card cursor-interaction" data-story-scene="arrival" aria-pressed="false"><span class="iv-story-number">01</span><span><strong>Arrival</strong><small class="iv-private">Elin follows the old path above the sea.</small><span class="iv-card-chips">8 s <span>Establishing shot</span></span></span><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+            <div class="iv-story-link"><i data-lucide="link" aria-hidden="true"></i> Continuous Shot</div>
+            <button class="iv-story-card iv-active cursor-interaction" data-story-scene="signal" aria-pressed="true"><span class="iv-story-number">02</span><span><strong>The signal</strong><small class="iv-private">A beam of light reaches her through the mist.</small><span class="iv-card-chips">8 s <span>Slow push in</span></span></span><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+            <div class="iv-story-link"><i data-lucide="scissors" aria-hidden="true"></i> Hard Cut</div>
+            <button class="iv-story-card cursor-interaction" data-story-scene="dawn" aria-pressed="false"><span class="iv-story-number">03</span><span><strong>Dawn</strong><small class="iv-private">At the railing, she watches the horizon brighten.</small><span class="iv-card-chips">8 s <span>Wide shot</span></span></span><i data-lucide="chevron-right" aria-hidden="true"></i></button>
+          </div><div class="iv-story-foot"><span class="iv-muted" data-story-state aria-live="polite">Outline ready for review</span><button class="iv-button iv-primary" data-action="expand"><i data-lucide="sparkles" aria-hidden="true"></i> Expand scenes</button></div></main>
+          <aside class="iv-panel iv-story-detail"><div class="iv-panel-title" data-story-detail-title>Scene 2</div><label class="iv-label">Title<input class="iv-field iv-private" value="The signal" data-story-title></label><label class="iv-label">Direction<textarea class="iv-field iv-private" rows="5" data-story-direction>A beam of light reaches Elin through the mist. She stops, recognizes the familiar pattern, and looks towards the lighthouse.</textarea></label><label class="iv-label">Incoming boundary<select class="iv-field"><option>Continuous Shot</option><option>Hard Cut</option><option>Blend Seam</option></select></label><label class="iv-label">Ambient sound<input class="iv-field iv-private" value="Wind over grass, distant waves"></label><div data-expanded-fields hidden><label class="iv-label">Section prompt<textarea class="iv-field iv-private" rows="4">@elin turns towards @lighthouse. The beam catches the edge of her coat. Slow push in through sea mist.</textarea></label></div><div class="iv-fact"><span>Characters</span><strong>@elin</strong></div></aside>
+        </div>
+        <footer class="iv-story-bottom"><i data-lucide="layers" aria-hidden="true"></i><span data-apply-state>Project unchanged</span><span class="iv-grow"></span><button class="iv-button" data-action="reset-story">Reset draft</button><button class="iv-button iv-primary" data-action="apply-story" disabled><i data-lucide="check" aria-hidden="true"></i> Apply to timeline</button></footer>
+      </div>
+    </section>
+    <section data-variant="Take review" aria-label="A/B take review workspace" hidden>
+      <div class="iv-app" data-screen="review" aria-label="Imagine A/B Take review">
+        <header class="iv-header"><div class="iv-brand">Imagine <span>MiniMax H3</span></div><div class="iv-workspaces"><button class="iv-icon" disabled aria-label="Image"><i data-lucide="image" aria-hidden="true"></i></button><button class="iv-icon" disabled aria-label="Character sheets"><i data-lucide="contact" aria-hidden="true"></i></button><button class="iv-icon iv-active" aria-label="Video" aria-pressed="true"><i data-lucide="film" aria-hidden="true"></i></button></div><div class="iv-header-actions"><button class="iv-icon" data-action="privacy" aria-label="Hide previews" aria-pressed="false"><i data-lucide="eye" aria-hidden="true"></i></button></div></header>
+        <div class="iv-toolbar"><span class="iv-project">The last light</span><span class="iv-separator"></span><span>02 · The signal</span><span class="iv-grow"></span><span class="iv-muted">A/B Take Review</span></div>
+        <div class="iv-ab-grid">
+          <section class="iv-panel iv-ab-panel"><div class="iv-ab-head"><span class="iv-letter">A</span><label class="iv-sr" for="iv-take-a">Take A</label><select class="iv-field" id="iv-take-a"><option>Take 2</option> <option>Take 1</option></select><span class="iv-status" data-status-a>Accepted</span></div><div class="iv-screen iv-private iv-art-a" role="img" aria-label="Synthetic take A, lighthouse in cool mist"><div class="iv-sky"></div><div class="iv-moon"></div><div class="iv-water"></div><div class="iv-beam"></div><div class="iv-ridge"></div><div class="iv-tower"><div></div></div><div class="iv-figure"></div><div class="iv-frame-caption">STORYBOARD A</div></div><div class="iv-ab-meta"><span>Seed <b>418071</b></span><span>1280 × 704</span></div><div class="iv-ab-actions"><button class="iv-button" data-action="accept-a"><i data-lucide="check" aria-hidden="true"></i> Accept A</button><button class="iv-button iv-quiet" data-action="reject-a">Reject</button></div></section>
+          <section class="iv-panel iv-ab-panel"><div class="iv-ab-head"><span class="iv-letter">B</span><label class="iv-sr" for="iv-take-b">Take B</label><select class="iv-field" id="iv-take-b"><option>Take 3</option><option>Take 4</option></select><span class="iv-muted" data-status-b>Candidate</span></div><div class="iv-screen iv-private iv-art-b" role="img" aria-label="Synthetic take B, closer framing with warmer light"><div class="iv-sky"></div><div class="iv-moon"></div><div class="iv-water"></div><div class="iv-beam"></div><div class="iv-ridge"></div><div class="iv-tower"><div></div></div><div class="iv-figure"></div><div class="iv-frame-caption">STORYBOARD B</div></div><div class="iv-ab-meta"><span>Seed <b>418072</b></span><span>1280 × 704</span></div><div class="iv-ab-actions"><button class="iv-button iv-primary" data-action="accept-b"><i data-lucide="check" aria-hidden="true"></i> Accept B</button><button class="iv-button iv-quiet" data-action="reject-b">Reject</button></div></section>
+        </div>
+        <div class="iv-panel iv-shared-player"><div class="iv-transport"><button class="iv-icon" data-action="play" aria-label="Play synchronized storyboard preview"><i data-lucide="play" aria-hidden="true"></i></button><span class="iv-time" data-time>00:02.4</span><input type="range" min="0" max="100" value="30" aria-label="Synchronized preview position" class="iv-seek"><span class="iv-time">00:08.0</span><label class="iv-inline-label iv-loop"><input type="checkbox" checked> Loop</label></div><div class="iv-ab-player-options"><span class="iv-muted">Synchronized playback</span><span class="iv-grow"></span><label class="iv-inline-label">Audio<select class="iv-mini-select" aria-label="Audio source"><option>Off</option><option>Take A</option><option>Take B</option></select></label></div></div>
+        <section class="iv-panel iv-comparison"><div class="iv-panel-title">Metadata differences</div><div class="iv-compare-row iv-compare-heading"><span></span><span>A · Take 2</span><span>B · Take 3</span></div><div class="iv-compare-row"><span>Seed</span><span>418071</span><span>418072</span></div><div class="iv-compare-row"><span>Camera</span><span>Locked frame</span><span>Slow push in</span></div><div class="iv-compare-row"><span>Sampling</span><span>20 steps · Single stage</span><span>20 steps · Single stage</span></div></section>
+        <footer class="iv-queue"><i data-lucide="check-check" aria-hidden="true"></i><span data-review-state aria-live="polite">Scene 2 · Take 2 accepted</span><span class="iv-grow"></span><span class="iv-muted">4 takes</span></footer>
+      </div>
+    </section>
+  </div>
+</div>
+<style>
+#imagine-video-prototypes { width:100%; }
+#imagine-video-prototypes .iv-app { --iv-bg:#181825;--iv-surface:#1e1e2e;--iv-field:#313244;--iv-raised:#45475a;--iv-hover:#585b70;--iv-text:#cdd6f4;--iv-dim:#a6adc8;--iv-accent:#fab387;--iv-accent-top:#4f3a2a;--iv-accent-bottom:#3d2d20;--iv-accent-border:#93664a;--iv-focus:#89b4fa;--iv-green:#a6e3a1;--iv-media:#11111b;--iv-error:#f38ba8;color-scheme:dark;background:var(--iv-bg);color:var(--iv-text);font:13px/1.45 system-ui,sans-serif;border:1px solid var(--iv-field);border-radius:10px;position:relative;min-height:740px;display:flex;flex-direction:column;overflow:clip; }
+#imagine-video-prototypes .iv-app * { box-sizing:border-box; }
+#imagine-video-prototypes .iv-app [hidden] { display:none!important; }
+#imagine-video-prototypes button,#imagine-video-prototypes input,#imagine-video-prototypes textarea,#imagine-video-prototypes select { font:inherit; }
+#imagine-video-prototypes button { color:var(--iv-text); }
+#imagine-video-prototypes button:disabled { opacity:.4;cursor:default; }
+#imagine-video-prototypes button:focus-visible,#imagine-video-prototypes input:focus-visible,#imagine-video-prototypes textarea:focus-visible,#imagine-video-prototypes select:focus-visible,#imagine-video-prototypes summary:focus-visible { outline:2px solid var(--iv-focus);outline-offset:2px; }
+#imagine-video-prototypes svg { width:16px;height:16px;flex-shrink:0;stroke-width:1.65; }
+#imagine-video-prototypes .iv-header { height:62px;display:flex;align-items:center;padding:0 17px;position:relative;background:linear-gradient(var(--iv-field),var(--iv-surface));border-bottom:1px solid var(--iv-field);gap:12px; }
+#imagine-video-prototypes .iv-brand { font-size:20px;font-weight:600;display:flex;gap:14px;align-items:center; }
+#imagine-video-prototypes .iv-brand span { font-size:12px;font-weight:400;color:var(--iv-dim);border-left:1px solid var(--iv-raised);padding-left:14px; }
+#imagine-video-prototypes .iv-workspaces { position:absolute;left:50%;transform:translateX(-50%);display:flex;gap:6px; }
+#imagine-video-prototypes .iv-header-actions { margin-left:auto;margin-right:84px; }
+#imagine-video-prototypes .iv-icon { display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid var(--iv-raised);border-radius:5px;background:linear-gradient(var(--iv-raised),var(--iv-field));padding:0;flex-shrink:0; }
+#imagine-video-prototypes .iv-button { display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:6px 11px;min-height:32px;border:1px solid var(--iv-raised);border-radius:5px;background:linear-gradient(var(--iv-raised),var(--iv-field));white-space:nowrap; }
+#imagine-video-prototypes .iv-icon:not(:disabled):hover,#imagine-video-prototypes .iv-button:not(:disabled):hover { background:linear-gradient(var(--iv-hover),var(--iv-raised)); }
+#imagine-video-prototypes .iv-primary,#imagine-video-prototypes .iv-active { background:linear-gradient(var(--iv-accent-top),var(--iv-accent-bottom))!important;border-color:var(--iv-accent-border)!important;color:var(--iv-accent)!important; }
+#imagine-video-prototypes .iv-primary:hover { filter:brightness(1.15); }
+#imagine-video-prototypes .iv-quiet { background:none; }
+#imagine-video-prototypes .iv-toolbar { display:flex;align-items:center;flex-wrap:wrap;gap:7px;min-height:48px;padding:8px 12px; }
+#imagine-video-prototypes .iv-project { font-weight:500;display:flex;align-items:center;gap:7px; }
+#imagine-video-prototypes .iv-dot { width:5px;height:5px;border-radius:50%;background:var(--iv-accent); }
+#imagine-video-prototypes .iv-separator { width:1px;height:20px;background:var(--iv-field);margin:0 5px; }
+#imagine-video-prototypes .iv-grow { flex:1; }
+#imagine-video-prototypes .iv-muted { color:var(--iv-dim);font-size:12px; }
+#imagine-video-prototypes .iv-panel { border:1px solid var(--iv-field);border-radius:6px;background:linear-gradient(var(--iv-surface),var(--iv-bg));min-width:0; }
+#imagine-video-prototypes .iv-panel-title { font-weight:500;display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:14px; }
+#imagine-video-prototypes .iv-count { color:var(--iv-dim);font-size:11px; }
+#imagine-video-prototypes .iv-editor { display:grid;grid-template-columns:minmax(150px,.8fr) minmax(0,2.2fr) minmax(218px,1fr);gap:8px;padding:0 8px;flex:1; }
+#imagine-video-prototypes .iv-no-references .iv-editor { grid-template-columns:minmax(0,2.2fr) minmax(218px,1fr); }
+#imagine-video-prototypes .iv-references,#imagine-video-prototypes .iv-inspector { padding:12px;position:relative; }
+#imagine-video-prototypes .iv-reference { width:100%;background:var(--iv-surface);border:1px solid var(--iv-field);border-radius:5px;display:flex;align-items:center;gap:8px;text-align:left;padding:7px;margin-bottom:8px; }
+#imagine-video-prototypes .iv-reference>span { min-width:0;flex:1; }
+#imagine-video-prototypes .iv-reference>svg { width:12px;color:var(--iv-accent); }
+#imagine-video-prototypes strong { font-weight:500; }
+#imagine-video-prototypes small { display:block;color:var(--iv-dim);font-size:11px;margin-top:3px; }
+#imagine-video-prototypes .iv-thumb { width:42px;height:50px;border-radius:3px;position:relative;overflow:hidden;flex-shrink:0; }
+#imagine-video-prototypes .iv-character { background:linear-gradient(145deg,#566378,#272a3a); }
+#imagine-video-prototypes .iv-person { position:absolute;left:28%;bottom:-5%;height:57%;width:47%;background:#302830;border-radius:40% 45% 0 0; }
+#imagine-video-prototypes .iv-person:before { content:"";position:absolute;left:20%;top:-45%;width:65%;height:66%;background:#bf9e88;border-radius:45%;box-shadow:inset 5px 2px #473736; }
+#imagine-video-prototypes .iv-location { background:linear-gradient(#454c67 40%,#99847e 61%,#344455 62%); }
+#imagine-video-prototypes .iv-location span { position:absolute;left:58%;top:28%;width:14%;height:55%;background:#c3bcb2;clip-path:polygon(30% 0,70% 0,100% 100%,0 100%); }
+#imagine-video-prototypes .iv-side-divider { border-top:1px solid var(--iv-field);margin:18px 0; }
+#imagine-video-prototypes .iv-anchor { display:flex;gap:9px;align-items:center; }
+#imagine-video-prototypes .iv-side-bottom { display:flex;align-items:center;gap:7px;color:var(--iv-dim);font-size:11px;margin-top:30px; }
+#imagine-video-prototypes .iv-viewer { background:var(--iv-media);display:flex;flex-direction:column;justify-content:center; }
+#imagine-video-prototypes .iv-viewer-head { padding:10px 12px;display:flex;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:auto; }
+#imagine-video-prototypes .iv-screen { position:relative;aspect-ratio:16/9;overflow:hidden;background:#202c3d;isolation:isolate;--iv-pan:0px; }
+#imagine-video-prototypes .iv-sky { position:absolute;inset:0;background:radial-gradient(ellipse at 76% 59%,#ba9b82 0,transparent 40%),linear-gradient(#263044,#596376 54%,#8d9291 75%); }
+#imagine-video-prototypes .iv-moon { position:absolute;left:25%;top:16%;width:2.8%;aspect-ratio:1;border-radius:50%;background:#ded7c4;box-shadow:0 0 28px #d8c1a122; }
+#imagine-video-prototypes .iv-water { position:absolute;inset:59% 0 0;background:repeating-linear-gradient(175deg,transparent 0 7px,#99aaa814 8px 9px,transparent 11px 16px),linear-gradient(#445562,#1b293a); }
+#imagine-video-prototypes .iv-ridge { position:absolute;inset:43% -2% -1%;background:linear-gradient(125deg,#303944,#151e29);clip-path:polygon(0 85%,15% 75%,29% 61%,42% 58%,55% 40%,65% 31%,78% 27%,90% 36%,100% 60%,100% 100%,0 100%); }
+#imagine-video-prototypes .iv-tower { position:absolute;left:70%;bottom:39%;width:5%;height:34%;background:linear-gradient(90deg,#a6aaa4,#666e70);clip-path:polygon(15% 15%,0 15%,0 8%,20% 8%,28% 0,72% 0,80% 8%,100% 8%,100% 15%,85% 15%,100% 100%,0 100%);transform:translateX(var(--iv-pan)); }
+#imagine-video-prototypes .iv-tower>div { position:absolute;top:8%;height:12%;width:100%;background:#efcf91;box-shadow:0 0 20px #ffe1aa; }
+#imagine-video-prototypes .iv-beam { position:absolute;left:15%;top:27%;height:14%;width:59%;background:linear-gradient(90deg,transparent,#f7dda34d);clip-path:polygon(0 0,100% 42%,100% 60%,0 100%);transform-origin:right center;transform:rotate(var(--iv-turn,0deg)); }
+#imagine-video-prototypes .iv-figure { position:absolute;left:45%;bottom:22%;width:2%;height:17%;background:#1b2029;border-radius:38% 38% 0 0;transform:translateX(var(--iv-pan)); }
+#imagine-video-prototypes .iv-figure:before { content:"";position:absolute;left:20%;top:-24%;width:72%;height:30%;border-radius:50%;background:#32323b; }
+#imagine-video-prototypes .iv-frame-caption { position:absolute;bottom:10px;left:12px;font-size:11px;letter-spacing:2px;color:#d6d9e0b0; }
+#imagine-video-prototypes [data-art="arrival"] .iv-tower { left:81%;height:25%;bottom:37%; }
+#imagine-video-prototypes [data-art="arrival"] .iv-figure { left:30%;bottom:12%;height:24%; }
+#imagine-video-prototypes [data-art="dawn"] .iv-sky { background:radial-gradient(ellipse at 20% 60%,#f7c99f 0,transparent 44%),linear-gradient(#4d5c7d,#c0a6a4 54%,#c8bbb0); }
+#imagine-video-prototypes .iv-art-a .iv-sky { filter:saturate(.7); }
+#imagine-video-prototypes .iv-art-b .iv-tower { left:67%;height:42%;bottom:36%; }
+#imagine-video-prototypes .iv-art-b .iv-figure { height:23%;left:43%;bottom:17%; }
+#imagine-video-prototypes .iv-art-b .iv-sky { filter:sepia(.13); }
+#imagine-video-prototypes .iv-transport { display:flex;align-items:center;gap:9px;padding:9px 10px; }
+#imagine-video-prototypes .iv-viewer>.iv-transport { margin-top:auto; }
+#imagine-video-prototypes .iv-time { font-size:11px;color:var(--iv-dim);font-variant-numeric:tabular-nums;white-space:nowrap; }
+#imagine-video-prototypes .iv-seek { min-width:30px;width:100%;accent-color:var(--iv-accent);height:4px; }
+#imagine-video-prototypes .iv-takes { display:flex;align-items:center;gap:6px;padding:8px 10px;border-top:1px solid var(--iv-field); }
+#imagine-video-prototypes .iv-take { width:27px;height:27px;border:1px solid var(--iv-raised);border-radius:4px;background:var(--iv-field);font-size:11px; }
+#imagine-video-prototypes .iv-status { color:var(--iv-green);font-size:11px; }
+#imagine-video-prototypes .iv-label { display:flex;flex-direction:column;gap:5px;color:var(--iv-dim);font-size:11px;margin-bottom:12px;min-width:0; }
+#imagine-video-prototypes .iv-field { width:100%;min-width:0;border:1px solid var(--iv-raised);background:var(--iv-field);color:var(--iv-text);border-radius:5px;padding:7px 8px;min-height:32px;font-size:12px; }
+#imagine-video-prototypes textarea.iv-field { resize:vertical;line-height:1.6; }
+#imagine-video-prototypes .iv-field-row { display:grid;grid-template-columns:1fr 1fr;gap:8px; }
+#imagine-video-prototypes .iv-details { border-top:1px solid var(--iv-field);padding-top:10px; }
+#imagine-video-prototypes .iv-details summary { font-size:12px;color:var(--iv-dim);margin-bottom:10px; }
+#imagine-video-prototypes .iv-timeline { margin:8px;padding:10px 12px; }
+#imagine-video-prototypes .iv-timeline-tools { display:flex;align-items:center;gap:12px;font-size:12px; }
+#imagine-video-prototypes .iv-inline-label { display:flex;align-items:center;gap:7px;font-size:11px;color:var(--iv-dim); }
+#imagine-video-prototypes .iv-mini-select { background:var(--iv-field);color:var(--iv-text);border:1px solid var(--iv-raised);border-radius:4px;padding:3px 6px;font-size:11px; }
+#imagine-video-prototypes .iv-ruler { display:flex;justify-content:space-between;color:var(--iv-dim);font-size:11px;padding:10px 0 5px;border-bottom:1px solid var(--iv-field);margin-bottom:6px;font-variant-numeric:tabular-nums; }
+#imagine-video-prototypes .iv-scenes { display:grid;grid-template-columns:1fr 24px 1fr 24px 1fr;align-items:stretch; }
+#imagine-video-prototypes .iv-scene { background:var(--iv-field);border:1px solid var(--iv-raised);border-radius:4px;padding:7px 9px;text-align:left;min-width:0;font-size:12px; }
+#imagine-video-prototypes .iv-scene small { display:flex;gap:4px;align-items:center; }
+#imagine-video-prototypes .iv-scene small svg { width:11px;height:11px; }
+#imagine-video-prototypes .iv-boundary { background:none;border:0;padding:0;display:flex;align-items:center;justify-content:center;color:var(--iv-dim); }
+#imagine-video-prototypes .iv-boundary svg { width:12px; }
+#imagine-video-prototypes .iv-sections { display:grid;grid-template-columns:1fr 1fr 1.2fr 1fr;gap:5px;margin-top:5px; }
+#imagine-video-prototypes .iv-sections span { font-size:11px;padding:3px 7px;border-radius:3px;background:#31324488;color:var(--iv-dim); }
+#imagine-video-prototypes .iv-audio { display:flex;align-items:center;gap:8px;background:#89b4fa0d;color:var(--iv-dim);border-radius:3px;margin-top:5px;padding:4px 7px;font-size:11px; }
+#imagine-video-prototypes .iv-wave { height:13px;flex:1;background:repeating-linear-gradient(90deg,#89b4fa66 0 1px,transparent 1px 3px);clip-path:polygon(0 40%,5% 20%,10% 40%,15% 0,20% 25%,25% 40%,30% 10%,35% 30%,40% 5%,45% 40%,50% 15%,55% 35%,60% 0,65% 30%,70% 20%,75% 40%,80% 5%,85% 30%,90% 15%,95% 40%,100% 20%,100% 80%,95% 60%,90% 85%,85% 70%,80% 95%,75% 60%,70% 80%,65% 70%,60% 100%,55% 65%,50% 85%,45% 60%,40% 95%,35% 70%,30% 90%,25% 60%,20% 75%,15% 100%,10% 60%,5% 80%,0 60%); }
+#imagine-video-prototypes .iv-queue { display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--iv-field);font-size:11px;min-height:38px; }
+#imagine-video-prototypes .iv-stage { display:flex;align-items:center;gap:8px;font-size:12px;color:var(--iv-dim); }
+#imagine-video-prototypes .iv-stage b { color:var(--iv-accent);font-weight:500; }
+#imagine-video-prototypes .iv-story-layout { display:grid;grid-template-columns:minmax(200px,1fr) minmax(0,1.5fr) minmax(210px,1fr);gap:8px;padding:0 8px 8px;flex:1; }
+#imagine-video-prototypes .iv-story-brief,#imagine-video-prototypes .iv-outline,#imagine-video-prototypes .iv-story-detail { padding:14px; }
+#imagine-video-prototypes .iv-cast { display:flex;gap:10px;align-items:center; }
+#imagine-video-prototypes .iv-cast>span { flex:1; }
+#imagine-video-prototypes input[type="checkbox"] { accent-color:var(--iv-accent); }
+#imagine-video-prototypes .iv-gap { margin-top:22px; }
+#imagine-video-prototypes .iv-outline { display:flex;flex-direction:column; }
+#imagine-video-prototypes .iv-story-cards { flex:1; }
+#imagine-video-prototypes .iv-story-card { width:100%;display:flex;align-items:flex-start;gap:11px;padding:14px 11px;border:1px solid var(--iv-field);background:var(--iv-surface);border-radius:6px;text-align:left; }
+#imagine-video-prototypes .iv-story-card>span:nth-child(2) { flex:1;min-width:0; }
+#imagine-video-prototypes .iv-story-card>svg { margin-top:3px;width:12px; }
+#imagine-video-prototypes .iv-story-number { color:var(--iv-dim);font-size:11px;padding-top:2px; }
+#imagine-video-prototypes .iv-card-chips { display:flex;gap:7px;font-size:11px;color:var(--iv-dim);margin-top:12px;flex-wrap:wrap; }
+#imagine-video-prototypes .iv-card-chips span { border-left:1px solid var(--iv-raised);padding-left:7px; }
+#imagine-video-prototypes .iv-story-link { display:flex;align-items:center;justify-content:center;gap:5px;color:var(--iv-dim);font-size:11px;padding:9px 0; }
+#imagine-video-prototypes .iv-story-link svg { width:12px;height:12px; }
+#imagine-video-prototypes .iv-story-foot { display:flex;flex-direction:column;align-items:flex-end;gap:10px;margin-top:20px; }
+#imagine-video-prototypes .iv-story-bottom { display:flex;align-items:center;gap:8px;padding:12px 14px;border-top:1px solid var(--iv-field);font-size:11px; }
+#imagine-video-prototypes .iv-fact { display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid var(--iv-field);padding:10px 0;font-size:12px; }
+#imagine-video-prototypes .iv-fact>span { color:var(--iv-dim); }
+#imagine-video-prototypes .iv-ab-grid { display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 8px; }
+#imagine-video-prototypes .iv-ab-panel { overflow:hidden;background:var(--iv-media); }
+#imagine-video-prototypes .iv-ab-head { display:flex;align-items:center;gap:10px;padding:10px 12px; }
+#imagine-video-prototypes .iv-ab-head select { width:110px; }
+#imagine-video-prototypes .iv-ab-head>span:last-child { margin-left:auto; }
+#imagine-video-prototypes .iv-letter { color:var(--iv-accent);font-size:14px; }
+#imagine-video-prototypes .iv-ab-meta { display:flex;justify-content:space-between;color:var(--iv-dim);font-size:11px;padding:9px 12px; }
+#imagine-video-prototypes .iv-ab-meta b { color:var(--iv-text);font-weight:400; }
+#imagine-video-prototypes .iv-ab-actions { display:flex;gap:7px;padding:0 12px 12px; }
+#imagine-video-prototypes .iv-shared-player { margin:8px; }
+#imagine-video-prototypes .iv-ab-player-options { display:flex;align-items:center;padding:0 12px 10px;gap:8px; }
+#imagine-video-prototypes .iv-comparison { margin:0 8px 8px;padding:12px;flex:1; }
+#imagine-video-prototypes .iv-compare-row { display:grid;grid-template-columns:1fr 1.3fr 1.3fr;gap:8px;padding:7px 0;border-bottom:1px solid var(--iv-field);font-size:12px; }
+#imagine-video-prototypes .iv-compare-row:last-child { border:0; }
+#imagine-video-prototypes .iv-compare-row>span:first-child,#imagine-video-prototypes .iv-compare-heading { color:var(--iv-dim); }
+#imagine-video-prototypes .iv-overlay { position:absolute;inset:0;z-index:3;background:#11111bcc;display:flex;align-items:center;justify-content:center;padding:16px; }
+#imagine-video-prototypes .iv-dialog { background:var(--iv-surface);border:1px solid var(--iv-raised);border-radius:10px;padding:18px;width:440px;max-width:100%;box-shadow:0 12px 48px #0006; }
+#imagine-video-prototypes .iv-dialog-title { font-size:16px;display:flex;justify-content:space-between;align-items:center;margin-bottom:16px; }
+#imagine-video-prototypes .iv-dialog-actions { display:flex;justify-content:flex-end;gap:8px;margin-top:18px; }
+#imagine-video-prototypes .iv-concealed .iv-private { visibility:hidden; }
+#imagine-video-prototypes .iv-concealed .iv-screen { visibility:visible; }
+#imagine-video-prototypes .iv-concealed .iv-screen>* { visibility:hidden; }
+#imagine-video-prototypes .iv-concealed .iv-screen:after { content:"Preview hidden";position:absolute;inset:0;display:grid;place-items:center;background:var(--iv-media);color:var(--iv-dim);font-size:12px; }
+#imagine-video-prototypes .iv-sr { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+@media(max-width:860px) { #imagine-video-prototypes .iv-editor { grid-template-columns:155px minmax(0,1fr); } #imagine-video-prototypes .iv-inspector { grid-column:1/-1; } #imagine-video-prototypes [data-scene-fields] { display:grid;grid-template-columns:1fr 1fr;gap:0 12px; } #imagine-video-prototypes [data-scene-fields]>.iv-label:nth-of-type(2) { grid-column:1/-1; } #imagine-video-prototypes .iv-story-layout { grid-template-columns:1fr 1.3fr; } #imagine-video-prototypes .iv-story-detail { grid-column:1/-1; } #imagine-video-prototypes .iv-brand span { display:none; } #imagine-video-prototypes .iv-app { min-height:1040px; } }
+@media(max-width:540px) { #imagine-video-prototypes .iv-editor,#imagine-video-prototypes .iv-story-layout,#imagine-video-prototypes .iv-ab-grid { grid-template-columns:1fr; } #imagine-video-prototypes .iv-references { display:none; } #imagine-video-prototypes .iv-references.iv-show { display:block; } #imagine-video-prototypes .iv-brand { font-size:16px; } #imagine-video-prototypes .iv-header { padding:0 10px; } #imagine-video-prototypes .iv-header-actions { margin-right:0; } #imagine-video-prototypes .iv-workspaces { position:static;transform:none;margin-left:auto; } #imagine-video-prototypes .iv-header-actions { margin-left:0; } #imagine-video-prototypes .iv-story-bottom { flex-wrap:wrap; } #imagine-video-prototypes .iv-scenes { grid-template-columns:1fr 18px 1fr 18px 1fr; } #imagine-video-prototypes .iv-scene { padding:6px 4px;font-size:11px; } #imagine-video-prototypes .iv-sections { grid-template-columns:1fr 1fr; } #imagine-video-prototypes .iv-toolbar>.iv-muted { display:none; } #imagine-video-prototypes .iv-compare-row { font-size:11px; } #imagine-video-prototypes .iv-loop { display:none; } #imagine-video-prototypes .iv-app { min-height:1460px; } }
+@media(pointer:coarse) { #imagine-video-prototypes .iv-icon,#imagine-video-prototypes .iv-button,#imagine-video-prototypes .iv-take { min-height:44px;min-width:44px; } #imagine-video-prototypes .iv-field { font-size:16px; } #imagine-video-prototypes .iv-workspaces { gap:3px; } #imagine-video-prototypes .iv-takes { flex-wrap:wrap; } }
+@media(max-width:540px) { #imagine-video-prototypes .iv-no-references .iv-editor { grid-template-columns:1fr; } }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('imagine-video-prototypes');
+  const apps = Array.from(root.querySelectorAll('.iv-app'));
+  const state = { scene: 'signal', take: '3', accepted: 'a', expanded: false, applied: false };
+  const scenes = {
+    arrival: { n: 1, title: 'Arrival', prompt: '@elin walks along the cliff path towards @lighthouse. Wide view of the sea, her coat moving in the wind.', direction: 'Elin returns to the island and takes the familiar path above the sea.' },
+    signal: { n: 2, title: 'The signal', prompt: '@elin pauses on the cliff path. The lighthouse beam sweeps across the mist. Slow push in, wind moving her coat.', direction: 'A beam of light reaches Elin through the mist. She stops, recognizes the familiar pattern, and looks towards the lighthouse.' },
+    dawn: { n: 3, title: 'Dawn', prompt: '@elin leans on the railing at @lighthouse. The sea brightens in the early morning. A quiet wide shot.', direction: 'At the railing, Elin watches the horizon brighten. She has decided to stay.' }
+  };
+  const timeline = apps.find(a => a.dataset.screen === 'timeline');
+  const story = apps.find(a => a.dataset.screen === 'story');
+  const review = apps.find(a => a.dataset.screen === 'review');
+  let storyScene = 'signal';
+  const timers = new Map();
+  function icons() { if (globalThis.lucide) lucide.createIcons({ attrs: { width:16, height:16 } }); }
+  function save() {
+    if (window.openai?.setWidgetState) window.openai.setWidgetState({ modelContent:{ prototype:'Imagine Video', scene:state.scene, acceptedTake:state.accepted, storyApplied:state.applied }, privateContent:{...state} }).catch(() => {});
+  }
+  function selectScene(key) {
+    if (!scenes[key]) return;
+    state.scene = key;
+    const scene = scenes[key];
+    timeline.querySelector('[data-scene-title]').textContent = `0${scene.n} · ${scene.title}`;
+    timeline.querySelector('[data-inspector-title]').textContent = `Scene ${scene.n} · ${scene.title}`;
+    timeline.querySelector('[data-review-scene]').textContent = scene.title;
+    timeline.querySelector('[data-prompt]').value = scene.prompt;
+    timeline.querySelector('[data-art]').dataset.art = key;
+    timeline.querySelector('[data-scene-fields]').hidden = false;
+    timeline.querySelector('[data-boundary-fields]').hidden = true;
+    timeline.querySelectorAll('[data-scene]').forEach(b => {b.classList.toggle('iv-active', b.dataset.scene === key);b.setAttribute('aria-pressed',String(b.dataset.scene === key));});
+    timeline.querySelector('[data-take-status]').textContent = key === 'dawn' ? 'No take yet' : 'Accepted';
+    timeline.querySelector('[data-take-status]').className = key === 'dawn' ? 'iv-muted' : 'iv-status';
+    timeline.querySelector('.iv-viewer-head .iv-muted').textContent = key === 'dawn' ? 'Storyboard' : `Take ${state.take}`;
+    timeline.querySelectorAll('[data-take], [data-action="accept"]').forEach(b=>{b.disabled=key==='dawn';});
+  }
+  function selectStory(key) {
+    if (!scenes[key]) return;
+    storyScene = key;
+    const scene = scenes[key];
+    story.querySelector('[data-story-detail-title]').textContent = `Scene ${scene.n}`;
+    story.querySelector('[data-story-title]').value = scene.title;
+    story.querySelector('[data-story-direction]').value = scene.direction;
+    story.querySelectorAll('[data-story-scene]').forEach(b => {b.classList.toggle('iv-active', b.dataset.storyScene === key);b.setAttribute('aria-pressed',String(b.dataset.storyScene === key));});
+    story.querySelector('[data-expanded-fields] textarea').value = scene.prompt;
+  }
+  function renderStory() {
+    story.querySelector('[data-story-heading]').textContent = state.expanded ? 'Storyboard' : 'Outline';
+    story.querySelector('[data-expanded-fields]').hidden = !state.expanded;
+    story.querySelector('[data-step-b]').style.color = state.expanded ? 'var(--iv-accent)' : '';
+    story.querySelector('[data-action="expand"]').disabled = state.expanded;
+    story.querySelector('[data-action="apply-story"]').disabled = !state.expanded || state.applied;
+    story.querySelector('[data-story-state]').textContent = state.expanded ? '3 scene drafts ready' : 'Outline ready for review';
+    story.querySelector('[data-apply-state]').textContent = state.applied ? '3 scenes applied · Prototype only' : 'Project unchanged';
+  }
+  function accept(side) {
+    state.accepted = side;
+    ['a','b'].forEach(s => {const el = review.querySelector(`[data-status-${s}]`);el.textContent = s === side ? 'Accepted' : 'Candidate';el.className = s === side ? 'iv-status' : 'iv-muted';});
+    review.querySelector('[data-review-state]').textContent = `Scene 2 · ${review.querySelector(side === 'a' ? '#iv-take-a' : '#iv-take-b').value} accepted · Prototype only`;
+  }
+  function position(app,value) {
+    app.querySelector('[data-time]').textContent = `00:${(value*.08).toFixed(1).padStart(4,'0')}`;
+    app.querySelectorAll('.iv-screen').forEach(v => {v.style.setProperty('--iv-pan',`${(value-30)*.06}px`);v.style.setProperty('--iv-turn',`${(value-30)*.03}deg`);});
+  }
+  function stop(app) {
+    clearInterval(timers.get(app));timers.delete(app);
+    const b = app.querySelector('[data-action="play"]');
+    if (b) { b.innerHTML = '<i data-lucide="play" aria-hidden="true"></i>';b.setAttribute('aria-label','Play storyboard preview'); }
+    icons();
+  }
+  function play(app) {
+    if (timers.has(app)) return stop(app);
+    const slider = app.querySelector('.iv-seek');
+    const button = app.querySelector('[data-action="play"]');
+    button.innerHTML = '<i data-lucide="pause" aria-hidden="true"></i>';button.setAttribute('aria-label','Pause storyboard preview');icons();
+    timers.set(app,setInterval(() => {
+      if (app.closest('[data-variant]').hidden || app.classList.contains('iv-concealed') || document.hidden) return stop(app);
+      let next = Number(slider.value)+1;
+      const loop = app.querySelector('.iv-loop input');
+      if (next>100) {if(loop?.checked) next=0;else return stop(app);}
+      slider.value=String(next);position(app,next);
+    },80));
+  }
+  root.addEventListener('click',e => {
+    const button = e.target.closest('button');
+    if (!button || button.disabled) return;
+    const app = button.closest('.iv-app');
+    if (!app) return;
+    if (button.dataset.scene) {selectScene(button.dataset.scene);save();return;}
+    if (button.dataset.storyScene) {selectStory(button.dataset.storyScene);return;}
+    if (button.dataset.take) {
+      state.take=button.dataset.take;
+      timeline.querySelectorAll('[data-take]').forEach(b=>{b.classList.toggle('iv-active',b===button);b.setAttribute('aria-pressed',String(b===button));});
+      timeline.querySelector('.iv-viewer-head .iv-muted').textContent=`Take ${state.take}`;
+      timeline.querySelector('[data-take-status]').textContent = state.take==='3'?'Accepted':'Candidate';save();return;
+    }
+    switch(button.dataset.action) {
+      case 'privacy': {const hidden=app.classList.toggle('iv-concealed');button.setAttribute('aria-pressed',String(hidden));button.classList.toggle('iv-active',hidden);button.setAttribute('aria-label',hidden?'Show previews':'Hide previews');button.innerHTML=`<i data-lucide="${hidden?'eye-off':'eye'}" aria-hidden="true"></i>`;if(hidden)stop(app);icons();break;}
+      case 'select-ref': {const enabled=button.getAttribute('aria-pressed')!=='true';button.setAttribute('aria-pressed',String(enabled));button.style.opacity=enabled?'1':'.5';break;}
+      case 'references': timeline.querySelector('.iv-references').classList.toggle('iv-show');break;
+      case 'boundary': {timeline.querySelector('[data-inspector-title]').textContent='Incoming boundary';timeline.querySelector('[data-scene-fields]').hidden=true;timeline.querySelector('[data-boundary-fields]').hidden=false;break;}
+      case 'review': app.querySelector('[data-review]').hidden=false;app.querySelector('[data-action="close-review"]').focus();break;
+      case 'close-review': app.querySelector('[data-review]').hidden=true;app.querySelector('[data-action="review"]').focus();break;
+      case 'generate': app.querySelector('[data-review]').hidden=true;app.querySelector('[data-queue-state]').textContent=`Scene ${scenes[state.scene].n} queued · Prototype only`;break;
+      
+      case 'accept': timeline.querySelector('[data-take-status]').textContent='Accepted';break;
+      case 'play': play(app);break;
+      case 'expand': state.expanded=true;state.applied=false;renderStory();save();break;
+      case 'apply-story': state.applied=true;renderStory();save();break;
+      case 'reset-story': state.expanded=false;state.applied=false;selectStory('signal');renderStory();save();break;
+      case 'accept-a': accept('a');save();break;
+      case 'accept-b': accept('b');save();break;
+      case 'reject-a': case 'reject-b': {const side=button.dataset.action.slice(-1);review.querySelector(`[data-status-${side}]`).textContent='Rejected';review.querySelector(`[data-status-${side}]`).className='iv-muted';if(state.accepted===side)state.accepted='';review.querySelector('[data-review-state]').textContent=`Take ${side.toUpperCase()} rejected · Prototype only`;save();break;}
+    }
+  });
+  root.addEventListener('input',e => {
+    if(e.target.matches('.iv-seek')) position(e.target.closest('.iv-app'),Number(e.target.value));
+    if(e.target.matches('[data-story-title]')) {scenes[storyScene].title=e.target.value;story.querySelector(`[data-story-scene="${storyScene}"] strong`).textContent=e.target.value;}
+    if(e.target.matches('[data-story-direction]')) {scenes[storyScene].direction=e.target.value;story.querySelector(`[data-story-scene="${storyScene}"] small`).textContent=e.target.value;}
+    if(e.target.matches('[data-prompt]')) scenes[state.scene].prompt=e.target.value;
+  });
+  root.addEventListener('change',e=>{
+    if(e.target.matches('#iv-take-a, #iv-take-b')) {
+      const side=e.target.id==='iv-take-a'?'a':'b';
+      const label=e.target.value;
+      const n=Number(label.replace('Take ',''));
+      const panel=e.target.closest('.iv-ab-panel');
+      panel.querySelector('.iv-ab-meta b').textContent=String(418069+n);
+      panel.querySelector('.iv-screen').style.filter=n%2?'brightness(1.06)':'none';
+      review.querySelector(`[data-status-${side}]`).textContent='Candidate';
+      review.querySelector(`[data-status-${side}]`).className='iv-muted';
+      const column=side==='a'?2:3;
+      review.querySelector(`.iv-compare-heading>span:nth-child(${column})`).textContent=`${side.toUpperCase()} · ${label}`;
+      review.querySelector(`.iv-compare-row:nth-child(3)>span:nth-child(${column})`).textContent=String(418069+n);
+      review.querySelector('[data-review-state]').textContent=`${label} selected for comparison`;
+      if(state.accepted===side)state.accepted='';
+      save();
+    }
+  });
+  root.addEventListener('keydown',e=>{
+    const dialog=timeline.querySelector('[data-review]');
+    if(dialog.hidden)return;
+    if(e.key==='Escape'){dialog.hidden=true;timeline.querySelector('[data-action="review"]').focus();}
+    if(e.key==='Tab'){
+      const buttons=Array.from(dialog.querySelectorAll('button:not(:disabled)'));
+      const first=buttons[0],last=buttons[buttons.length-1];
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    }
+  });
+  window.addEventListener('blur',()=>apps.forEach(stop));
+  function restore(saved) {const s=saved?.privateContent;if(!s)return;if(scenes[s.scene])selectScene(s.scene);if(['a','b'].includes(s.accepted))accept(s.accepted);state.expanded=!!s.expanded;state.applied=!!s.applied;renderStory();}
+  restore(window.openai?.widgetState);
+  window.addEventListener('openai:set_globals',e=>restore(e.detail?.globals?.widgetState));
+  if(globalThis.Tweak) {
+    const layout={references:true};
+    const tweak=new Tweak({container:timeline,onChange:()=>{timeline.querySelector('.iv-references').hidden=!layout.references;timeline.classList.toggle('iv-no-references',!layout.references);}});
+    tweak.addToggle(layout,'references',{label:'Reference panel'});
+    const compare={differences:true};
+    const reviewTweak=new Tweak({container:review,onChange:()=>{review.querySelector('.iv-comparison').hidden=!compare.differences;}});
+    reviewTweak.addToggle(compare,'differences',{label:'Metadata differences'});
+  }
+  icons();
+})();
+</script>

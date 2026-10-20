@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "expected_project_revision": 0,
+  "commands": [
+    {
+      "operation": "add_scene",
+      "scene": {
+        "id": "scene_example",
+        "start": { "num": 0, "den": 1 },
+        "duration": { "num": 5, "den": 1 },
+        "description": "SYNTHETIC EXAMPLE",
+        "model": "project_default",
+        "settings": [],
+        "sections": [],
+        "bindings": [],
+        "continuity": null,
+        "accepted_take": null
+      }
+    }
+  ]
+}

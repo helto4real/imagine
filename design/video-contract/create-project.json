@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "default_model": {
+    "adapter": "h3",
+    "model": "minimax-h3",
+    "variant": "reference",
+    "profile": "example-only",
+    "profile_revision": "1"
+  },
+  "delivery": { "fps": { "num": 24, "den": 1 }, "width": 1280, "height": 720 }
+}

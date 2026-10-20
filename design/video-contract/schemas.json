@@ -1,0 +1,1523 @@
+{
+  "create_project": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "CreateProject",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 1,
+        "maximum": 1
+      },
+      "default_model": {
+        "$ref": "#/$defs/ModelSelection"
+      },
+      "delivery": {
+        "$ref": "#/$defs/DeliverySettings"
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "schema_version",
+      "default_model",
+      "delivery"
+    ],
+    "$defs": {
+      "ModelSelection": {
+        "type": "object",
+        "properties": {
+          "adapter": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "variant": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "profile_revision": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "adapter",
+          "model",
+          "variant",
+          "profile",
+          "profile_revision"
+        ]
+      },
+      "DeliverySettings": {
+        "type": "object",
+        "properties": {
+          "fps": {
+            "$ref": "#/$defs/Time"
+          },
+          "width": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "height": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fps",
+          "width",
+          "height"
+        ]
+      },
+      "Time": {
+        "description": "Exact, nonnegative timeline time. Validation belongs to the document boundary.",
+        "type": "object",
+        "properties": {
+          "num": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "den": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "num",
+          "den"
+        ]
+      }
+    }
+  },
+  "edit_request": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "EditRequest",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 1,
+        "maximum": 1
+      },
+      "expected_project_revision": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "commands": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/Edit"
+        }
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "schema_version",
+      "expected_project_revision",
+      "commands"
+    ],
+    "$defs": {
+      "Edit": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_default_model"
+              },
+              "model": {
+                "$ref": "#/$defs/ModelSelection"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "model"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_delivery"
+              },
+              "delivery": {
+                "$ref": "#/$defs/DeliverySettings"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "delivery"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_global_prompt"
+              },
+              "prompt": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "prompt"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "add_asset"
+              },
+              "asset": {
+                "$ref": "#/$defs/Asset"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "asset"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "add_scene"
+              },
+              "scene": {
+                "$ref": "#/$defs/Scene"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "remove_scene"
+              },
+              "scene_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "move_scene"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "start": {
+                "$ref": "#/$defs/Time"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id",
+              "start"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_scene_model"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "model": {
+                "$ref": "#/$defs/ModelChoice"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id",
+              "model"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_scene_description"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id",
+              "description"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_scene_duration"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "duration": {
+                "$ref": "#/$defs/Time"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id",
+              "duration"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_model_settings"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "settings": {
+                "$ref": "#/$defs/SettingsSlot"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id",
+              "settings"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "add_section"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "section": {
+                "$ref": "#/$defs/Section"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id",
+              "section"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "update_section"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "section": {
+                "$ref": "#/$defs/Section"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id",
+              "section"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "remove_section"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "section_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id",
+              "section_id"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_bindings"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "bindings": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/Binding"
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id",
+              "bindings"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_continuity"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "continuity": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Continuity"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "duplicate_scene"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "new_scene_id": {
+                "type": "string"
+              },
+              "start": {
+                "$ref": "#/$defs/Time"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id",
+              "new_scene_id",
+              "start"
+            ]
+          }
+        ]
+      },
+      "ModelSelection": {
+        "type": "object",
+        "properties": {
+          "adapter": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "variant": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "profile_revision": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "adapter",
+          "model",
+          "variant",
+          "profile",
+          "profile_revision"
+        ]
+      },
+      "DeliverySettings": {
+        "type": "object",
+        "properties": {
+          "fps": {
+            "$ref": "#/$defs/Time"
+          },
+          "width": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "height": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fps",
+          "width",
+          "height"
+        ]
+      },
+      "Time": {
+        "description": "Exact, nonnegative timeline time. Validation belongs to the document boundary.",
+        "type": "object",
+        "properties": {
+          "num": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "den": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "num",
+          "den"
+        ]
+      },
+      "Asset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "kind": {
+            "$ref": "#/$defs/MediaKind"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "revision",
+          "kind"
+        ]
+      },
+      "MediaKind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video",
+          "audio"
+        ]
+      },
+      "Scene": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "start": {
+            "$ref": "#/$defs/Time"
+          },
+          "duration": {
+            "$ref": "#/$defs/Time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "model": {
+            "$ref": "#/$defs/ModelChoice"
+          },
+          "settings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/SettingsSlot"
+            }
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Section"
+            }
+          },
+          "bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "continuity": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Continuity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accepted_take": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AcceptedTake"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "start",
+          "duration",
+          "description",
+          "model",
+          "settings",
+          "sections",
+          "bindings"
+        ]
+      },
+      "ModelChoice": {
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "project_default"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "override": {
+                "$ref": "#/$defs/ModelSelection"
+              }
+            },
+            "required": [
+              "override"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "SettingsSlot": {
+        "description": "Settings are keyed by the entire model/profile identity, never copied between models.",
+        "type": "object",
+        "properties": {
+          "model": {
+            "$ref": "#/$defs/ModelSelection"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "values": true
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "schema_version",
+          "values"
+        ]
+      },
+      "Section": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "start": {
+            "$ref": "#/$defs/Time"
+          },
+          "duration": {
+            "$ref": "#/$defs/Time"
+          },
+          "prompt": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "start",
+          "duration",
+          "prompt"
+        ]
+      },
+      "Binding": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/$defs/InputRole"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "asset",
+          "role",
+          "enabled"
+        ]
+      },
+      "InputRole": {
+        "type": "string",
+        "enum": [
+          "first_frame",
+          "last_frame",
+          "visual_reference",
+          "video_reference",
+          "voice_reference",
+          "audio_reference"
+        ]
+      },
+      "Continuity": {
+        "type": "object",
+        "properties": {
+          "source_scene": {
+            "type": "string"
+          },
+          "method": {
+            "$ref": "#/$defs/ContinuityMethod"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "source_scene",
+          "method"
+        ]
+      },
+      "ContinuityMethod": {
+        "type": "string",
+        "enum": [
+          "last_frame_first_frame",
+          "combo",
+          "influence",
+          "motion_context",
+          "motion_context_exp"
+        ]
+      },
+      "AcceptedTake": {
+        "description": "A retained source identity; complete result/provenance publication belongs to P03.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "model": {
+            "$ref": "#/$defs/ModelSelection"
+          },
+          "source_fingerprint": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "model",
+          "source_fingerprint"
+        ]
+      }
+    }
+  },
+  "project": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "VideoProject",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 1,
+        "maximum": 1
+      },
+      "id": {
+        "type": "string"
+      },
+      "project_revision": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "default_model": {
+        "$ref": "#/$defs/ModelSelection"
+      },
+      "delivery": {
+        "$ref": "#/$defs/DeliverySettings"
+      },
+      "global_prompt": {
+        "type": "string"
+      },
+      "assets": {
+        "type": "object",
+        "additionalProperties": {
+          "$ref": "#/$defs/Asset"
+        }
+      },
+      "scenes": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/Scene"
+        }
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "schema_version",
+      "id",
+      "project_revision",
+      "default_model",
+      "delivery",
+      "global_prompt",
+      "assets",
+      "scenes"
+    ],
+    "$defs": {
+      "ModelSelection": {
+        "type": "object",
+        "properties": {
+          "adapter": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "variant": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "profile_revision": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "adapter",
+          "model",
+          "variant",
+          "profile",
+          "profile_revision"
+        ]
+      },
+      "DeliverySettings": {
+        "type": "object",
+        "properties": {
+          "fps": {
+            "$ref": "#/$defs/Time"
+          },
+          "width": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "height": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fps",
+          "width",
+          "height"
+        ]
+      },
+      "Time": {
+        "description": "Exact, nonnegative timeline time. Validation belongs to the document boundary.",
+        "type": "object",
+        "properties": {
+          "num": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "den": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "num",
+          "den"
+        ]
+      },
+      "Asset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "kind": {
+            "$ref": "#/$defs/MediaKind"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "revision",
+          "kind"
+        ]
+      },
+      "MediaKind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video",
+          "audio"
+        ]
+      },
+      "Scene": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "start": {
+            "$ref": "#/$defs/Time"
+          },
+          "duration": {
+            "$ref": "#/$defs/Time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "model": {
+            "$ref": "#/$defs/ModelChoice"
+          },
+          "settings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/SettingsSlot"
+            }
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Section"
+            }
+          },
+          "bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "continuity": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Continuity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accepted_take": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AcceptedTake"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "start",
+          "duration",
+          "description",
+          "model",
+          "settings",
+          "sections",
+          "bindings"
+        ]
+      },
+      "ModelChoice": {
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "project_default"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "override": {
+                "$ref": "#/$defs/ModelSelection"
+              }
+            },
+            "required": [
+              "override"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "SettingsSlot": {
+        "description": "Settings are keyed by the entire model/profile identity, never copied between models.",
+        "type": "object",
+        "properties": {
+          "model": {
+            "$ref": "#/$defs/ModelSelection"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "values": true
+        },
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "schema_version",
+          "values"
+        ]
+      },
+      "Section": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "start": {
+            "$ref": "#/$defs/Time"
+          },
+          "duration": {
+            "$ref": "#/$defs/Time"
+          },
+          "prompt": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "start",
+          "duration",
+          "prompt"
+        ]
+      },
+      "Binding": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/$defs/InputRole"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "asset",
+          "role",
+          "enabled"
+        ]
+      },
+      "InputRole": {
+        "type": "string",
+        "enum": [
+          "first_frame",
+          "last_frame",
+          "visual_reference",
+          "video_reference",
+          "voice_reference",
+          "audio_reference"
+        ]
+      },
+      "Continuity": {
+        "type": "object",
+        "properties": {
+          "source_scene": {
+            "type": "string"
+          },
+          "method": {
+            "$ref": "#/$defs/ContinuityMethod"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "source_scene",
+          "method"
+        ]
+      },
+      "ContinuityMethod": {
+        "type": "string",
+        "enum": [
+          "last_frame_first_frame",
+          "combo",
+          "influence",
+          "motion_context",
+          "motion_context_exp"
+        ]
+      },
+      "AcceptedTake": {
+        "description": "A retained source identity; complete result/provenance publication belongs to P03.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "model": {
+            "$ref": "#/$defs/ModelSelection"
+          },
+          "source_fingerprint": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "model",
+          "source_fingerprint"
+        ]
+      }
+    }
+  },
+  "capabilities": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Capabilities",
+    "type": "object",
+    "properties": {
+      "revision": {
+        "type": "string"
+      },
+      "runtime_available": {
+        "type": "boolean"
+      },
+      "experimental": {
+        "type": "boolean"
+      },
+      "validation_status": {
+        "$ref": "#/$defs/ValidationStatus"
+      },
+      "input_roles": {
+        "type": "object",
+        "properties": {
+          "audio_reference": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/MediaKind"
+            }
+          },
+          "first_frame": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/MediaKind"
+            }
+          },
+          "last_frame": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/MediaKind"
+            }
+          },
+          "video_reference": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/MediaKind"
+            }
+          },
+          "visual_reference": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/MediaKind"
+            }
+          },
+          "voice_reference": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/$defs/MediaKind"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "continuity": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "$ref": "#/$defs/ContinuityMethod"
+        }
+      },
+      "incompatible_roles": {
+        "type": "array",
+        "items": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "$ref": "#/$defs/InputRole"
+            },
+            {
+              "$ref": "#/$defs/InputRole"
+            }
+          ],
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "revision",
+      "runtime_available",
+      "experimental",
+      "validation_status",
+      "input_roles",
+      "continuity",
+      "incompatible_roles"
+    ],
+    "$defs": {
+      "ValidationStatus": {
+        "type": "string",
+        "enum": [
+          "unvalidated",
+          "synthetic_verified",
+          "runtime_verified"
+        ]
+      },
+      "MediaKind": {
+        "type": "string",
+        "enum": [
+          "image",
+          "video",
+          "audio"
+        ]
+      },
+      "ContinuityMethod": {
+        "type": "string",
+        "enum": [
+          "last_frame_first_frame",
+          "combo",
+          "influence",
+          "motion_context",
+          "motion_context_exp"
+        ]
+      },
+      "InputRole": {
+        "type": "string",
+        "enum": [
+          "first_frame",
+          "last_frame",
+          "visual_reference",
+          "video_reference",
+          "voice_reference",
+          "audio_reference"
+        ]
+      }
+    }
+  },
+  "h3_settings": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "H3Settings",
+    "description": "No image CFG/negative-conditioning defaults. Exact runtime constraints belong to P05.",
+    "type": "object",
+    "properties": {
+      "stage_one": {
+        "$ref": "#/$defs/H3Stage"
+      },
+      "stage_two": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/H3SecondStage"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "stage_one"
+    ],
+    "$defs": {
+      "H3Stage": {
+        "type": "object",
+        "properties": {
+          "steps": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "sampler": {
+            "type": "string"
+          },
+          "scheduler": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "steps",
+          "sampler",
+          "scheduler"
+        ]
+      },
+      "H3SecondStage": {
+        "type": "object",
+        "properties": {
+          "sampling": {
+            "$ref": "#/$defs/H3Stage"
+          },
+          "model": {
+            "$ref": "#/$defs/ModelSelection"
+          },
+          "handoff": {
+            "$ref": "#/$defs/H3Handoff"
+          },
+          "trained_latent_upscale_model": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "sampling",
+          "model",
+          "handoff"
+        ]
+      },
+      "ModelSelection": {
+        "type": "object",
+        "properties": {
+          "adapter": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "variant": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "profile_revision": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "adapter",
+          "model",
+          "variant",
+          "profile",
+          "profile_revision"
+        ]
+      },
+      "H3Handoff": {
+        "type": "string",
+        "enum": [
+          "continue_latent",
+          "re_noise_video_prediction"
+        ]
+      }
+    }
+  },
+  "validation_report": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "ValidationReport",
+    "type": "object",
+    "properties": {
+      "input_revision": {
+        "type": "string"
+      },
+      "model": {
+        "$ref": "#/$defs/ModelSelection"
+      },
+      "capability_revision": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "runtime_available": {
+        "type": "boolean"
+      },
+      "blockers": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/Issue"
+        }
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "input_revision",
+      "model",
+      "runtime_available",
+      "blockers"
+    ],
+    "$defs": {
+      "ModelSelection": {
+        "type": "object",
+        "properties": {
+          "adapter": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "variant": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "profile_revision": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "adapter",
+          "model",
+          "variant",
+          "profile",
+          "profile_revision"
+        ]
+      },
+      "Issue": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "scene_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "field"
+        ]
+      }
+    }
+  }
+}

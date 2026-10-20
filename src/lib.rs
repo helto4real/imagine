@@ -31,3 +31,5 @@ pub mod model_adapter;
 pub mod model_library;
 
 pub mod rust_runtime;
+
+pub mod video;
