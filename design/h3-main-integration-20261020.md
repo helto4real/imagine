@@ -44,10 +44,31 @@ both input deployments and assembled this new manifest. The active
 `comfyui/runtime-current.json` was not changed. No worker/service, CUDA or model
 was started. Do not execute the generic prepare launcher to mutate this snapshot.
 
-## Remaining gates
+## Completed local integration and CPU validation
 
-Combined main CPU/image regressions and normal signed-commit/merge completion
-must be recorded after they actually pass. Product activation is a separate step:
+Normal configured OpenPGP signing succeeded. Product commit
+`cd0ef53be69dd539ef0ffdf0cb03f4c1c5835fc7` was signature-verified and brought
+onto local main with `git merge --ff-only`, including the standalone H3 freeze.
+No unsigned commit, stash, reset, clean, broad staging, push or product restart
+was used. Six overlapping code paths and the additional ignore rule were
+combined with the existing local work. All 357 original pending files remain:
+350 byte-identical and seven with exact preservation proofs. Their original
+28 tracked modifications remain unstaged; unrelated later-core work is not
+part of either H3 commit.
+
+The combined product working tree passed 240 CPU tests, zero failed, three
+explicit live/GPU tests ignored. Workspace all-target Clippy with warnings
+denied, formatting and workspace build passed. These tests include preserved
+local image/UI improvements, not only the bare committed tree. The separate
+inference workspace and its pending later-core/D-05 tests were not executed.
+The newly built product server independently verified and reassembled the
+snapshot into identical manifest bytes, without starting a service or worker.
+Full command/log hashes are in `h3-main-cpu-validation-20261020.json`.
+
+## Remaining activation gates
+
+The active image-only manifest is unchanged. The new H3 manifest requires
+explicit selection at a later authorized launch. Product activation is a separate step:
 real image → H3 → image recovery, cancellation/Ticket lifecycle and native GUI/
 actual AV synchronization must be qualified with the selected deployment.
 No GPU test, product restart, push or unsigned commit is part of this preparation.

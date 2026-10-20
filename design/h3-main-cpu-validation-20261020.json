@@ -1,0 +1,82 @@
+{
+  "recorded_utc": "2026-10-20T14:57:31.095374+00:00",
+  "integrated_head": "cd0ef53be69dd539ef0ffdf0cb03f4c1c5835fc7",
+  "scope": "root product workspace plus preserved local product/UI changes; inference workspace excluded",
+  "counts": {
+    "passed": 240,
+    "failed": 0,
+    "ignored_live_gpu_tests": 3
+  },
+  "commands": [
+    {
+      "name": "workspace-tests",
+      "command": [
+        "cargo",
+        "test",
+        "--locked",
+        "--offline",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/h3-main-20261020/cpu-validation/workspace-tests.log",
+      "log_sha256": "0f93483363ee3777ed988024ca0b27973d198a53b1325d6eca943406fb8d0d1d"
+    },
+    {
+      "name": "workspace-clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--offline",
+        "--workspace",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/h3-main-20261020/cpu-validation/workspace-clippy.log",
+      "log_sha256": "2169a929161bd066a6d5338e34d072c37b9ae926f9b9af76e5fe3f0226864fdb"
+    },
+    {
+      "name": "format",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/h3-main-20261020/cpu-validation/format.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "workspace-build",
+      "command": [
+        "cargo",
+        "build",
+        "--locked",
+        "--offline",
+        "--workspace"
+      ],
+      "exit_code": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/h3-main-20261020/cpu-validation/workspace-build.log",
+      "log_sha256": "40108eb5c2e432741fc7f36afdf5c793ec02b19e7b1ce5e51bdd2ba377bd26cb"
+    }
+  ],
+  "runtime_verified_by_new_product_server": true,
+  "runtime_manifest": "/home/thhel/ChatGPT/imagine/comfyui/h3-main-20261020/product-runtime.json",
+  "runtime_manifest_sha256": "366d40e00bd58368ce0decbcecd778cf6be9acb8c96ad08da79aa0b61c2688a0",
+  "active_manifest_unchanged": true,
+  "backup": "/home/thhel/Documents/Codex/2026-10-20/task/h3-merge-backup-20261020T144547Z",
+  "original_pending_files_preserved": 357,
+  "unaffected_files_byte_identical": 350,
+  "overlap_preservation_proof": "/home/thhel/Documents/Codex/2026-10-20/task/h3-merge-backup-20261020T144547Z/preservation-proof.json",
+  "original_local_changes_not_committed": true,
+  "gpu_runs": 0,
+  "model_loads": 0,
+  "product_restarts": 0,
+  "pushes": 0,
+  "signing": "Normal configured OpenPGP signing succeeded and signature verified",
+  "checks_on_working_tree_not_bare_commit": true
+}
