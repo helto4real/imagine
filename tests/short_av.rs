@@ -6,6 +6,7 @@ use imagine_server::{
 #[test]
 fn lossless_av_roundtrip_retains_every_frame_and_stereo_sample() {
     let av = Av {
+        shape: Default::default(),
         frames: (0..h3::FRAMES)
             .map(|n| vec![n as u8; h3::FRAME_BYTES])
             .collect(),
@@ -27,12 +28,14 @@ fn lossless_av_roundtrip_retains_every_frame_and_stereo_sample() {
 fn malformed_av_is_rejected_before_any_codec_process() {
     assert!(
         short_av::encode(Av {
+            shape: Default::default(),
             frames: vec![],
             pcm: vec![]
         })
         .is_err()
     );
     let av = Av {
+        shape: Default::default(),
         frames: vec![vec![0; h3::FRAME_BYTES]; h3::FRAMES as usize],
         pcm: vec![0; h3::AUDIO_SAMPLES as usize * 8],
     };

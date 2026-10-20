@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized] target(s) in 0.13s
+     Running unittests src/lib.rs (comfyui/h3-main-20261020/target-product/debug/deps/imagine_ui-81d3568f525a9268)
+
+running 3 tests
+test app::video_ui::tests::completed_preview_never_saves_until_explicit_save_and_failure_keeps_bytes ... ok
+test app::video_ui::tests::playback_reaches_full_last_frame_interval_and_pauses_on_workspace_leave ... ok
+test app::video_ui::tests::video_layout_privacy_and_controls_are_headless_and_prompt_stays_private ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 88 filtered out; finished in 0.36s
+

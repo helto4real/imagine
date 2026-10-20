@@ -1,0 +1,3 @@
+    Checking imagine-ui v0.1.0 (/home/thhel/ChatGPT/imagine/ui)
+    Checking imagine-server v0.1.0 (/home/thhel/ChatGPT/imagine)
+    Finished `dev` profile [unoptimized] target(s) in 2.47s

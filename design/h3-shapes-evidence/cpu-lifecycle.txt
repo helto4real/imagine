@@ -1,0 +1,12 @@
+   Compiling imagine-server v0.1.0 (/home/thhel/ChatGPT/imagine)
+    Finished `test` profile [unoptimized] target(s) in 5.50s
+     Running tests/api_lifecycle.rs (comfyui/h3-main-20261020/target-product/debug/deps/api_lifecycle-5e99479684bb6afa)
+
+running 4 tests
+test h3_never_admits_without_coordinator_even_with_a_deployed_worker ... ok
+test h3_fixed_requests_require_deployment_and_reject_profile_expansion ... ok
+test h3_selected_geometry_reaches_queue_and_output_metadata ... ok
+test h3_and_images_share_fifo_atomic_publication_ranges_and_cancellation ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 0.46s
+

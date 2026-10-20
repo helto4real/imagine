@@ -1,0 +1,3507 @@
+{
+  "source": "/home/thhel/git/comfyui-helto-director/shared/h3/planner.py",
+  "sha256": "53ad732bce05bb52ee4ef8d22f86f4d9ef1585295159c0773d2438498482f47f",
+  "revision": "ab8a643af92b3fe63adc3b78e626e4656b9d800e",
+  "cases": [
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 416,
+        "height": 224,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 416,
+        "height": 224,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 416,
+        "height": 224,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 416,
+        "height": 224,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 416,
+        "height": 224,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 224,
+        "height": 416,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 224,
+        "height": 416,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 224,
+        "height": 416,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 224,
+        "height": 416,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 224,
+        "height": 416,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 608,
+        "height": 320,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 608,
+        "height": 320,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 608,
+        "height": 320,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 608,
+        "height": 320,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 608,
+        "height": 320,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 320,
+        "height": 608,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 320,
+        "height": 608,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 320,
+        "height": 608,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 320,
+        "height": 608,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 320,
+        "height": 608,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 832,
+        "height": 480,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 832,
+        "height": 480,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 832,
+        "height": 480,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 832,
+        "height": 480,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 832,
+        "height": 480,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 480,
+        "height": 832,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 480,
+        "height": 832,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 480,
+        "height": 832,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 480,
+        "height": 832,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 480,
+        "height": 832,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 928,
+        "height": 544,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 928,
+        "height": 544,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 928,
+        "height": 544,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 928,
+        "height": 544,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 928,
+        "height": 544,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 544,
+        "height": 928,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 544,
+        "height": 928,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 544,
+        "height": 928,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 544,
+        "height": 928,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 544,
+        "height": 928,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 1344,
+        "height": 736,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 1344,
+        "height": 736,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 1344,
+        "height": 736,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 1344,
+        "height": 736,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 1344,
+        "height": 736,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 736,
+        "height": 1344,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 736,
+        "height": 1344,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 736,
+        "height": 1344,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 736,
+        "height": 1344,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "16:9",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 736,
+        "height": 1344,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 352,
+        "height": 288,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 352,
+        "height": 288,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 352,
+        "height": 288,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 352,
+        "height": 288,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 352,
+        "height": 288,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 288,
+        "height": 352,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 288,
+        "height": 352,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 288,
+        "height": 352,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 288,
+        "height": 352,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 288,
+        "height": 352,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 512,
+        "height": 384,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 512,
+        "height": 384,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 512,
+        "height": 384,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 512,
+        "height": 384,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 512,
+        "height": 384,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 384,
+        "height": 512,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 384,
+        "height": 512,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 384,
+        "height": 512,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 384,
+        "height": 512,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 384,
+        "height": 512,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 736,
+        "height": 544,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 736,
+        "height": 544,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 736,
+        "height": 544,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 736,
+        "height": 544,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 736,
+        "height": 544,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 544,
+        "height": 736,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 544,
+        "height": 736,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 544,
+        "height": 736,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 544,
+        "height": 736,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 544,
+        "height": 736,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 832,
+        "height": 608,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 832,
+        "height": 608,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 832,
+        "height": 608,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 832,
+        "height": 608,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 832,
+        "height": 608,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 608,
+        "height": 832,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 608,
+        "height": 832,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 608,
+        "height": 832,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 608,
+        "height": 832,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 608,
+        "height": 832,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 1152,
+        "height": 864,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 1152,
+        "height": 864,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 1152,
+        "height": 864,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 1152,
+        "height": 864,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 1152,
+        "height": 864,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 864,
+        "height": 1152,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 864,
+        "height": 1152,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 864,
+        "height": 1152,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 864,
+        "height": 1152,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "4:3",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 864,
+        "height": 1152,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 384,
+        "height": 256,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 384,
+        "height": 256,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 384,
+        "height": 256,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 384,
+        "height": 256,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 384,
+        "height": 256,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 256,
+        "height": 384,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 256,
+        "height": 384,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 256,
+        "height": 384,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 256,
+        "height": 384,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 256,
+        "height": 384,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 544,
+        "height": 352,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 544,
+        "height": 352,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 544,
+        "height": 352,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 544,
+        "height": 352,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 544,
+        "height": 352,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 352,
+        "height": 544,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 352,
+        "height": 544,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 352,
+        "height": 544,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 352,
+        "height": 544,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 352,
+        "height": 544,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 768,
+        "height": 512,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 768,
+        "height": 512,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 768,
+        "height": 512,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 768,
+        "height": 512,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 768,
+        "height": 512,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 512,
+        "height": 768,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 512,
+        "height": 768,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 512,
+        "height": 768,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 512,
+        "height": 768,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 512,
+        "height": 768,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 864,
+        "height": 576,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 864,
+        "height": 576,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 864,
+        "height": 576,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 864,
+        "height": 576,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 864,
+        "height": 576,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 576,
+        "height": 864,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 576,
+        "height": 864,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 576,
+        "height": 864,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 576,
+        "height": 864,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 576,
+        "height": 864,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 1216,
+        "height": 832,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 1216,
+        "height": 832,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 1216,
+        "height": 832,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 1216,
+        "height": 832,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 1216,
+        "height": 832,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 832,
+        "height": 1216,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 832,
+        "height": 1216,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 832,
+        "height": 1216,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 832,
+        "height": 1216,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "3:2",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 832,
+        "height": 1216,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 480,
+        "height": 192,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 480,
+        "height": 192,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 480,
+        "height": 192,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 480,
+        "height": 192,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 480,
+        "height": 192,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 192,
+        "height": 480,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 192,
+        "height": 480,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 192,
+        "height": 480,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 192,
+        "height": 480,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 192,
+        "height": 480,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 672,
+        "height": 288,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 672,
+        "height": 288,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 672,
+        "height": 288,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 672,
+        "height": 288,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 672,
+        "height": 288,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 288,
+        "height": 672,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 288,
+        "height": 672,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 288,
+        "height": 672,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 288,
+        "height": 672,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 288,
+        "height": 672,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 960,
+        "height": 416,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 960,
+        "height": 416,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 960,
+        "height": 416,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 960,
+        "height": 416,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 960,
+        "height": 416,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 416,
+        "height": 960,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 416,
+        "height": 960,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 416,
+        "height": 960,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 416,
+        "height": 960,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 416,
+        "height": 960,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 1088,
+        "height": 448,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 1088,
+        "height": 448,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 1088,
+        "height": 448,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 1088,
+        "height": 448,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 1088,
+        "height": 448,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 448,
+        "height": 1088,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 448,
+        "height": 1088,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 448,
+        "height": 1088,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 448,
+        "height": 1088,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 448,
+        "height": 1088,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 1536,
+        "height": 640,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 1536,
+        "height": 640,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 1536,
+        "height": 640,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 1536,
+        "height": 640,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 1536,
+        "height": 640,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 640,
+        "height": 1536,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 640,
+        "height": 1536,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 640,
+        "height": 1536,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 640,
+        "height": 1536,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "21:9",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 640,
+        "height": 1536,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 320,
+        "height": 320,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 320,
+        "height": 320,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 320,
+        "height": 320,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 320,
+        "height": 320,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Quick Draft",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 320,
+        "height": 320,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 320,
+        "height": 320,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 320,
+        "height": 320,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 320,
+        "height": 320,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 320,
+        "height": 320,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Quick Draft",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 320,
+        "height": 320,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 448,
+        "height": 448,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 448,
+        "height": 448,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 448,
+        "height": 448,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 448,
+        "height": 448,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Draft",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 448,
+        "height": 448,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 448,
+        "height": 448,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 448,
+        "height": 448,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 448,
+        "height": 448,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 448,
+        "height": 448,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Draft",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 448,
+        "height": 448,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 640,
+        "height": 640,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 640,
+        "height": 640,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 640,
+        "height": 640,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 640,
+        "height": 640,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Standard",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 640,
+        "height": 640,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 640,
+        "height": 640,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 640,
+        "height": 640,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 640,
+        "height": 640,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 640,
+        "height": 640,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Standard",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 640,
+        "height": 640,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 704,
+        "height": 704,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 704,
+        "height": 704,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 704,
+        "height": 704,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 704,
+        "height": 704,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "High",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 704,
+        "height": 704,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 704,
+        "height": 704,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 704,
+        "height": 704,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 704,
+        "height": 704,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 704,
+        "height": 704,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "High",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 704,
+        "height": 704,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 992,
+        "height": 992,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 992,
+        "height": 992,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 992,
+        "height": 992,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 992,
+        "height": 992,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Native Resolution",
+        "portrait": false,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 992,
+        "height": 992,
+        "frames": 362,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 0.25
+      },
+      "shape": {
+        "width": 992,
+        "height": 992,
+        "frames": 22,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 1.625
+      },
+      "shape": {
+        "width": 992,
+        "height": 992,
+        "frames": 39,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 5.0
+      },
+      "shape": {
+        "width": 992,
+        "height": 992,
+        "frames": 124,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 10.0
+      },
+      "shape": {
+        "width": 992,
+        "height": 992,
+        "frames": 243,
+        "fps": 24
+      }
+    },
+    {
+      "selection": {
+        "ratio": "1:1",
+        "quality": "Native Resolution",
+        "portrait": true,
+        "seconds": 15.0
+      },
+      "shape": {
+        "width": 992,
+        "height": 992,
+        "frames": 362,
+        "fps": 24
+      }
+    }
+  ]
+}

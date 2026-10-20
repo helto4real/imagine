@@ -37,6 +37,7 @@ fn request(prompt: &str) -> Request {
         id: "cpu-request".into(),
         profile: p::Profile::ShortAvNoReferenceV1,
         prompt: prompt.into(),
+        shape: Default::default(),
         seed: 42,
     }
 }
@@ -89,7 +90,11 @@ fn invalid_request_rejects_before_factory_or_native_initialization() {
     value["seed"] = 43.into();
     cases.push(frame(&serde_json::to_vec(&value).unwrap(), &[]));
     for (key, v) in [
-        ("protocol", serde_json::json!(2)),
+        ("protocol", serde_json::json!(p::VERSION + 1)),
+        (
+            "shape",
+            serde_json::json!({"width":384,"height":256,"frames":40,"fps":24}),
+        ),
         ("profile", serde_json::json!("unknown")),
         ("reference", serde_json::json!("forbidden")),
         ("prompt", serde_json::json!(" ")),
@@ -283,10 +288,17 @@ fn real_cpu_child_streams_complete_av_with_private_prompt_only_on_stdin() {
         deployment.worker_sha256,
         deployment::sha(&PathBuf::from(env!("CARGO_BIN_EXE_h3-cpu-worker-fixture"))).unwrap()
     );
-    let r = request("SYNTHETIC_PRIVATE_CANARY");
+    let mut r = request("SYNTHETIC_PRIVATE_CANARY");
+    r.profile = p::Profile::AvNoReferenceV2;
+    r.shape = p::Shape {
+        width: 64,
+        height: 96,
+        frames: 22,
+        fps: 24,
+    };
     input.write_all(&encoded(&r)).unwrap();
     drop(input);
-    let mut stream = Stream::new(r.id.clone()).unwrap();
+    let mut stream = Stream::with_shape(r.id.clone(), r.shape).unwrap();
     loop {
         let (e, payload) = event(&mut output);
         stream.accept(&e, &payload).unwrap();

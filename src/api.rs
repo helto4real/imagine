@@ -135,6 +135,8 @@ fn model_capability(app: &App, mut value: Value) -> Value {
         };
         value["operations"] = json!(["text_to_video"]);
         value["profile"] = json!(crate::video::job::PROFILE);
+        value["geometry_selectable"] = json!(true);
+        value["gpu_validated_default"] = json!({"width":384,"height":256,"frames":39,"fps":24});
         value["video"] =
             json!({"width":384,"height":256,"frames":39,"fps":24,"audio":true,"seed":42});
     }

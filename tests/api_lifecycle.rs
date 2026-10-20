@@ -85,8 +85,11 @@ impl Backend for Fake {
             self.0.video_calls.fetch_add(1, Ordering::SeqCst);
             self.0.release.notified().await;
             Ok(imagine_server::short_av::Av {
-                frames: (0..39).map(|i| vec![i; 384 * 256 * 3]).collect(),
-                pcm: vec![0; 52000 * 8],
+                shape: input.shape,
+                frames: (0..input.shape.frames)
+                    .map(|i| vec![i as u8; input.shape.frame_bytes()])
+                    .collect(),
+                pcm: vec![0; input.shape.audio_samples() as usize * 8],
             })
         })
     }
@@ -1679,10 +1682,7 @@ async fn h3_and_images_share_fifo_atomic_publication_ranges_and_cancellation() {
     assert!(before["output"].is_null());
     h.probe.release.notify_one();
     let video = wait_status(&h.store, first, "local", "succeeded").await;
-    assert_eq!(
-        video["effective"]["profile_revision"],
-        "h3-short-av-noref-v1"
-    );
+    assert_eq!(video["effective"]["profile_revision"], "h3-av-noref-v2");
     assert_eq!(video["effective"]["prompt"], h3_request()["prompt"]);
     assert_eq!(video["output"]["format"], "mkv");
     assert_eq!(video["output"]["assets"][0]["role"], "video");
@@ -1775,5 +1775,42 @@ async fn h3_never_admits_without_coordinator_even_with_a_deployed_worker() {
         .unwrap_err();
     assert_eq!(error.code, "coordinator_unavailable");
     assert_eq!(h.probe.video_calls.load(Ordering::SeqCst), 0);
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn h3_selected_geometry_reaches_queue_and_output_metadata() {
+    let h = setup_inner(true).await;
+    h.engine_state.send_modify(|s| {
+        s.backend = "rust".into();
+        s.h3_available = true;
+    });
+    let mut value = h3_request();
+    value["width"] = 64.into();
+    value["height"] = 96.into();
+    value["video"]["frames"] = 22.into();
+    value["video"]["profile"] = "h3-av-noref-v2".into();
+    let (status, job) = req(&h.router, "POST", "/v1/jobs", Some(value.clone()), None).await;
+    assert_eq!(status, 202, "{job}");
+    let id = job["id"].as_str().unwrap();
+    wait_status(&h.store, id, "local", "running").await;
+    h.probe.release.notify_one();
+    let done = wait_status(&h.store, id, "local", "succeeded").await;
+    assert_eq!(done["effective"]["width"], 64);
+    assert_eq!(done["output"]["assets"][0]["width"], 64);
+    assert_eq!(done["output"]["assets"][0]["height"], 96);
+    assert_eq!(done["output"]["video"]["frames"], 22);
+    assert_eq!(done["output"]["video"]["samples"], 29333);
+    for (key, bad) in [("frames", 23), ("fps", 30)] {
+        let mut invalid = value.clone();
+        invalid["video"][key] = bad.into();
+        assert_eq!(
+            req(&h.router, "POST", "/v1/jobs", Some(invalid), None)
+                .await
+                .0,
+            422
+        );
+    }
+    assert_eq!(h.probe.video_calls.load(Ordering::SeqCst), 1);
     stop(h).await;
 }

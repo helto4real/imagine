@@ -53,10 +53,11 @@ impl PipeBackend {
         input.write_all(&header).await?;
         input.write_u32(0).await?;
         input.flush().await?;
-        let mut stream =
-            wire::Stream::new(request.id.clone()).ok_or(EngineError("invalid_h3_request"))?;
+        let mut stream = wire::Stream::with_shape(request.id.clone(), request.shape)
+            .ok_or(EngineError("invalid_h3_request"))?;
         let mut result = Av {
-            frames: Vec::with_capacity(wire::FRAMES as usize),
+            shape: request.shape,
+            frames: Vec::with_capacity(request.shape.frames as usize),
             pcm: Vec::new(),
         };
         loop {

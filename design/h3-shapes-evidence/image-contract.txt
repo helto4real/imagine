@@ -1,0 +1,10 @@
+   Compiling imagine-server v0.1.0 (/home/thhel/ChatGPT/imagine)
+    Finished `test` profile [unoptimized] target(s) in 3.74s
+     Running unittests src/lib.rs (comfyui/h3-main-20261020/target-product/debug/deps/imagine_server-0ad0fa0959b5007b)
+
+running 2 tests
+test contract::tests::dimensions_accept_aligned_sizes_and_reject_out_of_bounds ... ok
+test contract::tests::strict_contract_and_order ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 0.00s
+

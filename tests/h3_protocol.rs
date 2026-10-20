@@ -6,6 +6,7 @@ fn request() -> Request {
         id: "synthetic-42".into(),
         profile: Profile::ShortAvNoReferenceV1,
         prompt: "Synthetic rotating cube".into(),
+        shape: Default::default(),
         seed: 42,
     }
 }
@@ -16,7 +17,7 @@ fn request_has_no_model_paths_overrides_or_silent_versions() {
     let mut v = serde_json::to_value(&r).unwrap();
     v["model_path"] = serde_json::json!("/private/model");
     assert!(serde_json::from_value::<Request>(v).is_err());
-    for (version, seed) in [(2, 42), (1, 43)] {
+    for (version, seed) in [(VERSION + 1, 42), (VERSION, 43)] {
         let mut r = request();
         r.protocol = version;
         r.seed = seed;

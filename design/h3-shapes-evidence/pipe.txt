@@ -1,0 +1,12 @@
+   Compiling imagine-server v0.1.0 (/home/thhel/ChatGPT/imagine)
+    Finished `test` profile [unoptimized] target(s) in 0.43s
+     Running tests/h3_pipe.rs (comfyui/h3-main-20261020/target-product/debug/deps/h3_pipe-cd4227de6470f8a9)
+
+running 4 tests
+test nondefault_shape_survives_the_real_pipe_boundary ... ok
+test image_video_image_share_one_supervised_slot_and_reap_h3_on_success ... ok
+test mismatch_partial_errors_and_bounds_never_publish_av_and_remain_sanitized ... ok
+test cancelled_future_leaves_owned_child_for_stop_to_reap_before_release ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+

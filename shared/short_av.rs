@@ -12,17 +12,22 @@ use std::{
     time::{Duration, Instant},
 };
 pub const MIME: &str = "video/x-matroska";
-pub const MAX_CONTAINER: usize = 32 * 1024 * 1024;
+pub const MAX_CONTAINER: usize = h3::geometry::MAX_RAW_BYTES as usize + 64 * 1024 * 1024;
 pub struct Av {
+    pub shape: h3::Shape,
     pub frames: Vec<Vec<u8>>,
     /// Interleaved stereo f32 LE, no normalization or resampling.
     pub pcm: Vec<u8>,
 }
 impl Av {
     pub fn valid(&self) -> bool {
-        self.frames.len() == h3::FRAMES as usize
-            && self.frames.iter().all(|f| f.len() == h3::FRAME_BYTES)
-            && self.pcm.len() == h3::AUDIO_SAMPLES as usize * h3::CHANNELS as usize * 4
+        self.shape.valid()
+            && self.frames.len() == self.shape.frames as usize
+            && self
+                .frames
+                .iter()
+                .all(|f| f.len() == self.shape.frame_bytes())
+            && self.pcm.len() == self.shape.audio_samples() as usize * h3::CHANNELS as usize * 4
             && self
                 .pcm
                 .chunks_exact(4)
@@ -57,7 +62,7 @@ fn collect(
         stdout.take(max as u64 + 1).read_to_end(&mut b)?;
         Ok::<_, std::io::Error>(b)
     });
-    let deadline = Instant::now() + Duration::from_secs(30);
+    let deadline = Instant::now() + Duration::from_secs(180);
     let status = loop {
         match child.try_wait() {
             Ok(Some(status)) => break Ok(status),
@@ -98,7 +103,7 @@ pub fn encode(av: Av) -> Result<Vec<u8>, &'static str> {
         "-pixel_format",
         "rgb24",
         "-video_size",
-        "384x256",
+        &format!("{}x{}", av.shape.width, av.shape.height),
         "-framerate",
         "24",
         "-i",
@@ -172,7 +177,7 @@ fn decode_stream(bytes: &[u8], args: &[&str], max: usize) -> Result<Vec<u8>, &'s
         max,
     )
 }
-fn verify_streams(bytes: &[u8]) -> Result<(), &'static str> {
+fn verify_streams(bytes: &[u8]) -> Result<h3::Shape, &'static str> {
     if bytes.len() > MAX_CONTAINER || !bytes.starts_with(&[0x1a, 0x45, 0xdf, 0xa3]) {
         return Err("invalid_av_container");
     }
@@ -187,8 +192,9 @@ fn verify_streams(bytes: &[u8]) -> Result<(), &'static str> {
             "matroska",
             "-i",
             "pipe:0",
+            "-count_frames",
             "-show_entries",
-            "stream=codec_type,codec_name,width,height,r_frame_rate,sample_rate,channels",
+            "stream=codec_type,codec_name,width,height,r_frame_rate,sample_rate,channels,nb_read_frames",
             "-of",
             "json",
         ])
@@ -222,9 +228,23 @@ fn verify_streams(bytes: &[u8]) -> Result<(), &'static str> {
         .iter()
         .find(|s| s["codec_type"] == "audio")
         .ok_or("invalid_av_container")?;
-    if video["codec_name"] != "ffv1"
-        || video["width"] != h3::WIDTH
-        || video["height"] != h3::HEIGHT
+    let number = |key: &str| {
+        video[key]
+            .as_u64()
+            .and_then(|n| u32::try_from(n).ok())
+            .ok_or("invalid_av_container")
+    };
+    let shape = h3::Shape {
+        width: number("width")?,
+        height: number("height")?,
+        frames: video["nb_read_frames"]
+            .as_str()
+            .and_then(|v| v.parse().ok())
+            .ok_or("invalid_av_container")?,
+        fps: 24,
+    };
+    if !shape.valid()
+        || video["codec_name"] != "ffv1"
         || video["r_frame_rate"] != "24/1"
         || audio["codec_name"] != "pcm_f32le"
         || audio["sample_rate"] != "32000"
@@ -232,30 +252,31 @@ fn verify_streams(bytes: &[u8]) -> Result<(), &'static str> {
     {
         return Err("invalid_av_container");
     }
-    Ok(())
+    Ok(shape)
 }
-/// Decode only the fixed product profile. Bound the output before allocation.
+/// Decode a validated product geometry. Bound the output before allocation.
 pub fn decode(bytes: &[u8]) -> Result<Av, &'static str> {
-    verify_streams(bytes)?;
+    let shape = verify_streams(bytes)?;
     let pixels = decode_stream(
         bytes,
         &[
             "-map", "0:v:0", "-an", "-c:v", "rawvideo", "-pix_fmt", "rgb24", "-threads", "1", "-f",
             "rawvideo",
         ],
-        h3::FRAMES as usize * h3::FRAME_BYTES,
+        shape.frames as usize * shape.frame_bytes(),
     )?;
     let pcm = decode_stream(
         bytes,
         &["-map", "0:a:0", "-vn", "-c:a", "pcm_f32le", "-f", "f32le"],
-        h3::AUDIO_SAMPLES as usize * 8,
+        shape.audio_samples() as usize * 8,
     )?;
-    if !pixels.len().is_multiple_of(h3::FRAME_BYTES) {
+    if !pixels.len().is_multiple_of(shape.frame_bytes()) {
         return Err("invalid_av_result");
     }
     let av = Av {
+        shape,
         frames: pixels
-            .chunks_exact(h3::FRAME_BYTES)
+            .chunks_exact(shape.frame_bytes())
             .map(<[u8]>::to_vec)
             .collect(),
         pcm,

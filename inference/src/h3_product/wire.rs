@@ -66,7 +66,8 @@ pub fn serve<G: Generator>(
         }
     };
     let id = request.id.clone();
-    let mut stream = Stream::new(id.clone()).ok_or(ErrorCode::InvalidRequest)?;
+    let mut stream =
+        Stream::with_shape(id.clone(), request.shape).ok_or(ErrorCode::InvalidRequest)?;
     let result = catch_unwind(AssertUnwindSafe(|| {
         let mut generator = factory(&request)?;
         let mut emit = |event: &Event, payload: &[u8]| {
@@ -88,8 +89,8 @@ pub fn serve<G: Generator>(
         Ok(()) => {
             let complete = Event::Complete {
                 id: id.clone(),
-                frames: p::FRAMES,
-                audio_samples: p::AUDIO_SAMPLES,
+                frames: request.shape.frames,
+                audio_samples: request.shape.audio_samples(),
             };
             if stream.accept(&complete, &[]).is_ok() {
                 return write(output, &complete, &[]);

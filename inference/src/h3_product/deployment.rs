@@ -74,7 +74,7 @@ pub fn identity(
     let map = serde_json::to_vec(dependencies).map_err(|_| ErrorCode::DeploymentMismatch)?;
     Ok(Deployment {
         protocol: p::VERSION,
-        profile: Profile::ShortAvNoReferenceV1,
+        profile: Profile::AvNoReferenceV2,
         core_revision: p::CORE_REVISION.into(),
         model_lock_sha256: p::MODEL_LOCK_SHA256.into(),
         worker_sha256: sha(executable)?,

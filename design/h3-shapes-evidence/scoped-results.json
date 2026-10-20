@@ -1,0 +1,18 @@
+{
+  "tests_passed": 34,
+  "director_comparison_cases": 250,
+  "geometry_protocol_container_passed": 11,
+  "gpu_tests": 0,
+  "service_starts": 0,
+  "service_stops": 0,
+  "broad_workspace_test": "denied_before_execution_by_automatic_review",
+  "checks": [
+    "workspace_fmt_check",
+    "workspace_clippy_all_targets_warnings_denied",
+    "workspace_build",
+    "frozen_h3_worker_build",
+    "frozen_h3_worker_clippy_warnings_denied",
+    "cpu_transport_clippy_warnings_denied"
+  ],
+  "signed_commit": "denied_before_execution_by_automatic_review_missing_explicit_authorization"
+}

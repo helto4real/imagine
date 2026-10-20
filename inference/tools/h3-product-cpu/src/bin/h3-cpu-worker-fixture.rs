@@ -32,8 +32,8 @@ impl Generator for Fake {
                 &[],
             )?;
         }
-        let frame = vec![0; p::FRAME_BYTES];
-        for index in 0..p::FRAMES {
+        let frame = vec![0; r.shape.frame_bytes()];
+        for index in 0..r.shape.frames {
             emit(
                 &Event::VideoFrame {
                     id: r.id.clone(),
@@ -45,12 +45,12 @@ impl Generator for Fake {
                 return Err(ErrorCode::GenerationFailed);
             }
         }
-        let audio = vec![0; p::AUDIO_SAMPLES as usize * p::CHANNELS as usize * 4];
+        let audio = vec![0; r.shape.audio_samples() as usize * p::CHANNELS as usize * 4];
         emit(
             &Event::AudioChunk {
                 id: r.id.clone(),
                 start: 0,
-                samples: p::AUDIO_SAMPLES,
+                samples: r.shape.audio_samples(),
             },
             &audio,
         )

@@ -1,18 +1,28 @@
-//! Fixed experimental H3 dispatch; no image defaults reach inference.
+//! H3 geometry with frozen sampling settings; no image defaults reach inference.
 use crate::{
     contract::{JobRequest, ModelOptions, Operation},
     h3_protocol as h3,
 };
-pub const PROFILE: &str = "h3-short-av-noref-v1";
+pub const PROFILE: &str = "h3-av-noref-v2";
 pub fn request(job: &JobRequest) -> Result<h3::Request, &'static str> {
     let v = job.video.as_ref().ok_or("h3_profile_required")?;
+    let shape = h3::Shape {
+        width: job.width,
+        height: job.height,
+        frames: v.frames,
+        fps: v.fps,
+    };
+    let profile = match v.profile.as_deref() {
+        Some(PROFILE) => h3::Profile::AvNoReferenceV2,
+        Some("h3-short-av-noref-v1") if shape == h3::Shape::default() => {
+            h3::Profile::ShortAvNoReferenceV1
+        }
+        _ => return Err("unsupported_h3_profile"),
+    };
     if job.model != "minimax-h3"
         || job.operation != Operation::TextToVideo
-        || (job.width, job.height) != (h3::WIDTH, h3::HEIGHT)
-        || v.frames != h3::FRAMES
-        || v.fps != h3::FPS
+        || !shape.valid()
         || !v.audio
-        || v.profile.as_deref() != Some(PROFILE)
         || job.seed != Some(42)
         || job.sampling.steps != 4
         || job.sampling.cfg_scale != 1.
@@ -44,7 +54,8 @@ pub fn request(job: &JobRequest) -> Result<h3::Request, &'static str> {
         protocol: h3::VERSION,
         kind: h3::RequestKind::GenerateVideo,
         id: "x".repeat(128),
-        profile: h3::Profile::ShortAvNoReferenceV1,
+        profile,
+        shape,
         prompt: job.prompt.clone(),
         seed: 42,
     };

@@ -1052,4 +1052,4 @@ mod tests {
 
 #[path = "video_client.rs"]
 mod video;
-pub use video::{VideoCompleted, video_request};
+pub use video::{VideoCompleted, video_request, video_request_with_selection};

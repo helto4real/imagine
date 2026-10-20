@@ -65,6 +65,10 @@ pub async fn generate(
     if request.model == "minimax-h3" {
         let input = crate::video::job::request(request).map_err(crate::engine::EngineError)?;
         let av = engine.generate_video(&input).await?;
+        anyhow::ensure!(
+            av.shape == input.shape,
+            crate::engine::EngineError("h3_invalid_output")
+        );
         engine.stage(Some("encoding_video"));
         let bytes = tokio::task::spawn_blocking(move || crate::short_av::encode(av))
             .await?

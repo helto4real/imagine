@@ -2,7 +2,10 @@
 //! Only serde/serde_json/std: no tensor, CUDA, filesystem or async dependencies.
 use serde::{Deserialize, Serialize};
 
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
+#[path = "h3_geometry.rs"]
+pub mod geometry;
+pub use geometry::{Selection, Shape};
 pub const CORE_REVISION: &str = "40ff91114a6d71782aa1a79a76df6940546570bb";
 pub const MODEL_LOCK_SHA256: &str =
     "9cb461e3b118be5775602a81e4ddbd7e727b178f45aba9ce8fab0a3917c296b4";
@@ -24,6 +27,8 @@ pub const STEPS: u32 = 4;
 pub enum Profile {
     #[serde(rename = "h3-short-av-noref-v1")]
     ShortAvNoReferenceV1,
+    #[serde(rename = "h3-av-noref-v2")]
+    AvNoReferenceV2,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -67,6 +72,8 @@ pub struct Request {
     pub profile: Profile,
     pub prompt: String,
     pub seed: u64,
+    #[serde(default)]
+    pub shape: Shape,
 }
 impl Request {
     pub fn valid(&self) -> bool {
@@ -74,6 +81,8 @@ impl Request {
             && valid_id(&self.id)
             && !self.prompt.trim().is_empty()
             && self.prompt.len() <= MAX_PROMPT_BYTES
+            && self.shape.valid()
+            && (self.profile != Profile::ShortAvNoReferenceV1 || self.shape == Shape::default())
             && self.seed == 42
             && serde_json::to_vec(self).is_ok_and(|header| header.len() <= MAX_HEADER)
     }
@@ -147,6 +156,7 @@ pub enum Event {
 /// Product uses this before accepting any bytes. No partial result is publishable.
 /// Ready is checked against the verified deployment before constructing a stream.
 pub struct Stream {
+    shape: Shape,
     id: String,
     frames: u32,
     audio_samples: u32,
@@ -155,7 +165,11 @@ pub struct Stream {
 }
 impl Stream {
     pub fn new(id: String) -> Option<Self> {
-        valid_id(&id).then_some(Self {
+        Self::with_shape(id, Shape::default())
+    }
+    pub fn with_shape(id: String, shape: Shape) -> Option<Self> {
+        (valid_id(&id) && shape.valid()).then_some(Self {
+            shape,
             id,
             frames: 0,
             audio_samples: 0,
@@ -187,8 +201,8 @@ impl Stream {
             Event::VideoFrame { id, index }
                 if id == &self.id
                     && *index == self.frames
-                    && *index < FRAMES
-                    && payload.len() == FRAME_BYTES =>
+                    && *index < self.shape.frames
+                    && payload.len() == self.shape.frame_bytes() =>
             {
                 self.frames += 1;
             }
@@ -196,7 +210,7 @@ impl Stream {
                 if id == &self.id
                     && *start == self.audio_samples
                     && *samples > 0
-                    && *samples <= AUDIO_SAMPLES - self.audio_samples
+                    && *samples <= self.shape.audio_samples() - self.audio_samples
                     && payload.len() == *samples as usize * CHANNELS as usize * 4 =>
             {
                 if !payload
@@ -213,10 +227,10 @@ impl Stream {
                 audio_samples,
             } if id == &self.id
                 && payload.is_empty()
-                && *frames == FRAMES
-                && *audio_samples == AUDIO_SAMPLES
-                && self.frames == FRAMES
-                && self.audio_samples == AUDIO_SAMPLES
+                && *frames == self.shape.frames
+                && *audio_samples == self.shape.audio_samples()
+                && self.frames == self.shape.frames
+                && self.audio_samples == self.shape.audio_samples()
                 && self.steps == STEPS =>
             {
                 self.terminal = true;

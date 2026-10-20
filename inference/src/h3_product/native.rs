@@ -175,14 +175,29 @@ impl VideoExecution for Exec<'_> {
         Ok(free + reserved - active)
     }
 }
-fn budget(role: Component) -> f64 {
+fn budget(role: Component, shape: p::Shape) -> f64 {
     match role {
         Component::Text => 0.,
         Component::Dit => {
-            2. * (24. * 12. * 16. * 24. + 32. * 2. * 65.) * 2. * 0.01 * 0.114 * 1048576.
+            2. * (24.
+                * shape.video_latent_t() as f64
+                * (shape.height / 16) as f64
+                * (shape.width / 16) as f64
+                + 32. * 2. * shape.audio_latent_t() as f64)
+                * 2.
+                * 0.01
+                * 0.114
+                * 1048576.
         }
-        Component::VideoVae => (9.5 * 30. * 256. * 384. + 270_000_000.) * 2. * 1.03,
-        Component::AudioVae => 42_000_000. * 4. * 1.03,
+        Component::VideoVae => {
+            (9.5 * 30. * shape.height as f64 * shape.width as f64 + 270_000_000.)
+                * 2.
+                * 1.03
+                * (shape.frames as f64 / 39.).max(1.)
+        }
+        Component::AudioVae => {
+            42_000_000. * 4. * 1.03 * (shape.audio_samples() as f64 / 52_000.).max(1.)
+        }
     }
 }
 fn component<T>(
@@ -190,6 +205,7 @@ fn component<T>(
     aimdo: &Aimdo,
     models: &Models,
     role: Component,
+    shape: p::Shape,
     notify: &mut dyn FnMut(Notice) -> NResult<()>,
     forward: impl FnOnce(&PreparedParameters, &mut ModelSampling, &mut Exec<'_>) -> NResult<T>,
 ) -> Result<T, ErrorCode> {
@@ -246,7 +262,7 @@ fn component<T>(
         manager
             .load(
                 std::slice::from_ref(&patcher),
-                budget(role),
+                budget(role, shape),
                 None,
                 false,
                 false,
@@ -326,6 +342,7 @@ impl Generator for Native {
             &aimdo,
             &models,
             Component::Text,
+            request.shape,
             &mut quiet,
             |params, _, exec| {
                 phase(emit, Phase::EncodingText).map_err(|_| native_error())?;
@@ -356,12 +373,22 @@ impl Generator for Native {
             &aimdo,
             &models,
             Component::Dit,
+            request.shape,
             &mut progress,
             |params, schedule, exec| {
                 (exec.notify)(Notice::Phase(Phase::Sampling))?;
                 schedule.sigmas = params["model_sampling.sigmas"].as_tensor()?;
                 let sigmas = h3::sampling::simple_sigmas(schedule, 4)?;
-                let base = Tensor::f_zeros([1, 32, 12, 16, 24], (Kind::Float, dev))?;
+                let base = Tensor::f_zeros(
+                    [
+                        1,
+                        32,
+                        request.shape.video_latent_t(),
+                        i64::from(request.shape.height / 16),
+                        i64::from(request.shape.width / 16),
+                    ],
+                    (Kind::Float, dev),
+                )?;
                 let latent =
                     h3::streams::NestedTensor::new(h3::preprocessing::empty_streams(&base)?.into());
                 let noise = latent.prepare_noise(request.seed, None)?;
@@ -403,6 +430,7 @@ impl Generator for Native {
             &aimdo,
             &models,
             Component::VideoVae,
+            request.shape,
             &mut quiet,
             |params, _, exec| {
                 phase(emit, Phase::DecodingVideo).map_err(|_| native_error())?;
@@ -413,13 +441,21 @@ impl Generator for Native {
                 let vae = h3::video_vae::VideoVae::new(params.clone(), config);
                 let video = latents.0.f_to_device_(dev, Kind::Half, false, false)?;
                 let frames = unsafe { vae.decode(&rt, &video, None, exec) }?;
-                if frames.size() != [1, 3, 39, 256, 384] {
+                if frames.size()
+                    != [
+                        1,
+                        3,
+                        i64::from(request.shape.frames),
+                        i64::from(request.shape.height),
+                        i64::from(request.shape.width),
+                    ]
+                {
                     return Err(native_error());
                 }
                 Ok(frames.f_to_device(Device::Cpu)?)
             },
         )?;
-        for index in 0..p::FRAMES {
+        for index in 0..request.shape.frames {
             let frame = frames
                 .f_get(0)
                 .and_then(|v| v.f_select(1, index as i64))
@@ -427,7 +463,7 @@ impl Generator for Native {
                 .and_then(|v| v.f_to_kind(Kind::Float))
                 .and_then(|v| v.f_contiguous())
                 .map_err(|_| ErrorCode::GenerationFailed)?;
-            let mut pixels = vec![0f32; p::FRAME_BYTES];
+            let mut pixels = vec![0f32; request.shape.frame_bytes()];
             let n = pixels.len();
             frame
                 .f_copy_data(&mut pixels, n)
@@ -448,13 +484,16 @@ impl Generator for Native {
             &aimdo,
             &models,
             Component::AudioVae,
+            request.shape,
             &mut quiet,
             |params, _, exec| {
                 phase(emit, Phase::DecodingAudio).map_err(|_| native_error())?;
                 let vae = h3::audio_vae::AudioVae::new(params.clone(), Default::default());
                 let audio = latents.1.f_to_device(dev)?;
                 let pcm = unsafe { vae.decode(&rt, &audio, exec) }?;
-                if pcm.size() != [1, 2, 52000] || pcm.kind() != Kind::Float {
+                if pcm.size() != [1, 2, i64::from(request.shape.native_audio_samples())]
+                    || pcm.kind() != Kind::Float
+                {
                     return Err(native_error());
                 }
                 Ok(pcm
@@ -463,22 +502,30 @@ impl Generator for Native {
                     .f_contiguous()?)
             },
         )?;
-        let mut samples = vec![0f32; p::AUDIO_SAMPLES as usize * p::CHANNELS as usize];
+        let mut samples =
+            vec![0f32; request.shape.native_audio_samples() as usize * p::CHANNELS as usize];
         let n = samples.len();
         pcm.f_copy_data(&mut samples, n)
+            .map_err(|_| ErrorCode::GenerationFailed)?;
+        let samples = request
+            .shape
+            .fit_audio(samples)
             .map_err(|_| ErrorCode::GenerationFailed)?;
         let bytes = samples
             .iter()
             .flat_map(|sample| sample.to_le_bytes())
             .collect::<Vec<_>>();
-        emit(
-            &Event::AudioChunk {
-                id: request.id.clone(),
-                start: 0,
-                samples: p::AUDIO_SAMPLES,
-            },
-            &bytes,
-        )
+        for (index, chunk) in bytes.chunks(p::MAX_PAYLOAD / 8 * 8).enumerate() {
+            emit(
+                &Event::AudioChunk {
+                    id: request.id.clone(),
+                    start: (index * (p::MAX_PAYLOAD / 8)) as u32,
+                    samples: (chunk.len() / 8) as u32,
+                },
+                chunk,
+            )?;
+        }
+        Ok(())
     }
 }
 pub fn run() -> Result<(), ErrorCode> {

@@ -140,6 +140,7 @@ impl Store {
         owner: &str,
         generated: impl Into<crate::generation::Generated>,
     ) -> Result<()> {
+        let mut video_shape = None;
         let (artifacts, format) = match generated.into() {
             crate::generation::Generated::Images(artifacts) => {
                 let mut media = Vec::new();
@@ -152,18 +153,19 @@ impl Store {
                 (media, "png")
             }
             crate::generation::Generated::Video(bytes) => {
-                let bytes = tokio::task::spawn_blocking(move || {
-                    crate::short_av::decode(&bytes).map_err(anyhow::Error::msg)?;
-                    Ok::<_, anyhow::Error>(bytes)
+                let (bytes, shape) = tokio::task::spawn_blocking(move || {
+                    let av = crate::short_av::decode(&bytes).map_err(anyhow::Error::msg)?;
+                    Ok::<_, anyhow::Error>((bytes, av.shape))
                 })
                 .await??;
+                video_shape = Some(shape);
                 (
                     vec![(
                         "video",
                         ImageInfo {
                             bytes,
-                            width: crate::h3_protocol::WIDTH,
-                            height: crate::h3_protocol::HEIGHT,
+                            width: shape.width,
+                            height: shape.height,
                             mime: crate::short_av::MIME.into(),
                         },
                     )],
@@ -197,7 +199,7 @@ impl Store {
                     "height":info.height,"bytes":info.bytes.len(),"sha256":sha256}));
             }
             let mut output=json!({"assets":assets,"format":format});
-            if format=="mkv"{output["video"]=json!({"frames":39,"fps":24,"audio":true,"sample_rate":32000,"channels":2,"samples":52000});}
+            if let Some(shape)=video_shape {output["video"]=json!({"frames":shape.frames,"fps":shape.fps,"duration_seconds":shape.seconds(),"audio":true,"sample_rate":32000,"channels":2,"samples":shape.audio_samples()});}
             let updated = sqlx::query("UPDATE jobs SET status='succeeded',output=?,finished=? WHERE id=? AND owner=? AND status='running'")
                 .bind(output.to_string()).bind(now()).bind(job).bind(owner).execute(&mut *transaction).await?;
             if updated.rows_affected() != 1 { bail!("output job is no longer running"); }

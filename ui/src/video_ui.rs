@@ -10,6 +10,7 @@ use std::{
 #[derive(Default)]
 pub(super) struct VideoDesk {
     pub prompt: String,
+    pub selection: h3::Selection,
     pub available: bool,
     pub checked: bool,
     pub working: bool,
@@ -109,15 +110,15 @@ impl VideoView {
     fn advance(&mut self) {
         if let Some((start, base)) = self.started {
             let frame = base + (start.elapsed().as_secs_f64() * h3::FPS as f64) as usize;
-            self.frame = frame.min(h3::FRAMES as usize - 1);
-            if frame >= h3::FRAMES as usize {
+            self.frame = frame.min(self.av.shape.frames as usize - 1);
+            if frame >= self.av.shape.frames as usize {
                 self.started = None;
                 self.audio = None;
             }
         }
     }
     fn play(&mut self) -> Result<(), &'static str> {
-        if self.frame == h3::FRAMES as usize - 1 {
+        if self.frame == self.av.shape.frames as usize - 1 {
             self.frame = 0;
         }
         let sample = self.frame * h3::SAMPLE_RATE as usize / h3::FPS as usize;
@@ -236,7 +237,16 @@ impl ImagineApp {
         if self.video.pending.is_none() {
             self.video.pending = Some(Submission {
                 upscale_source: None,
-                request: client::video_request(&self.video.prompt),
+                request: match client::video_request_with_selection(
+                    &self.video.prompt,
+                    &self.video.selection,
+                ) {
+                    Ok(request) => request,
+                    Err(error) => {
+                        self.video.error = Some(error.into());
+                        return;
+                    }
+                },
                 key: uuid::Uuid::new_v4().to_string(),
                 folder: PathBuf::new(),
                 job: None,
@@ -301,14 +311,39 @@ impl ImagineApp {
         let inner = bounds.shrink(12.);
         workspace::region(ui, "video-desk", inner, |ui| {
             egui::ScrollArea::vertical().id_salt("video-scroll").show(ui,|ui|{
-                ui.horizontal(|ui|{ui.heading("H3");ui.weak("Experimental · 384 × 256 · 39 frames · 24 fps · Audio");});
+                ui.horizontal(|ui|{ui.heading("H3");ui.weak("Experimental · 24 fps · Audio");});
+                ui.add_enabled_ui(!self.video.working && self.video.pending.is_none(), |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        egui::ComboBox::from_id_salt("h3-ratio").selected_text(&self.video.selection.ratio).show_ui(ui, |ui| {
+                            for ratio in h3::geometry::RATIOS { ui.selectable_value(&mut self.video.selection.ratio, ratio.into(), ratio); }
+                        });
+                        egui::ComboBox::from_id_salt("h3-orientation").selected_text(if self.video.selection.portrait {"Portrait"} else {"Landscape"}).show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.video.selection.portrait, false, "Landscape");
+                            ui.selectable_value(&mut self.video.selection.portrait, true, "Portrait");
+                        });
+                        egui::ComboBox::from_id_salt("h3-size").selected_text(&self.video.selection.quality).show_ui(ui, |ui| {
+                            for quality in h3::geometry::QUALITIES { ui.selectable_value(&mut self.video.selection.quality, quality.into(), quality); }
+                        });
+                        ui.label("Seconds");
+                        ui.add(egui::DragValue::new(&mut self.video.selection.seconds).range(0.25..=3600.).speed(0.25).max_decimals(3));
+                    });
+                });
+                let geometry = self.video.selection.resolve();
+                match geometry {
+                    Ok(shape) => {
+                        ui.label(format!("{} × {} · {} frames · {:.3} s · Audio {:.3} s", shape.width, shape.height, shape.frames, shape.seconds(), shape.audio_samples() as f64 / 32000.));
+                        if shape != h3::Shape::default() { ui.weak(format!("GPU untested: may exceed VRAM. Decoded AV {:.0} MiB. Verified: 384 × 256 / 39 frames.", shape.raw_bytes() as f64 / 1048576.)); }
+                        if shape.frames < 124 || shape.frames > 362 { ui.weak("Outside H3's reported training range (~5–15 s); motion or audio quality may degrade."); }
+                    },
+                    Err(_) => { ui.colored_label(helto::ERROR, "Invalid duration or decoded result exceeds the 2 GiB host-memory limit. Reduce size or duration."); }
+                }
                 ui.label("Prompt");
                 ui.add_enabled_ui(!self.video.working&&self.video.pending.is_none(),|ui|{
                     helto::textarea(ui,&mut self.video.prompt,3,"Video prompt",self.prefs.privacy_mode,true);
                 });
                 ui.horizontal(|ui|{
                     let label=if self.video.pending.is_some()&&!self.video.working{"Retry"}else{"Generate video"};
-                    if ui.add_enabled_ui(self.video.available&&!self.video.working&&!self.video.saving&&!self.video.prompt.trim().is_empty(),|ui|helto::select_button(ui,label,true)).inner.clicked(){self.generate_video(ui.ctx());}
+                    if ui.add_enabled_ui(geometry.is_ok()&&self.video.available&&!self.video.working&&!self.video.saving&&!self.video.prompt.trim().is_empty(),|ui|helto::select_button(ui,label,true)).inner.clicked(){self.generate_video(ui.ctx());}
                     if self.video.working {
                         if ui.add_enabled_ui(!self.video.cancelling&&self.video.pending.as_ref().is_some_and(|s|s.job.is_some()),|ui|helto::select_button(ui,"Cancel video",false)).inner.clicked(){self.cancel_video(ui.ctx());}
                         ui.spinner();
@@ -340,17 +375,17 @@ impl ImagineApp {
                     }
                     if revealed {
                         if view.texture.as_ref().is_none_or(|(frame,_)|*frame!=view.frame){
-                            let image=egui::ColorImage::from_rgb([h3::WIDTH as usize,h3::HEIGHT as usize],&view.av.frames[view.frame]);
+                            let image=egui::ColorImage::from_rgb([view.av.shape.width as usize,view.av.shape.height as usize],&view.av.frames[view.frame]);
                             view.texture=Some((view.frame,ui.ctx().load_texture("video-preview",image,egui::TextureOptions::LINEAR)));
                         }
                         let (_,texture)=view.texture.as_ref().unwrap();
-                        let fit=egui::vec2(h3::WIDTH as f32,h3::HEIGHT as f32)*(media.width()/h3::WIDTH as f32).min(media.height()/h3::HEIGHT as f32);
+                        let fit=egui::vec2(view.av.shape.width as f32,view.av.shape.height as f32)*(media.width()/view.av.shape.width as f32).min(media.height()/view.av.shape.height as f32);
                         ui.painter().image(texture.id(),egui::Rect::from_center_size(media.center(),fit),egui::Rect::from_min_max(egui::Pos2::ZERO,egui::pos2(1.,1.)),egui::Color32::WHITE);
                     }else {ui.painter().text(media.center(),egui::Align2::CENTER_CENTER,"Preview hidden",egui::FontId::proportional(14.),helto::DIM);}
                     ui.horizontal(|ui|{
                         if helto::select_button(ui,if view.started.is_some(){"Pause"}else{"Play"},false).clicked(){play=true;}
                         let mut frame=view.frame;
-                        if ui.add(egui::Slider::new(&mut frame,0..=h3::FRAMES as usize-1).text("Frame")).changed(){view.pause();view.frame=frame;}
+                        if ui.add(egui::Slider::new(&mut frame,0..=view.av.shape.frames as usize-1).text("Frame")).changed(){view.pause();view.frame=frame;}
                         let label=if self.video.saving{"Saving"}else if view.saved.is_some(){"Saved"}else{"Save video"};
                         if ui.add_enabled_ui(!self.video.saving&&!self.video.working&&view.saved.is_none(),|ui|helto::select_button(ui,label,false)).inner.clicked(){save=true;}
                     });
@@ -374,6 +409,7 @@ mod tests {
         client::VideoCompleted {
             bytes: Arc::new(vec![1, 2, 3]),
             av: short_av::Av {
+                shape: Default::default(),
                 frames: vec![vec![0; h3::FRAME_BYTES]; h3::FRAMES as usize],
                 pcm: vec![0; h3::AUDIO_SAMPLES as usize * 8],
             },

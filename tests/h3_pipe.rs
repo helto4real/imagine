@@ -17,6 +17,7 @@ fn input(prompt: &str) -> h3::Request {
         id: "fixture-42".into(),
         profile: h3::Profile::ShortAvNoReferenceV1,
         prompt: prompt.into(),
+        shape: Default::default(),
         seed: 42,
     }
 }
@@ -68,10 +69,11 @@ if q['prompt']=='unknown':
 for phase in ['loading_text','encoding_text','loading_dit','sampling','loading_video_vae','decoding_video','loading_audio_vae','decoding_audio']:
  emit(dict(type='phase',id=q['id'],phase=phase))
 for i in range(1,5):emit(dict(type='progress',id=q['id'],completed=i,total=4,elapsed_seconds=i/10))
-for i in range(39):emit(dict(type='video_frame',id=q['id'],index=i),bytes([i])*384*256*3)
+shape=q['shape']; count=shape['frames']; samples=(count*4000+1)//3
+for i in range(count):emit(dict(type='video_frame',id=q['id'],index=i),bytes([i%256])*shape['width']*shape['height']*3)
 if q['prompt']=='partial':sys.exit(0)
-for i in range(0,52000,1000):emit(dict(type='audio_chunk',id=q['id'],start=i,samples=min(1000,52000-i)),bytes(min(1000,52000-i)*8))
-emit(dict(type='complete',id=q['id'],frames=39,audio_samples=52000))
+for i in range(0,samples,1000):emit(dict(type='audio_chunk',id=q['id'],start=i,samples=min(1000,samples-i)),bytes(min(1000,samples-i)*8))
+emit(dict(type='complete',id=q['id'],frames=count,audio_samples=samples))
 time.sleep(60)
 "#)).unwrap();
     for path in [&image, &video] {
@@ -95,7 +97,7 @@ time.sleep(60)
     let mut h3environment = environment.clone();
     h3environment.remove("IMAGINE_PILLOW_LIBRARY");
     let identity = h3::Deployment {
-        protocol: 1,
+        protocol: h3::VERSION,
         profile: h3::Profile::ShortAvNoReferenceV1,
         core_revision: h3::CORE_REVISION.into(),
         model_lock_sha256: h3::MODEL_LOCK_SHA256.into(),
@@ -187,4 +189,22 @@ async fn cancelled_future_leaves_owned_child_for_stop_to_reap_before_release() {
     let pid = state.borrow().pid.unwrap();
     engine.stop().await.unwrap();
     assert!(!Path::new(&format!("/proc/{pid}")).exists());
+}
+
+#[tokio::test]
+async fn nondefault_shape_survives_the_real_pipe_boundary() {
+    let (_dir, mut engine, state) = fake(false);
+    let mut request = input("synthetic");
+    request.profile = h3::Profile::AvNoReferenceV2;
+    request.shape = h3::Shape {
+        width: 64,
+        height: 96,
+        frames: 22,
+        fps: 24,
+    };
+    let av = engine.generate_video(&request).await.unwrap();
+    assert_eq!(av.shape, request.shape);
+    assert!(av.valid());
+    assert_eq!(av.frames[21][0], 21);
+    assert!(state.borrow().pid.is_none());
 }
