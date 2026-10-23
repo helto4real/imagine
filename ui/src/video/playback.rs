@@ -80,12 +80,38 @@ impl ImagineApp {
             }
         }
     }
+    /// The Scene whose media the viewer shows: a chosen Take, else a Scene's
+    /// accepted Take or clip.
+    fn timeline_shown_scene(&self) -> Option<SceneId> {
+        let d = self.timeline.document.as_ref()?;
+        if let Some(take) = &self.timeline.selected_take {
+            return d
+                .view
+                .takes
+                .iter()
+                .find(|t| &t.id.0 == take)
+                .map(|t| t.scene_id.clone());
+        }
+        let shown = self.timeline.preview_asset.as_deref()?;
+        d.project
+            .scenes
+            .iter()
+            .find(|s| scene_media(d, s).as_deref() == Some(shown))
+            .map(|s| s.id.clone())
+    }
     /// Moves the playhead with the playing scene and continues into the next.
+    /// Media played from the viewer moves it too, within its own Scene.
     pub(super) fn timeline_follow_playback(&mut self, ctx: &egui::Context) {
         if let Some(play) = self.timeline.playback.request.take() {
             self.timeline_cue(ctx, play);
         }
-        let Some(scene_id) = self.timeline.playback.scene.clone() else {
+        let Some(scene_id) = self
+            .timeline
+            .playback
+            .scene
+            .clone()
+            .or_else(|| self.timeline_shown_scene())
+        else {
             return;
         };
         let Some(scene) = self
@@ -183,5 +209,33 @@ mod tests {
         app.timeline.playhead = 99.;
         app.timeline_cue(&ctx, true);
         assert!(app.timeline.playback.scene.is_none() && !app.timeline.playback.chain);
+    }
+    #[test]
+    fn a_take_played_from_the_viewer_moves_the_playhead_within_its_scene() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let mut app = app(&ctx, root.path());
+        let second = app.timeline.document.as_ref().unwrap().project.scenes[1].clone();
+        let mut document = app.timeline.document.take().unwrap();
+        document.view = serde_json::from_value(json!({
+            "takes":[{"id":"own-take","scene_id":second.id.0,"status":"candidate","provenance":null}]
+        }))
+        .unwrap();
+        app.timeline.document = Some(document);
+        app.timeline.selected_take = Some("own-take".into());
+        let mut player = player::Player::new(player::Preview::synthetic(2.));
+        player.seek(0.5);
+        player.start().unwrap();
+        app.timeline.player = Some(player);
+        app.timeline.playhead = 0.;
+        app.timeline_follow_playback(&ctx);
+        let start = seconds(second.start);
+        assert!(
+            (app.timeline.playhead - (start + 0.5)).abs() < 0.1,
+            "{} vs {start}",
+            app.timeline.playhead
+        );
+        // Not draft playback: it does not continue into another Scene.
+        assert!(!app.timeline.playback.chain);
     }
 }

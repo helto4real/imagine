@@ -149,6 +149,24 @@ impl Chip {
         self.tone == Tone::Plain
     }
 }
+/// Director's playhead: a gold line over every track with a marker in the ruler.
+fn playhead(ui: &egui::Ui, canvas: Rect, x: f32) {
+    let painter = ui.painter();
+    painter.vline(
+        x,
+        canvas.top()..=canvas.bottom(),
+        Stroke::new(2., helto::ACCENT),
+    );
+    painter.add(egui::Shape::convex_polygon(
+        vec![
+            egui::pos2(x - 6., canvas.top()),
+            egui::pos2(x + 6., canvas.top()),
+            egui::pos2(x, canvas.top() + 8.),
+        ],
+        helto::ACCENT,
+        Stroke::NONE,
+    ));
+}
 /// The Scene band's take count, coloured by the Scene's take state, at its right end.
 fn take_badge(ui: &egui::Ui, bar: Rect, state: SceneState, takes: usize) -> Rect {
     let (text, fill, color) = match state {
@@ -497,11 +515,8 @@ impl ImagineApp {
                             .clamp(0., whole);
                     self.timeline.playback.request = Some(false);
                 }
-                ui.painter().vline(
-                    canvas.left() + self.timeline.playhead as f32 * self.timeline.zoom,
-                    canvas.top()..=canvas.bottom(),
-                    Stroke::new(1., helto::FOCUS),
-                );
+                let head = canvas.left() + self.timeline.playhead as f32 * self.timeline.zoom;
+                // Drawn last, over the blocks; see `playhead` below.
                 let tick = (48. / self.timeline.zoom).ceil().max(1.) as usize;
                 let visible = ui.clip_rect().intersect(canvas);
                 let first =
@@ -1027,6 +1042,7 @@ impl ImagineApp {
                     }
                 }
                 self.timeline_audio_tracks(ui, canvas, project, enabled, commands);
+                playhead(ui, canvas, head);
                 if project.audio_tracks.is_empty() {
                     ui.painter().text(
                         egui::pos2(canvas.left() + 4., canvas.top() + AUDIO_TOP + 6.),
