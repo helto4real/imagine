@@ -33,14 +33,9 @@ impl ImagineApp {
                     .iter()
                     .filter(|j| j.working && !matches!(j.status.as_str(), "Queued" | "Submitting"))
                     .count();
-                let video_pending = usize::from(
-                    self.video.working
-                        && matches!(self.video.status.as_str(), "Queued" | "Submitting"),
-                );
                 let (scene_pending, scene_active) = self.timeline_queue_counts();
-                let pending = pending + video_pending + scene_pending;
-                let active =
-                    active + usize::from(self.video.working) - video_pending + scene_active;
+                let pending = pending + scene_pending;
+                let active = active + scene_active;
                 ui.label(
                     RichText::new(format!("{active} active · {pending} waiting"))
                         .small()
@@ -92,23 +87,6 @@ impl ImagineApp {
                 .id_salt("queue-rows")
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
-                    if self.video.working || self.video.error.is_some() {
-                        ui.horizontal(|ui| {
-                            ui.label(if revealed {
-                                self.video.prompt.lines().next().unwrap_or("Video")
-                            } else {
-                                "Hidden prompt"
-                            });
-                            ui.weak(format!("Video · {}", self.video.status));
-                            if self.video.working
-                                && !self.video.cancelling
-                                && self.video.pending.as_ref().is_some_and(|s| s.job.is_some())
-                                && helto::select_button(ui, "Cancel video", false).clicked()
-                            {
-                                self.cancel_video(ui.ctx());
-                            }
-                        });
-                    }
                     self.timeline_queue_rows(ui, revealed);
                     for (index, job) in self
                         .queue
@@ -216,7 +194,6 @@ impl ImagineApp {
                         .jobs
                         .iter()
                         .any(|j| j.working || j.error.is_some())
-                        && !self.video.working
                         && self.timeline_queue_counts() == (0, 0)
                         && !self.timeline_has_job_errors()
                     {

@@ -6,11 +6,9 @@ impl ImagineApp {
         self.animate_image_blocked().is_none()
     }
     pub(in crate::app) fn animate_image_blocked(&self) -> Option<&'static str> {
-        self.edit_image_blocked().or((self.video.working
-            || self.video.pending.is_some()
-            || self.timeline.busy
-            || self.timeline.admitting)
-            .then_some("Wait for the current video operation."))
+        self.edit_image_blocked()
+            .or((self.timeline.busy || self.timeline.admitting)
+                .then_some("Wait for the current video operation."))
     }
 
     pub(in crate::app) fn start_animating(&mut self, ctx: &egui::Context) {
@@ -24,7 +22,6 @@ impl ImagineApp {
         let file = image.file.clone();
         let [width, height] = image.texture.size();
         let epoch = self.timeline.epoch;
-        self.timeline.quick_clip = false;
         self.timeline.busy = true;
         self.timeline.error = None;
         self.workspace = Workspace::Video;
@@ -148,6 +145,26 @@ mod tests {
         fn stop(&mut self) -> engine::EngineFuture<'_, ()> {
             Box::pin(async { Ok(()) })
         }
+    }
+
+    #[test]
+    fn animate_requires_a_selected_image_and_an_idle_timeline() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.workspace = Workspace::Image;
+        assert_eq!(app.animate_image_blocked(), None);
+        app.timeline.busy = true;
+        assert_eq!(
+            app.animate_image_blocked(),
+            Some("Wait for the current video operation.")
+        );
+        app.timeline.busy = false;
+        app.image.result = None;
+        assert_eq!(
+            app.animate_image_blocked(),
+            Some("Generate or choose an image first.")
+        );
     }
 
     #[tokio::test]

@@ -937,7 +937,6 @@ fn texture(ctx: &egui::Context, preview: &Preview, id: &str) -> egui::TextureHan
 impl eframe::App for ImagineApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.pause_timeline();
-        self.pause_video();
         if self.models.dirty {
             self.save_preferences();
         }

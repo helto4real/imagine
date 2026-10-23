@@ -129,7 +129,6 @@ pub(super) struct Timeline {
     pending: Option<(Value, String)>,
     pending_seed_advance: Option<seed::Advance>,
     after_edit: Option<PostAction>,
-    pub(super) quick_clip: bool,
     player: Option<player::Player>,
     comparison: Option<player::Comparison>,
     comparison_state: Option<player::ComparisonState>,

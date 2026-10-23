@@ -156,8 +156,10 @@ The Reference desk layout places ordered references on the left, the image in
 the center, and the prompt/size/seed inspector on the right. Every toolbar action
 uses an outline icon with a tooltip and accessible name. The image, character-card
 and film icons switch between Image, Character sheets and Video. Switching keeps
-each workspace's drafts, references, results and pending job intact. Video currently has an explicit unavailable state, not a video engine
-or editing tools.
+each workspace's drafts, references, results and pending job intact. Video opens
+the Timeline. **Animate** in the image viewer creates a one-scene Timeline project
+with the selected image as its first frame; there is no separate single-clip desk.
+Disabled actions name themselves and give the reason on hover.
 
 The gear opens a separate native **Settings** window with **Generation** (Steps,
 CFG, Reference size, Upscale target), **Storage** (output folder), and **Privacy** (Hide previews). Changes save

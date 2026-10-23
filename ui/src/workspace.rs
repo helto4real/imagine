@@ -202,7 +202,6 @@ impl ImagineApp {
         helto::set_privacy_mode(ui.ctx(), self.prefs.privacy_mode);
         self.receive(ui.ctx());
         if self.workspace != Workspace::Video {
-            self.pause_video();
             self.pause_timeline();
         }
         self.keyboard_shortcuts(ui.ctx());
@@ -256,7 +255,7 @@ impl ImagineApp {
                     _scroll.content_size,
                 );
             }
-            Workspace::Video => self.video_workspace(ui, body),
+            Workspace::Video => self.timeline_workspace(ui, body),
         });
         self.queue_panel(ui, dock);
         self.multiple_prompts_window(ui.ctx());

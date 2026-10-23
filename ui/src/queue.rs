@@ -64,9 +64,7 @@ impl Default for Queue {
 impl ImagineApp {
     /// Expand the dock when any image, video, run or export work is added.
     pub(super) fn expand_queue_for_new_work(&mut self) {
-        let work = self.queue.jobs.len()
-            + usize::from(self.video.working || self.video.pending.is_some())
-            + self.timeline_queue_work();
+        let work = self.queue.jobs.len() + self.timeline_queue_work();
         if work > self.queue.seen_work {
             self.queue.collapsed = false;
         }

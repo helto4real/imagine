@@ -264,16 +264,22 @@ impl ImagineApp {
             None
         }
     }
-    pub(super) fn timeline_generate_blocked(&self) -> Option<&'static str> {
-        self.timeline_blocked(true).or(if !self.video.available {
-            Some("H3 is unavailable. Reconnect to retry.")
+    pub(super) fn timeline_generate_blocked(&self) -> Option<String> {
+        let reason = self.timeline_blocked(true).or(if !self.video.checked {
+            Some("Checking H3 availability.")
+        } else if !self.video.available {
+            return Some(match &self.video.error {
+                Some(error) => format!("H3 is unavailable: {error}"),
+                None => "H3 is unavailable. Check the H3 deployment and GPU coordinator, then reconnect.".into(),
+            });
         } else if self.timeline.scene().is_none() {
             Some("Select a scene first.")
         } else if self.timeline.scene_active() {
             Some("This scene is already generating.")
         } else {
             None
-        })
+        });
+        reason.map(str::to_owned)
     }
     fn timeline_toolbar_left(
         &mut self,
@@ -380,10 +386,6 @@ impl ImagineApp {
                 super::qa::control(ui, "library-open-window".into(), &r);
                 if r.clicked() {
                     *action = Some(PostAction::Library);
-                    ui.close();
-                }
-                if ui.button("Single clip").clicked() {
-                    self.timeline.quick_clip = true;
                     ui.close();
                 }
                 ui.add_enabled_ui(document.is_some(), |ui| {
@@ -590,7 +592,7 @@ impl ImagineApp {
                     "Generate"
                 },
                 true,
-                self.timeline_generate_blocked(),
+                self.timeline_generate_blocked().as_deref(),
             );
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, "timeline-generate".into(), &response);

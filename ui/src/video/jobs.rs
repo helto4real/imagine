@@ -284,7 +284,6 @@ impl ImagineApp {
                 .map(str::to_owned);
             if let Some(asset) = asset {
                 self.workspace = Workspace::Video;
-                self.timeline.quick_clip = false;
                 self.timeline.clear_audio_selection();
                 self.timeline.selected.clear();
                 self.timeline.selected.insert(SceneId(scene));
@@ -296,7 +295,6 @@ impl ImagineApp {
         }
         if let Some(asset) = delivery {
             self.workspace = Workspace::Video;
-            self.timeline.quick_clip = false;
             self.timeline.selected_take = None;
             self.timeline_load_media(ui.ctx(), asset);
         }
