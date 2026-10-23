@@ -1643,3 +1643,86 @@ fn a_busy_image_desk_leaves_the_sheet_usable_but_blocks_editing_its_result() {
     desk.frame(vec![]);
     assert!(!desk.control("Generate").is_disabled());
 }
+
+#[test]
+fn references_reorder_by_dragging_a_picture_onto_another_card() {
+    let mut desk = Desk::new();
+    desk.app.prefs.privacy_mode = false;
+    desk.frame(vec![]);
+    let names: Vec<String> = desk
+        .app
+        .image
+        .references
+        .iter()
+        .map(|r| r.id.clone())
+        .collect();
+    assert!(names.len() >= 2);
+    let card = |desk: &Desk, number: usize| {
+        let node = desk
+            .nodes
+            .iter()
+            .filter(|(_, n)| n.label() == Some("Move reference up"))
+            .nth(number)
+            .unwrap()
+            .1
+            .bounds()
+            .unwrap();
+        egui::pos2(node.x0 as f32 - 60., ((node.y0 + node.y1) / 2.) as f32)
+    };
+    let (from, to) = (card(&desk, 1), card(&desk, 0));
+    let button = |pos, pressed| egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: egui::Modifiers::NONE,
+    };
+    desk.frame(vec![egui::Event::PointerMoved(from), button(from, true)]);
+    for step in 1..=6 {
+        desk.frame(vec![egui::Event::PointerMoved(
+            from + (to - from) * step as f32 / 6.,
+        )]);
+    }
+    desk.frame(vec![button(to, false)]);
+    desk.frame(vec![]);
+    let after: Vec<String> = desk
+        .app
+        .image
+        .references
+        .iter()
+        .map(|r| r.id.clone())
+        .collect();
+    assert_eq!(after[0], names[1], "{names:?} -> {after:?}");
+    assert_eq!(after[1], names[0]);
+}
+
+#[test]
+fn image_files_dropped_on_the_window_upload_as_references() {
+    #[derive(Debug)]
+    struct Own(PathBuf);
+    impl egui::DroppedFile for Own {
+        fn path(&self) -> &std::path::Path {
+            &self.0
+        }
+        fn bytes(&self) -> Result<Vec<u8>, String> {
+            Err("not read by the UI".into())
+        }
+    }
+    let mut desk = Desk::new();
+    desk.app.image.references.clear();
+    let mut output = desk.ctx.run_ui(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1280., 800.),
+            )),
+            dropped_files: vec![
+                std::sync::Arc::new(Own(desk._root.path().join("own.png"))),
+                std::sync::Arc::new(Own(desk._root.path().join("notes.txt"))),
+            ],
+            ..Default::default()
+        },
+        |ui| desk.app.content(ui),
+    );
+    output.textures_delta.clear();
+    assert!(desk.app.image.uploading);
+}

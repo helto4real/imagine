@@ -131,6 +131,10 @@ fn sampling_setting(
     ui.end_row();
 }
 
+/// A reference being dragged to a new position in the list.
+#[derive(Clone, Copy)]
+struct ReferenceDrag(usize);
+
 pub(super) struct ViewerProgress {
     working: bool,
     status: String,
@@ -287,6 +291,12 @@ impl ImagineApp {
             self.pause_timeline();
         }
         self.keyboard_shortcuts(ui.ctx());
+        if matches!(
+            self.workspace,
+            Workspace::Image | Workspace::ImageEdit | Workspace::CharacterSheet
+        ) {
+            self.reference_file_drop(ui.ctx());
+        }
         if self.busy()
             || self.connecting
             || self.queue.jobs.iter().any(|job| job.working)
@@ -719,6 +729,10 @@ impl ImagineApp {
         }
         let mut remove = None;
         let mut swap = None;
+        let mut moved = None;
+        if ui.ctx().input(|i| !i.raw.hovered_files.is_empty()) {
+            ui.label(RichText::new("Drop images to add references").color(helto::ACCENT));
+        }
         egui::ScrollArea::vertical()
             .id_salt("reference-list")
             .max_height(if editing { 230. } else { f32::INFINITY })
@@ -753,14 +767,23 @@ impl ImagineApp {
                             ui.add_space(6.);
                             return;
                         }
-                        ui.horizontal(|ui| {
+                        let row = ui.horizontal(|ui| {
                             let width = (ui.available_width() - 40.).max(64.);
-                            let image = private_image(
-                                ui,
-                                &reference.texture,
-                                egui::vec2(width, width * 1.05),
-                                self.prefs.privacy_mode,
-                            );
+                            // Drag a picture onto another card to change the order.
+                            let image = ui
+                                .dnd_drag_source(
+                                    ui.id().with("reference-drag"),
+                                    ReferenceDrag(index),
+                                    |ui| {
+                                        private_image(
+                                            ui,
+                                            &reference.texture,
+                                            egui::vec2(width, width * 1.05),
+                                            self.prefs.privacy_mode,
+                                        )
+                                    },
+                                )
+                                .inner;
                             let badge = Rect::from_min_size(image.rect.min, egui::vec2(24., 24.));
                             ui.painter().rect_filled(badge, 5, helto::SURFACE);
                             ui.painter().text(
@@ -815,6 +838,19 @@ impl ImagineApp {
                                 }
                             });
                         });
+                        if editable {
+                            if row.response.dnd_hover_payload::<ReferenceDrag>().is_some() {
+                                ui.painter().hline(
+                                    row.response.rect.x_range(),
+                                    row.response.rect.top() - 3.,
+                                    Stroke::new(2., helto::ACCENT),
+                                );
+                            }
+                            if let Some(from) = row.response.dnd_release_payload::<ReferenceDrag>()
+                            {
+                                moved = Some((from.0, index));
+                            }
+                        }
                         ui.add_space(6.);
                     });
                 }
@@ -823,7 +859,41 @@ impl ImagineApp {
             self.desk_mut().references.remove(index);
         } else if let Some((a, b)) = swap {
             self.desk_mut().references.swap(a, b);
+        } else if let Some((from, to)) = moved {
+            let references = &mut self.desk_mut().references;
+            if from < references.len() && from != to {
+                let reference = references.remove(from);
+                references.insert(to.min(references.len()), reference);
+            }
         }
+    }
+    /// Image files dropped on the window become references of the open desk,
+    /// through the same upload and limit as Add references.
+    fn reference_file_drop(&mut self, ctx: &egui::Context) {
+        let dropped: Vec<PathBuf> = ctx.input(|i| {
+            i.raw
+                .dropped_files
+                .iter()
+                .map(|file| file.path().to_path_buf())
+                .filter(|path| {
+                    path.extension().and_then(|e| e.to_str()).is_some_and(|e| {
+                        ["png", "jpg", "jpeg", "webp"].contains(&e.to_ascii_lowercase().as_str())
+                    })
+                })
+                .collect()
+        });
+        if dropped.is_empty() {
+            return;
+        }
+        if self.client.is_none() || !self.editable() {
+            self.desk_mut().error =
+                Some("Wait for the current generation before adding references.".into());
+            return;
+        }
+        self.desk_mut().uploading = true;
+        self.desk_mut().error = None;
+        let _ = self.tx.send(Message::Picked(self.workspace, dropped));
+        ctx.request_repaint();
     }
 
     fn prompt_panel(&mut self, ui: &mut Ui) {
