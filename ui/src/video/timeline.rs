@@ -180,6 +180,13 @@ impl ImagineApp {
                         .navigation
                         .set(start, end, whole, width, &mut self.timeline.zoom);
                 }
+                let play =
+                    helto::icon_button(ui, crate::icons::Icon::Play, "Play from playhead", false);
+                #[cfg(feature = "ui-preview")]
+                super::qa::control(ui, "timeline-play-draft".into(), &play);
+                if play.clicked() {
+                    self.timeline.playback.request = Some(true);
+                }
                 let fit = helto::icon_button(ui, crate::icons::Icon::Fit, "Zoom to Fit", false);
                 #[cfg(feature = "ui-preview")]
                 super::qa::control(ui, "timeline-fit".into(), &fit);
@@ -311,6 +318,7 @@ impl ImagineApp {
                     self.timeline.playhead =
                         f64::from((pointer.x - canvas.left()) / self.timeline.zoom)
                             .clamp(0., whole);
+                    self.timeline.playback.request = Some(false);
                 }
                 ui.painter().vline(
                     canvas.left() + self.timeline.playhead as f32 * self.timeline.zoom,

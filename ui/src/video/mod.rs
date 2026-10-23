@@ -30,6 +30,7 @@ mod media_binding;
 mod media_health;
 mod media_picker;
 mod navigation;
+mod playback;
 mod player;
 mod preflight;
 mod project_prompt;
@@ -102,6 +103,7 @@ pub(super) struct Timeline {
     captures: captures::State,
     reference_cache: reference_cache::State,
     preflight: preflight::State,
+    playback: playback::State,
     media_health: media_health::State,
     compatibility_open: bool,
     compatibility_report: Option<Value>,
@@ -627,6 +629,7 @@ impl ImagineApp {
                         self.timeline.player = Some(player::Player::new(preview));
                         self.timeline.preview_asset = Some(asset);
                         self.timeline.error = None;
+                        self.timeline_cue_loaded(nonce);
                     }
                     Err(error) => self.timeline.error = Some(error),
                 }
@@ -1762,6 +1765,7 @@ impl Drop for Timeline {
 }
 impl ImagineApp {
     fn timeline_load_media(&mut self, ctx: &egui::Context, asset: String) {
+        self.timeline_end_playback();
         let (Some(client), Some(session)) = (self.client.clone(), self.timeline.session.clone())
         else {
             return;

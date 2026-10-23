@@ -170,6 +170,11 @@ the queue, and the Timeline's media shelf, inspector and timeline height.
 Sizes are kept with the other public UI settings; double-click a gap to restore
 its default. In a narrow window the media shelf makes room for the viewer.
 
+Click the Timeline ruler to show the scene under the playhead in the viewer at
+that point: its accepted Take, or its imported clip. **Play from playhead** plays
+scene after scene from there, and the playhead follows the viewer. A scene
+without an accepted Take stops playback with a note.
+
 The gear opens a separate native **Settings** window with **Generation** (Steps,
 CFG, Reference size, Upscale target), **Models**, **Prompt enhancement**,
 **Storage** (output folder) and **Privacy** (Hide previews). Switches save at once;

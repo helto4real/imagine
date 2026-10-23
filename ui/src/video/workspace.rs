@@ -11,6 +11,7 @@ impl ImagineApp {
         self.timeline_session(ui.ctx());
         self.timeline_poll_runs(ui.ctx());
         self.timeline_preflight_poll(ui.ctx());
+        self.timeline_follow_playback(ui.ctx());
         if self.timeline.zoom == 0. {
             self.timeline.zoom = 68.;
         }

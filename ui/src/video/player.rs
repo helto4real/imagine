@@ -28,6 +28,20 @@ pub struct Preview {
     pcm: Vec<u8>,
     duration: f64,
 }
+impl Preview {
+    /// Silent synthetic frames for tests.
+    #[cfg(test)]
+    pub fn synthetic(seconds: f64) -> Self {
+        let frames = (seconds * 24.).ceil() as usize;
+        Self {
+            width: 8,
+            height: 8,
+            frames: vec![vec![40; 8 * 8 * 3]; frames],
+            pcm: vec![],
+            duration: seconds,
+        }
+    }
+}
 pub struct Player {
     media: Preview,
     frame: usize,
@@ -37,9 +51,33 @@ pub struct Player {
     muted: bool,
 }
 impl Player {
-    #[cfg(any(test, feature = "ui-preview"))]
     pub fn is_playing(&self) -> bool {
         self.started.is_some()
+    }
+    /// Seconds into the media, including the running clock.
+    pub fn position(&self) -> f64 {
+        match self.started {
+            Some((instant, start)) => {
+                (start as f64 / 24. + instant.elapsed().as_secs_f64()).min(self.media.duration)
+            }
+            None => self.frame as f64 / 24.,
+        }
+    }
+    /// Pauses and moves to `seconds` into the media.
+    pub fn seek(&mut self, seconds: f64) {
+        self.pause();
+        let last = (self.media.duration * 24.).ceil().max(1.) as usize - 1;
+        self.frame = ((seconds.max(0.) * 24.).round() as usize).min(last);
+    }
+    /// Starts playback from the current frame.
+    pub fn start(&mut self) -> Result<(), String> {
+        self.play()
+    }
+    /// Played to its last frame (the clock has stopped there).
+    pub fn finished(&mut self) -> bool {
+        self.advance();
+        let last = (self.media.duration * 24.).ceil().max(1.) as usize - 1;
+        self.started.is_none() && self.frame >= last
     }
     #[cfg(feature = "ui-preview")]
     pub fn audio_running(&mut self) -> bool {
