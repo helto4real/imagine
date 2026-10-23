@@ -252,6 +252,13 @@ impl ImagineApp {
     fn desk_mut(&mut self) -> &mut GenerationDesk {
         self.desk_for_mut(self.workspace)
     }
+    /// A generation or upload is running on that tab's desk. Tabs work independently;
+    /// Image and Edit only wait for each other where one replaces the other's result.
+    fn desk_busy(&self, workspace: Workspace) -> bool {
+        let desk = self.desk_for(workspace);
+        desk.working || desk.uploading
+    }
+    /// Any desk is busy, for app-wide actions such as Reconnect.
     fn busy(&self) -> bool {
         self.image.working
             || self.sheet.working
@@ -314,7 +321,7 @@ impl ImagineApp {
             Some("Connecting to Imagine.")
         } else if self.picking_folder {
             Some("Finish choosing the output folder.")
-        } else if self.busy() || self.desk().pending.is_some() {
+        } else if self.desk_busy(self.workspace) || self.desk().pending.is_some() {
             Some("Wait for the current generation.")
         } else {
             None
@@ -571,7 +578,7 @@ impl ImagineApp {
         }
     }
     fn generate(&mut self, ctx: &egui::Context) {
-        if self.busy() || self.connecting || self.workspace == Workspace::Video {
+        if self.desk_busy(self.workspace) || self.connecting || self.workspace == Workspace::Video {
             return;
         }
         if self.workspace == Workspace::Image && self.image.pending.is_none() {
@@ -667,7 +674,7 @@ impl ImagineApp {
             .find(|a| a.role == role && !a.asset_id.is_empty())
     }
     fn upscale_submission(&self) -> anyhow::Result<Submission> {
-        if self.busy() || self.desk().pending.is_some() {
+        if self.desk_busy(self.workspace) || self.desk().pending.is_some() {
             anyhow::bail!("Wait for the current job before upscaling.");
         }
         let source = self

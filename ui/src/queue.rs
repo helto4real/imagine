@@ -459,7 +459,7 @@ impl ImagineApp {
                 }
                 self.queue.loading = None;
                 match result {
-                    Ok(done) if !self.busy() && !self.edit.open => {
+                    Ok(done) if !self.desk_busy(Workspace::Image) && !self.edit.open => {
                         let elapsed = self
                             .queue
                             .gallery
@@ -508,7 +508,7 @@ impl ImagineApp {
     }
 
     pub(super) fn select_queue_result(&mut self, ctx: &egui::Context, id: &str) {
-        if self.edit.open || self.busy() || self.image.pending.is_some() {
+        if self.edit.open || self.desk_busy(Workspace::Image) || self.image.pending.is_some() {
             return;
         }
         let Some(item) = self.queue.gallery.iter().find(|r| r.id == id) else {

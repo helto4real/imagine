@@ -1082,7 +1082,8 @@ fn sheet_tab_preserves_image_draft_and_routes_async_results_to_origin() {
     });
     desk.app.sheet.working = true;
     desk.click("Image");
-    assert!(desk.control("Add to queue").is_disabled());
+    // Each tab has its own desk: a running character sheet leaves Image usable.
+    assert!(!desk.control("Add to queue").is_disabled());
     desk.app
         .tx
         .send(Message::Progress(
@@ -1626,4 +1627,19 @@ fn pane_dividers_resize_save_once_settled_and_reset_on_double_click() {
     desk.frame(Vec::new());
     assert!(desk.app.prefs.layout.prompt.is_none());
     assert!((prompt_width(&desk) - before).abs() < 1.);
+}
+
+#[test]
+fn a_busy_image_desk_leaves_the_sheet_usable_but_blocks_editing_its_result() {
+    let mut desk = Desk::new();
+    desk.app.metadata = Some(imagine_server::contract::model(client::MODEL).unwrap());
+    desk.app.image.working = true;
+    assert_eq!(
+        desk.app.edit_image_blocked(),
+        Some("Wait for the current generation.")
+    );
+    desk.click("Character sheets");
+    desk.app.sheet.character_description = "SYNTHETIC CHARACTER".into();
+    desk.frame(vec![]);
+    assert!(!desk.control("Generate").is_disabled());
 }

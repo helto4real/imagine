@@ -36,7 +36,10 @@ impl ImagineApp {
             Some("Connecting to Imagine.")
         } else if self.queue.loading.is_some() {
             Some("Wait until the result has loaded.")
-        } else if self.busy() || self.image.pending.is_some() {
+        } else if self.desk_busy(Workspace::Image)
+            || self.desk_busy(Workspace::ImageEdit)
+            || self.image.pending.is_some()
+        {
             Some("Wait for the current generation.")
         } else if self
             .image
@@ -64,7 +67,10 @@ impl ImagineApp {
         self.workspace = Workspace::ImageEdit;
     }
     pub(super) fn finish_editing(&mut self) {
-        if self.workspace != Workspace::ImageEdit || self.busy() || self.edit.desk.pending.is_some()
+        if self.workspace != Workspace::ImageEdit
+            || self.desk_busy(Workspace::Image)
+            || self.desk_busy(Workspace::ImageEdit)
+            || self.edit.desk.pending.is_some()
         {
             return;
         }
@@ -77,7 +83,7 @@ impl ImagineApp {
         self.workspace = Workspace::Image;
     }
     pub(super) fn select_edit_version(&mut self, index: usize) {
-        if self.busy() || self.edit.desk.pending.is_some() {
+        if self.desk_busy(Workspace::ImageEdit) || self.edit.desk.pending.is_some() {
             return;
         }
         if let Some(version) = self.edit.versions.get(index) {

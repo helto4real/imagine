@@ -268,7 +268,7 @@ impl ImagineApp {
     }
 
     pub(super) fn editable(&self) -> bool {
-        !self.busy() && !self.connecting && self.desk().pending.is_none()
+        !self.desk_busy(self.workspace) && !self.connecting && self.desk().pending.is_none()
     }
 
     pub fn content(&mut self, ui: &mut Ui) {
@@ -1213,8 +1213,10 @@ impl ImagineApp {
                 self.edit_version_selector(ui);
             }
             ui.separator();
-            let ready =
-                self.client.is_some() && !self.connecting && !self.busy() && !self.picking_folder;
+            let ready = self.client.is_some()
+                && !self.connecting
+                && !self.desk_busy(self.workspace)
+                && !self.picking_folder;
             ui.horizontal(|ui| {
                 if !editing {
                     let generate = self.command_button(ui, Command::Generate);

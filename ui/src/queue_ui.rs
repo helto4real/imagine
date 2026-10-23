@@ -229,7 +229,7 @@ impl ImagineApp {
             // Opening a result replaces the image desk; never discard an open edit.
             let select_blocked = if self.edit.open {
                 Some("Finish editing first.")
-            } else if self.busy() || self.image.pending.is_some() {
+            } else if self.desk_busy(Workspace::Image) || self.image.pending.is_some() {
                 Some("Wait for the current generation.")
             } else {
                 None
