@@ -5,6 +5,43 @@ pub(super) fn routes() -> Router<App> {
         .route("/v1/video/projects/{id}/captures", post(mutate))
         .route("/v1/video/projects/{id}/captures/import", post(import))
         .route("/v1/video/projects/{id}/takes/cleanup", post(cleanup))
+        .route(
+            "/v1/video/projects/{id}/takes/{take}/last-frame",
+            get(last_frame),
+        )
+}
+
+/// The last frame an H3 Take kept for Last Frame → First Frame continuity, as
+/// PNG, so the editor can show what the next Scene will start from.
+async fn last_frame(
+    State(app): State<App>,
+    Path((id, take)): Path<(String, String)>,
+) -> Result<Response, Error> {
+    let file = {
+        let service = app.video.lock().await;
+        let session = service.projects.session(&ProjectId(id))?;
+        let resource = session
+            .document()
+            .resources
+            .iter()
+            .find(|r| matches!(&r.kind, ResourceKind::H3Endpoint { take_id, .. } if take_id.0 == take))
+            .ok_or_else(|| Error::new(StatusCode::NOT_FOUND, "last_frame_not_found"))?;
+        session.resource_file(&resource.id)?
+    };
+    let bytes = tokio::task::spawn_blocking(move || {
+        use std::io::Read;
+        let mut bytes = vec![];
+        file.take(crate::h3_protocol::MAX_INPUT_IMAGE as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(internal)?;
+        if bytes.len() > crate::h3_protocol::MAX_INPUT_IMAGE {
+            return Err(Error::from(StorageError::new("invalid_endpoint")));
+        }
+        Ok::<_, Error>(bytes)
+    })
+    .await
+    .map_err(internal)??;
+    Ok(([(header::CONTENT_TYPE, "image/png")], bytes).into_response())
 }
 
 #[derive(serde::Deserialize)]

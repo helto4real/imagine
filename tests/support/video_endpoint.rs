@@ -22,6 +22,29 @@ async fn accepted_endpoint_drives_target_pixels_survives_reopen_and_source_repla
         .clone();
     assert_eq!(endpoint["kind"]["schema_version"], 1);
     assert_eq!(endpoint["kind"]["take_id"], source_take);
+    // The editor shows that stored frame as the next Scene's first frame.
+    let last_frame = |take: String| {
+        h.router.clone().oneshot(
+            Request::builder()
+                .uri(format!(
+                    "/v1/video/projects/{project}/takes/{take}/last-frame"
+                ))
+                .header("X-Imagine-Session", &h.store.session.id)
+                .body(Body::empty())
+                .unwrap(),
+        )
+    };
+    let response = last_frame(source_take.as_str().unwrap().into())
+        .await
+        .unwrap();
+    assert_eq!(response.status().as_u16(), 200);
+    assert_eq!(response.headers()["content-type"], "image/png");
+    let png = to_bytes(response.into_body(), 64 * 1024 * 1024)
+        .await
+        .unwrap();
+    assert!(png.starts_with(b"\x89PNG\r\n\x1a\n"));
+    let missing = last_frame("own-missing-take".into()).await.unwrap();
+    assert_eq!(missing.status().as_u16(), 404);
     let mut target_model = document["project"]["default_model"].clone();
     target_model["variant"] = json!("i2v");
     target_model["profile"] = json!(imagine_server::video::job::I2V_PROFILE);
