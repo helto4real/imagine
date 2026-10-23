@@ -269,7 +269,8 @@ impl ImagineApp {
                         );
                     }
                 }
-                let menu = ui.menu_button("Differences", |ui| {
+                let menu = helto::icon_button(ui, crate::icons::Icon::Info, "Differences", false);
+                egui::Popup::menu(&menu).show(|ui| {
                     let reveal = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
                     if !reveal {
                         ui.label("Hidden metadata");
@@ -323,7 +324,7 @@ impl ImagineApp {
                     });
                 });
                 #[cfg(feature = "ui-preview")]
-                super::qa::control(ui, "take-differences".into(), &menu.response);
+                super::qa::control(ui, "take-differences".into(), &menu);
                 let _ = menu;
             });
         });

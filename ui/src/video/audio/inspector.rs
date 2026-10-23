@@ -99,7 +99,13 @@ impl ImagineApp {
             .unwrap_or_else(|| original.clone());
         let mut changed = false;
         let mut duplicated: Option<AudioClip> = None;
-        let select = ui.add_enabled(enabled, egui::Button::new("Choose audio…"));
+        let select = helto::action(
+            ui,
+            crate::icons::Icon::Import,
+            "Choose audio…",
+            false,
+            (!enabled).then_some("Wait for the current timeline operation."),
+        );
         #[cfg(feature = "ui-preview")]
         crate::app::timeline::qa::control(ui, "audio-pick-source".into(), &select);
         if select.clicked() {
@@ -160,7 +166,8 @@ impl ImagineApp {
                 .as_ref()
                 .and_then(|id| d.raw["runtime_assets"][&id.0].as_str())
             {
-                let response = ui.button("Preview source");
+                let response =
+                    helto::icon_button(ui, crate::icons::Icon::Play, "Preview source", false);
                 #[cfg(feature = "ui-preview")]
                 crate::app::timeline::qa::control(ui, "audio-preview-source".into(), &response);
                 if response.clicked() {
@@ -332,7 +339,19 @@ impl ImagineApp {
             #[cfg(feature = "ui-preview")]
             crate::app::timeline::qa::control(ui, "audio-lock".into(), &r);
             changed |= r.changed();
-            let response = ui.button("Duplicate clip");
+            let row = ui.horizontal(|ui| {
+                (
+                    helto::icon_button(ui, crate::icons::Icon::Duplicate, "Duplicate clip", false),
+                    helto::action(
+                        ui,
+                        crate::icons::Icon::Trash,
+                        "Remove clip",
+                        false,
+                        c.locked.then_some("Unlock the clip first."),
+                    ),
+                )
+            });
+            let (response, remove) = row.inner;
             #[cfg(feature = "ui-preview")]
             crate::app::timeline::qa::control(ui, "audio-duplicate".into(), &response);
             if response.clicked() {
@@ -352,7 +371,7 @@ impl ImagineApp {
                     clip: Box::new(copy),
                 });
             }
-            let response = ui.add_enabled(!c.locked, egui::Button::new("Remove clip"));
+            let response = remove;
             #[cfg(feature = "ui-preview")]
             crate::app::timeline::qa::control(ui, "audio-remove".into(), &response);
             if response.clicked() {

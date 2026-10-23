@@ -142,9 +142,12 @@ impl ImagineApp {
                 } else {
                     "Submission unconfirmed"
                 });
-                let response = ui.add_enabled(
-                    !self.timeline.admitting,
-                    egui::Button::new("Retrieve submission"),
+                let response = helto::action(
+                    ui,
+                    crate::icons::Icon::Download,
+                    "Retrieve submission",
+                    false,
+                    self.timeline.admitting.then_some("Submitting now."),
                 );
                 #[cfg(feature = "ui-preview")]
                 super::qa::control(ui, "submission-reconnect".into(), &response);
@@ -164,18 +167,18 @@ impl ImagineApp {
                     ui.weak(label);
                     if !job.terminal() {
                         if !job.monitoring {
-                            let response=ui.button("Reconnect");
+                            let response=helto::icon_button(ui,crate::icons::Icon::Link,"Reconnect",false);
                             #[cfg(feature="ui-preview")]
                             super::qa::control(ui,format!("job-reconnect-{index}"),&response);
                             if response.clicked(){reconnect=Some(job.id.clone());}
                         }
-                        let response=ui.add_enabled(!job.acting && job.observation["status"]!="cancelling",egui::Button::new("Cancel"));
+                        let response=helto::action(ui,crate::icons::Icon::Stop,"Cancel",false,(job.acting || job.observation["status"]=="cancelling").then_some("Cancelling."));
                         #[cfg(feature="ui-preview")]
                         super::qa::control(ui,format!("job-cancel-{index}"),&response);
                         if response.clicked(){cancel=Some(job.id.clone());}
                     } else {
                         let can_retry=self.timeline.document.as_ref().is_some_and(|d| job.retryable(&d.project)) && !self.timeline.admitting && self.timeline.pending.is_none();
-                        let response=ui.add_enabled(can_retry,egui::Button::new(if job.request["kind"]=="video_assembly"{"Retry export"}else{"Retry scene"})).on_disabled_hover_text("Open the source project to retry. A montage retry uses its frozen media.").on_hover_text("A completed montage is saved again without rendering. Otherwise its frozen sources are rendered again.");
+                        let response=helto::action(ui,crate::icons::Icon::Retry,if job.request["kind"]=="video_assembly"{"Retry export"}else{"Retry scene"},false,(!can_retry).then_some("Open the source project to retry. A montage retry uses its frozen media.")).on_hover_text("A completed montage is saved again without rendering. Otherwise its frozen sources are rendered again.");
                         #[cfg(feature="ui-preview")]
                         super::qa::control(ui,format!("job-retry-{index}"),&response);
                         if response.clicked() {retry=Some(job.id.clone());}

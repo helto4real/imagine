@@ -308,8 +308,7 @@ impl ImagineApp {
                     }
                 });
                 ui.horizontal(|ui|{
-                    let r = ui
-                        .add_enabled(!self.timeline.busy, egui::Button::new("Import from files…"));
+                    let r = helto::action(ui, crate::icons::Icon::Import, "Import from files…", false, self.timeline.busy.then_some("Wait for the current timeline operation."));
                     control(ui, "media-picker-import", &r);
                     import = r.clicked();
                 });
@@ -320,8 +319,8 @@ impl ImagineApp {
                     let selected_library=self.timeline.library.selected_id();
                     if selected_library!=state.library_id {state.library_id=selected_library;state.library_assets.clear();state.library_selected.clear();state.library_loading=false;refresh_library=state.library_id.is_some();}
                     ui.horizontal(|ui|{
-                        let r=ui.button("Choose library…");control(ui,"media-picker-library-choose",&r);choose_library=r.clicked();
-                        let r=ui.add_enabled(state.library_id.is_some()&&!state.library_loading,egui::Button::new("Refresh"));control(ui,"media-picker-library-refresh",&r);refresh_library|=r.clicked();
+                        let r=helto::icon_button(ui,crate::icons::Icon::Library,"Choose library…",false);control(ui,"media-picker-library-choose",&r);choose_library=r.clicked();
+                        let r=helto::action(ui,crate::icons::Icon::Retry,"Refresh",false,if state.library_id.is_none(){Some("Choose a library first.")}else{state.library_loading.then_some("Loading.")});control(ui,"media-picker-library-refresh",&r);refresh_library|=r.clicked();
                     });
                     if state.library_id.is_none(){ui.weak("Choose an Imagine library.");}
                     if state.library_loading{ui.spinner();}
@@ -379,13 +378,16 @@ impl ImagineApp {
                 }
                 ui.horizontal(|ui| {
                     let has_selection=match state.tab{SourceTab::Project=>!state.selected.is_empty(),SourceTab::Library=>!state.library_selected.is_empty(),SourceTab::Folders=>false};
-                    let r = ui.add_enabled(
-                        !self.timeline.busy && has_selection,
-                        egui::Button::new("Use selected"),
+                    let r = helto::action(
+                        ui,
+                        crate::icons::Icon::Check,
+                        "Use selected",
+                        true,
+                        self.timeline.busy.then_some("Wait for the current timeline operation.").or((!has_selection).then_some("Select media first.")),
                     );
                     control(ui, "media-picker-use", &r);
                     use_selection = r.clicked();
-                    let r = ui.button("Cancel");
+                    let r = helto::icon_button(ui, crate::icons::Icon::Close, "Cancel", false);
                     control(ui, "media-picker-cancel", &r);
                     if r.clicked() {
                         cancel = true;

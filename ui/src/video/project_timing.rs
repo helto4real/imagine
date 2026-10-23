@@ -39,11 +39,11 @@ impl ImagineApp {
                 ui.label("Sections keep their timing. Fit Last or Fit All can bring overflow into this duration.");
                 if let Some(error)=&state.error{ui.colored_label(helto::ERROR,error);}
                 ui.horizontal(|ui|{
-                    let r=ui.button("Apply");
+                    let r=helto::icon_button(ui,crate::icons::Icon::Check,"Apply",true);
                     #[cfg(feature="ui-preview")]
                     super::qa::control(ui,"project-timeline-apply".into(),&r);
                     if r.clicked(){match state.text.trim().parse::<f64>().ok().filter(|v|v.is_finite()&&*v>0.).map(editing::time).filter(|v|v.positive()) {Some(value)=>request=Some(Some(value)),None=>state.error=Some("Enter a positive duration in seconds.".into())}}
-                    let r=ui.button("Cancel");
+                    let r=helto::icon_button(ui,crate::icons::Icon::Close,"Cancel",false);
                     #[cfg(feature="ui-preview")]
                     super::qa::control(ui,"project-timeline-cancel".into(),&r);
                     if r.clicked(){state.open=false;}

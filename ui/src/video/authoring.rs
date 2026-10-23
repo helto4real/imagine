@@ -407,8 +407,8 @@ impl ImagineApp {
             }
             let (operation,field)=state.draft.as_ref().map_or((state.operation,state.scene_field),|d|(d.request.operation,d.request.scene_field));
             if operation==Operation::EnhanceScene {ui.strong(format!("Enhance {}",field.unwrap_or_default().label()));}else if operation==Operation::EnhanceSection {ui.strong("Enhance Section prompt");}
-            ui.horizontal(|ui|{ui.weak("Project cast · image inventory · editable source and bindings");let r=ui.button("Close review");control(ui,"story-close",&r);close_review=r.clicked();});
-            if let Some(error)=&state.failure{ui.colored_label(helto::ERROR,error);if let Some(d)=&state.draft {let r=ui.button("Reconnect proposal");control(ui,"story-reconnect",&r);if r.clicked(){call=Some((Reply::Draft,false,format!("/v1/video/authoring/{}",d.id),None));}}}
+            ui.horizontal(|ui|{ui.weak("Project cast · image inventory · editable source and bindings");let r=helto::icon_button(ui,crate::icons::Icon::Close,"Close review",false);control(ui,"story-close",&r);close_review=r.clicked();});
+            if let Some(error)=&state.failure{ui.colored_label(helto::ERROR,error);if let Some(d)=&state.draft {let r=helto::icon_button(ui,crate::icons::Icon::Link,"Reconnect proposal",false);control(ui,"story-reconnect",&r);if r.clicked(){call=Some((Reply::Draft,false,format!("/v1/video/authoring/{}",d.id),None));}}}
             if !state.history.is_empty()&&!state.busy {
                 let menu=egui::ComboBox::from_id_salt("recent-story-proposals").selected_text("Recent proposals").show_ui(ui,|ui|{
                     for (i,draft) in state.history.iter().enumerate() {let r=ui.button(format!("{:?} · revision {} · {} scenes",draft.request.operation,draft.request.expected_project_revision,draft.scenes.len()));control(ui,&format!("story-history-{i}"),&r);if r.clicked(){state.draft=Some(draft.clone());}}
@@ -421,8 +421,8 @@ impl ImagineApp {
                     ui.weak(format!("{} · {}",draft.prompt_profile_id,draft.provider_snapshot["model"].as_str().unwrap_or("Provider")));
                     if !draft.profile_warning.is_empty(){ui.label(&draft.profile_warning);}
                     for warning in &draft.warnings{ui.colored_label(helto::ACCENT,warning);}
-                    if busy {ui.spinner();let r=ui.button("Cancel");control(ui,"story-cancel",&r);if r.clicked(){call=Some((Reply::Draft,true,format!("/v1/video/authoring/{}/cancel",draft.id),Some(json!({}))));}}
-                    let r=ui.add_enabled(!busy,egui::Button::new("New proposal"));control(ui,"story-new",&r);if r.clicked(){state.history.push(draft.clone());new_proposal=true;}
+                    if busy {ui.spinner();let r=helto::icon_button(ui,crate::icons::Icon::Stop,"Cancel",false);control(ui,"story-cancel",&r);if r.clicked(){call=Some((Reply::Draft,true,format!("/v1/video/authoring/{}/cancel",draft.id),Some(json!({}))));}}
+                    let r=helto::action(ui,crate::icons::Icon::Plus,"New proposal",false,busy.then_some("Wait for the current proposal."));control(ui,"story-new",&r);if r.clicked(){state.history.push(draft.clone());new_proposal=true;}
                 });
                 if state.progress["draft_id"]==draft.id {
                     let completed=state.progress["completed"].as_u64().unwrap_or(0);let total=state.progress["total"].as_u64().unwrap_or(1).max(1);
@@ -430,7 +430,7 @@ impl ImagineApp {
                     let elapsed=state.progress["elapsed_seconds"].as_f64().unwrap_or(0.);ui.weak(if let Some(eta)=state.progress["eta_seconds"].as_f64(){format!("{elapsed:.1} s elapsed · about {eta:.1} s remaining")}else{format!("{elapsed:.1} s elapsed")});
                 }
                 if let Some(failure)=&draft.failure{ui.colored_label(helto::ERROR,format!("{failure} · previous completed scenes are retained"));}
-                if !busy&&draft.outline.is_none()&&matches!(draft.phase,Phase::Failed|Phase::Cancelled){let r=ui.button("Retry proposal");control(ui,"story-retry",&r);if r.clicked(){call=Some((Reply::Draft,true,format!("/v1/video/authoring/{}/retry",draft.id),Some(json!({}))));}}
+                if !busy&&draft.outline.is_none()&&matches!(draft.phase,Phase::Failed|Phase::Cancelled){let r=helto::icon_button(ui,crate::icons::Icon::Retry,"Retry proposal",false);control(ui,"story-retry",&r);if r.clicked(){call=Some((Reply::Draft,true,format!("/v1/video/authoring/{}/retry",draft.id),Some(json!({}))));}}
                 if !draft.inventory.is_empty(){let header=ui.collapsing(format!("Image inventory · {}",draft.inventory.len()),|ui|{for note in &draft.inventory{ui.strong(image_label(&note.id,&draft.request.images));ui.label(&note.note);}});control(ui,"story-inventory-open",&header.header_response);}
                 if let Some(cast)=draft.selected_cast.as_array(){ui.weak(cast.iter().filter_map(|c|c["reference_tag"].as_str()).collect::<Vec<_>>().join(" · "));}
                 let stale=document.as_ref().is_none_or(|s|s.project.id!=draft.project_id||s.project.project_revision!=draft.request.expected_project_revision);
@@ -439,8 +439,8 @@ impl ImagineApp {
                 let editable=draft.phase!=Phase::Applied;
                 ui.add_enabled_ui(!busy,|ui|{
                     ui.horizontal_wrapped(|ui|{
-                        if draft.outline.is_some(){let r=ui.add_enabled(editable,egui::Button::new(if draft.failed_index.is_some(){"Retry from failed scene"}else{"Expand scenes"}));control(ui,"story-expand",&r);if r.clicked(){expand=Some(draft.failed_index.unwrap_or(0));}}
-                        let r=ui.add_enabled(!stale&&draft.phase==Phase::Review,egui::Button::new("Apply reviewed proposal"));control(ui,"story-apply",&r);apply=r.clicked();
+                        if draft.outline.is_some(){let r=helto::action(ui,if draft.failed_index.is_some(){crate::icons::Icon::Retry}else{crate::icons::Icon::Generate},if draft.failed_index.is_some(){"Retry from failed scene"}else{"Expand scenes"},true,(!editable).then_some("Wait for the current proposal."));control(ui,"story-expand",&r);if r.clicked(){expand=Some(draft.failed_index.unwrap_or(0));}}
+                        let r=helto::action(ui,crate::icons::Icon::Check,"Apply reviewed proposal",true,if stale{Some("The project changed. Create a new proposal.")}else{(draft.phase!=Phase::Review).then_some("Finish the proposal first.")});control(ui,"story-apply",&r);apply=r.clicked();
                     });
                     ui.vertical(|ui|{
                         if let Some(text)=&mut draft.text {
@@ -485,7 +485,7 @@ impl ImagineApp {
                 if state.operation==Operation::Outline {
                     if let Some(d)=&document {
                         let header=ui.collapsing("Cast & source images",|ui|{
-                            let r=ui.button("Add source images…");control(ui,"story-pick-images",&r);pick_images=r.clicked();
+                            let r=helto::icon_button(ui,crate::icons::Icon::Import,"Add source images…",false);control(ui,"story-pick-images",&r);pick_images=r.clicked();
                             for (i,r)in d.project.creative.references.iter().enumerate(){let mut selected=state.cast.contains(&r.id);let response=ui.checkbox(&mut selected,format!("{} · @{}{}",r.name,r.alias,if r.enabled{""}else{" · disabled in project"}));control(ui,&format!("story-cast-{i}"),&response);if response.changed(){state.cast.remove(&r.id);if selected{state.cast.insert(r.id.clone());}}}
                             let r=ui.checkbox(&mut state.add_dialogue,"Plan dialogue");control(ui,"story-dialogue",&r);
                             for (i,asset)in d.project.assets.values().filter(|a|a.kind==MediaKind::Image).enumerate(){let mut selected=state.images.contains_key(&asset.id);let response=ui.checkbox(&mut selected,format!("Source image {}",i+1));control(ui,&format!("story-image-{i}"),&response);if response.changed(){state.images.remove(&asset.id);if selected{state.images.insert(asset.id.clone(),ImageUse::SettingReference);}}
@@ -498,7 +498,7 @@ impl ImagineApp {
                     ui.horizontal(|ui|{ui.label("Duration");ui.add(egui::DragValue::new(&mut state.duration).range(0.25..=3600.).suffix(" s"));for (d,label) in [(Destination::Append,"Append"),(Destination::Replace,"Replace scenes"),(Destination::Continue,"Continue")]{let name=serde_json::to_value(d).unwrap().as_str().unwrap().to_owned();let r=ui.selectable_value(&mut state.destination,d,label);control(ui,&format!("story-destination-{name}"),&r);}});
                 }
                 ui.label("Additional instruction");let r=ui.add(egui::TextEdit::multiline(&mut state.instruction).desired_rows(3).desired_width(f32::INFINITY));control(ui,"story-instruction",&r);
-                let r=ui.add_enabled(!state.busy&&document.is_some(),egui::Button::new(if state.operation==Operation::Outline{"Generate outline"}else{"Generate enhancement"}));control(ui,"story-generate",&r);
+                let r=helto::action(ui,crate::icons::Icon::Generate,if state.operation==Operation::Outline{"Generate outline"}else{"Generate enhancement"},true,if document.is_none(){Some("Create or open a project first.")}else{state.busy.then_some("Wait for the current proposal.")});control(ui,"story-generate",&r);
                 if r.clicked()&&let Some(d)=&document{call=Some((Reply::Draft,true,format!("/v1/video/projects/{}/authoring",d.project.id.0),Some(json!(Request{schema_version:1,expected_project_revision:d.project.project_revision,provider_profile_id:state.provider_id.clone(),provider:provider_transport(&state),prompt_profile_id:state.profile.clone(),operation:state.operation,scene_field:state.scene_field,scene_id:state.target_scene.clone(),section_id:state.target_section.clone(),brief:state.brief.clone(),instruction:state.instruction.clone(),duration_seconds:state.duration,destination:state.destination,cast:if state.operation==Operation::Outline{state.cast.iter().cloned().collect()}else{vec![]},images:if state.operation==Operation::Outline{state.images.iter().enumerate().map(|(i,(asset,usage))|StoryImage{pair_with:state.pairs.get(asset).filter(|id|!id.0.is_empty()).map(|id|id.0.clone()),id:asset.0.clone(),asset:asset.clone(),label:format!("Source image {}",i+1),usage:*usage}).collect()}else{vec![]},add_dialogue:state.operation==Operation::Outline&&state.add_dialogue}))));}
             }
             });
@@ -516,7 +516,8 @@ impl ImagineApp {
                 .max_height((ctx.content_rect().height() - 70.).max(200.))
                 .vscroll(true)
                 .show(ctx, |ui| {
-                    let r = ui.button("Close settings");
+                    let r =
+                        helto::icon_button(ui, crate::icons::Icon::Close, "Close settings", false);
                     control(ui, "story-provider-close", &r);
                     if r.clicked() {
                         state.provider_settings = false;

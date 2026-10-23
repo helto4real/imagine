@@ -736,16 +736,16 @@ impl ImagineApp {
                     ui.push_id((draft.session, &draft.model.variant), |ui| {
                         draft.sampling.show(ui, &draft.model);
                     });
-                    let r=ui.button("Project LoRAs…");control(ui,"project-loras",&r);
+                    let r=helto::icon_button(ui,crate::icons::Icon::Lora,"Project LoRAs…",false);control(ui,"project-loras",&r);
                     if r.clicked(){self.timeline_open_loras(None);}
                     if let Some(e) = &draft.error {
                         ui.colored_label(helto::ERROR, e);
                     }
                     ui.horizontal(|ui| {
-                        let r = ui.add_enabled(!self.timeline.busy, egui::Button::new("Apply"));
+                        let r = helto::action(ui, crate::icons::Icon::Check, "Apply", true, self.timeline.busy.then_some("Wait for the current timeline operation."));
                         control(ui, "generation-apply", &r);
                         apply = r.clicked();
-                        let r = ui.button("Cancel");
+                        let r = helto::icon_button(ui, crate::icons::Icon::Close, "Cancel", false);
                         control(ui, "generation-cancel", &r);
                         cancel = r.clicked();
                     });
@@ -831,7 +831,7 @@ impl ImagineApp {
             .id_salt(("scene-sampling", &scene.id.0))
             .show(ui, |ui| {
                 let key = (d.project.id.clone(), scene.id.clone(), model.clone());
-                let r = ui.button("Scene LoRAs…");
+                let r = helto::icon_button(ui, crate::icons::Icon::Lora, "Scene LoRAs…", false);
                 control(ui, "scene-loras", &r);
                 if r.clicked() {
                     self.timeline_open_loras(Some(scene.id.clone()));

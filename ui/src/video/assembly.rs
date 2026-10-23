@@ -364,7 +364,12 @@ impl ImagineApp {
             });
             let r = ui.checkbox(&mut clip.include_audio, "Include source audio");
             control(ui, "assembly-clip-audio", &r);
-            let r = ui.button("Use generated Take instead");
+            let r = helto::icon_button(
+                ui,
+                crate::icons::Icon::Unlink,
+                "Use generated Take instead",
+                false,
+            );
             control(ui, "assembly-remove-clip", &r);
             if r.clicked() {
                 commands.push(Edit::SetClipInstance {
@@ -604,11 +609,11 @@ impl ImagineApp {
             let hidden=!helto::reveal_in_viewport(ui,self.prefs.privacy_mode);
             helto::private_scope(ui,hidden,|ui|{
             ui.horizontal_wrapped(|ui|{
-                let r=ui.button("Back to Timeline");control(ui,"assembly-close",&r);close=r.clicked();
-                let r=ui.add_enabled(!busy&&!self.timeline.busy&&!self.timeline.admitting&&self.timeline.pending.is_none()&&self.timeline.assembly.pending_final.is_none()&&document.is_some(),egui::Button::new("Render current Timeline"));control(ui,"assembly-render-current",&r);render_current=r.clicked();
+                let r=helto::icon_button(ui,crate::icons::Icon::Back,"Back to Timeline",false);control(ui,"assembly-close",&r);close=r.clicked();
+                let r=helto::action(ui,crate::icons::Icon::Generate,"Render current Timeline",true,if document.is_none(){Some("Create or open a project first.")}else{(busy||self.timeline.busy||self.timeline.admitting||self.timeline.pending.is_some()||self.timeline.assembly.pending_final.is_some()).then_some("Wait for the current operation.")});control(ui,"assembly-render-current",&r);render_current=r.clicked();
             });
             if self.timeline.assembly.retry_request().is_some() {
-                let r=ui.button("Retry Final preparation");control(ui,"assembly-retry-preparation",&r);retry=r.clicked();
+                let r=helto::icon_button(ui,crate::icons::Icon::Retry,"Retry Final preparation",false);control(ui,"assembly-retry-preparation",&r);retry=r.clicked();
                 ui.weak("Retry uses the original Timeline revision and export choices. Render current Timeline uses your current choices.");
             }
             if let Some(error)=&self.timeline.assembly.error{ui.colored_label(helto::ERROR,error);}
@@ -640,7 +645,7 @@ impl ImagineApp {
             });
             ui.separator();
             ui.weak("Render freezes the current montage internally. Frozen-plan inspection below is optional.");
-            let response=ui.add_enabled(!busy&&document.is_some(),egui::Button::new("Freeze current montage plan"));control(ui,"assembly-freeze",&response);capture=response.clicked();
+            let response=helto::action(ui,crate::icons::Icon::Lock,"Freeze current montage plan",false,if document.is_none(){Some("Create or open a project first.")}else{busy.then_some("Wait for the current operation.")});control(ui,"assembly-freeze",&response);capture=response.clicked();
             if busy{ui.spinner();}
             if let Some(plan)=&self.timeline.assembly.plan{
                 let fps=imagine_video_contract::assembly::seconds(plan.delivery.fps);
@@ -651,7 +656,7 @@ impl ImagineApp {
                     for (i,clip) in plan.clips.iter().enumerate(){ui.label(format!("Scene {} · {:?} · {} frames / {} overlap · {}",i+1,clip.boundary,clip.frames,clip.overlap,if clip.take_id.is_some(){"selected Take"}else{"imported video"}));}
                     for warning in &plan.warnings{ui.colored_label(helto::ACCENT,warning);}
                 });
-                let r=ui.add_enabled(!busy&&!self.timeline.admitting&&self.timeline.pending.is_none(),egui::Button::new("Render frozen plan"));control(ui,"assembly-render",&r);submit=r.clicked();
+                let r=helto::action(ui,crate::icons::Icon::Generate,"Render frozen plan",true,(busy||self.timeline.admitting||self.timeline.pending.is_some()).then_some("Wait for the current operation."));control(ui,"assembly-render",&r);submit=r.clicked();
             }
             if let Some(phase)=self.timeline.assembly.progress["phase"].as_str(){let response=ui.weak(assembly_phase_label(phase));control(ui,"assembly-progress",&response);}
             if self.timeline.assembly.progress["rendered_result_available"]==true{ui.weak("The encoded export is retained in this session. Retry export in the queue to save it again.");}

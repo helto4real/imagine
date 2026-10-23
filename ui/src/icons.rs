@@ -1,7 +1,7 @@
 //! Small outline icons, drawn at the same logical size on every display scale.
 use eframe::egui::{self, Color32, Painter, Rect, Stroke};
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Icon {
     Image,
     Save,
@@ -36,6 +36,22 @@ pub enum Icon {
     Compare,
     Swap,
     Unlink,
+    Animate,
+    Play,
+    Pause,
+    Story,
+    Montage,
+    Review,
+    Link,
+    Menu,
+    Person,
+    Library,
+    Import,
+    Export,
+    Download,
+    Back,
+    Lock,
+    Info,
 }
 
 pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
@@ -57,7 +73,132 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
             egui::StrokeKind::Middle,
         );
     };
+    let triangle = |points: [[f32; 2]; 3]| {
+        painter.add(egui::Shape::closed_line(
+            points.iter().map(|[x, y]| pos(*x, *y)).collect(),
+            stroke,
+        ));
+    };
     match icon {
+        Icon::Animate => {
+            box_at(2., 5., 20., 14., 2);
+            for x in [6., 18.] {
+                line(&[[x, 5.], [x, 19.]]);
+            }
+            triangle([[10., 9.], [10., 15.], [15., 12.]]);
+        }
+        Icon::Play => triangle([[7., 4.], [7., 20.], [19., 12.]]),
+        Icon::Pause => {
+            box_at(6., 4., 4., 16., 1);
+            box_at(14., 4., 4., 16., 1);
+        }
+        Icon::Story => {
+            line(&[
+                [12., 6.],
+                [8., 4.],
+                [2., 4.],
+                [2., 19.],
+                [8., 19.],
+                [12., 21.],
+            ]);
+            line(&[
+                [12., 6.],
+                [16., 4.],
+                [22., 4.],
+                [22., 19.],
+                [16., 19.],
+                [12., 21.],
+            ]);
+            line(&[[12., 6.], [12., 21.]]);
+        }
+        Icon::Montage => {
+            for x in [2., 9., 16.] {
+                box_at(x, 7., 6., 10., 1);
+            }
+            line(&[[2., 20.], [22., 20.]]);
+            line(&[[19., 18.], [22., 20.], [19., 22.]]);
+        }
+        Icon::Review => {
+            box_at(4., 4., 16., 18., 2);
+            box_at(9., 2., 6., 4., 1);
+            line(&[[8., 14.], [11., 17.], [16., 10.]]);
+        }
+        Icon::Link => {
+            line(&[
+                [10., 14.],
+                [7., 17.],
+                [5., 17.],
+                [3., 15.],
+                [3., 13.],
+                [7., 9.],
+                [9., 9.],
+                [11., 11.],
+            ]);
+            line(&[
+                [14., 10.],
+                [17., 7.],
+                [19., 7.],
+                [21., 9.],
+                [21., 11.],
+                [17., 15.],
+                [15., 15.],
+                [13., 13.],
+            ]);
+            line(&[[9., 15.], [15., 9.]]);
+        }
+        Icon::Menu => {
+            for y in [6., 12., 18.] {
+                line(&[[4., y], [20., y]]);
+            }
+        }
+        Icon::Person => {
+            painter.circle_stroke(pos(12., 8.), 4. * s, stroke);
+            line(&[
+                [4., 21.],
+                [5., 16.],
+                [9., 14.],
+                [15., 14.],
+                [19., 16.],
+                [20., 21.],
+            ]);
+        }
+        Icon::Library => {
+            box_at(3., 4., 4., 17., 1);
+            box_at(9., 4., 4., 17., 1);
+            line(&[[15., 6.], [19., 5.], [22., 20.], [18., 21.], [15., 6.]]);
+        }
+        Icon::Import | Icon::Export | Icon::Download => {
+            line(&[[3., 15.], [3., 21.], [21., 21.], [21., 15.]]);
+            line(&[[12., 3.], [12., 16.]]);
+            if matches!(icon, Icon::Export) {
+                line(&[[7., 8.], [12., 3.], [17., 8.]]);
+            } else {
+                line(&[[7., 11.], [12., 16.], [17., 11.]]);
+            }
+            if matches!(icon, Icon::Download) {
+                line(&[[8., 18.], [16., 18.]]);
+            }
+        }
+        Icon::Back => {
+            line(&[[20., 12.], [4., 12.]]);
+            line(&[[11., 5.], [4., 12.], [11., 19.]]);
+        }
+        Icon::Lock => {
+            box_at(4., 10., 16., 12., 2);
+            line(&[
+                [8., 10.],
+                [8., 6.],
+                [10., 3.],
+                [14., 3.],
+                [16., 6.],
+                [16., 10.],
+            ]);
+        }
+        Icon::Info => {
+            painter.circle_stroke(pos(12., 12.), 9.5 * s, stroke);
+            line(&[[12., 11.], [12., 17.]]);
+            painter.circle_filled(pos(12., 7.5), 1.1 * s, color);
+        }
         Icon::Unlink => {
             line(&[
                 [9., 6.],

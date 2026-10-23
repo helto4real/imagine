@@ -502,12 +502,14 @@ impl ImagineApp {
                     ui.horizontal(|ui| {
                         ui.label("Edit image");
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            if ui
-                                .add_enabled_ui(self.editable(), |ui| {
-                                    helto::icon_button(ui, Icon::Close, "Finish editing", false)
-                                })
-                                .inner
-                                .clicked()
+                            if helto::action(
+                                ui,
+                                Icon::Check,
+                                "Finish editing",
+                                false,
+                                (!self.editable()).then_some("Wait for the current generation."),
+                            )
+                            .clicked()
                             {
                                 self.finish_editing();
                             }
@@ -535,16 +537,14 @@ impl ImagineApp {
                     self.enhancement_field(ui, &response, Field::Prompt);
                     focus_prompt_shortcut(response);
                     ui.add_space(12.);
-                    if ui
-                        .add_enabled_ui(
-                            self.editable()
-                                && self.client.is_some()
-                                && !self.picking_folder
-                                && self.can_generate(),
-                            |ui| helto::icon_button(ui, Icon::Generate, "Create version", true),
-                        )
-                        .inner
-                        .clicked()
+                    if helto::action(
+                        ui,
+                        Icon::Generate,
+                        "Create version",
+                        true,
+                        self.desk_blocked().or(self.input_blocked()),
+                    )
+                    .clicked()
                     {
                         self.generate(ui.ctx());
                     }
@@ -593,16 +593,16 @@ impl ImagineApp {
                 self.reference_limit()
             ));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                if ui
-                    .add_enabled_ui(
-                        editable
-                            && self.client.is_some()
-                            && self.desk().references.len() < self.reference_limit(),
-                        |ui| helto::icon_button(ui, Icon::Plus, "Add references", false),
-                    )
-                    .inner
-                    .clicked()
-                {
+                let blocked = if self.client.is_none() {
+                    Some("Not connected to Imagine.")
+                } else if !editable {
+                    Some("Wait for the current generation.")
+                } else if self.desk().references.len() >= self.reference_limit() {
+                    Some("The reference limit is reached.")
+                } else {
+                    None
+                };
+                if helto::action(ui, Icon::Plus, "Add references", false, blocked).clicked() {
                     self.choose_references(ui.ctx());
                 }
             });
@@ -992,21 +992,25 @@ impl ImagineApp {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     self.sampling_preview_controls(ui);
                     if self.workspace == Workspace::Image
-                        && ui
-                            .add_enabled_ui(self.can_edit_image(), |ui| {
-                                helto::icon_button(ui, Icon::Edit, "Edit image", false)
-                            })
-                            .inner
-                            .clicked()
+                        && helto::action(
+                            ui,
+                            Icon::Edit,
+                            "Edit image",
+                            false,
+                            self.edit_image_blocked(),
+                        )
+                        .clicked()
                     {
                         self.start_editing();
                     }
                     if self.workspace == Workspace::Image {
-                        let animate = ui
-                            .add_enabled_ui(self.can_animate_image(), |ui| {
-                                helto::select_button(ui, "Animate", false)
-                            })
-                            .inner;
+                        let animate = helto::action(
+                            ui,
+                            Icon::Animate,
+                            "Animate",
+                            false,
+                            self.animate_image_blocked(),
+                        );
                         #[cfg(feature = "ui-preview")]
                         timeline::qa::control(ui, "image-animate".into(), &animate);
                         if animate.clicked() {
@@ -1124,23 +1128,17 @@ impl ImagineApp {
                 self.client.is_some() && !self.connecting && !self.busy() && !self.picking_folder;
             ui.horizontal(|ui| {
                 if !editing {
-                    let generate = ui
-                        .add_enabled_ui(
-                            ready && self.desk().pending.is_none() && self.can_generate(),
-                            |ui| {
-                                helto::icon_button(
-                                    ui,
-                                    Icon::Generate,
-                                    if self.workspace == Workspace::Image {
-                                        "Add to queue"
-                                    } else {
-                                        "Generate"
-                                    },
-                                    true,
-                                )
-                            },
-                        )
-                        .inner;
+                    let generate = helto::action(
+                        ui,
+                        Icon::Generate,
+                        if self.workspace == Workspace::Image {
+                            "Add to queue"
+                        } else {
+                            "Generate"
+                        },
+                        true,
+                        self.desk_blocked().or(self.input_blocked()),
+                    );
                     #[cfg(feature = "ui-preview")]
                     crate::app::timeline::qa::control(ui, "image-generate".into(), &generate);
                     if generate.clicked() {
@@ -1148,12 +1146,14 @@ impl ImagineApp {
                     }
                 }
                 if self.workspace == Workspace::Image
-                    && ui
-                        .add_enabled_ui(ready && self.image.pending.is_none(), |ui| {
-                            helto::icon_button(ui, Icon::Duplicate, "Multiple prompts", false)
-                        })
-                        .inner
-                        .clicked()
+                    && helto::action(
+                        ui,
+                        Icon::Duplicate,
+                        "Multiple prompts",
+                        false,
+                        self.desk_blocked(),
+                    )
+                    .clicked()
                 {
                     let restored = self.queue.parked_drafts.take();
                     self.queue.drafts = Some(
@@ -1162,37 +1162,39 @@ impl ImagineApp {
                     self.queue.draft_error = None;
                 }
                 if !editing
-                    && ui
-                        .add_enabled_ui(
-                            ready
-                                && self.desk().pending.is_none()
-                                && self.upscale_source().is_some(),
-                            |ui| {
-                                helto::icon_button(ui, Icon::Upscale, "Upscale", false)
-                                    .on_hover_text(
-                                        self.prefs
-                                            .upscale_target
-                                            .dimensions(self.upscale_ratio())
-                                            .map(|(w, h)| {
-                                                format!(
-                                                    "{} · {w} × {h} px",
-                                                    if sheet { "Character sheet" } else { "Image" }
-                                                )
-                                            })
-                                            .unwrap_or_else(|e| e.to_string()),
-                                    )
-                            },
-                        )
-                        .inner
-                        .clicked()
+                    && helto::action(
+                        ui,
+                        Icon::Upscale,
+                        "Upscale",
+                        false,
+                        self.desk_blocked().or(self
+                            .upscale_source()
+                            .is_none()
+                            .then_some("Generate or choose an image first.")),
+                    )
+                    .on_hover_text(
+                        self.prefs
+                            .upscale_target
+                            .dimensions(self.upscale_ratio())
+                            .map(|(w, h)| {
+                                format!(
+                                    "{} · {w} × {h} px",
+                                    if sheet { "Character sheet" } else { "Image" }
+                                )
+                            })
+                            .unwrap_or_else(|e| e.to_string()),
+                    )
+                    .clicked()
                 {
                     self.upscale(ui.ctx());
                 }
-                let cancel = ui
-                    .add_enabled_ui(activity.can_cancel, |ui| {
-                        helto::icon_button(ui, Icon::Stop, "Cancel generation", false)
-                    })
-                    .inner;
+                let cancel = helto::action(
+                    ui,
+                    Icon::Stop,
+                    "Cancel generation",
+                    false,
+                    (!activity.can_cancel).then_some("Nothing is running."),
+                );
                 #[cfg(feature = "ui-preview")]
                 crate::app::timeline::qa::control(ui, "image-cancel".into(), &cancel);
                 if cancel.clicked() {

@@ -259,16 +259,23 @@ impl State {
                 }
                 ui.weak("Applies to the next sampling job. Does not change seeds or the recipe.");
                 ui.horizontal(|ui| {
-                    let apply = ui.add_enabled(
-                        self.status.is_some() && !self.saving && self.draft.valid(),
-                        egui::Button::new("Apply"),
-                    );
+                    let blocked = if self.status.is_none() {
+                        Some("Settings have not loaded yet.")
+                    } else if self.saving {
+                        Some("Saving.")
+                    } else if !self.draft.valid() {
+                        Some("Fix the invalid values first.")
+                    } else {
+                        None
+                    };
+                    let apply =
+                        helto::action(ui, crate::icons::Icon::Check, "Apply", true, blocked);
                     #[cfg(feature = "ui-preview")]
                     crate::app::timeline::qa::control(ui, "sampling-preview-apply".into(), &apply);
                     if apply.clicked() {
                         save = Some(self.draft);
                     }
-                    let close = ui.button("Close");
+                    let close = helto::icon_button(ui, crate::icons::Icon::Close, "Close", false);
                     #[cfg(feature = "ui-preview")]
                     crate::app::timeline::qa::control(ui, "sampling-preview-close".into(), &close);
                     if close.clicked() {

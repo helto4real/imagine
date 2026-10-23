@@ -112,13 +112,17 @@ impl Player {
         }
         let mut play = false;
         ui.horizontal(|ui| {
-            let response = ui.add_enabled(
-                revealed,
-                egui::Button::new(if self.started.is_some() {
-                    "Pause"
-                } else {
-                    "Play"
-                }),
+            let (icon, label) = if self.started.is_some() {
+                (crate::icons::Icon::Pause, "Pause")
+            } else {
+                (crate::icons::Icon::Play, "Play")
+            };
+            let response = helto::action(
+                ui,
+                icon,
+                label,
+                false,
+                (!revealed).then_some("Reveal the preview to play it."),
             );
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, "timeline-play".into(), &response);

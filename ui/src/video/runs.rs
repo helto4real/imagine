@@ -251,9 +251,12 @@ impl ImagineApp {
     }
     pub(super) fn timeline_run_rows(&mut self, ui: &mut egui::Ui) {
         if self.timeline.pending_run.is_some() {
-            let r = ui.add_enabled(
-                !self.timeline.admitting,
-                egui::Button::new("Retrieve run request"),
+            let r = helto::action(
+                ui,
+                crate::icons::Icon::Download,
+                "Retrieve run request",
+                false,
+                self.timeline.admitting.then_some("Submitting now."),
             );
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, "run-retrieve".into(), &r);
@@ -295,12 +298,27 @@ impl ImagineApp {
                     Status::Interrupted => "Interrupted",
                 });
                 if !run.status.terminal() {
-                    for (cancel, label, name) in [
-                        (false, "Stop after current", "run-stop"),
-                        (true, "Cancel current", "run-cancel"),
+                    for (cancel, icon, label, name) in [
+                        (
+                            false,
+                            crate::icons::Icon::Pause,
+                            "Stop after current",
+                            "run-stop",
+                        ),
+                        (
+                            true,
+                            crate::icons::Icon::Stop,
+                            "Cancel current",
+                            "run-cancel",
+                        ),
                     ] {
-                        let response =
-                            ui.add_enabled(!self.timeline.run_acting, egui::Button::new(label));
+                        let response = helto::action(
+                            ui,
+                            icon,
+                            label,
+                            false,
+                            self.timeline.run_acting.then_some("Updating the run."),
+                        );
                         #[cfg(feature = "ui-preview")]
                         super::qa::control(ui, format!("{name}-{index}"), &response);
                         #[cfg(feature = "ui-preview")]

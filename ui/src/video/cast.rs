@@ -167,7 +167,8 @@ impl ImagineApp {
                         state.draft.visual_references_enabled = Some(enabled);
                     }
                     ui.horizontal_wrapped(|ui| {
-                        let r = ui.button("Add reference");
+                        let r =
+                            helto::icon_button(ui, crate::icons::Icon::Plus, "Add reference", true);
                         control(ui, "cast-add", &r);
                         if r.clicked() {
                             let n = state.draft.references.len() + 1;
@@ -187,7 +188,7 @@ impl ImagineApp {
                                 origin: None,
                             });
                         }
-                        let r = ui.button("Close");
+                        let r = helto::icon_button(ui, crate::icons::Icon::Close, "Close", false);
                         control(ui, "cast-close", &r);
                         close = r.clicked();
                         let r = helto::icon_button(
@@ -388,7 +389,12 @@ impl ImagineApp {
                                 }
                                 let mut default_preview = None;
                                 let images = ui.collapsing("Images", |ui| {
-                                    let r = ui.button("Add reference images…");
+                                    let r = helto::icon_button(
+                                        ui,
+                                        crate::icons::Icon::Import,
+                                        "Add reference images…",
+                                        false,
+                                    );
                                     control(ui, &format!("cast-pick-image-{i}"), &r);
                                     if r.clicked() {
                                         pick_media = Some(media_picker::Target::ReferenceImage(
@@ -482,7 +488,12 @@ impl ImagineApp {
                                     });
                                 }
                                 if let Some(voice) = &mut reference.voice {
-                                    let r = ui.button("Add voice references…");
+                                    let r = helto::icon_button(
+                                        ui,
+                                        crate::icons::Icon::Import,
+                                        "Add voice references…",
+                                        false,
+                                    );
                                     control(ui, &format!("cast-pick-voice-{i}"), &r);
                                     if r.clicked() {
                                         pick_media = Some(media_picker::Target::ReferenceVoice(

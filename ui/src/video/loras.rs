@@ -204,8 +204,8 @@ impl ImagineApp {
             });
             });
             ui.horizontal(|ui| {
-                let r=ui.add_enabled(!self.timeline.busy,egui::Button::new("Apply"));control(ui,"lora-apply",&r);apply=r.clicked();
-                let r=ui.button("Cancel");control(ui,"lora-cancel",&r);cancel=r.clicked();
+                let r=helto::action(ui,crate::icons::Icon::Check,"Apply",true,self.timeline.busy.then_some("Wait for the current timeline operation."));control(ui,"lora-apply",&r);apply=r.clicked();
+                let r=helto::icon_button(ui,crate::icons::Icon::Close,"Cancel",false);control(ui,"lora-cancel",&r);cancel=r.clicked();
             });
         });
         if response.should_close() {

@@ -57,7 +57,7 @@ impl ImagineApp {
                     #[cfg(feature = "ui-preview")]
                     super::qa::control(ui, "global-prompt-text".into(), &r);
                     commit |= r.lost_focus();
-                    let r = ui.button("Close");
+                    let r = helto::icon_button(ui, crate::icons::Icon::Close, "Close", false);
                     #[cfg(feature = "ui-preview")]
                     super::qa::control(ui, "global-prompt-close".into(), &r);
                     close = r.clicked();

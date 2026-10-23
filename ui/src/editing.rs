@@ -26,15 +26,27 @@ impl Default for EditSession {
 }
 impl ImagineApp {
     pub(super) fn can_edit_image(&self) -> bool {
-        self.workspace == Workspace::Image
-            && self.queue.loading.is_none()
-            && !self.busy()
-            && !self.connecting
-            && self.image.pending.is_none()
-            && self
-                .image
-                .selected_result()
-                .is_some_and(|r| !r.asset_id.is_empty())
+        self.edit_image_blocked().is_none()
+    }
+    /// Why the selected image cannot be edited or animated now.
+    pub(super) fn edit_image_blocked(&self) -> Option<&'static str> {
+        if self.workspace != Workspace::Image {
+            Some("Available in the Image workspace.")
+        } else if self.connecting {
+            Some("Connecting to Imagine.")
+        } else if self.queue.loading.is_some() {
+            Some("Wait until the result has loaded.")
+        } else if self.busy() || self.image.pending.is_some() {
+            Some("Wait for the current generation.")
+        } else if self
+            .image
+            .selected_result()
+            .is_none_or(|r| r.asset_id.is_empty())
+        {
+            Some("Generate or choose an image first.")
+        } else {
+            None
+        }
     }
     pub(super) fn start_editing(&mut self) {
         if !self.can_edit_image() {

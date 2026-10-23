@@ -3,11 +3,14 @@ use super::*;
 
 impl ImagineApp {
     pub(in crate::app) fn can_animate_image(&self) -> bool {
-        self.can_edit_image()
-            && !self.video.working
-            && self.video.pending.is_none()
-            && !self.timeline.busy
-            && !self.timeline.admitting
+        self.animate_image_blocked().is_none()
+    }
+    pub(in crate::app) fn animate_image_blocked(&self) -> Option<&'static str> {
+        self.edit_image_blocked().or((self.video.working
+            || self.video.pending.is_some()
+            || self.timeline.busy
+            || self.timeline.admitting)
+            .then_some("Wait for the current video operation."))
     }
 
     pub(in crate::app) fn start_animating(&mut self, ctx: &egui::Context) {

@@ -86,13 +86,13 @@ impl ImagineApp {
             if let Some(id) = self.timeline.captures.confirm.clone() {
                 ui.label("Remove this Capture and its owned project files? External originals are preserved. Receipts used by other Takes are retained as provenance.");
                 ui.horizontal(|ui| {
-                    let remove = ui.add_enabled(!self.timeline.busy, egui::Button::new("Remove Capture"));
+                    let remove = helto::action(ui, crate::icons::Icon::Trash, "Remove Capture", false, self.timeline.busy.then_some("Wait for the current timeline operation."));
                     control(ui, "capture-confirm-remove", &remove);
                     if remove.clicked() {
                         action = Some((id, Action::Delete));
                         self.timeline.captures.confirm = None;
                     }
-                    let cancel = ui.button("Cancel"); control(ui, "capture-confirm-cancel", &cancel);
+                    let cancel = helto::icon_button(ui, crate::icons::Icon::Close, "Cancel", false); control(ui, "capture-confirm-cancel", &cancel);
                     if cancel.clicked() { self.timeline.captures.confirm = None; }
                 });
                 return;

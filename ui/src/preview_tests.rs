@@ -881,7 +881,7 @@ fn headless_layout_and_recoverable_job_state() {
 
 // Minimal CPU rasterization of egui's own triangle output for inspection.
 // This is not a substitute for native compositor/font-renderer acceptance.
-fn render(
+pub(super) fn render(
     ctx: &egui::Context,
     mut output: egui::FullOutput,
     width: u32,
@@ -1453,3 +1453,96 @@ fn sheet_upscale_replaces_only_whole_sheet_even_when_viewing_portrait() {
 
 #[path = "model_ui_tests.rs"]
 mod model_ui_tests;
+
+/// Icon sheet for visual review; written only when IMAGINE_UI_PREVIEW_DIR is set.
+#[test]
+fn headless_icon_sheet() {
+    use crate::icons::Icon::*;
+    let icons = [
+        Image,
+        Save,
+        Edit,
+        Enhance,
+        Duplicate,
+        Copy,
+        Insert,
+        Lora,
+        CharacterSheet,
+        Video,
+        Audio,
+        Settings,
+        Eye,
+        EyeOff,
+        Plus,
+        Up,
+        Down,
+        Trash,
+        Fit,
+        Actual,
+        Hand,
+        Generate,
+        Upscale,
+        Retry,
+        Stop,
+        Folder,
+        Close,
+        Check,
+        Undo,
+        Redo,
+        Compare,
+        Swap,
+        Unlink,
+        Animate,
+        Play,
+        Pause,
+        Story,
+        Montage,
+        Review,
+        Link,
+        Menu,
+        Person,
+        Library,
+        Import,
+        Export,
+        Download,
+        Back,
+        Lock,
+    ];
+    let ctx = egui::Context::default();
+    helto::install(&ctx);
+    let (width, height) = (1100, 60 + 84 * icons.len().div_ceil(4) as u32);
+    let mut combined = egui::FullOutput::default();
+    for _ in 0..2 {
+        combined.append(ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(width as f32, height as f32),
+                )),
+                ..Default::default()
+            },
+            |ui| {
+                egui::Grid::new("icons").spacing([12., 10.]).show(ui, |ui| {
+                    for (index, icon) in icons.iter().enumerate() {
+                        let name = format!("{icon:?}");
+                        let (rect, _) =
+                            ui.allocate_exact_size(egui::vec2(72., 72.), egui::Sense::hover());
+                        crate::icons::paint(ui.painter(), rect, *icon, helto::TEXT);
+                        helto::icon_button(ui, *icon, &name, index % 9 == 0);
+                        ui.label(name);
+                        if index % 4 == 3 {
+                            ui.end_row();
+                        }
+                    }
+                });
+            },
+        ));
+    }
+    if let Some(dir) = std::env::var_os("IMAGINE_UI_PREVIEW_DIR") {
+        let dir = PathBuf::from(dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        render(&ctx, combined, width, height)
+            .save(dir.join("icons.png"))
+            .unwrap();
+    }
+}

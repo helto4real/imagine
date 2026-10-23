@@ -548,11 +548,11 @@ impl ImagineApp {
                 }
                 ui.add_enabled_ui(!self.timeline.busy, |ui| {
                     ui.horizontal_wrapped(|ui| {
-                        for (name, label) in [
-                            ("create", "Create library"),
-                            ("open", "Open library"),
+                        for (name, icon, label) in [
+                            ("create", crate::icons::Icon::Plus, "Create library"),
+                            ("open", crate::icons::Icon::Folder, "Open library"),
                         ] {
-                            let r = ui.button(label);
+                            let r = helto::icon_button(ui, icon, label, false);
                             control(ui, &format!("library-{name}"), &r);
                             if r.clicked() {
                                 action = Some(name);
@@ -612,7 +612,7 @@ impl ImagineApp {
                     }
                     ui.add_enabled_ui(!self.timeline.busy, |ui| {
                         ui.horizontal_wrapped(|ui| {
-                            let r = ui.button("Copy selected into project"); control(ui, "library-copy", &r); if r.clicked() { action = Some("copy"); }
+                            let r = helto::icon_button(ui, crate::icons::Icon::Import, "Copy selected into project", true); control(ui, "library-copy", &r); if r.clicked() { action = Some("copy"); }
                             for (key, icon, label) in [("edit", crate::icons::Icon::Save, "Save entry metadata"), ("delete", crate::icons::Icon::Trash, "Delete library entry; keep project and original media")] {
                                 let r = helto::icon_button(ui, icon, label, false); control(ui, &format!("library-{key}"), &r); if r.clicked() { action = Some(key); }
                             }
@@ -636,7 +636,7 @@ impl ImagineApp {
                         ui.add_enabled_ui(!self.timeline.busy, |ui| {
                             ui.horizontal_wrapped(|ui| {
                                 let (save, replace) = match state.tab.as_str() { "character" => ("save-cast", "replace-cast"), "asset" => ("save-asset", "replace-asset"), _ => ("save-project", "replace-project") };
-                                for (name, label) in [(save, "Save as new library entry"), (replace, "Update selected from project")] { let r = ui.button(label); control(ui, &format!("library-{name}"), &r); if r.clicked() { action = Some(name); } }
+                                for (name, icon, label) in [(save, crate::icons::Icon::Plus, "Save as new library entry"), (replace, crate::icons::Icon::Save, "Update selected from project")] { let r = helto::icon_button(ui, icon, label, false); control(ui, &format!("library-{name}"), &r); if r.clicked() { action = Some(name); } }
                             });
                         });
                     }
@@ -650,7 +650,7 @@ impl ImagineApp {
                 if let Some(notice) = &state.notice {
                     ui.label(notice);
                 }
-                let r = ui.button("Close library");
+                let r = helto::icon_button(ui, crate::icons::Icon::Close, "Close library", false);
                 control(ui, "library-close", &r);
                 close = r.clicked();
             });

@@ -77,7 +77,7 @@ impl State {
                 ui.horizontal(|ui|{ui.label("Memory limit (MiB)");let r=ui.add(egui::DragValue::new(&mut self.limit_mib).range(0..=u64::MAX/1048576));
                 #[cfg(feature="ui-preview")] super::qa::control(ui,"cache-budget".into(),&r);
                 let _=r;});
-                let r=ui.button("Apply budget");
+                let r=helto::icon_button(ui,crate::icons::Icon::Check,"Apply budget",true);
                 #[cfg(feature="ui-preview")] super::qa::control(ui,"cache-apply".into(),&r);
                 if r.clicked(){action=Some((true,"/v1/video/reference-cache".into(),Some(json!({"schema_version":1,"limit_bytes":self.limit_mib.saturating_mul(1048576),"enabled":self.enabled}))));}
                 let r=helto::icon_button(ui,crate::icons::Icon::Trash,"Clear reference cache",false);

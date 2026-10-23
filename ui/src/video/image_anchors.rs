@@ -229,7 +229,8 @@ impl ImagineApp {
                     if anchor != before {
                         image.anchor = Some(anchor);
                     }
-                    let r = ui.small_button("Remove anchor");
+                    let r =
+                        helto::icon_button(ui, crate::icons::Icon::Trash, "Remove anchor", false);
                     #[cfg(feature = "ui-preview")]
                     super::qa::control(ui, format!("anchor-remove-{i}"), &r);
                     if r.clicked() {

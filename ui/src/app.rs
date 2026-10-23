@@ -259,20 +259,57 @@ impl ImagineApp {
         }
     }
     fn can_generate(&self) -> bool {
+        self.input_blocked().is_none()
+    }
+    /// Why the current desk's input cannot be generated.
+    fn input_blocked(&self) -> Option<&'static str> {
         if self.models.catalog.is_some() && self.model_selection().is_err() {
-            return false;
+            return Some("Choose a model first.");
         }
         match self.workspace {
-            Workspace::Image => !self.image.prompt.trim().is_empty(),
-            Workspace::ImageEdit => !self.edit.desk.prompt.trim().is_empty(),
+            Workspace::Image => self
+                .image
+                .prompt
+                .trim()
+                .is_empty()
+                .then_some("Write a prompt first."),
+            Workspace::ImageEdit => self
+                .edit
+                .desk
+                .prompt
+                .trim()
+                .is_empty()
+                .then_some("Describe the edit first."),
             Workspace::CharacterSheet => {
-                self.metadata
+                if !self
+                    .metadata
                     .as_ref()
                     .is_some_and(client::supports_character_sheets)
-                    && (!self.sheet.character_description.trim().is_empty()
-                        || !self.sheet.references.is_empty())
+                {
+                    Some("This model does not create character sheets.")
+                } else if self.sheet.character_description.trim().is_empty()
+                    && self.sheet.references.is_empty()
+                {
+                    Some("Describe the character or add a reference first.")
+                } else {
+                    None
+                }
             }
-            Workspace::Video => false,
+            Workspace::Video => Some("Generate from the Timeline."),
+        }
+    }
+    /// Why the desk cannot start new work now.
+    fn desk_blocked(&self) -> Option<&'static str> {
+        if self.client.is_none() {
+            Some("Not connected to Imagine.")
+        } else if self.connecting {
+            Some("Connecting to Imagine.")
+        } else if self.picking_folder {
+            Some("Finish choosing the output folder.")
+        } else if self.busy() || self.desk().pending.is_some() {
+            Some("Wait for the current generation.")
+        } else {
+            None
         }
     }
     fn connect(&mut self, ctx: &egui::Context) {

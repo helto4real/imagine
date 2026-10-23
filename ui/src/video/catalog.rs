@@ -576,12 +576,12 @@ impl ImagineApp {
                                     Err(e) => e,
                                 });
                             }
-                            let r = ui.add_enabled(!state.busy, egui::Button::new("Save"));
+                            let r = helto::action(ui, crate::icons::Icon::Save, "Save", true, state.busy.then_some("Saving."));
                             control(ui, "catalog-save", &r);
                             if r.clicked() {
                                 save = Some((false, false));
                             }
-                            let r = ui.add_enabled(!state.busy, egui::Button::new("Save as…"));
+                            let r = helto::action(ui, crate::icons::Icon::Duplicate, "Save as…", false, state.busy.then_some("Saving."));
                             control(ui, "catalog-save-as", &r);
                             if r.clicked() {
                                 if private { state.save_as_name = Some(state.selected.clone()); }
@@ -596,16 +596,16 @@ impl ImagineApp {
                             ui.horizontal_wrapped(|ui| {
                                 ui.label("Private catalog filename");
                                 let r = ui.text_edit_singleline(name); control(ui, "catalog-private-filename", &r);
-                                let r = ui.button("Save"); control(ui, "catalog-private-save-as", &r);
+                                let r = helto::icon_button(ui, crate::icons::Icon::Save, "Save", true); control(ui, "catalog-private-save-as", &r);
                                 if r.clicked() { filename = Some(PathBuf::from(name.as_str())); save = Some((true, false)); done = true; }
-                                if ui.button("Cancel").clicked() { done = true; }
+                                if helto::icon_button(ui, crate::icons::Icon::Close, "Cancel", false).clicked() { done = true; }
                             });
                             if done { state.save_as_name = None; }
                         }
                         if state.confirm_delete {ui.horizontal_wrapped(|ui|{
                             ui.label(format!("Delete {}?",state.selected));
-                            let r=ui.button("Delete");control(ui,"catalog-delete-confirm",&r);if r.clicked(){save=Some((false,true));state.confirm_delete=false;}
-                            let r=ui.button("Cancel");control(ui,"catalog-delete-cancel",&r);if r.clicked(){state.confirm_delete=false;}
+                            let r=helto::icon_button(ui,crate::icons::Icon::Trash,"Delete",false);control(ui,"catalog-delete-confirm",&r);if r.clicked(){save=Some((false,true));state.confirm_delete=false;}
+                            let r=helto::icon_button(ui,crate::icons::Icon::Close,"Cancel",false);control(ui,"catalog-delete-cancel",&r);if r.clicked(){state.confirm_delete=false;}
                         });}
                         ui.horizontal(|ui| {
                             for (yaml, label) in [(true, "YAML"), (false, "Form")] {
@@ -693,9 +693,15 @@ impl ImagineApp {
                                 if r.clicked() {
                                     ctx.copy_text(expansion.text.clone());
                                 }
-                                let r = ui.add_enabled(
-                                    state.insertion_target.is_some(),
-                                    egui::Button::new("Insert in prompt"),
+                                let r = helto::action(
+                                    ui,
+                                    crate::icons::Icon::Insert,
+                                    "Insert in prompt",
+                                    true,
+                                    state
+                                        .insertion_target
+                                        .is_none()
+                                        .then_some("Place the cursor in a prompt field first."),
                                 );
                                 control(ui, "composer-insert", &r);
                                 if r.clicked() {

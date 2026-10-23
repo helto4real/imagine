@@ -407,7 +407,7 @@ impl ImagineApp {
                 if state.pending{
                     ui.spinner();ui.label("Checking media…");
                     if state.apply_nonce.is_none() {
-                        let r=ui.button("Cancel");
+                        let r=helto::icon_button(ui,crate::icons::Icon::Stop,"Cancel",false);
                         #[cfg(feature="ui-preview")] super::qa::control(ui,"media-health-cancel".into(),&r);
                         if r.clicked(){cancel=true;}
                     }
@@ -421,10 +421,10 @@ impl ImagineApp {
                     ui.label(format!("Replacement: {replacement}"));
                     ui.label("Asset identity and listed bindings are kept. Existing Takes keep their source revision.");
                     egui::ScrollArea::vertical().max_height(300.).show(ui,|ui|{for (index,impact) in value["impacts"].as_array().into_iter().flatten().enumerate(){if hidden{ui.label(format!("Affected binding {}",index+1));}else{ui.label(format!("{} · {} · {}",impact["kind"].as_str().unwrap_or(""),impact["owner"].as_str().unwrap_or(""),impact["binding"].as_str().unwrap_or("")));}}});
-                    ui.horizontal(|ui|{let r=ui.add_enabled(!state.pending,egui::Button::new("Back"));
+                    ui.horizontal(|ui|{let r=helto::action(ui,crate::icons::Icon::Back,"Back",false,state.pending.then_some("Checking media."));
                     #[cfg(feature="ui-preview")] super::qa::control(ui,"media-health-back".into(),&r);
                     if r.clicked(){back=true;}
-                    let r=ui.add_enabled(!state.pending && !stale,egui::Button::new("Relink asset"));
+                    let r=helto::action(ui,crate::icons::Icon::Link,"Relink asset",true,if state.pending{Some("Checking media.")}else{stale.then_some("Project changed. Check media again.")});
                     #[cfg(feature="ui-preview")] super::qa::control(ui,"media-health-apply".into(),&r);
                     if r.clicked(){apply=Some(value["request"].clone());}});
                 }else if let Some(report)=&state.report{
@@ -434,7 +434,7 @@ impl ImagineApp {
                             ui.label(format!("Affected bindings: {}",entry["impacts"].as_array().map_or(0,Vec::len)));
                             // Replacement uses another explicitly imported project media asset's immutable runtime descriptor.
                             // Importing goes through the existing contextual media picker; there are no raw path fields.
-                            ui.add_enabled_ui(!state.pending && !stale,|ui|{let menu=ui.menu_button("Relink…",|ui|{
+                            ui.add_enabled_ui(!state.pending && !stale,|ui|{let menu=helto::icon_button(ui,crate::icons::Icon::Link,"Relink…",false);egui::Popup::menu(&menu).show(|ui|{
                                 let r=ui.button("Choose replacement file…");
                                 #[cfg(feature="ui-preview")] super::qa::control(ui,format!("relink-file-{}",asset.id.0),&r);
                                 if r.clicked(){choose=Some((asset.id.clone(),asset.kind.clone()));ui.close();}
@@ -442,7 +442,7 @@ impl ImagineApp {
                                 for replacement in document.project.assets.values().filter(|a|a.id!=asset.id && a.kind==asset.kind){if let Some(runtime)=document.raw["runtime_assets"][&replacement.id.0].as_str(){let label=if hidden{"Replacement media".into()}else if replacement.name.is_empty(){replacement.id.0.clone()}else{replacement.name.clone()};let r=ui.button(label);
                                 #[cfg(feature="ui-preview")] super::qa::control(ui,format!("relink-replacement-{}",replacement.id.0),&r);
                                 if r.clicked(){preview=Some(json!({"schema_version":1,"expected_project_revision":document.project.project_revision,"asset_id":asset.id,"expected_asset_revision":asset.revision,"replacement_asset_id":runtime}));ui.close();}}}});
-                            #[cfg(feature="ui-preview")] super::qa::control(ui,format!("relink-{}",asset.id.0),&menu.response);
+                            #[cfg(feature="ui-preview")] super::qa::control(ui,format!("relink-{}",asset.id.0),&menu);
                             let _=menu;});
                         });
                     }});

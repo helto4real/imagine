@@ -172,10 +172,15 @@ impl ImagineApp {
                         ui.disable();
                     }
                     ui.horizontal(|ui| {
-                        let r = ui.button("Save character");
+                        let r = helto::icon_button(
+                            ui,
+                            crate::icons::Icon::Save,
+                            "Save character",
+                            true,
+                        );
                         control(ui, "library-character-save", &r);
                         save = r.clicked();
-                        let r = ui.button("Cancel");
+                        let r = helto::icon_button(ui, crate::icons::Icon::Close, "Cancel", false);
                         control(ui, "library-character-cancel", &r);
                         cancel = r.clicked();
                     });
@@ -267,7 +272,8 @@ impl ImagineApp {
                     });
                     ui.separator();
                     ui.strong("Images");
-                    let r = ui.button("Add images…");
+                    let r =
+                        helto::icon_button(ui, crate::icons::Icon::Import, "Add images…", false);
                     control(ui, "library-character-images", &r);
                     if r.clicked() {
                         pick = Some(false);
@@ -345,7 +351,12 @@ impl ImagineApp {
                             &mut voice.description,
                             true,
                         );
-                        let r = ui.button("Add voice audio…");
+                        let r = helto::icon_button(
+                            ui,
+                            crate::icons::Icon::Import,
+                            "Add voice audio…",
+                            false,
+                        );
                         control(ui, "library-character-audio", &r);
                         if r.clicked() {
                             pick = Some(true);

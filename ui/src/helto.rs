@@ -137,12 +137,43 @@ pub fn install(ctx: &egui::Context) {
         ctx.set_fonts(fonts);
     }
 }
+/// Icon-only button; its label is the accessible name and the hover text,
+/// also while disabled.
 pub(crate) fn icon_button(
     ui: &mut egui::Ui,
     icon: Icon,
     label: &str,
     active: bool,
 ) -> egui::Response {
+    paint_icon_button(ui, icon, label, active)
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(label)
+        .on_disabled_hover_text(label)
+}
+
+/// Icon-only action that is disabled while `blocked` names a reason; the
+/// hover text then gives the name and that reason.
+pub(crate) fn action(
+    ui: &mut egui::Ui,
+    icon: Icon,
+    label: &str,
+    primary: bool,
+    blocked: Option<&str>,
+) -> egui::Response {
+    let response = ui
+        .add_enabled_ui(blocked.is_none(), |ui| {
+            paint_icon_button(ui, icon, label, primary)
+        })
+        .inner
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .on_hover_text(label);
+    match blocked {
+        Some(reason) => response.on_disabled_hover_text(format!("{label}\n{reason}")),
+        None => response,
+    }
+}
+
+fn paint_icon_button(ui: &mut egui::Ui, icon: Icon, label: &str, active: bool) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(egui::vec2(32., 32.), egui::Sense::click());
     response.widget_info(|| {
         egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), active, label)
@@ -189,8 +220,6 @@ pub(crate) fn icon_button(
         icons::paint(ui.painter(), painted.shrink(7.), icon, color);
     }
     response
-        .on_hover_cursor(egui::CursorIcon::PointingHand)
-        .on_hover_text(label)
 }
 
 pub fn select_button(ui: &mut egui::Ui, label: &str, active: bool) -> egui::Response {
@@ -491,6 +520,33 @@ fn redact_text_accessibility(ctx: &egui::Context, id: egui::Id) {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn blocked_icon_actions_keep_their_name_and_report_disabled() {
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut clicked = false;
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            clicked |=
+                action(ui, Icon::Generate, "Own action", true, Some("Own reason.")).clicked();
+            icon_button(ui, Icon::Save, "Own ready action", false);
+        });
+        output.textures_delta.clear();
+        let nodes = output.platform_output.accesskit_update.unwrap().nodes;
+        let node = |label| {
+            nodes
+                .iter()
+                .find(|(_, n)| n.label() == Some(label))
+                .unwrap_or_else(|| panic!("missing {label}"))
+                .1
+                .clone()
+        };
+        assert!(node("Own action").is_disabled());
+        assert!(!node("Own ready action").is_disabled());
+        assert!(!clicked);
+    }
+
     #[test]
     fn multiline_field_geometry_tracks_the_frame_without_truncating_long_text() {
         let ctx = egui::Context::default();
@@ -687,7 +743,6 @@ mod tests {
             );
         }
     }
-    use super::*;
     #[test]
     fn private_text_hides_on_leave_even_with_focus_and_selection() {
         fn contains_text(shape: &egui::Shape) -> bool {

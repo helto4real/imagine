@@ -423,11 +423,11 @@ impl Comparison {
         }
         ui.add_enabled_ui(revealed, |ui| {
             ui.horizontal_wrapped(|ui| {
-                let r = ui.button(if self.clock.started.is_some() {
-                    "Pause"
+                let r = if self.clock.started.is_some() {
+                    helto::icon_button(ui, crate::icons::Icon::Pause, "Pause", false)
                 } else {
-                    "Play"
-                });
+                    helto::icon_button(ui, crate::icons::Icon::Play, "Play", false)
+                };
                 control(ui, "comparison-play", &r);
                 if r.clicked() {
                     if self.clock.started.is_some() {

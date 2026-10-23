@@ -427,8 +427,8 @@ impl ImagineApp {
                     true,
                 );
                 ui.horizontal(|ui| {
-                    use_text = helto::select_button(ui, "Use", true).clicked();
-                    discard = ui.button("Discard").clicked();
+                    use_text = helto::icon_button(ui, Icon::Check, "Use", true).clicked();
+                    discard = helto::icon_button(ui, Icon::Close, "Discard", false).clicked();
                 });
             });
         if use_text || discard || !open {
@@ -445,12 +445,12 @@ impl ImagineApp {
             .id_salt("enhancement-settings")
             .show(ui, |ui| {
                 if !self.enhancement.loaded {
-                    if ui
-                        .add_enabled(
-                            !self.enhancement.loading && self.client.is_some(),
-                            egui::Button::new("Load profiles"),
-                        )
-                        .clicked()
+                    let blocked = if self.client.is_none() {
+                        Some("Not connected to Imagine.")
+                    } else {
+                        self.enhancement.loading.then_some("Loading profiles.")
+                    };
+                    if helto::action(ui, Icon::Download, "Load profiles", false, blocked).clicked()
                     {
                         self.load_enhancement_profiles(ui.ctx());
                     }
@@ -659,16 +659,27 @@ impl ImagineApp {
                         }
                     });
             }
-            load_models = ui
-                .add_enabled(
-                    !loading_models && self.client.is_some(),
-                    egui::Button::new(if have_models {
-                        "Refresh models"
-                    } else {
-                        "Load models"
-                    }),
-                )
-                .clicked();
+            let blocked = if self.client.is_none() {
+                Some("Not connected to Imagine.")
+            } else {
+                loading_models.then_some("Loading models.")
+            };
+            load_models = helto::action(
+                ui,
+                if have_models {
+                    Icon::Retry
+                } else {
+                    Icon::Download
+                },
+                if have_models {
+                    "Refresh models"
+                } else {
+                    "Load models"
+                },
+                false,
+                blocked,
+            )
+            .clicked();
             if loading_models {
                 ui.spinner();
             }
@@ -805,20 +816,18 @@ impl ImagineApp {
             && !draft.name.trim().is_empty()
             && !draft.model.trim().is_empty();
         let dirty = self.enhancement_profile_dirty();
-        if ui
-            .add_enabled_ui(valid && dirty && self.client.is_some(), |ui| {
-                helto::select_button(ui, "Save profile", true)
-            })
-            .inner
-            .on_disabled_hover_text(if valid {
-                "Profile is saved."
-            } else if self.enhancement.extra_error.is_some() {
-                "Fix the extra parameters in Advanced."
-            } else {
-                "Enter a name, model ID and system prompt."
-            })
-            .clicked()
-        {
+        let blocked = if self.client.is_none() {
+            Some("Not connected to Imagine.")
+        } else if self.enhancement.extra_error.is_some() {
+            Some("Fix the extra parameters in Advanced.")
+        } else if !valid {
+            Some("Enter a name, model ID and system prompt.")
+        } else if !dirty {
+            Some("No unsaved changes.")
+        } else {
+            None
+        };
+        if helto::action(ui, Icon::Save, "Save profile", true, blocked).clicked() {
             self.save_enhancement_profile(ui.ctx(), false);
         }
         if load_models {

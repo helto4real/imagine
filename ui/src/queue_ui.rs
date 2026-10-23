@@ -426,15 +426,10 @@ impl ImagineApp {
                     if helto::icon_button(ui, Icon::Plus, "Add prompt", false).clicked() {
                         drafts.push(String::new());
                     }
-                    enqueue = ui
-                        .add_enabled(
-                            !drafts.is_empty()
-                                && drafts.iter().all(|p| !p.trim().is_empty())
-                                && self.editable()
-                                && self.client.is_some()
-                                && !self.picking_folder,
-                            egui::Button::new("Add all to queue"),
-                        )
+                    let blocked = self.desk_blocked().or((drafts.is_empty()
+                        || drafts.iter().any(|p| p.trim().is_empty()))
+                    .then_some("Fill in or remove empty prompts."));
+                    enqueue = helto::action(ui, Icon::Generate, "Add all to queue", true, blocked)
                         .clicked();
                 });
                 if let Some(error) = &self.queue.draft_error {

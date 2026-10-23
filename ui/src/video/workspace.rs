@@ -1,6 +1,7 @@
 //! Locked Timeline composition using existing native Helto surfaces.
 use super::*;
 use crate::app::workspace as chrome;
+use crate::icons::Icon;
 use egui::{Rect, RichText};
 impl ImagineApp {
     pub(in crate::app) fn timeline_workspace(&mut self, ui: &mut egui::Ui, bounds: Rect) {
@@ -125,11 +126,15 @@ impl ImagineApp {
                     ui.add_space(36.);
                     ui.heading("Video Timeline");
                     ui.add_space(12.);
-                    ui.add_enabled_ui(enabled, |ui| {
-                        if helto::select_button(ui, "New project", true).clicked() {
+                    let blocked = self.timeline_blocked(false);
+                    ui.horizontal(|ui| {
+                        ui.add_space((ui.available_width() - 70.).max(0.) / 2.);
+                        let r = helto::action(ui, Icon::Plus, "New project", true, blocked);
+                        if r.clicked() {
                             action = Some(PostAction::New);
                         }
-                        if ui.button("Open project…").clicked() {
+                        let r = helto::action(ui, Icon::Folder, "Open project…", false, blocked);
+                        if r.clicked() {
                             action = Some(PostAction::Open);
                         }
                     });
@@ -150,8 +155,8 @@ impl ImagineApp {
                 if recovering {
                     ui.horizontal_wrapped(|ui|{
                         ui.label("Server session changed. Project and text drafts kept.");
-                        let label = if self.timeline.session.is_some() { "Reopen project" } else { "Reconnect" };
-                        let r = ui.add_enabled(!self.timeline.busy,egui::Button::new(label)).on_hover_text("Reconnect the saved project without resuming old jobs. Uncommitted text drafts are kept.");
+                        let (icon, label) = if self.timeline.session.is_some() { (Icon::Retry, "Reopen project") } else { (Icon::Link, "Reconnect") };
+                        let r = helto::action(ui, icon, label, false, self.timeline.busy.then_some("Wait for the current timeline operation.")).on_hover_text("Reconnect the saved project without resuming old jobs. Uncommitted text drafts are kept.");
                         #[cfg(feature="ui-preview")] super::qa::control(ui,"project-reopen".into(),&r);
                         if r.clicked() { self.timeline_reopen(ui.ctx()); }
                     });
@@ -245,6 +250,31 @@ impl ImagineApp {
         self.timeline_media_health_window(ui.ctx());
         self.timeline_assembly_window(ui.ctx());
     }
+    /// Why Timeline actions are unavailable; `needs_project` also requires an open project.
+    pub(super) fn timeline_blocked(&self, needs_project: bool) -> Option<&'static str> {
+        if self.timeline.session.is_none() {
+            Some("Not connected to the video service.")
+        } else if self.timeline.needs_reopen {
+            Some("Reopen the project first.")
+        } else if self.timeline.busy || self.timeline.admitting {
+            Some("Wait for the current timeline operation.")
+        } else if needs_project && self.timeline.document.is_none() {
+            Some("Create or open a project first.")
+        } else {
+            None
+        }
+    }
+    pub(super) fn timeline_generate_blocked(&self) -> Option<&'static str> {
+        self.timeline_blocked(true).or(if !self.video.available {
+            Some("H3 is unavailable. Reconnect to retry.")
+        } else if self.timeline.scene().is_none() {
+            Some("Select a scene first.")
+        } else if self.timeline.scene_active() {
+            Some("This scene is already generating.")
+        } else {
+            None
+        })
+    }
     fn timeline_toolbar_left(
         &mut self,
         ui: &mut egui::Ui,
@@ -253,8 +283,15 @@ impl ImagineApp {
         commands: &mut Vec<Edit>,
         action: &mut Option<PostAction>,
     ) {
-        ui.add_enabled_ui(enabled, |ui| {
-            let _menu = ui.menu_button("Project", |ui| {
+        {
+            let _menu = helto::action(
+                ui,
+                Icon::Menu,
+                "Project",
+                false,
+                self.timeline_blocked(false),
+            );
+            egui::Popup::menu(&_menu).show(|ui| {
                 let health = ui.add_enabled(
                     document.is_some(),
                     egui::Button::new("Check Media / Relink…"),
@@ -383,8 +420,8 @@ impl ImagineApp {
                 });
             });
             #[cfg(feature = "ui-preview")]
-            super::qa::control(ui, "project-menu".into(), &_menu.response);
-        });
+            super::qa::control(ui, "project-menu".into(), &_menu);
+        }
         let saved = document
             .as_ref()
             .and_then(|d| d.raw["persistence"]["state"].as_str())
@@ -492,82 +529,201 @@ impl ImagineApp {
         action: &mut Option<PostAction>,
     ) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let run_button=ui.add_enabled_ui(enabled && document.is_some() && self.timeline.pending.is_none(),|ui|helto::icon_button(ui,crate::icons::Icon::Down,"Generation Run options",false)).inner;
-                        #[cfg(feature="ui-preview")]
-                        super::qa::control(ui,"run-menu".into(),&run_button);
-                        egui::Popup::menu(&run_button).show(|ui| {
-                            for (mode,name,label) in [
-                                (imagine_video_contract::runs::Mode::MissingOnly,"run-missing","Generate missing scenes"),
-                                (imagine_video_contract::runs::Mode::AllSameSeeds,"run-same","Regenerate all · same seeds"),
-                                (imagine_video_contract::runs::Mode::AllFreshSeeds,"run-fresh","Regenerate all · fresh seeds"),
-                                (imagine_video_contract::runs::Mode::SelectedWithDependents,"run-dependents","Selected + dependent scenes"),
-                            ] {
-                                let ready=!self.timeline.has_active_run() && (mode!=imagine_video_contract::runs::Mode::SelectedWithDependents || self.timeline.scene().is_some());
-                                let response=ui.add_enabled(ready,egui::Button::new(label));
-                                #[cfg(feature="ui-preview")]
-                                super::qa::control(ui,name.into(),&response);
-                                let _=name;
-                                if response.clicked(){*action=Some(PostAction::Run(mode));ui.close();}
-                            }
-                        });
-                        let response = ui
-                            .add_enabled_ui(
-                                enabled
-                                    && self.video.available
-                                    && self.timeline.scene().is_some()
-                                    && !self.timeline.scene_active(),
-                                |ui| {
-                                    helto::select_button(
-                                        ui,
-                                        if self.timeline.pending.is_some() {
-                                            "Retry submission"
-                                        } else {
-                                            "Generate"
-                                        },
-                                        true,
-                                    )
-                                },
-                            )
-                            .inner;
-                        #[cfg(feature = "ui-preview")]
-                        super::qa::control(ui, "timeline-generate".into(), &response);
-                        if response.clicked() {
-                            *action = Some(PostAction::Generate);
-                        }
-                        let r=ui.add_enabled(enabled&&self.timeline.scene().is_some(),egui::Button::new("Review"));
-                        #[cfg(feature="ui-preview")]super::qa::control(ui,"compiled-open".into(),&r);
-                        if r.clicked(){*action=Some(PostAction::Compiled);}
-                        let response=ui.add_enabled(document.is_some(),egui::Button::new("Final video…"));
-                        #[cfg(feature="ui-preview")]super::qa::control(ui,"assembly-open".into(),&response);
-                        if response.clicked(){*action=Some(PostAction::Assembly);}
-                        let menu=ui.add_enabled_ui(enabled&&document.is_some(),|ui|ui.menu_button("Story",|ui|{
-                            for (operation,name,label) in [(imagine_video_contract::authoring::Operation::Outline,"story-open","Story outline…"),(imagine_video_contract::authoring::Operation::EnhanceScene,"enhance-scene","Enhance scene…"),(imagine_video_contract::authoring::Operation::EnhanceSection,"enhance-section","Enhance section…")] {
-                                let ready=operation==imagine_video_contract::authoring::Operation::Outline || self.timeline.scene().is_some() && (operation!=imagine_video_contract::authoring::Operation::EnhanceSection||self.timeline.section.is_some());
-                                let r=ui.add_enabled(ready,egui::Button::new(label));
-                                #[cfg(feature="ui-preview")] super::qa::control(ui,name.into(),&r);
-                                let _=name;
-                                if r.clicked(){*action=Some(PostAction::Authoring(operation));ui.close();}
-                            }
-                        })).inner;
-                        #[cfg(feature="ui-preview")]super::qa::control(ui,"story-menu".into(),&menu.response);
-                        let _=menu;
-                        if self.timeline.busy || self.timeline.admitting {
-                            ui.spinner();
-                        }
-                        if self.timeline.session.is_none()
-                            && !self.timeline.busy
-                            && ui.button("Reconnect").clicked()
-                        {
-                            self.timeline.session_checked = false;
-                            self.timeline_session(ui.ctx());
-                        }
-                    });
+            let run_button = ui
+                .add_enabled_ui(
+                    enabled && document.is_some() && self.timeline.pending.is_none(),
+                    |ui| {
+                        helto::icon_button(
+                            ui,
+                            crate::icons::Icon::Down,
+                            "Generation Run options",
+                            false,
+                        )
+                    },
+                )
+                .inner;
+            #[cfg(feature = "ui-preview")]
+            super::qa::control(ui, "run-menu".into(), &run_button);
+            egui::Popup::menu(&run_button).show(|ui| {
+                for (mode, name, label) in [
+                    (
+                        imagine_video_contract::runs::Mode::MissingOnly,
+                        "run-missing",
+                        "Generate missing scenes",
+                    ),
+                    (
+                        imagine_video_contract::runs::Mode::AllSameSeeds,
+                        "run-same",
+                        "Regenerate all · same seeds",
+                    ),
+                    (
+                        imagine_video_contract::runs::Mode::AllFreshSeeds,
+                        "run-fresh",
+                        "Regenerate all · fresh seeds",
+                    ),
+                    (
+                        imagine_video_contract::runs::Mode::SelectedWithDependents,
+                        "run-dependents",
+                        "Selected + dependent scenes",
+                    ),
+                ] {
+                    let ready = !self.timeline.has_active_run()
+                        && (mode != imagine_video_contract::runs::Mode::SelectedWithDependents
+                            || self.timeline.scene().is_some());
+                    let response = ui.add_enabled(ready, egui::Button::new(label));
+                    #[cfg(feature = "ui-preview")]
+                    super::qa::control(ui, name.into(), &response);
+                    let _ = name;
+                    if response.clicked() {
+                        *action = Some(PostAction::Run(mode));
+                        ui.close();
+                    }
+                }
+            });
+            let retry = self.timeline.pending.is_some();
+            let response = helto::action(
+                ui,
+                if retry { Icon::Retry } else { Icon::Generate },
+                if retry {
+                    "Retry submission"
+                } else {
+                    "Generate"
+                },
+                true,
+                self.timeline_generate_blocked(),
+            );
+            #[cfg(feature = "ui-preview")]
+            super::qa::control(ui, "timeline-generate".into(), &response);
+            if response.clicked() {
+                *action = Some(PostAction::Generate);
+            }
+            let r = helto::action(
+                ui,
+                Icon::Review,
+                "Review",
+                false,
+                self.timeline_blocked(true).or(self
+                    .timeline
+                    .scene()
+                    .is_none()
+                    .then_some("Select a scene first.")),
+            );
+            #[cfg(feature = "ui-preview")]
+            super::qa::control(ui, "compiled-open".into(), &r);
+            if r.clicked() {
+                *action = Some(PostAction::Compiled);
+            }
+            let response = helto::action(
+                ui,
+                Icon::Montage,
+                "Final video…",
+                false,
+                document
+                    .is_none()
+                    .then_some("Create or open a project first."),
+            );
+            #[cfg(feature = "ui-preview")]
+            super::qa::control(ui, "assembly-open".into(), &response);
+            if response.clicked() {
+                *action = Some(PostAction::Assembly);
+            }
+            let menu = helto::action(ui, Icon::Story, "Story", false, self.timeline_blocked(true));
+            egui::Popup::menu(&menu).show(|ui| {
+                for (operation, name, label) in [
+                    (
+                        imagine_video_contract::authoring::Operation::Outline,
+                        "story-open",
+                        "Story outline…",
+                    ),
+                    (
+                        imagine_video_contract::authoring::Operation::EnhanceScene,
+                        "enhance-scene",
+                        "Enhance scene…",
+                    ),
+                    (
+                        imagine_video_contract::authoring::Operation::EnhanceSection,
+                        "enhance-section",
+                        "Enhance section…",
+                    ),
+                ] {
+                    let ready = operation == imagine_video_contract::authoring::Operation::Outline
+                        || self.timeline.scene().is_some()
+                            && (operation
+                                != imagine_video_contract::authoring::Operation::EnhanceSection
+                                || self.timeline.section.is_some());
+                    let r = ui.add_enabled(ready, egui::Button::new(label));
+                    #[cfg(feature = "ui-preview")]
+                    super::qa::control(ui, name.into(), &r);
+                    let _ = name;
+                    if r.clicked() {
+                        *action = Some(PostAction::Authoring(operation));
+                        ui.close();
+                    }
+                }
+            });
+            #[cfg(feature = "ui-preview")]
+            super::qa::control(ui, "story-menu".into(), &menu);
+            let _ = menu;
+            if self.timeline.busy || self.timeline.admitting {
+                ui.spinner();
+            }
+            if self.timeline.session.is_none()
+                && !self.timeline.busy
+                && helto::icon_button(ui, Icon::Link, "Reconnect", false).clicked()
+            {
+                self.timeline.session_checked = false;
+                self.timeline_session(ui.ctx());
+            }
+        });
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// Synthetic timeline frames; written only when IMAGINE_UI_PREVIEW_DIR is set.
+    #[test]
+    fn headless_timeline_with_project() {
+        for (width, height, name) in [(1280, 800, "timeline"), (760, 800, "timeline-narrow")] {
+            let root = tempfile::tempdir().unwrap();
+            let ctx = egui::Context::default();
+            helto::install(&ctx);
+            let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+            let project = super::super::media_picker::tests::project();
+            app.workspace = Workspace::Video;
+            app.timeline.session = Some("own-synthetic-session".into());
+            app.timeline.session_checked = true;
+            app.timeline.document = Some(Snapshot {
+                project: project.clone(),
+                raw: json!({"persistence":{"state":"saved"}}),
+            });
+            app.timeline.selected.insert(project.scenes[0].id.clone());
+            app.video.available = true;
+            app.video.checked = true;
+            let mut output = egui::FullOutput::default();
+            for _ in 0..3 {
+                output.append(ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(width as f32, height as f32),
+                        )),
+                        focused: true,
+                        ..Default::default()
+                    },
+                    |ui| app.content(ui),
+                ));
+            }
+            assert!(!output.shapes.is_empty());
+            if let Some(dir) = std::env::var_os("IMAGINE_UI_PREVIEW_DIR") {
+                let dir = std::path::PathBuf::from(dir);
+                std::fs::create_dir_all(&dir).unwrap();
+                crate::app::tests::render(&ctx, output, width, height)
+                    .save(dir.join(format!("{name}.png")))
+                    .unwrap();
+            }
+        }
+    }
     #[test]
     fn toolbar_actions_do_not_overlap_at_small_and_normal_widths() {
         for width in [600., 760., 1000., 1280.] {

@@ -180,11 +180,16 @@ impl ImagineApp {
                 && d.project.effective_model(scene).variant
                     != if motion { "reference" } else { "i2v" }
             {
-                let response = ui.button(if motion {
-                    "Use H3 Reference for target"
-                } else {
-                    "Use H3 I2V for target"
-                });
+                let response = helto::icon_button(
+                    ui,
+                    crate::icons::Icon::Video,
+                    if motion {
+                        "Use H3 Reference for target"
+                    } else {
+                        "Use H3 I2V for target"
+                    },
+                    false,
+                );
                 #[cfg(feature = "ui-preview")]
                 super::qa::control(ui, "continuity-i2v".into(), &response);
                 if response.clicked() {

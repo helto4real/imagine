@@ -17,9 +17,9 @@ impl ImagineApp {
                     ui.label("Create a separate copy readable by older Imagine versions. The original project keeps all data and remains active.");
                     ui.label("Project defaults become concrete scene settings. New media labels, mixed image/video ordering, library links, image-role annotations, inactive sampling presets and newer Enhance drafts remain in the original.");
                     ui.label("Existing media and Takes keep their contents and provenance. Scene-type labels and inactive clip bindings remain in the original. Older engines cannot reproduce features they do not support, and use their own seed controls. New boundary settings and applied conditioning receipts require the current format.");
-                    let r=ui.button(if self.timeline.private_storage {"Export private older-compatible copy"} else {"Choose export folder…"});#[cfg(feature="ui-preview")]super::qa::control(ui,"compatible-choose-folder".into(),&r);export=r.clicked();
+                    let r=helto::icon_button(ui,crate::icons::Icon::Export,if self.timeline.private_storage {"Export private older-compatible copy"} else {"Choose export folder…"},true);#[cfg(feature="ui-preview")]super::qa::control(ui,"compatible-choose-folder".into(),&r);export=r.clicked();
                 }
-                let r=ui.button(if self.timeline.compatibility_report.is_some(){"Close"}else{"Cancel"});#[cfg(feature="ui-preview")]super::qa::control(ui,"compatible-close".into(),&r);close=r.clicked();
+                let r=helto::icon_button(ui,crate::icons::Icon::Close,if self.timeline.compatibility_report.is_some(){"Close"}else{"Cancel"},false);#[cfg(feature="ui-preview")]super::qa::control(ui,"compatible-close".into(),&r);close=r.clicked();
             });
         });
         self.timeline.compatibility_open = open && !close && !export;

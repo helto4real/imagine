@@ -2,6 +2,7 @@
 use super::editing::{resize_scene, seconds, time};
 use super::*;
 use crate::app::workspace as chrome;
+use crate::icons::Icon;
 use egui::Rect;
 impl ImagineApp {
     fn timeline_enhance_action(
@@ -72,18 +73,21 @@ impl ImagineApp {
                 ui.strong("References / Media");
             });
             ui.separator();
-            let r = ui.add_enabled(enabled, egui::Button::new("Cast & references…"));
-            #[cfg(feature = "ui-preview")]
-            super::qa::control(ui, "cast-open".into(), &r);
-            if r.clicked() {
-                self.timeline_open_cast();
-            }
-            if ui
-                .add_enabled(enabled, egui::Button::new("Import media…"))
-                .clicked()
-            {
-                self.timeline_choose_media(ui.ctx());
-            }
+            let blocked = (!enabled).then(|| {
+                self.timeline_blocked(true)
+                    .unwrap_or("Wait for the current timeline operation.")
+            });
+            ui.horizontal(|ui| {
+                let r = helto::action(ui, Icon::Person, "Cast & references…", false, blocked);
+                #[cfg(feature = "ui-preview")]
+                super::qa::control(ui, "cast-open".into(), &r);
+                if r.clicked() {
+                    self.timeline_open_cast();
+                }
+                if helto::action(ui, Icon::Import, "Import media…", false, blocked).clicked() {
+                    self.timeline_choose_media(ui.ctx());
+                }
+            });
             egui::ScrollArea::vertical()
                 .id_salt("project-assets")
                 .show(ui, |ui| {
@@ -102,53 +106,68 @@ impl ImagineApp {
                                 },
                                 ordinal
                             ));
-                            if asset.kind == MediaKind::Audio {
-                                let response =
-                                    ui.add_enabled(enabled, egui::Button::new("Add to timeline"));
-                                #[cfg(feature = "ui-preview")]
-                                super::qa::control(
-                                    ui,
-                                    format!("add-audio-asset-{ordinal}"),
-                                    &response,
-                                );
-                                if response.clicked() {
-                                    commands.extend(self.timeline.draft_edits());
-                                    commands.push(
-                                        self.timeline.add_audio(&d.project, Some(asset.id.clone())),
-                                    );
-                                }
-                            }
-                            if let Some(scene) = self.timeline.scene().cloned() {
-                                if asset.kind == MediaKind::Video {
-                                    let r = ui.add_enabled(
-                                        enabled,
-                                        egui::Button::new("Use as scene clip"),
+                            ui.horizontal(|ui| {
+                                if asset.kind == MediaKind::Audio {
+                                    let response = helto::action(
+                                        ui,
+                                        Icon::Plus,
+                                        "Add to timeline",
+                                        false,
+                                        blocked,
                                     );
                                     #[cfg(feature = "ui-preview")]
                                     super::qa::control(
                                         ui,
-                                        format!("assembly-use-video-{ordinal}"),
-                                        &r,
+                                        format!("add-audio-asset-{ordinal}"),
+                                        &response,
                                     );
-                                    if r.clicked() {
+                                    if response.clicked() {
                                         commands.extend(self.timeline.draft_edits());
-                                        let action = PostAction::UseClip {
-                                            scene: scene.id.clone(),
-                                            asset: asset.id.clone(),
-                                        };
-                                        if commands.is_empty() {
-                                            self.timeline_action(ui.ctx(), action);
-                                        } else {
-                                            self.timeline.after_edit = Some(action);
-                                        }
+                                        commands.push(
+                                            self.timeline
+                                                .add_audio(&d.project, Some(asset.id.clone())),
+                                        );
                                     }
                                 }
-                                if ui.button("Preview").clicked()
-                                    && let Some(id) = d.raw["runtime_assets"][&asset.id.0].as_str()
-                                {
-                                    self.timeline.selected_take = None;
-                                    self.timeline_load_media(ui.ctx(), id.to_owned());
+                                if let Some(scene) = self.timeline.scene().cloned() {
+                                    if asset.kind == MediaKind::Video {
+                                        let r = helto::action(
+                                            ui,
+                                            Icon::Video,
+                                            "Use as scene clip",
+                                            false,
+                                            blocked,
+                                        );
+                                        #[cfg(feature = "ui-preview")]
+                                        super::qa::control(
+                                            ui,
+                                            format!("assembly-use-video-{ordinal}"),
+                                            &r,
+                                        );
+                                        if r.clicked() {
+                                            commands.extend(self.timeline.draft_edits());
+                                            let action = PostAction::UseClip {
+                                                scene: scene.id.clone(),
+                                                asset: asset.id.clone(),
+                                            };
+                                            if commands.is_empty() {
+                                                self.timeline_action(ui.ctx(), action);
+                                            } else {
+                                                self.timeline.after_edit = Some(action);
+                                            }
+                                        }
+                                    }
+                                    if helto::icon_button(ui, Icon::Play, "Preview", false)
+                                        .clicked()
+                                        && let Some(id) =
+                                            d.raw["runtime_assets"][&asset.id.0].as_str()
+                                    {
+                                        self.timeline.selected_take = None;
+                                        self.timeline_load_media(ui.ctx(), id.to_owned());
+                                    }
                                 }
+                            });
+                            if let Some(scene) = self.timeline.scene().cloned() {
                                 self.timeline_media_binding(
                                     ui, d, &scene, asset, enabled, commands,
                                 );
@@ -219,11 +238,11 @@ impl ImagineApp {
                         let _=response;
                         if before!=kind {commands.push(Edit::SetSceneKind{scene_id:scene.id.clone(),kind});}
                         ui.horizontal_wrapped(|ui| {
-                            for (kind, label, key) in [
-                                (MediaKind::Image, "Attach images…", "attach-images"),
-                                (MediaKind::Video, "Attach videos…", "attach-videos"),
+                            for (kind, icon, label, key) in [
+                                (MediaKind::Image, Icon::Image, "Attach images…", "attach-images"),
+                                (MediaKind::Video, Icon::Video, "Attach videos…", "attach-videos"),
                             ] {
-                                let r = ui.button(label);
+                                let r = helto::icon_button(ui, icon, label, false);
                                 #[cfg(feature = "ui-preview")]
                                 super::qa::control(ui, key.into(), &r);
                                 let _ = key;
@@ -378,17 +397,19 @@ impl ImagineApp {
                                 });
                             }
                         }
+                        ui.horizontal(|ui| {
                         if d.project
                             .scenes
                             .first()
                             .is_some_and(|first| first.id != scene.id)
-                            && ui.button("Boundary settings").clicked()
+                            && helto::icon_button(ui, Icon::Settings, "Boundary settings", false)
+                                .clicked()
                         {
                             commands.extend(self.timeline.draft_edits());
                             self.timeline.boundary = true;
                             self.timeline.section = None;
                         }
-                        if ui.button("Duplicate scene").clicked() {
+                        if helto::icon_button(ui, Icon::Duplicate, "Duplicate scene", false).clicked() {
                             commands.push(Edit::DuplicateScene {
                                 scene_id: scene.id.clone(),
                                 new_scene_id: SceneId(format!(
@@ -398,11 +419,12 @@ impl ImagineApp {
                                 start: time(seconds(scene.start) + seconds(scene.duration)),
                             });
                         }
-                        if ui.button("Remove scene").clicked() {
+                        if helto::icon_button(ui, Icon::Trash, "Remove scene", false).clicked() {
                             commands.push(Edit::RemoveScene {
                                 scene_id: scene.id.clone(),
                             });
                         }
+                        });
                     });
                 });
         });
