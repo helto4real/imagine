@@ -308,6 +308,37 @@ pub(super) fn add(p: &VideoProject, selected: Option<&SceneId>, snap: Snap) -> D
     let target = selected
         .and_then(|id| p.scene(id).ok())
         .filter(|s| p.scene_kind(&s.id) != imagine_video_contract::creative::SceneKind::Imported);
+    // A Scene keeps its length: the new Section takes the Scene's free end,
+    // all of an empty Scene. Only a full Scene grows by a one-second Section.
+    if let Some(owner) = target {
+        let used = owner
+            .sections
+            .iter()
+            .map(|v| seconds(v.start) + seconds(v.duration))
+            .fold(0., f64::max);
+        let free = seconds(owner.duration) - used;
+        if free >= 0.25 {
+            let mut desired = p.clone();
+            let id = SectionId(format!("section_{}", uuid::Uuid::new_v4().simple()));
+            desired
+                .scenes
+                .iter_mut()
+                .find(|s| s.id == owner.id)
+                .unwrap()
+                .sections
+                .push(Section {
+                    id: id.clone(),
+                    start: time(used),
+                    duration: time(free),
+                    prompt: String::new(),
+                });
+            return Duplicate {
+                edits: editing::difference(p, &desired),
+                sections: vec![id],
+                audio: vec![],
+            };
+        }
+    }
     let length = duration(p).min(1.);
     let preferred = target
         .map(|s| {
@@ -695,13 +726,43 @@ mod tests {
         }
     }
     #[test]
-    fn add_rebases_selected_owner_from_actual_sections_without_losing_metadata() {
+    fn add_fills_the_selected_scene_without_changing_its_length() {
         let mut p = project();
         p.scenes[0].duration = time(8.);
         p.scenes[0].sections[0].start = time(3.);
         p.scenes[0].description = "Keep own authored metadata".into();
         p.scenes.remove(1);
         let owner = p.scenes[0].id.clone();
+        // The new Section takes the free end after the last Section.
+        let result = add(&p, Some(&owner), Snap::None);
+        apply(&mut p, result.edits);
+        let s = p.scene(&owner).unwrap();
+        assert_eq!((s.start, s.duration), (time(0.), time(8.)));
+        assert_eq!(
+            (s.sections[1].start, s.sections[1].duration),
+            (time(4.), time(4.))
+        );
+        assert_eq!(s.description, "Keep own authored metadata");
+        // An empty Scene gets one Section over its whole length.
+        p.scenes[0].sections.clear();
+        let result = add(&p, Some(&owner), Snap::None);
+        apply(&mut p, result.edits);
+        let s = p.scene(&owner).unwrap();
+        assert_eq!(s.duration, time(8.));
+        assert_eq!(
+            (s.sections[0].start, s.sections[0].duration),
+            (time(0.), time(8.))
+        );
+    }
+    #[test]
+    fn add_rebases_a_full_scene_from_actual_sections_without_losing_metadata() {
+        let mut p = project();
+        p.scenes[0].duration = time(4.);
+        p.scenes[0].sections[0].start = time(3.);
+        p.scenes[0].description = "Keep own authored metadata".into();
+        p.scenes.remove(1);
+        let owner = p.scenes[0].id.clone();
+        // No free end: a one-second Section follows, and the Scene spans its Sections.
         let result = add(&p, Some(&owner), Snap::None);
         apply(&mut p, result.edits);
         let s = p.scene(&owner).unwrap();
