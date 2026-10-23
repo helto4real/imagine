@@ -1408,6 +1408,80 @@ mod tests {
                     );
                 }
             }
+            // Generate is the double-width main action at the end of its row.
+            let generate = bounds.iter().find(|(n, _)| *n == "Generate").unwrap().1;
+            assert!(
+                (generate.x1 - generate.x0 - 64.).abs() < 0.5,
+                "{generate:?}"
+            );
+            for (name, b) in &bounds {
+                if *name != "Generate" && b.y0 < generate.y1 && b.y1 > generate.y0 {
+                    assert!(b.x1 <= generate.x0, "{name} right of Generate at {width}");
+                }
+            }
         }
+    }
+
+    #[test]
+    fn the_media_bin_opens_the_library_on_its_own_tab() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.client = None;
+        let project = super::super::media_picker::tests::project();
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-synthetic-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.document = Some(Snapshot::with(project, json!({})));
+        let frame = |app: &mut ImagineApp, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1400., 900.),
+                    )),
+                    events,
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            output.textures_delta.clear();
+            output.platform_output.accesskit_update.unwrap().nodes
+        };
+        let click = |app: &mut ImagineApp, label: &str| {
+            let mut nodes = vec![];
+            for _ in 0..2 {
+                nodes = frame(app, vec![]);
+            }
+            let b = nodes
+                .iter()
+                .find_map(|(_, n)| (n.label() == Some(label)).then(|| n.bounds()).flatten())
+                .unwrap_or_else(|| panic!("{label}"));
+            let pos = egui::pos2(((b.x0 + b.x1) / 2.) as f32, ((b.y0 + b.y1) / 2.) as f32);
+            for pressed in [true, false] {
+                frame(
+                    app,
+                    vec![
+                        egui::Event::PointerMoved(pos),
+                        egui::Event::PointerButton {
+                            pos,
+                            button: egui::PointerButton::Primary,
+                            pressed,
+                            modifiers: Default::default(),
+                        },
+                    ],
+                );
+            }
+        };
+        click(&mut app, "Insert media from Library…");
+        assert!(app.timeline.library.open);
+        assert!(app.timeline.library.showing("asset"));
+        app.timeline.library.open = false;
+        app.timeline.bin_cast = true;
+        click(&mut app, "Insert character from Library…");
+        assert!(app.timeline.library.open);
+        assert!(app.timeline.library.showing("character"));
     }
 }

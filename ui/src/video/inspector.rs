@@ -95,6 +95,30 @@ impl ImagineApp {
                     if helto::icon_button(ui, Icon::Close, "Hide media bin", false).clicked() {
                         self.timeline.shelf_collapsed = true;
                     }
+                    // Library media and characters copy in from the Library window.
+                    let r = helto::action(
+                        ui,
+                        Icon::Library,
+                        if self.timeline.bin_cast {
+                            "Insert character from Library…"
+                        } else {
+                            "Insert media from Library…"
+                        },
+                        false,
+                        blocked,
+                    );
+                    #[cfg(feature = "ui-preview")]
+                    super::qa::control(ui, "bin-library".into(), &r);
+                    if r.clicked() {
+                        self.timeline_open_library(
+                            ui.ctx(),
+                            if self.timeline.bin_cast {
+                                "character"
+                            } else {
+                                "asset"
+                            },
+                        );
+                    }
                     let r = helto::action(ui, Icon::Person, "Cast & references…", false, blocked);
                     #[cfg(feature = "ui-preview")]
                     super::qa::control(ui, "cast-open".into(), &r);

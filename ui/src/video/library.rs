@@ -73,6 +73,19 @@ impl State {
             .and_then(|c| c["entries"].as_array())
             .map_or(0, Vec::len)
     }
+    #[cfg(test)]
+    pub(super) fn showing(&self, kind: &str) -> bool {
+        entry_kind(self) == kind
+    }
+    /// Opens the window on the tab of `kind`: "asset", "character" or "project".
+    pub(super) fn open_on(&mut self, kind: &str) {
+        self.open = true;
+        if entry_kind(self) != kind {
+            self.tab = kind.into();
+            self.selected = None;
+            self.confirm_delete = None;
+        }
+    }
     pub(super) fn path_from_dialog(&mut self, path: PathBuf) {
         self.path = path.display().to_string();
     }
@@ -590,6 +603,16 @@ impl ImagineApp {
             }
         }
     }
+    /// Opens the Library on `kind`'s tab; the private library opens itself.
+    pub(super) fn timeline_open_library(&mut self, ctx: &egui::Context, kind: &str) {
+        self.timeline.library.open_on(kind);
+        if self.timeline.library.catalog.is_none()
+            && self.timeline.private_storage
+            && !self.timeline.busy
+        {
+            self.library_select(ctx, "open");
+        }
+    }
     pub(super) fn library_select(&mut self, ctx: &egui::Context, mode: &str) {
         if self.timeline.busy {
             return;
@@ -834,6 +857,7 @@ impl ImagineApp {
         state: &mut State,
         catalog: &Value,
         rows: &[(usize, Value)],
+        action: &mut Action,
     ) {
         const CARD: egui::Vec2 = egui::vec2(112., 80.);
         let columns = ((ui.available_width() + 8.) / (CARD.x + 16.))
@@ -882,6 +906,14 @@ impl ImagineApp {
                                     egui::Sense::click(),
                                 )
                                 .on_hover_text(title);
+                            // Media and characters copy in with a double-click;
+                            // a project copy replaces the open one, so it stays a button.
+                            let quick = entry["content"]["kind"] != "project";
+                            let r = if quick {
+                                r.on_hover_text("Double-click to copy into the project")
+                            } else {
+                                r
+                            };
                             r.widget_info(|| {
                                 egui::WidgetInfo::selected(
                                     egui::WidgetType::SelectableLabel,
@@ -907,6 +939,9 @@ impl ImagineApp {
                                     .unwrap_or("")
                                     .into();
                                 state.confirm_delete = None;
+                            }
+                            if quick && r.double_clicked() && !state.busy {
+                                *action = Some("copy");
                             }
                             if (n + 1) % columns == 0 {
                                 ui.end_row();
@@ -966,7 +1001,7 @@ impl ImagineApp {
                         let grid = (ui.available_width() - detail - gaps).max(140.);
                         ui.allocate_ui(egui::vec2(grid, 380.), |ui| {
                             ui.set_width(grid);
-                            self.library_grid(ui, &mut state, &catalog, &rows);
+                            self.library_grid(ui, &mut state, &catalog, &rows, &mut action);
                         });
                         ui.separator();
                         ui.vertical(|ui| {
