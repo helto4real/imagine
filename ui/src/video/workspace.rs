@@ -176,55 +176,27 @@ impl ImagineApp {
                 }
             });
         }
-        // Save also works while typing; pending text drafts are saved with it.
-        if enabled
-            && document.is_some()
-            && ui.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::S))
-        {
-            action = Some(PostAction::Save);
-        }
-        if enabled && !ui.ctx().text_edit_focused() {
-            // Delete belongs to the Timeline, never to a floating dialog or text field.
-            // The active Timeline remains the shortcut scope after a drag or
-            // deletion releases its item. An actually focused field/button
-            // still owns its keys, just as Director's interactive targets do.
+        if enabled {
+            use crate::app::Command;
+            self.command_shortcuts(ui.ctx(), &[Command::TimelineSave]);
+            // Delete and Undo belong to the Timeline, never to a floating dialog or
+            // text field. The active Timeline remains the shortcut scope after a drag
+            // or deletion releases its item. An actually focused field/button still
+            // owns its keys, just as Director's interactive targets do.
             let timeline_focused = ui.ctx().memory(|m| {
                 m.is_above_modal_layer(ui.layer_id())
                     && m.focused()
                         .is_none_or(|id| self.timeline.keyboard_focus == Some(id))
             });
-            if timeline_focused
-                && ui.input_mut(|i| {
-                    i.consume_key(egui::Modifiers::NONE, egui::Key::Delete)
-                        || i.consume_key(egui::Modifiers::NONE, egui::Key::Backspace)
-                })
-            {
-                commands.extend(self.timeline.draft_edits());
-                commands.extend(self.timeline.delete_selection());
-            }
-            let redo = egui::Modifiers {
-                ctrl: true,
-                command: true,
-                shift: true,
-                ..Default::default()
-            };
-            if timeline_focused
-                && ui.input_mut(|i| {
-                    i.consume_key(redo, egui::Key::Z)
-                        || i.consume_key(egui::Modifiers::CTRL, egui::Key::Y)
-                })
-                && let Some(d) = &document
-            {
-                self.timeline_edit(ui.ctx(), self.timeline.history.redo_commands(&d.project), 1);
-            }
-            if timeline_focused
-                && ui.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::Z))
-                && let Some(d) = &document
-            {
-                self.timeline_edit(
+            if timeline_focused {
+                // Redo first: its Ctrl+Shift+Z must not be read as Undo.
+                self.command_shortcuts(
                     ui.ctx(),
-                    self.timeline.history.undo_commands(&d.project),
-                    -1,
+                    &[
+                        Command::TimelineDelete,
+                        Command::TimelineRedo,
+                        Command::TimelineUndo,
+                    ],
                 );
             }
         }
@@ -269,7 +241,76 @@ impl ImagineApp {
             None
         }
     }
-    pub(super) fn timeline_generate_blocked(&self) -> Option<String> {
+    pub(in crate::app) fn timeline_submission_pending(&self) -> bool {
+        self.timeline.pending.is_some()
+    }
+    pub(in crate::app) fn timeline_command_blocked(
+        &self,
+        command: crate::app::Command,
+    ) -> Option<&'static str> {
+        use crate::app::Command;
+        self.timeline_blocked(true).or(match command {
+            Command::TimelineUndo => self
+                .timeline
+                .history
+                .undo
+                .is_empty()
+                .then_some("Nothing to undo."),
+            Command::TimelineRedo => self
+                .timeline
+                .history
+                .redo
+                .is_empty()
+                .then_some("Nothing to redo."),
+            Command::TimelineDelete => self
+                .timeline
+                .document
+                .as_ref()
+                .is_none_or(|d| self.timeline.selection_items(&d.project).is_empty())
+                .then_some("Select Sections or audio clips first."),
+            _ => None,
+        })
+    }
+    /// Timeline commands apply pending text drafts first, like toolbar edits.
+    pub(in crate::app) fn timeline_run_command(
+        &mut self,
+        ctx: &egui::Context,
+        command: crate::app::Command,
+    ) {
+        use crate::app::Command;
+        let Some(d) = self.timeline.document.clone() else {
+            return;
+        };
+        match command {
+            Command::TimelineUndo => {
+                let edits = self.timeline.history.undo_commands(&d.project);
+                self.timeline_edit(ctx, edits, -1);
+            }
+            Command::TimelineRedo => {
+                let edits = self.timeline.history.redo_commands(&d.project);
+                self.timeline_edit(ctx, edits, 1);
+            }
+            Command::TimelineDelete => {
+                let mut edits = self.timeline.draft_edits();
+                edits.extend(self.timeline.delete_selection());
+                self.timeline_edit(ctx, edits, 0);
+            }
+            Command::TimelineSave => self.timeline_after_drafts(ctx, PostAction::Save),
+            Command::TimelineGenerate => self.timeline_after_drafts(ctx, PostAction::Generate),
+            _ => {}
+        }
+    }
+    /// Runs `action` once pending text drafts are committed.
+    fn timeline_after_drafts(&mut self, ctx: &egui::Context, action: PostAction) {
+        let edits = self.timeline.draft_edits();
+        if edits.is_empty() {
+            self.timeline_action(ctx, action);
+        } else {
+            self.timeline.after_edit = Some(action);
+            self.timeline_edit(ctx, edits, 0);
+        }
+    }
+    pub(in crate::app) fn timeline_generate_blocked(&self) -> Option<String> {
         let reason = self.timeline_blocked(true).or(if !self.video.checked {
             Some("Checking H3 availability.")
         } else if !self.video.available {
@@ -498,30 +539,9 @@ impl ImagineApp {
                     }
                 }
             }
-            if ui
-                .add_enabled_ui(!self.timeline.history.undo.is_empty(), |ui| {
-                    helto::icon_button(ui, crate::icons::Icon::Undo, "Undo", false)
-                })
-                .inner
-                .on_hover_text("Undo · Ctrl+Z")
-                .clicked()
-                && let Some(d) = &document
-            {
-                let edits = self.timeline.history.undo_commands(&d.project);
-                self.timeline_edit(ui.ctx(), edits, -1);
-            }
-            if ui
-                .add_enabled_ui(!self.timeline.history.redo.is_empty(), |ui| {
-                    helto::icon_button(ui, crate::icons::Icon::Redo, "Redo", false)
-                })
-                .inner
-                .on_hover_text("Redo · Ctrl+Shift+Z")
-                .clicked()
-                && let Some(d) = &document
-            {
-                let edits = self.timeline.history.redo_commands(&d.project);
-                self.timeline_edit(ui.ctx(), edits, 1);
-            }
+            self.command_button(ui, crate::app::Command::TimelineUndo);
+            self.command_button(ui, crate::app::Command::TimelineRedo);
+            self.command_button(ui, crate::app::Command::TimelineSave);
         });
     }
 
@@ -585,23 +605,10 @@ impl ImagineApp {
                     }
                 }
             });
-            let retry = self.timeline.pending.is_some();
-            let response = helto::action(
-                ui,
-                if retry { Icon::Retry } else { Icon::Generate },
-                if retry {
-                    "Retry submission"
-                } else {
-                    "Generate"
-                },
-                true,
-                self.timeline_generate_blocked().as_deref(),
-            );
+            let response = self.command_button(ui, crate::app::Command::TimelineGenerate);
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, "timeline-generate".into(), &response);
-            if response.clicked() {
-                *action = Some(PostAction::Generate);
-            }
+            let _ = response;
             let r = helto::action(
                 ui,
                 Icon::Review,
@@ -864,6 +871,7 @@ mod tests {
                 "Add Section",
                 "Undo",
                 "Redo",
+                "Save project",
                 "Generate",
                 "Review",
                 "Final video…",

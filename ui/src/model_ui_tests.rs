@@ -162,7 +162,7 @@ fn variants_keep_loras_and_missing_files_do_not_silently_change_selection() {
     assert_eq!(desk.app.model_selection().unwrap().loras[0].id, lora.id);
     desk.app.workspace = Workspace::CharacterSheet;
     desk.app.sheet.character_description = "Synthetic".into();
-    assert!(!desk.app.can_generate());
+    assert!(desk.app.input_blocked().is_some());
     desk.app.workspace = Workspace::Image;
     let mut library = desk.app.models.catalog.clone().unwrap();
     library.files.retain(|f| f.id != lora.id);

@@ -159,7 +159,11 @@ and film icons switch between Image, Character sheets and Video. Switching keeps
 each workspace's drafts, references, results and pending job intact. Video opens
 the Timeline. **Animate** in the image viewer creates a one-scene Timeline project
 with the selected image as its first frame; there is no separate single-clip desk.
-Disabled actions name themselves and give the reason on hover.
+Disabled actions name themselves and give the reason on hover; actions with a
+keyboard shortcut also show it there. Shortcuts: Ctrl+Space Hide previews, Z actual
+pixels or fit, Ctrl+Enter Add to queue/Generate, Ctrl+P focus the prompt; in the
+Timeline Ctrl+Z Undo, Ctrl+Shift+Z or Ctrl+Y Redo, Delete/Backspace delete the
+selection and Ctrl+S Save project (also while typing).
 
 The gear opens a separate native **Settings** window with **Generation** (Steps,
 CFG, Reference size, Upscale target), **Models**, **Prompt enhancement**,

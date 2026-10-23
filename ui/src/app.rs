@@ -269,9 +269,6 @@ impl ImagineApp {
             10
         }
     }
-    fn can_generate(&self) -> bool {
-        self.input_blocked().is_none()
-    }
     /// Why the current desk's input cannot be generated.
     fn input_blocked(&self) -> Option<&'static str> {
         if self.models.catalog.is_some() && self.model_selection().is_err() {
@@ -775,6 +772,10 @@ impl ImagineApp {
 
 #[path = "workspace.rs"]
 mod workspace;
+
+#[path = "commands.rs"]
+mod commands;
+use commands::Command;
 
 #[path = "video/sampling_preview.rs"]
 mod sampling_preview;

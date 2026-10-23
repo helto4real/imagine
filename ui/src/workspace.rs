@@ -131,13 +131,13 @@ fn sampling_setting(
     ui.end_row();
 }
 
-struct ViewerProgress {
+pub(super) struct ViewerProgress {
     working: bool,
     status: String,
     sampling: Option<client::SamplingProgress>,
     cancelling: bool,
-    can_cancel: bool,
-    queue_job: Option<(String, usize)>,
+    pub(super) can_cancel: bool,
+    pub(super) queue_job: Option<(String, usize)>,
 }
 
 // Saving a downloaded result can overlap the next server job. Prefer the
@@ -160,7 +160,7 @@ impl ViewerProgress {
 }
 
 impl ImagineApp {
-    fn viewer_progress(&self) -> ViewerProgress {
+    pub(super) fn viewer_progress(&self) -> ViewerProgress {
         let desk = self.desk();
         let mut progress = ViewerProgress {
             working: desk.working,
@@ -278,31 +278,10 @@ impl ImagineApp {
     }
 
     fn keyboard_shortcuts(&mut self, ctx: &egui::Context) {
-        if !ctx.input(|input| input.focused) || ctx.text_edit_focused() {
-            return;
-        }
-        if consume_key(ctx, egui::Key::Space, true) {
-            self.prefs.privacy_mode = !self.prefs.privacy_mode;
-            self.save_preferences();
-        }
-        if self.queue.drafts.is_some() {
-            return;
-        }
-        if self.workspace == Workspace::Video {
-            return;
-        }
-        if consume_key(ctx, egui::Key::Z, false) && self.desk().result.is_some() {
-            let desk = self.desk_mut();
-            desk.actual_pixels = !desk.actual_pixels;
-            desk.image_pan = Vec2::ZERO;
-        }
-        if consume_key(ctx, egui::Key::Enter, true)
-            && self.editable()
-            && self.client.is_some()
-            && !self.picking_folder
-            && self.can_generate()
-        {
-            self.generate(ctx);
+        self.command_shortcuts(ctx, &[Command::TogglePrivacy]);
+        // The Multiple prompts editor and the Timeline own their other keys.
+        if self.queue.drafts.is_none() && self.workspace != Workspace::Video {
+            self.command_shortcuts(ctx, &[Command::ToggleActualPixels, Command::Generate]);
         }
     }
 
@@ -392,18 +371,7 @@ impl ImagineApp {
             ),
             |ui| {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    let privacy = self.prefs.privacy_mode;
-                    if helto::icon_button(
-                        ui,
-                        if privacy { Icon::EyeOff } else { Icon::Eye },
-                        "Hide previews",
-                        privacy,
-                    )
-                    .clicked()
-                    {
-                        self.prefs.privacy_mode = !privacy;
-                        self.save_preferences();
-                    }
+                    self.command_button(ui, Command::TogglePrivacy);
                     if helto::icon_button(ui, Icon::Settings, "Settings", self.settings_open)
                         .clicked()
                     {
@@ -555,17 +523,7 @@ impl ImagineApp {
                     self.enhancement_field(ui, &response, Field::Prompt);
                     focus_prompt_shortcut(response);
                     ui.add_space(12.);
-                    if helto::action(
-                        ui,
-                        Icon::Generate,
-                        "Create version",
-                        true,
-                        self.desk_blocked().or(self.input_blocked()),
-                    )
-                    .clicked()
-                    {
-                        self.generate(ui.ctx());
-                    }
+                    self.command_button(ui, Command::Generate);
                     if let Some(result) = self.edit.desk.selected_result() {
                         let [w, h] = result.texture.size();
                         ui.label(
@@ -1009,31 +967,14 @@ impl ImagineApp {
             |ui| {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     self.sampling_preview_controls(ui);
-                    if self.workspace == Workspace::Image
-                        && helto::action(
-                            ui,
-                            Icon::Edit,
-                            "Edit image",
-                            false,
-                            self.edit_image_blocked(),
-                        )
-                        .clicked()
-                    {
-                        self.start_editing();
+                    if self.workspace == Workspace::Image {
+                        self.command_button(ui, Command::EditImage);
                     }
                     if self.workspace == Workspace::Image {
-                        let animate = helto::action(
-                            ui,
-                            Icon::Animate,
-                            "Animate",
-                            false,
-                            self.animate_image_blocked(),
-                        );
+                        let animate = self.command_button(ui, Command::Animate);
                         #[cfg(feature = "ui-preview")]
                         timeline::qa::control(ui, "image-animate".into(), &animate);
-                        if animate.clicked() {
-                            self.start_animating(ui.ctx());
-                        }
+                        let _ = animate;
                     }
                     ui.add_enabled_ui(self.desk().result.is_some(), |ui| {
                         if helto::icon_button(
@@ -1146,82 +1087,33 @@ impl ImagineApp {
                 self.client.is_some() && !self.connecting && !self.busy() && !self.picking_folder;
             ui.horizontal(|ui| {
                 if !editing {
-                    let generate = helto::action(
-                        ui,
-                        Icon::Generate,
-                        if self.workspace == Workspace::Image {
-                            "Add to queue"
-                        } else {
-                            "Generate"
-                        },
-                        true,
-                        self.desk_blocked().or(self.input_blocked()),
-                    );
+                    let generate = self.command_button(ui, Command::Generate);
                     #[cfg(feature = "ui-preview")]
                     crate::app::timeline::qa::control(ui, "image-generate".into(), &generate);
-                    if generate.clicked() {
-                        self.generate(ui.ctx());
-                    }
+                    let _ = generate;
                 }
-                if self.workspace == Workspace::Image
-                    && helto::action(
-                        ui,
-                        Icon::Duplicate,
-                        "Multiple prompts",
-                        false,
-                        self.desk_blocked(),
-                    )
-                    .clicked()
-                {
-                    let restored = self.queue.parked_drafts.take();
-                    self.queue.drafts = Some(
-                        restored.unwrap_or_else(|| vec![self.image.prompt.clone(), String::new()]),
-                    );
-                    self.queue.draft_error = None;
+                if self.workspace == Workspace::Image {
+                    self.command_button(ui, Command::MultiplePrompts);
                 }
-                if !editing
-                    && helto::action(
-                        ui,
-                        Icon::Upscale,
-                        "Upscale",
-                        false,
-                        self.desk_blocked().or(self
-                            .upscale_source()
-                            .is_none()
-                            .then_some("Generate or choose an image first.")),
-                    )
-                    .on_hover_text(
-                        self.prefs
-                            .upscale_target
-                            .dimensions(self.upscale_ratio())
-                            .map(|(w, h)| {
-                                format!(
-                                    "{} · {w} × {h} px",
-                                    if sheet { "Character sheet" } else { "Image" }
-                                )
-                            })
-                            .unwrap_or_else(|e| e.to_string()),
-                    )
-                    .clicked()
-                {
-                    self.upscale(ui.ctx());
+                if !editing {
+                    let target = self
+                        .prefs
+                        .upscale_target
+                        .dimensions(self.upscale_ratio())
+                        .map(|(w, h)| {
+                            format!(
+                                "{} · {w} × {h} px",
+                                if sheet { "Character sheet" } else { "Image" }
+                            )
+                        })
+                        .unwrap_or_else(|e| e.to_string());
+                    self.command_button(ui, Command::Upscale)
+                        .on_hover_text(target);
                 }
-                let cancel = helto::action(
-                    ui,
-                    Icon::Stop,
-                    "Cancel generation",
-                    false,
-                    (!activity.can_cancel).then_some("Nothing is running."),
-                );
+                let cancel = self.command_button(ui, Command::Cancel);
                 #[cfg(feature = "ui-preview")]
                 crate::app::timeline::qa::control(ui, "image-cancel".into(), &cancel);
-                if cancel.clicked() {
-                    if let Some((id, _)) = &activity.queue_job {
-                        self.cancel_queue_job(ui.ctx(), id);
-                    } else {
-                        self.cancel(ui.ctx());
-                    }
-                }
+                let _ = cancel;
                 ui.add_space(6.);
                 if activity.working
                     && let Some(progress) = &activity.sampling
