@@ -1551,8 +1551,8 @@ fn headless_icon_sheet() {
         Lock,
         Info,
         Scene,
-        PanelLeft,
         PanelRight,
+        PanelBottom,
     ];
     let ctx = egui::Context::default();
     helto::install(&ctx);

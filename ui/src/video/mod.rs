@@ -140,6 +140,8 @@ pub(super) struct Timeline {
     audio_primary: Option<AudioClipId>,
     audio_draft: Option<AudioClip>,
     project_audio: bool,
+    /// Project settings opened in the docked inspector from its project strip.
+    project_open: bool,
     audio_settings_draft: Option<AudioSettings>,
     history: editing::History,
     snap: editing::Snap,
@@ -178,6 +180,8 @@ pub(super) struct Timeline {
     selected_take: Option<String>,
     refresh_after_busy: bool,
     shelf_collapsed: bool,
+    /// The media bin shows the cast instead of project media.
+    bin_cast: bool,
     inspector_collapsed: bool,
     keyboard_focus: Option<egui::Id>,
     drag: Option<tracks::Drag>,

@@ -232,8 +232,8 @@ impl ImagineApp {
                 }
                 let shelf = helto::icon_button(
                     ui,
-                    crate::icons::Icon::PanelLeft,
-                    "Toggle media shelf",
+                    crate::icons::Icon::PanelRight,
+                    "Toggle media bin",
                     !self.timeline.shelf_collapsed,
                 );
                 #[cfg(feature = "ui-preview")]
@@ -243,7 +243,7 @@ impl ImagineApp {
                 }
                 let inspector = helto::icon_button(
                     ui,
-                    crate::icons::Icon::PanelRight,
+                    crate::icons::Icon::PanelBottom,
                     "Toggle inspector",
                     !self.timeline.inspector_collapsed,
                 );

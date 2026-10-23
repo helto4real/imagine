@@ -3,10 +3,19 @@ use super::*;
 use crate::app::workspace as chrome;
 use crate::icons::Icon;
 use egui::{Rect, RichText};
-/// Narrower than this, the media shelf yields its width to the viewer.
+/// Narrower than this, the media bin yields its width to the viewer.
 const MIN_VIEWER: f32 = 360.;
+/// The viewer row's least height; the docked inspector shrinks before it.
+const MIN_UPPER: f32 = 170.;
+/// The docked inspector's height with nothing selected: a one-line project strip.
+const INSPECTOR_STRIP: f32 = 40.;
 impl ImagineApp {
     pub(in crate::app) fn timeline_workspace(&mut self, ui: &mut egui::Ui, bounds: Rect) {
+        // The Timeline is denser than the image desks, as Director's is.
+        let styles = &mut ui.style_mut().text_styles;
+        styles.insert(egui::TextStyle::Body, egui::FontId::proportional(13.));
+        styles.insert(egui::TextStyle::Button, egui::FontId::proportional(13.));
+        styles.insert(egui::TextStyle::Monospace, egui::FontId::monospace(12.));
         self.timeline_catalog_install(ui.ctx());
         self.timeline_session(ui.ctx());
         self.timeline_poll_runs(ui.ctx());
@@ -26,27 +35,45 @@ impl ImagineApp {
             if bounds.width() < 850. {
                 (bounds.height() * 0.38).clamp(260., 300.)
             } else {
-                (bounds.height() * 0.29).clamp(160., 220.)
+                (bounds.height() * 0.3).clamp(200., 280.)
             },
             140.0..=(bounds.height() * 0.6),
         );
-        let tracks = Rect::from_min_max(
-            egui::pos2(bounds.left(), bounds.bottom() - timeline_h),
+        let top = toolbar.bottom()
+            + 6.
+            + if self.timeline.needs_reopen {
+                62.
+            } else if self.timeline.error.is_some() {
+                24.
+            } else {
+                0.
+            };
+        // Director's layout: tracks in the middle and the selection's inspector
+        // docked under them. With nothing selected it is a one-line project strip.
+        let inspector_open = self.timeline.document.is_some()
+            && !self.timeline.inspector_collapsed
+            && self.timeline_inspector_has_content();
+        let inspector_h = if inspector_open {
+            let wanted = self.pane_size(
+                chrome::Pane::Inspector,
+                (bounds.height() * 0.3).clamp(210., 300.),
+                150.0..=(bounds.height() * 0.5),
+            );
+            // The viewer row keeps at least MIN_UPPER; the inspector yields first.
+            wanted.min((bounds.bottom() - top - timeline_h - 12. - MIN_UPPER).max(INSPECTOR_STRIP))
+        } else {
+            INSPECTOR_STRIP
+        };
+        let inspector = Rect::from_min_max(
+            egui::pos2(bounds.left(), bounds.bottom() - inspector_h),
             bounds.max,
         );
+        let tracks = Rect::from_min_max(
+            egui::pos2(bounds.left(), inspector.top() - 6. - timeline_h),
+            egui::pos2(bounds.right(), inspector.top() - 6.),
+        );
         let main = Rect::from_min_max(
-            egui::pos2(
-                bounds.left(),
-                toolbar.bottom()
-                    + 6.
-                    + if self.timeline.needs_reopen {
-                        62.
-                    } else if self.timeline.error.is_some() {
-                        24.
-                    } else {
-                        0.
-                    },
-            ),
+            egui::pos2(bounds.left(), top),
             egui::pos2(bounds.right(), tracks.top() - 6.),
         );
         let enabled = self.timeline.session.is_some()
@@ -106,71 +133,58 @@ impl ImagineApp {
             let area = Rect::from_min_max(main.min, bounds.max);
             self.timeline_story_view(ui, area);
         } else if let Some(document) = &document {
-            let right_w = if self.timeline.inspector_collapsed {
-                0.
-            } else {
-                self.pane_size(
-                    chrome::Pane::Inspector,
-                    (main.width() * 0.25).clamp(220., 310.),
-                    220.0..=(main.width() * 0.45),
-                )
-            };
-            let shelf_w = self.pane_size(
+            // The viewer takes a 16:9 picture at the row's height; the media bin the rest.
+            let ideal_viewer = ((main.height() - 70.) * 16. / 9. + 20.).max(MIN_VIEWER);
+            let bin_w = self.pane_size(
                 chrome::Pane::Shelf,
-                (main.width() * 0.20).clamp(176., 230.),
-                160.0..=(main.width() * 0.35),
+                (main.width() - ideal_viewer - 6.).clamp(260., main.width() * 0.6),
+                220.0..=(main.width() * 0.65),
             );
-            // A narrow window gives the viewer room first; the shelf returns when widened.
-            let left_w = if self.timeline.shelf_collapsed
-                || main.width() - right_w - shelf_w - 12. < MIN_VIEWER
-            {
+            let bin_w = if self.timeline.shelf_collapsed || main.width() - bin_w - 6. < MIN_VIEWER {
                 0.
             } else {
-                shelf_w
+                bin_w
             };
-            let left =
-                Rect::from_min_max(main.min, egui::pos2(main.left() + left_w, main.bottom()));
-            let right =
-                Rect::from_min_max(egui::pos2(main.right() - right_w, main.top()), main.max);
-            let center = Rect::from_min_max(
-                egui::pos2(left.right() + 6., main.top()),
-                egui::pos2(right.left() - 6., main.bottom()),
+            let viewer = Rect::from_min_max(
+                main.min,
+                egui::pos2(
+                    if bin_w > 0. {
+                        main.right() - bin_w - 6.
+                    } else {
+                        main.right()
+                    },
+                    main.bottom(),
+                ),
             );
-            if left_w > 0. {
-                self.timeline_references(ui, left, document, enabled, &mut commands);
-            }
-            self.timeline_viewer(ui, center, document);
-            if right_w > 0. {
-                self.timeline_inspector(ui, right, document, enabled, &mut commands);
+            let bin = Rect::from_min_max(egui::pos2(main.right() - bin_w, main.top()), main.max);
+            self.timeline_viewer(ui, viewer, document);
+            if bin_w > 0. {
+                self.timeline_references(ui, bin, document, enabled, &mut commands);
             }
             self.timeline_tracks(ui, tracks, &document.project, enabled, &mut commands);
             if let Some(dropped) = self.timeline.drop.take() {
                 self.timeline_use_dropped(ui.ctx(), &document.project, dropped);
             }
-            let gap = |a: Rect, b: Rect| {
-                Rect::from_min_max(
-                    egui::pos2(a.right(), main.top()),
-                    egui::pos2(b.left(), main.bottom()),
-                )
-            };
-            if left_w > 0. {
-                self.pane_divider(ui, chrome::Pane::Shelf, gap(left, center), left_w, 1., true);
-            }
-            if right_w > 0. {
-                self.pane_divider(
-                    ui,
-                    chrome::Pane::Inspector,
-                    gap(center, right),
-                    right_w,
-                    -1.,
-                    true,
+            self.timeline_inspector(ui, inspector, document, enabled, &mut commands);
+            if bin_w > 0. {
+                let gap = Rect::from_min_max(
+                    egui::pos2(viewer.right(), main.top()),
+                    egui::pos2(bin.left(), main.bottom()),
                 );
+                self.pane_divider(ui, chrome::Pane::Shelf, gap, bin_w, -1., true);
             }
             let gap = Rect::from_min_max(
                 egui::pos2(bounds.left(), main.bottom()),
                 egui::pos2(bounds.right(), tracks.top()),
             );
             self.pane_divider(ui, chrome::Pane::Tracks, gap, timeline_h, -1., false);
+            if inspector_open {
+                let gap = Rect::from_min_max(
+                    egui::pos2(bounds.left(), tracks.bottom()),
+                    egui::pos2(bounds.right(), inspector.top()),
+                );
+                self.pane_divider(ui, chrome::Pane::Inspector, gap, inspector_h, -1., false);
+            }
         } else {
             chrome::panel(ui, main, false);
             chrome::region(ui, "timeline-empty", main.shrink(24.), |ui| {
@@ -1003,40 +1017,51 @@ mod tests {
             project,
             json!({"persistence":{"state":"saved"}}),
         ));
-        let mut nodes = vec![];
-        for _ in 0..3 {
-            let mut output = ctx.run_ui(
-                egui::RawInput {
-                    screen_rect: Some(Rect::from_min_size(
-                        egui::Pos2::ZERO,
-                        egui::vec2(1280., 800.),
-                    )),
-                    ..Default::default()
-                },
-                |ui| app.content(ui),
-            );
-            output.textures_delta.clear();
-            nodes = output.platform_output.accesskit_update.unwrap().nodes;
-        }
-        let has = |label| {
+        let frames = |app: &mut ImagineApp| {
+            let mut nodes = vec![];
+            for _ in 0..3 {
+                let mut output = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(1280., 800.),
+                        )),
+                        ..Default::default()
+                    },
+                    |ui| app.content(ui),
+                );
+                output.textures_delta.clear();
+                nodes = output.platform_output.accesskit_update.unwrap().nodes;
+            }
             nodes
-                .iter()
-                .any(|(_, n)| n.label() == Some(label) || n.value() == Some(label))
+        };
+        // Nothing selected: the docked inspector is a one-line project strip.
+        let nodes = frames(&mut app);
+        let has = |nodes: &Vec<(egui::accesskit::NodeId, egui::accesskit::Node)>, text: &str| {
+            nodes.iter().any(|(_, n)| {
+                n.label()
+                    .into_iter()
+                    .chain(n.value())
+                    .any(|t| t.contains(text))
+            })
         };
         assert!(app.timeline.selected.is_empty());
-        assert!(has("Project") && has("64 × 64 · 24 fps"));
+        assert!(has(&nodes, "Project") && has(&nodes, "64 × 64 · 24 fps"));
+        assert!(has(&nodes, "Project settings") && !has(&nodes, "Global prompt…"));
+        app.timeline.project_open = true;
+        let nodes = frames(&mut app);
         for name in [
             "Timeline settings…",
             "Generation settings…",
             "Global prompt…",
         ] {
-            assert!(has(name), "{name}");
+            assert!(has(&nodes, name), "{name}");
         }
     }
 
     #[test]
-    fn narrow_windows_give_the_viewer_the_media_shelf_width() {
-        for (width, shelf) in [(760., false), (1280., true)] {
+    fn narrow_windows_give_the_viewer_the_media_bin_width() {
+        for (width, shelf) in [(600., false), (760., true), (1280., true)] {
             let root = tempfile::tempdir().unwrap();
             let ctx = egui::Context::default();
             ctx.enable_accesskit();
@@ -1068,6 +1093,7 @@ mod tests {
             let has = |label| nodes.iter().any(|(_, n)| n.label() == Some(label));
             assert_eq!(has("Cast & references…"), shelf, "{width}");
             assert_eq!(has("Resize media shelf"), shelf, "{width}");
+            assert_eq!(has("Media 3"), shelf, "{width}");
             assert!(has("Resize inspector") && has("Resize timeline"), "{width}");
         }
     }
@@ -1139,7 +1165,11 @@ mod tests {
     /// Synthetic timeline frames; written only when IMAGINE_UI_PREVIEW_DIR is set.
     #[test]
     fn headless_timeline_with_project() {
-        for (width, height, name) in [(1280, 800, "timeline"), (760, 800, "timeline-narrow")] {
+        for (width, height, name) in [
+            (1280, 800, "timeline"),
+            (760, 800, "timeline-narrow"),
+            (1600, 1000, "timeline-section"),
+        ] {
             let root = tempfile::tempdir().unwrap();
             let ctx = egui::Context::default();
             helto::install(&ctx);
@@ -1153,6 +1183,9 @@ mod tests {
                 json!({"persistence":{"state":"saved"}}),
             ));
             app.timeline.selected.insert(project.scenes[0].id.clone());
+            if name == "timeline-section" {
+                app.timeline.section = Some(project.scenes[0].sections[0].id.clone());
+            }
             app.video.available = true;
             app.video.checked = true;
             let mut output = egui::FullOutput::default();
