@@ -453,7 +453,7 @@ impl ImagineApp {
                 }
                 self.queue.loading = None;
                 match result {
-                    Ok(done) if !self.busy() => {
+                    Ok(done) if !self.busy() && !self.edit.open => {
                         let elapsed = self
                             .queue
                             .gallery
@@ -502,7 +502,7 @@ impl ImagineApp {
     }
 
     pub(super) fn select_queue_result(&mut self, ctx: &egui::Context, id: &str) {
-        if self.busy() || self.image.pending.is_some() {
+        if self.edit.open || self.busy() || self.image.pending.is_some() {
             return;
         }
         let Some(item) = self.queue.gallery.iter().find(|r| r.id == id) else {

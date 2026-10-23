@@ -12,7 +12,14 @@ impl ImagineApp {
     }
 
     pub(in crate::app) fn start_animating(&mut self, ctx: &egui::Context) {
-        if !self.can_animate_image() {
+        if !self.can_animate_image() || self.timeline_hold_replace(super::Replace::Animate) {
+            return;
+        }
+        self.animate_now(ctx);
+    }
+    pub(in crate::app) fn animate_now(&mut self, ctx: &egui::Context) {
+        // Also runs after confirmation, when the Video workspace already shows the dialog.
+        if self.timeline.busy || self.timeline.admitting {
             return;
         }
         let (Some(client), Some(image)) = (self.client.clone(), self.image.selected_result())

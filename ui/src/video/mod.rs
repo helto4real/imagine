@@ -68,6 +68,8 @@ impl Snapshot {
 }
 #[derive(Default)]
 pub(super) struct Timeline {
+    /// A project-replacing action held until the user discards unsaved work.
+    replace_pending: Option<Replace>,
     captures: captures::State,
     reference_cache: reference_cache::State,
     media_health: media_health::State,
@@ -290,6 +292,12 @@ pub(super) enum FolderMode {
     Open,
     Save,
     SaveAs,
+}
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(super) enum Replace {
+    New,
+    Open,
+    Animate,
 }
 #[derive(Clone)]
 pub(super) enum PostAction {
@@ -955,8 +963,16 @@ impl ImagineApp {
             PostAction::Run(mode) => self.timeline_start_run(ctx, mode),
             PostAction::Generate => self.timeline_generate(ctx),
             PostAction::Save => self.timeline_save(ctx),
-            PostAction::New => self.timeline_new(ctx),
-            PostAction::Open => self.timeline_choose_folder(ctx, FolderMode::Open),
+            PostAction::New => {
+                if !self.timeline_hold_replace(Replace::New) {
+                    self.timeline_new(ctx)
+                }
+            }
+            PostAction::Open => {
+                if !self.timeline_hold_replace(Replace::Open) {
+                    self.timeline_choose_folder(ctx, FolderMode::Open)
+                }
+            }
             PostAction::SaveAs => self.timeline_choose_folder(ctx, FolderMode::SaveAs),
             PostAction::Review {
                 scene,
@@ -1047,6 +1063,79 @@ impl ImagineApp {
             false,
             Some((project, history)),
         );
+    }
+    /// Whether the open project has work that New, Open or Animate would discard.
+    pub(super) fn timeline_unsaved(&self) -> bool {
+        let Some(d) = &self.timeline.document else {
+            return false;
+        };
+        let has_content = !d.project.scenes.is_empty()
+            || !d.project.assets.is_empty()
+            || !d.project.audio_tracks.is_empty();
+        !self.timeline.draft_edits().is_empty()
+            || has_content && d.raw["persistence"]["state"].as_str() != Some("saved")
+    }
+    /// Holds `replace` for confirmation when it would discard unsaved work.
+    pub(super) fn timeline_hold_replace(&mut self, replace: Replace) -> bool {
+        if !self.timeline_unsaved() {
+            return false;
+        }
+        self.timeline.replace_pending = Some(replace);
+        self.workspace = Workspace::Video;
+        true
+    }
+    pub(super) fn timeline_replace_window(&mut self, ctx: &egui::Context) {
+        let Some(replace) = self.timeline.replace_pending else {
+            return;
+        };
+        let mut decision = None;
+        egui::Window::new("Unsaved project")
+            .id(egui::Id::new("video-replace-unsaved"))
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.label(match replace {
+                    Replace::New => {
+                        "Start a new project? Unsaved changes in this project are lost."
+                    }
+                    Replace::Open => {
+                        "Open another project? Unsaved changes in this project are lost."
+                    }
+                    Replace::Animate => {
+                        "Animate into a new project? Unsaved changes in this project are lost."
+                    }
+                });
+                ui.horizontal(|ui| {
+                    let r =
+                        helto::icon_button(ui, crate::icons::Icon::Trash, "Discard changes", false);
+                    #[cfg(feature = "ui-preview")]
+                    qa::control(ui, "replace-discard".into(), &r);
+                    if r.clicked() {
+                        decision = Some(true);
+                    }
+                    let r =
+                        helto::icon_button(ui, crate::icons::Icon::Close, "Keep project", false);
+                    #[cfg(feature = "ui-preview")]
+                    qa::control(ui, "replace-keep".into(), &r);
+                    if r.clicked() {
+                        decision = Some(false);
+                    }
+                });
+            });
+        if let Some(discard) = decision {
+            self.timeline.replace_pending = None;
+            if !discard && replace == Replace::Animate {
+                self.workspace = Workspace::Image;
+            }
+            if discard {
+                match replace {
+                    Replace::New => self.timeline_new(ctx),
+                    Replace::Open => self.timeline_choose_folder(ctx, FolderMode::Open),
+                    Replace::Animate => self.animate_now(ctx),
+                }
+            }
+        }
     }
     fn timeline_new(&mut self, ctx: &egui::Context) {
         let shape = crate::h3_protocol::Selection {

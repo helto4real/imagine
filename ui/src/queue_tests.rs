@@ -659,3 +659,21 @@ fn empty_dock_starts_collapsed_and_new_work_expands_it() {
     desk.frame(vec![]);
     assert!(!desk.app.queue.collapsed);
 }
+
+#[test]
+fn opening_a_result_never_discards_an_open_edit() {
+    let mut desk = Desk::new();
+    let ids = stage(&mut desk, &["First"]);
+    let done = completed(desk._root.path(), "edit-guard", [10, 20, 30, 255]);
+    desk.app.queue_message(
+        &desk.ctx,
+        Event::Finished(ids[0].clone(), Ok(Completion::new(done))),
+    );
+    desk.app.edit.open = true;
+    desk.app.workspace = Workspace::ImageEdit;
+    let gallery = desk.app.queue.gallery[0].id.clone();
+    desk.app.select_queue_result(&desk.ctx, &gallery);
+    assert!(desk.app.queue.loading.is_none());
+    assert!(desk.app.edit.open);
+    assert_eq!(desk.app.workspace, Workspace::ImageEdit);
+}

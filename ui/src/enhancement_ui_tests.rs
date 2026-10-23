@@ -333,6 +333,17 @@ fn profile_editor_edits_required_system_prompt_and_new_copied_profiles_keep_inst
     h.frame(vec![], true);
     assert!(h.node("Save profile").is_disabled());
     h.click("New enhancement profile", true);
+    // The unsaved copy is only replaced after confirmation.
+    assert!(
+        h.app
+            .enhancement
+            .draft
+            .as_ref()
+            .unwrap()
+            .system_prompt
+            .is_empty()
+    );
+    h.click("Discard changes", true);
     assert!(
         !h.app
             .enhancement
@@ -539,5 +550,36 @@ fn model_results_are_ignored_after_connection_changes_and_json_cannot_override_c
         )
         .unwrap()["stop"],
         serde_json::json!(["<end>"])
+    );
+}
+
+#[test]
+fn deleting_or_leaving_an_edited_profile_asks_first() {
+    let mut h = UiHarness::new();
+    for _ in 0..3 {
+        h.frame(vec![], true);
+    }
+    h.click("Prompt enhancement", true);
+    let original = h.app.enhancement.draft.clone().unwrap();
+    h.click("Delete enhancement profile", true);
+    assert!(!h.app.enhancement.saving);
+    h.click("Keep profile", true);
+    assert_eq!(h.app.enhancement.draft.as_ref(), Some(&original));
+    h.app.enhancement.draft.as_mut().unwrap().name = "Own unsaved name".into();
+    h.click("New enhancement profile", true);
+    assert_eq!(
+        h.app.enhancement.draft.as_ref().unwrap().name,
+        "Own unsaved name"
+    );
+    h.click("Keep profile", true);
+    assert_eq!(
+        h.app.enhancement.draft.as_ref().unwrap().name,
+        "Own unsaved name"
+    );
+    h.click("New enhancement profile", true);
+    h.click("Discard changes", true);
+    assert_eq!(
+        h.app.enhancement.draft.as_ref().unwrap().name,
+        "New profile"
     );
 }

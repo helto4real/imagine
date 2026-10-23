@@ -56,6 +56,15 @@ pub(super) struct EnhancementUi {
     fields: HashMap<Target, egui::Id>,
     active: Option<Run>,
     proposal: Option<Proposal>,
+    /// A profile change held until the user confirms discarding or deleting.
+    confirm: Option<ProfileChange>,
+}
+#[derive(Clone, PartialEq)]
+enum ProfileChange {
+    New,
+    Duplicate,
+    Select(Option<String>),
+    Delete,
 }
 pub(super) enum Event {
     Models {
@@ -544,11 +553,49 @@ impl ImagineApp {
             ui.colored_label(helto::ERROR, error);
         }
     }
+    fn apply_profile_change(&mut self, ctx: &egui::Context, change: ProfileChange) {
+        let draft = self.enhancement.draft.clone();
+        match change {
+            ProfileChange::New => {
+                self.enhancement.draft = Some(Profile {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    name: "New profile".into(),
+                    ..Default::default()
+                });
+            }
+            ProfileChange::Duplicate => {
+                if let Some(draft) = draft {
+                    self.enhancement.draft = Some(Profile {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        name: format!("{} copy", draft.name),
+                        ..draft
+                    });
+                }
+            }
+            ProfileChange::Select(selected) => {
+                self.enhancement.draft = selected.and_then(|id| {
+                    self.enhancement
+                        .profiles
+                        .iter()
+                        .find(|p| p.id == id)
+                        .cloned()
+                });
+            }
+            ProfileChange::Delete => {
+                if draft.is_some_and(|d| self.enhancement.profiles.iter().any(|p| p.id == d.id)) {
+                    self.save_enhancement_profile(ctx, true);
+                } else {
+                    self.enhancement.draft = self.enhancement.profiles.first().cloned();
+                }
+            }
+        }
+    }
     fn enhancement_profile_editor(&mut self, ui: &mut egui::Ui) {
         // Leave room for the text area's border inside the settings clip rect.
         ui.set_max_width((ui.available_width() - 8.).max(120.));
         let mut selected = self.enhancement.draft.as_ref().map(|p| p.id.clone());
         let previous = selected.clone();
+        let mut change = None;
         ui.horizontal(|ui| {
             egui::ComboBox::from_id_salt("enhancement-editor-profile")
                 .selected_text(
@@ -565,40 +612,60 @@ impl ImagineApp {
                     }
                 });
             if helto::icon_button(ui, Icon::Plus, "New enhancement profile", false).clicked() {
-                self.enhancement.draft = Some(Profile {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    name: "New profile".into(),
-                    ..Default::default()
-                });
+                change = Some(ProfileChange::New);
             }
-            if let Some(draft) = self.enhancement.draft.clone() {
+            if self.enhancement.draft.is_some() {
                 if helto::icon_button(ui, Icon::Duplicate, "Duplicate enhancement profile", false)
                     .clicked()
                 {
-                    self.enhancement.draft = Some(Profile {
-                        id: uuid::Uuid::new_v4().to_string(),
-                        name: format!("{} copy", draft.name),
-                        ..draft.clone()
-                    });
+                    change = Some(ProfileChange::Duplicate);
                 }
                 if helto::icon_button(ui, Icon::Trash, "Delete enhancement profile", false)
                     .clicked()
                 {
-                    if self.enhancement.profiles.iter().any(|p| p.id == draft.id) {
-                        self.save_enhancement_profile(ui.ctx(), true);
-                    } else {
-                        self.enhancement.draft = self.enhancement.profiles.first().cloned();
-                    }
+                    change = Some(ProfileChange::Delete);
                 }
             }
         });
         if selected != previous {
-            self.enhancement.draft = selected.and_then(|id| {
-                self.enhancement
-                    .profiles
-                    .iter()
-                    .find(|p| p.id == id)
-                    .cloned()
+            change = Some(ProfileChange::Select(selected));
+        }
+        // Deleting always asks. New or another profile asks only when it would drop
+        // edits; a duplicate carries them over.
+        if let Some(change) = change {
+            if change == ProfileChange::Delete
+                || change != ProfileChange::Duplicate && self.enhancement_profile_dirty()
+            {
+                self.enhancement.confirm = Some(change);
+            } else {
+                self.apply_profile_change(ui.ctx(), change);
+            }
+        }
+        if let Some(change) = self.enhancement.confirm.clone() {
+            ui.horizontal_wrapped(|ui| {
+                let delete = change == ProfileChange::Delete;
+                ui.label(if delete {
+                    "Delete this profile?"
+                } else {
+                    "Discard unsaved profile changes?"
+                });
+                let confirm = helto::icon_button(
+                    ui,
+                    Icon::Trash,
+                    if delete {
+                        "Delete profile"
+                    } else {
+                        "Discard changes"
+                    },
+                    false,
+                );
+                if confirm.clicked() {
+                    self.enhancement.confirm = None;
+                    self.apply_profile_change(ui.ctx(), change);
+                }
+                if helto::icon_button(ui, Icon::Close, "Keep profile", false).clicked() {
+                    self.enhancement.confirm = None;
+                }
             });
         }
         let Some(draft) = &mut self.enhancement.draft else {

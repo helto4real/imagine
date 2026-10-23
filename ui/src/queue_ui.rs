@@ -225,7 +225,15 @@ impl ImagineApp {
                     }
                 });
             });
-            let can_select = !self.busy() && self.image.pending.is_none();
+            // Opening a result replaces the image desk; never discard an open edit.
+            let select_blocked = if self.edit.open {
+                Some("Finish editing first.")
+            } else if self.busy() || self.image.pending.is_some() {
+                Some("Wait for the current generation.")
+            } else {
+                None
+            };
+            let can_select = select_blocked.is_none();
             egui::ScrollArea::horizontal()
                 .id_salt("result-thumbnails")
                 .auto_shrink([false, false])
@@ -299,7 +307,9 @@ impl ImagineApp {
                                         ),
                                         egui::StrokeKind::Inside,
                                     );
-                                    if can_select && response.clicked() {
+                                    if let Some(reason) = select_blocked {
+                                        response.on_hover_text(reason);
+                                    } else if response.clicked() {
                                         selection = Some(item.id.clone());
                                     }
                                     ui.horizontal(|ui| {

@@ -249,6 +249,7 @@ impl ImagineApp {
         self.timeline_reference_cache_window(ui.ctx());
         self.timeline_media_health_window(ui.ctx());
         self.timeline_assembly_window(ui.ctx());
+        self.timeline_replace_window(ui.ctx());
     }
     /// Why Timeline actions are unavailable; `needs_project` also requires an open project.
     pub(super) fn timeline_blocked(&self, needs_project: bool) -> Option<&'static str> {
@@ -683,6 +684,30 @@ impl ImagineApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn replacing_an_unsaved_project_waits_for_confirmation() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let project = super::super::media_picker::tests::project();
+        assert!(!app.timeline_hold_replace(Replace::New));
+        for (state, held) in [
+            ("saved", false),
+            ("session_only", true),
+            ("not_saved", true),
+        ] {
+            app.timeline.replace_pending = None;
+            app.timeline.document = Some(Snapshot {
+                project: project.clone(),
+                raw: json!({"persistence":{"state":state}}),
+            });
+            app.workspace = Workspace::Image;
+            assert_eq!(app.timeline_hold_replace(Replace::Animate), held, "{state}");
+            assert_eq!(app.timeline.replace_pending.is_some(), held);
+            assert_eq!(app.workspace == Workspace::Video, held);
+        }
+    }
+
     /// Synthetic timeline frames; written only when IMAGINE_UI_PREVIEW_DIR is set.
     #[test]
     fn headless_timeline_with_project() {
