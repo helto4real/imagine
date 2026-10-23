@@ -368,7 +368,6 @@ impl ImagineApp {
         if self.settings_open {
             self.settings_window(ui.ctx());
         }
-        self.enhancement_proposal(ui.ctx());
     }
 
     fn keyboard_shortcuts(&mut self, ctx: &egui::Context) {

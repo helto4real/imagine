@@ -602,3 +602,36 @@ fn a_proposal_cannot_be_used_after_its_context_changes_and_keeps_its_text() {
     h.click("Discard", false);
     assert_eq!(h.app.image.prompt, "SYNTHETIC newer draft");
 }
+
+#[test]
+fn a_proposal_shows_under_its_field_and_retry_enhances_the_current_text() {
+    let mut h = UiHarness::new();
+    let target = Target {
+        workspace: Workspace::Image,
+        field: Field::Prompt,
+    };
+    let id = h.pending(target);
+    h.app.image.prompt = "SYNTHETIC newer draft".into();
+    h.finish(id, Ok("SYNTHETIC proposal".into()));
+    let field = h.node("Prompt").bounds().unwrap();
+    let proposal = h.node("Use").bounds().unwrap();
+    assert!(proposal.y0 > field.y1, "{proposal:?} below {field:?}");
+    assert!(h.node("Enhance prompt").is_disabled());
+    h.click("Retry", false);
+    assert!(h.app.enhancement.proposal.is_none());
+    assert!(
+        h.app
+            .enhancement
+            .active
+            .as_ref()
+            .is_some_and(|run| run.original == "SYNTHETIC newer draft")
+            || h.app.enhancement.error.is_some()
+    );
+    assert_eq!(h.app.image.prompt, "SYNTHETIC newer draft");
+    h.app.client = None;
+    h.app.enhancement.active = None;
+    let id = h.pending(target);
+    h.app.image.prompt = "SYNTHETIC offline draft".into();
+    h.finish(id, Ok("SYNTHETIC proposal".into()));
+    assert!(h.node("Retry").is_disabled());
+}

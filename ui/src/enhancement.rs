@@ -408,56 +408,70 @@ impl ImagineApp {
         {
             ui.colored_label(helto::ERROR, error);
         }
-    }
-    pub(super) fn enhancement_proposal(&mut self, ctx: &egui::Context) {
-        let Some(proposal) = self.enhancement.proposal.as_ref() else {
-            return;
-        };
-        if proposal.run.target.workspace != self.workspace {
-            return;
+        if self
+            .enhancement
+            .proposal
+            .as_ref()
+            .is_some_and(|p| p.run.target == target)
+        {
+            self.enhancement_proposal(ui, target);
         }
-        let mut text = proposal.text.clone();
-        let mut use_text = false;
-        let mut discard = false;
-        let mut open = true;
-        egui::Window::new("Enhanced prompt")
-            .id(egui::Id::new("enhanced-prompt-proposal"))
-            .open(&mut open)
-            .collapsible(false)
-            .default_width(420.)
-            .show(ctx, |ui| {
-                ui.label("The prompt changed while enhancement was running.");
-                helto::textarea(
-                    ui,
-                    &mut text,
-                    8,
-                    "enhancement-proposal",
-                    self.prefs.privacy_mode,
-                    true,
-                );
-                ui.horizontal(|ui| {
-                    // Applying after another change would overwrite it; keep the text instead.
-                    let changed =
-                        self.enhancement.proposal.as_ref().is_some_and(|p| {
-                            self.enhancement_context(p.run.target) != p.run.context
-                        });
-                    use_text = helto::action(
-                        ui,
-                        Icon::Check,
-                        "Use",
-                        true,
-                        changed.then_some(
-                            "The text changed again. Copy what you need from here, then Discard.",
-                        ),
-                    )
-                    .clicked();
-                    discard = helto::icon_button(ui, Icon::Close, "Discard", false).clicked();
-                });
+    }
+    /// A result that arrived after its field was edited, shown under that field
+    /// until it is used, retried or discarded.
+    fn enhancement_proposal(&mut self, ui: &mut egui::Ui, target: Target) {
+        let mut text = self.enhancement.proposal.as_ref().unwrap().text.clone();
+        let (mut use_text, mut retry, mut discard) = (false, false, false);
+        // Applying after a context change would mix the old references in; keep the text instead.
+        let stale = self
+            .enhancement
+            .proposal
+            .as_ref()
+            .is_some_and(|p| self.enhancement_context(p.run.target) != p.run.context);
+        let retry_blocked = if self.client.is_none() {
+            Some("Not connected to Imagine.")
+        } else if self.enhancement_text(target).trim().is_empty() {
+            Some("Enter text to enhance.")
+        } else {
+            None
+        };
+        ui.add_space(4.);
+        ui.group(|ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal(|ui| {
+                ui.label(helto::section("Enhanced prompt"));
+                ui.weak("The text changed while enhancement was running.");
             });
-        if use_text || discard || !open {
+            helto::textarea(
+                ui,
+                &mut text,
+                5,
+                "enhancement-proposal",
+                self.prefs.privacy_mode,
+                true,
+            );
+            ui.horizontal(|ui| {
+                use_text = helto::action(
+                    ui,
+                    Icon::Check,
+                    "Use",
+                    true,
+                    stale.then_some(
+                        "The model family or image references changed. Retry or Discard.",
+                    ),
+                )
+                .clicked();
+                retry = helto::action(ui, Icon::Retry, "Retry", false, retry_blocked).clicked();
+                discard = helto::icon_button(ui, Icon::Close, "Discard", false).clicked();
+            });
+        });
+        if use_text || retry || discard {
             let proposal = self.enhancement.proposal.take().unwrap();
             if use_text && self.enhancement_context(proposal.run.target) == proposal.run.context {
-                self.apply_enhancement(ctx, &proposal.run, text);
+                self.apply_enhancement(ui.ctx(), &proposal.run, text);
+            }
+            if retry {
+                self.start_enhancement(ui.ctx(), target);
             }
         } else if let Some(proposal) = &mut self.enhancement.proposal {
             proposal.text = text;
