@@ -110,8 +110,21 @@ impl ImagineApp {
                             } else {
                                 asset.name.clone()
                             };
-                            ui.add(egui::Label::new(name).truncate());
-                            self.timeline_thumbnail(ui, d, asset);
+                            // Drag the name or thumbnail onto a scene or Section to use it there.
+                            let source = ui.id().with(("shelf-media", &asset.id.0));
+                            if enabled {
+                                ui.dnd_drag_source(
+                                    source,
+                                    super::tracks::ShelfMedia(asset.id.clone()),
+                                    |ui| {
+                                        ui.add(egui::Label::new(name).truncate());
+                                        self.timeline_thumbnail(ui, d, asset);
+                                    },
+                                );
+                            } else {
+                                ui.add(egui::Label::new(name).truncate());
+                                self.timeline_thumbnail(ui, d, asset);
+                            }
                             ui.horizontal(|ui| {
                                 if asset.kind == MediaKind::Audio {
                                     let response = helto::action(

@@ -110,7 +110,11 @@ fn matches(asset: &Asset, kind: Option<&MediaKind>, query: &str) -> bool {
 }
 
 /// Apply a selection once, preserving input order and not duplicating existing bindings.
-fn bind(project: &VideoProject, target: &Target, assets: &[AssetId]) -> Result<Vec<Edit>, String> {
+pub(super) fn bind(
+    project: &VideoProject,
+    target: &Target,
+    assets: &[AssetId],
+) -> Result<Vec<Edit>, String> {
     for id in assets {
         let asset = project
             .assets

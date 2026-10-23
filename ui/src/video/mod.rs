@@ -104,6 +104,8 @@ pub(super) struct Timeline {
     reference_cache: reference_cache::State,
     preflight: preflight::State,
     playback: playback::State,
+    /// Shelf media dropped on a scene or Section this frame.
+    drop: Option<tracks::Dropped>,
     media_health: media_health::State,
     compatibility_open: bool,
     compatibility_report: Option<Value>,

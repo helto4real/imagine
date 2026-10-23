@@ -9,6 +9,41 @@ pub(super) struct Drag {
     origin: egui::Pos2,
     before: VideoProject,
 }
+/// Media dragged from the shelf; see `inspector::timeline_references`.
+#[derive(Clone)]
+pub(super) struct ShelfMedia(pub AssetId);
+/// Where shelf media was dropped on the Timeline.
+pub(super) struct Dropped {
+    pub asset: AssetId,
+    pub scene: SceneId,
+    pub section: Option<SectionId>,
+}
+/// Highlights `rect` while shelf media hovers it and records a drop.
+fn drop_target(
+    ui: &egui::Ui,
+    response: &egui::Response,
+    rect: Rect,
+    dropped: &mut Option<Dropped>,
+    scene: &SceneId,
+    section: Option<&SectionId>,
+) {
+    if response.dnd_hover_payload::<ShelfMedia>().is_some() {
+        ui.painter().rect_stroke(
+            rect,
+            3,
+            Stroke::new(2., helto::ACCENT),
+            egui::StrokeKind::Inside,
+        );
+    }
+    if let Some(media) = response.dnd_release_payload::<ShelfMedia>() {
+        *dropped = Some(Dropped {
+            asset: media.0.clone(),
+            scene: scene.clone(),
+            section: section.cloned(),
+        });
+    }
+}
+
 fn boundary_label(mode: &imagine_video_contract::assembly::BoundaryMode) -> &'static str {
     use imagine_video_contract::assembly::BoundaryMode;
     match mode {
@@ -399,7 +434,16 @@ impl ImagineApp {
                             color,
                         );
                     }
-                    let title = scene.description.lines().next().unwrap_or("").trim();
+                    if enabled {
+                        drop_target(ui, &response, bar, &mut self.timeline.drop, &scene.id, None);
+                    }
+                    let title = project
+                        .creative
+                        .scene_prompts
+                        .get(&scene.id)
+                        .map(|prompt| prompt.title.trim())
+                        .filter(|title| !title.is_empty())
+                        .unwrap_or_else(|| scene.description.lines().next().unwrap_or("").trim());
                     let response = response.on_hover_text(format!(
                         "Scene {} · {:.2} s · {}",
                         index + 1,
@@ -617,6 +661,16 @@ impl ImagineApp {
                                 Sense::hover()
                             },
                         );
+                        if enabled {
+                            drop_target(
+                                ui,
+                                &response,
+                                r,
+                                &mut self.timeline.drop,
+                                &scene.id,
+                                Some(&section.id),
+                            );
+                        }
                         #[cfg(feature = "ui-preview")]
                         super::qa::control(ui, format!("section-{}", section.id.0), &response);
                         if response.clicked() || response.secondary_clicked() {

@@ -139,6 +139,9 @@ impl ImagineApp {
                 self.timeline_inspector(ui, right, document, enabled, &mut commands);
             }
             self.timeline_tracks(ui, tracks, &document.project, enabled, &mut commands);
+            if let Some(dropped) = self.timeline.drop.take() {
+                self.timeline_use_dropped(ui.ctx(), &document.project, dropped);
+            }
             let gap = |a: Rect, b: Rect| {
                 Rect::from_min_max(
                     egui::pos2(a.right(), main.top()),
@@ -259,6 +262,53 @@ impl ImagineApp {
         self.timeline_media_health_window(ui.ctx());
         self.timeline_assembly_window(ui.ctx());
         self.timeline_replace_window(ui.ctx());
+    }
+    /// Shelf media dropped on the Timeline: images and videos become inputs of
+    /// the scene or Section, audio a clip at the scene start, as their pickers
+    /// do. Pending text drafts go in the same edit, so nothing is dropped.
+    fn timeline_use_dropped(
+        &mut self,
+        ctx: &egui::Context,
+        project: &VideoProject,
+        dropped: super::tracks::Dropped,
+    ) {
+        match self.timeline_dropped_edits(project, dropped) {
+            Ok(edits) => self.timeline_edit(ctx, edits, 0),
+            Err(error) => self.timeline.error = Some(error),
+        }
+    }
+    fn timeline_dropped_edits(
+        &mut self,
+        project: &VideoProject,
+        dropped: super::tracks::Dropped,
+    ) -> Result<Vec<Edit>, String> {
+        let (Some(asset), Ok(scene)) = (
+            project.assets.get(&dropped.asset),
+            project.scene(&dropped.scene),
+        ) else {
+            return Err("The dropped media or its scene was removed.".into());
+        };
+        let mut edits = self.timeline.draft_edits();
+        if asset.kind == MediaKind::Audio {
+            let mut edit = self
+                .timeline
+                .add_audio(project, Some(dropped.asset.clone()));
+            if let Edit::AddAudioClip { clip, .. } = &mut edit {
+                clip.start = scene.start;
+            }
+            edits.push(edit);
+            return Ok(edits);
+        }
+        let target = media_picker::Target::Generation {
+            scene: dropped.scene.clone(),
+            section: dropped.section.clone(),
+            kind: asset.kind.clone(),
+        };
+        // Bind against the drafted project so a whole-creative edit keeps both.
+        let drafted = group_commands::prepared(project, edits.clone())
+            .map_err(|error| format!("Could not use the media: {}", error.code))?;
+        edits.extend(media_picker::bind(&drafted, &target, &[dropped.asset])?);
+        Ok(edits)
     }
     pub(super) fn timeline_open_global_prompt(&mut self) {
         self.timeline.project_prompt_open = true;
@@ -810,6 +860,53 @@ mod tests {
             assert_eq!(painted(&output.shapes, "01 · Own signal title"), shown);
             assert!(!painted(&output.shapes, "more"));
         }
+    }
+
+    #[test]
+    fn dropped_media_binds_to_its_target_and_keeps_pending_drafts() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let project = super::super::media_picker::tests::project();
+        let scene = project.scenes[0].clone();
+        app.timeline.document = Some(Snapshot::with(project.clone(), json!({})));
+        app.timeline.selected.insert(scene.id.clone());
+        app.timeline.sync_draft();
+        app.timeline.draft_scene_prompt.summary = "Own drafted summary".into();
+        let dropped = |asset: &str| super::super::tracks::Dropped {
+            asset: AssetId(asset.into()),
+            scene: scene.id.clone(),
+            section: None,
+        };
+        let edits = app
+            .timeline_dropped_edits(&project, dropped("image"))
+            .unwrap();
+        let mut result = project.clone();
+        imagine_video_contract::editing::apply(
+            &mut result,
+            EditRequest {
+                schema_version: 1,
+                expected_project_revision: project.project_revision,
+                commands: edits,
+            },
+        )
+        .unwrap();
+        assert!(
+            result.scenes[0]
+                .bindings
+                .iter()
+                .any(|b| b.asset.0 == "image" && b.enabled)
+        );
+        assert_eq!(
+            result.creative.scene_prompts[&scene.id].summary,
+            "Own drafted summary"
+        );
+        let edits = app
+            .timeline_dropped_edits(&project, dropped("voice"))
+            .unwrap();
+        assert!(edits.iter().any(|e| matches!(e,
+            Edit::AddAudioClip { clip, .. } if clip.start == scene.start
+                && clip.asset == Some(AssetId("voice".into())))));
     }
 
     #[test]
