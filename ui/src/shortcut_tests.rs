@@ -116,7 +116,7 @@ fn shortcuts_focus_the_active_prompt_and_leave_text_editing_alone() {
 }
 
 #[test]
-fn shortcuts_reveal_prompt_until_pointer_moves_then_restore_hover_privacy() {
+fn typing_reveals_only_the_focused_prompt_until_focus_is_lost() {
     fn visible_prompt(shape: &egui::Shape) -> bool {
         match shape {
             egui::Shape::Text(text) => {
@@ -177,19 +177,42 @@ fn shortcuts_reveal_prompt_until_pointer_moves_then_restore_hover_privacy() {
             vec![egui::Event::PointerMoved(outside)],
             true
         ));
+        // Focus alone reveals nothing.
         ctrl(&mut desk, egui::Key::P);
-        assert!(frame(&mut desk, vec![], true), "{workspace:?}");
+        assert!(desk.ctx.text_edit_focused());
+        assert!(!frame(&mut desk, vec![], true), "{workspace:?}");
+        // Typing reveals the field, also on the first keystroke and after pointer moves.
         assert!(frame(
             &mut desk,
             vec![egui::Event::Text(" typed".into())],
             true
         ));
-        assert!(!frame(
+        assert!(frame(
             &mut desk,
             vec![egui::Event::MouseMoved(egui::vec2(1., 0.))],
             true,
         ));
+        assert!(frame(
+            &mut desk,
+            vec![egui::Event::PointerMoved(outside)],
+            true
+        ));
+        assert!(frame(&mut desk, vec![], true));
+        // Losing window focus conceals it; regaining focus alone does not reveal it.
+        assert!(!frame(&mut desk, vec![], false));
         assert!(!frame(&mut desk, vec![], true));
+        assert!(frame(
+            &mut desk,
+            vec![key(egui::Key::Backspace, egui::Modifiers::NONE, false)],
+            true
+        ));
+        // Leaving the field conceals it; hover still reveals as before.
+        desk.frame(vec![key(egui::Key::Escape, egui::Modifiers::NONE, false)]);
+        assert!(!frame(
+            &mut desk,
+            vec![egui::Event::PointerMoved(outside)],
+            true
+        ));
         assert!(frame(
             &mut desk,
             vec![egui::Event::PointerMoved(inside)],
@@ -200,12 +223,6 @@ fn shortcuts_reveal_prompt_until_pointer_moves_then_restore_hover_privacy() {
             vec![egui::Event::PointerMoved(outside)],
             true
         ));
-
-        desk.frame(vec![key(egui::Key::Escape, egui::Modifiers::NONE, false)]);
-        ctrl(&mut desk, egui::Key::P);
-        assert!(frame(&mut desk, vec![], true));
-        assert!(!frame(&mut desk, vec![], false));
-        assert!(!frame(&mut desk, vec![], true));
         assert!(desk.app.prefs.privacy_mode);
         assert!(Preferences::load(desk._root.path()).unwrap().privacy_mode);
     }

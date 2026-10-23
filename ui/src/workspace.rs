@@ -66,7 +66,7 @@ fn focus_prompt_shortcut(response: egui::Response) {
         && !ctx.text_edit_focused()
         && consume_key(ctx, egui::Key::P, true)
     {
-        helto::focus_and_reveal_textarea(&response);
+        response.request_focus();
         response.scroll_to_me(Some(Align::Center));
     }
 }
@@ -199,6 +199,7 @@ impl ImagineApp {
     }
 
     pub fn content(&mut self, ui: &mut Ui) {
+        helto::set_privacy_mode(ui.ctx(), self.prefs.privacy_mode);
         self.receive(ui.ctx());
         if self.workspace != Workspace::Video {
             self.pause_video();

@@ -1544,5 +1544,7 @@ fn headless_icon_sheet() {
         render(&ctx, combined, width, height)
             .save(dir.join("icons.png"))
             .unwrap();
+    } else {
+        combined.textures_delta.clear();
     }
 }

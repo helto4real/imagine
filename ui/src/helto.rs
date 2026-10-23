@@ -7,25 +7,77 @@ pub fn reveal_in_viewport(ui: &egui::Ui, privacy_mode: bool) -> bool {
     !privacy_mode || ui.input(|i| i.focused) && ui.rect_contains_pointer(ui.clip_rect())
 }
 
+const PRIVACY_MODE: &str = "helto-privacy-mode";
+/// Records Hide previews for this frame; private scopes default to hidden mode.
+pub fn set_privacy_mode(ctx: &egui::Context, on: bool) {
+    ctx.data_mut(|data| data.insert_temp(egui::Id::new(PRIVACY_MODE), on));
+}
+fn privacy_mode(ctx: &egui::Context) -> bool {
+    ctx.data(|data| data.get_temp(egui::Id::new(PRIVACY_MODE)))
+        .unwrap_or(true)
+}
+
 /// Conceal a private window body while preserving its layout and scroll extent.
+/// Controls stay usable, as on the main desk. The text field being typed in
+/// stays revealed while it keeps focus in a focused window.
 pub(crate) fn private_scope<R>(
     ui: &mut egui::Ui,
     hidden: bool,
     body: impl FnOnce(&mut egui::Ui) -> R,
 ) -> R {
     ui.scope(|ui| {
-        if hidden {
-            ui.set_invisible();
-        }
+        let layer = ui.layer_id();
+        let start = ui.ctx().graphics_mut(|g| g.entry(layer).next_idx());
         let result = body(ui);
+        let typed = typed_field(ui);
         if hidden {
-            redact_private_accessibility(ui.ctx(), ui.unique_id());
+            let keep = typed.map(|(_, rect)| rect.expand(1.));
+            ui.ctx().graphics_mut(|g| {
+                let list = g.entry(layer);
+                for index in start.0..list.next_idx().0 {
+                    list.mutate_shape(egui::layers::ShapeIdx(index), |clipped| {
+                        let bounds = clipped
+                            .shape
+                            .visual_bounding_rect()
+                            .intersect(clipped.clip_rect);
+                        if !keep.is_some_and(|keep| keep.contains_rect(bounds)) {
+                            clipped.shape = egui::Shape::Noop;
+                        }
+                    });
+                }
+            });
+            redact_private_accessibility(ui.ctx(), ui.unique_id(), typed.map(|(id, _)| id));
         }
         result
     })
     .inner
 }
-fn redact_private_accessibility(ctx: &egui::Context, id: egui::Id) {
+/// The focused text field inside this scope once the user has typed in it.
+fn typed_field(ui: &egui::Ui) -> Option<(egui::Id, egui::Rect)> {
+    let ctx = ui.ctx();
+    let id = ctx.memory(|memory| memory.focused())?;
+    let response = ctx.read_response(id)?;
+    let editing = ctx.text_edit_focused()
+        && ctx.input(|input| input.focused)
+        && response.layer_id == ui.layer_id()
+        && ui.min_rect().intersects(response.rect);
+    let private = privacy_mode(ctx);
+    let typed = editing && ctx.input(|input| input.events.iter().any(edits_text));
+    let reveal_id = id.with("scope-typing-reveal");
+    ctx.data_mut(|data| {
+        if !editing || !private {
+            data.remove::<bool>(reveal_id);
+        } else if typed {
+            data.insert_temp(reveal_id, true);
+        }
+        data.get_temp::<bool>(reveal_id)
+    })
+    .map(|_| (id, response.rect))
+}
+fn redact_private_accessibility(ctx: &egui::Context, id: egui::Id, keep: Option<egui::Id>) {
+    if Some(id) == keep {
+        return;
+    }
     let children = ctx
         .accesskit_node_builder(id, |node| {
             node.clear_label();
@@ -37,7 +89,7 @@ fn redact_private_accessibility(ctx: &egui::Context, id: egui::Id) {
         .unwrap_or_default();
     for child in children {
         let id = unsafe { egui::Id::from_high_entropy_bits(child.0) };
-        redact_private_accessibility(ctx, id);
+        redact_private_accessibility(ctx, id, keep);
     }
 }
 
@@ -337,12 +389,19 @@ pub fn gradient(
     }
     painter.add(mesh);
 }
-pub fn focus_and_reveal_textarea(response: &egui::Response) {
-    response.request_focus();
-    response.ctx.data_mut(|data| {
-        data.insert_temp(response.id.with("keyboard-reveal"), true);
-    });
-    response.ctx.request_repaint();
+/// Typing, pasting or deleting in the focused field; focus or caret movement alone is not.
+fn edits_text(event: &egui::Event) -> bool {
+    matches!(
+        event,
+        egui::Event::Text(_) | egui::Event::Paste(_) | egui::Event::Cut | egui::Event::Ime(_)
+    ) || matches!(
+        event,
+        egui::Event::Key {
+            key: egui::Key::Backspace | egui::Key::Delete | egui::Key::Enter,
+            pressed: true,
+            ..
+        }
+    )
 }
 
 pub fn textarea(
@@ -379,7 +438,7 @@ pub fn textarea(
                 .auto_shrink([false, false])
                 .max_height(rect.height())
                 .show(ui, |ui| {
-                    textarea_content(ui, text, id, hidden, rect.height())
+                    textarea_content(ui, text, id, privacy_mode, hidden, rect.height())
                 })
                 .inner;
             // A field's geometry is its frame, not the potentially much taller
@@ -400,28 +459,24 @@ fn textarea_content(
     ui: &mut egui::Ui,
     text: &mut String,
     id: &str,
+    private: bool,
     hidden: bool,
     height: f32,
 ) -> egui::Response {
     ui.scope(|ui| {
         ui.visuals_mut().selection.stroke = Stroke::new(1., FOCUS);
         let id = ui.make_persistent_id(id);
-        let reset_reveal = !ui.memory(|memory| memory.has_focus(id))
-            || ui.input(|input| {
-                !input.focused
-                    || input.events.iter().any(|event| {
-                        matches!(
-                            event,
-                            egui::Event::PointerMoved(_)
-                                | egui::Event::MouseMoved(_)
-                                | egui::Event::PointerGone
-                        )
-                    })
-            });
-        let keyboard_reveal = ui.data_mut(|data| {
-            let reveal_id = id.with("keyboard-reveal");
-            if reset_reveal {
+        // In hidden mode the field being typed in stays revealed while it keeps
+        // focus in a focused window. Checked before painting so the first
+        // keystroke is not concealed; typing before Hide previews was on is not.
+        let editing = ui.memory(|memory| memory.has_focus(id)) && ui.input(|input| input.focused);
+        let typed = editing && ui.input(|input| input.events.iter().any(edits_text));
+        let typing_reveal = ui.data_mut(|data| {
+            let reveal_id = id.with("typing-reveal");
+            if !editing || !private {
                 data.remove::<bool>(reveal_id);
+            } else if typed {
+                data.insert_temp(reveal_id, true);
             }
             data.get_temp::<bool>(reveal_id).unwrap_or(false)
         });
@@ -434,7 +489,7 @@ fn textarea_content(
                 let mut values = d
                     .get_temp::<std::collections::BTreeMap<String, (u64, bool, bool, bool)>>(key)
                     .unwrap_or_default();
-                values.insert(format!("{id:?}"), (frame, hidden, keyboard_reveal, focused));
+                values.insert(format!("{id:?}"), (frame, hidden, typing_reveal, focused));
                 d.insert_temp(key, values);
             });
         }
@@ -444,7 +499,7 @@ fn textarea_content(
             .scope(|ui| {
                 // Suppress glyphs, selection and caret together, while keeping editing active.
                 // Keep the clipboard menu outside this scope so it remains visible.
-                if hidden && !keyboard_reveal {
+                if hidden && !typing_reveal {
                     ui.set_opacity(0.);
                 }
                 egui::TextEdit::multiline(text)
@@ -459,7 +514,7 @@ fn textarea_content(
             })
             .inner;
         // Opacity hides pixels only; concealed text must also leave accessibility values.
-        if hidden && !keyboard_reveal {
+        if hidden && !typing_reveal {
             redact_text_accessibility(ui.ctx(), output.response.id);
         }
         // egui 0.36 moves the caret on any pointer press, including right-click.
@@ -627,6 +682,61 @@ mod tests {
         }
         assert!(sizes[1..].windows(2).all(|v| v[0] == v[1]), "{sizes:?}");
         assert_eq!(text, "Own private field");
+    }
+    #[test]
+    fn concealed_window_reveals_only_the_field_being_typed_in() {
+        fn painted(shapes: &[egui::epaint::ClippedShape], needle: &str) -> bool {
+            fn find(shape: &egui::Shape, needle: &str) -> bool {
+                match shape {
+                    egui::Shape::Text(text) => text.galley.text().contains(needle),
+                    egui::Shape::Vec(shapes) => shapes.iter().any(|s| find(s, needle)),
+                    _ => false,
+                }
+            }
+            shapes.iter().any(|s| find(&s.shape, needle))
+        }
+        let ctx = egui::Context::default();
+        let mut text = "Own typed field".to_owned();
+        let mut field = None;
+        let mut frame = |events: Vec<egui::Event>, focused: bool| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(800., 700.),
+                    )),
+                    events,
+                    focused,
+                    ..Default::default()
+                },
+                |ui| {
+                    private_scope(ui, true, |ui| {
+                        ui.label("Own private name");
+                        let response = ui.text_edit_singleline(&mut text);
+                        if field.is_none() {
+                            response.request_focus();
+                            field = Some(response.id);
+                        }
+                    });
+                },
+            );
+            output.textures_delta.clear();
+            (
+                painted(&output.shapes, "Own typed"),
+                painted(&output.shapes, "Own private name"),
+            )
+        };
+        assert_eq!(frame(vec![], true), (false, false));
+        // Focus alone reveals nothing; typing reveals only the field.
+        assert_eq!(frame(vec![], true), (false, false));
+        assert_eq!(
+            frame(vec![egui::Event::Text("!".into())], true),
+            (true, false)
+        );
+        assert_eq!(frame(vec![], true), (true, false));
+        assert_eq!(frame(vec![], false), (false, false));
+        assert_eq!(frame(vec![], true), (false, false));
+        assert_eq!(text, "Own typed field!");
     }
     #[test]
     fn viewport_privacy_still_hides_on_leave_and_lost_focus() {

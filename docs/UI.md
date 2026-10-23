@@ -199,9 +199,12 @@ The eye icon and **Hide previews** switch toggle visual privacy for the result,
 reference images, prompt and negative prompt. It is on by default and the choice
 is saved immediately. Each image or text field reveals only while the pointer is
 over it and the window has focus. Leaving the area or losing window focus hides
-it immediately, including selected text and the caret. Editing focus alone does
-not reveal text. This is visual concealment only: prompt content, clipboard
-operations and saved PNGs are unchanged.
+it immediately, including selected text and the caret. Editing focus alone
+(Ctrl+P, Tab or a click) does not reveal text. Once you type, paste or delete in
+the focused field, that field alone stays revealed, also inside windows such as
+Story or Cast, until it loses focus or the window loses focus. This is visual
+concealment only: prompt content, clipboard operations and saved PNGs are
+unchanged.
 Uploading does not resize the source file: server preprocessing controls the
 VAE and vision inputs, with further native resizing disabled. The client creates
 small thumbnails only for display. The

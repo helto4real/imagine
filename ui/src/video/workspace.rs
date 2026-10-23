@@ -721,6 +721,8 @@ mod tests {
                 crate::app::tests::render(&ctx, output, width, height)
                     .save(dir.join(format!("{name}.png")))
                     .unwrap();
+            } else {
+                output.textures_delta.clear();
             }
         }
     }
