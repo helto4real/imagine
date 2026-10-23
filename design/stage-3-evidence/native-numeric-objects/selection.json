@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "2dfc39c32725bfab0c8dcea1ba34aa47249e4380a90474b36f242b0c38944b5c",
+  "execution_root": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "shared_numeric_objects_tests::native_numeric_objects_match_cpython_cache_payload_truth_exact_integer_and_key_hashes",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/2dfc39c32725bfab0c8dcea1ba34aa47249e4380a90474b36f242b0c38944b5c/runs/26db3fc84e744e6eb11788abeda0f0ee/00-native_numeric_objects_match_cpython_cache_payload_truth_exact_integer_and_key_hashes.log",
+      "evidence": "00-native_numeric_objects_match_cpython_cache_payload_truth_exact_integer_and_key_hashes.json"
+    },
+    {
+      "name": "shared_numeric_objects_tests::native_numeric_dictionary_retains_original_first_key_owners_cross_type_collisions_and_distinct_nan_keys",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/2dfc39c32725bfab0c8dcea1ba34aa47249e4380a90474b36f242b0c38944b5c/runs/26db3fc84e744e6eb11788abeda0f0ee/01-native_numeric_dictionary_retains_original_first_key_owners_cross_type_collisions_and_distinct_nan_keys.log",
+      "evidence": "01-native_numeric_dictionary_retains_original_first_key_owners_cross_type_collisions_and_distinct_nan_keys.json"
+    }
+  ],
+  "result": "passed"
+}

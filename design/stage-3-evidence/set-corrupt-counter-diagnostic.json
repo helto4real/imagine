@@ -1,0 +1,58 @@
+{
+  "schema": 1,
+  "python": "3.12.13 (main, Jul 18 2026, 14:06:13) [GCC 16.1.1 20260625]",
+  "trained_model_weights": 0,
+  "cuda_work": false,
+  "source": {
+    "path": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/sources/cpython/Objects/setobject.c",
+    "sha256": "e633e7ae4e427ecead8879965910e27427d34ae0fc5b956142bc337f741a367c"
+  },
+  "runs": [
+    {
+      "logical_used": 5,
+      "active_entries": 4,
+      "order": [
+        5,
+        1,
+        2,
+        3
+      ],
+      "capacity": 8,
+      "smalltable": true,
+      "clear_loop_remaining_after_all_valid_entries": 1,
+      "cleanup_executed": false,
+      "exit": "os._exit; no Python object finalization"
+    },
+    {
+      "logical_used": 5,
+      "active_entries": 4,
+      "order": [
+        5,
+        1,
+        2,
+        3
+      ],
+      "capacity": 8,
+      "smalltable": true,
+      "clear_loop_remaining_after_all_valid_entries": 1,
+      "cleanup_executed": false,
+      "exit": "os._exit; no Python object finalization"
+    },
+    {
+      "logical_used": 5,
+      "active_entries": 4,
+      "order": [
+        5,
+        1,
+        2,
+        3
+      ],
+      "capacity": 8,
+      "smalltable": true,
+      "clear_loop_remaining_after_all_valid_entries": 1,
+      "cleanup_executed": false,
+      "exit": "os._exit; no Python object finalization"
+    }
+  ],
+  "conclusion": "Source set_clear_internal and set_dealloc loop until used active entries, without a mask bound. Each observed smalltable has used=5 but only 4 active entries; the next read after its valid table is out of bounds. Cleanup was not executed."
+}

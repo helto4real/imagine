@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "ba05e7c1c85bc91b3dcf3758daa22d72e04cbfa297b053ef8f1b37fa24f5c815",
+  "execution_root": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "shared_key_error_tests::native_scalar_keyerrors_preserve_args_identity_exact_repr_and_deferred_mutable_decimal_limit",
+      "returncode": 1,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/ba05e7c1c85bc91b3dcf3758daa22d72e04cbfa297b053ef8f1b37fa24f5c815/runs/6fc729ab82fb486fa45eb5ccdf94021d/00-native_scalar_keyerrors_preserve_args_identity_exact_repr_and_deferred_mutable_decimal_limit.log"
+    }
+  ],
+  "result": "failed"
+}

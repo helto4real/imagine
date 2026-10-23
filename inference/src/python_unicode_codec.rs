@@ -29,7 +29,7 @@ pub fn ascii(bytes: &[u8]) -> Result<Options, Error> {
         }
         points.push(u32::from(*byte));
     }
-    SourceText::from_codepoints(points)
+    SourceText::decoded_codepoints(points)
 }
 pub fn utf8(bytes: &[u8], surrogate_pass: bool) -> Result<Options, Error> {
     let mut points = vec![];
@@ -99,5 +99,5 @@ pub fn utf8(bytes: &[u8], surrogate_pass: bool) -> Result<Options, Error> {
         points.push(point);
         index += length;
     }
-    SourceText::from_codepoints(points)
+    SourceText::decoded_codepoints(points)
 }

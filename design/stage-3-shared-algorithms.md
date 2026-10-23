@@ -18,6 +18,18 @@ The next work is the smallest shared native AV base; a concrete contract/file
 boundary is required before shared product changes. See
 [native-av-baseline-plan-20261020.md](native-av-baseline-plan-20261020.md).
 
+Resume coordination, 2026-10-20: the coordinator verified common baseline
+`901c847929cc9a68d046910fefdda1dba30e8214` and created H3 owner task
+`01a15806-0f7c-7153-a34e-2f16a31dd51c` in
+`/home/thhel/.codex/worktrees/be07/imagine` from that exact commit. It explicitly
+instructed this core task to resume the previously paused dynamic object/caller,
+checkpoint and registry gates in the main checkout. H3 learned layers belong
+only to the H3 owner. No shared product/UI edits are authorized by this resume.
+Core build targets/caches remain core-owned; fresh native execution outputs
+are separated under `comfyui/stage3-core-20261020`. New GPU tests must use the
+same canonical Ticket socket; no new GPU work has started in this continuation.
+The common baseline and historical evidence remain immutable controls.
+
 Tomas requested a commit followed by implementation of Stage 3 on 2026-10-19.
 Commit **24317e9** preserves the completed Stage 2 follow-up and its retained
 tests/evidence. Publication is recorded separately in
@@ -3363,3 +3375,475 @@ This is neither trained H3 acceptance nor complete Stage 3. The earlier 386-test
 full run remains evidence for its own frozen candidate. The shared AV handoff
 preserves all remaining caller, object protocol, restricted whole-loader and
 full registry/interaction work rather than weakening their exit requirements.
+
+
+## Native numeric object binding in progress
+
+The resumed slice adds immutable native numeric metadata objects over canonical
+signed arbitrary-width integer bytes, binary64 payloads and already-materialized
+complex parts. Boolean and small-int constructor owners use their original
+singleton/cache behavior. Float and complex owners remain distinct objects;
+NaN hashes follow each actual native object's identity. This preserves the
+source algorithm, not an impossible cross-process equality of heap addresses.
+Finite hash values, numeric equality, cached aliases and retained dictionary key
+owners have direct CPython 3.12.13 fixtures. This is not complex() argument
+conversion, general arithmetic or full checkpoint materialization. The concrete
+numeric key provider uses the existing CPython dictionary table implementation;
+complete Unicode/tuple/object key composition and unpickler constructor/caller
+bindings remain next. No tolerance, hashing policy or model behavior is changed.
+
+
+The [native numeric object selection](stage-3-evidence/native-numeric-objects/selection.json)
+passes two isolated CPU tests: **1,572** objects, **48,528** comparisons and
+**152** dictionary owner histories, plus distinct/same-NaN key behavior.
+Warnings-denied all-target Clippy passes. The input record verified **1,327+181**
+fingerprints before the scalar/caller follow-up. Finite hashes are compared
+exactly; NaN hashing checks the original generic-owner relationship using each
+actual native owner, not a captured Python heap address. Numeric constructor
+conversion/arithmetic and whole checkpoint materialization remain open.
+
+The official CPython 3.12.13 release archive has now been acquired as source-only
+verification material. Eight selected files and their hashes are recorded in
+[the acquisition record](stage-3-evidence/cpython-31213-source-acquisition.json).
+The complete complexobject.c Git blob matches the exact official tag identity
+returned by gh-axi. Neither the earlier truncated API probe nor a Python runtime
+is an inference/build dependency. The source confirms that None uses the fixed
+hash `0xFCA86420`, and complex parts use their shared owning object's NaN hash.
+
+The ongoing scalar VM binding composes real scalar owners, source Unicode,
+None, tuples and the existing general mapping with the original stack machine.
+Default constructor bindings retain the already accepted abstract VM contract;
+the concrete scalar composition retains output/memo/stack aliases. Its caller
+oracle currently has **36** own byte streams and **37** loads, including malformed
+streams and a second load on the same unpickler. Decoder-side Latin-1 singleton
+reuse is implemented at the actual ASCII/UTF-8 decode boundary; general Unicode
+allocation is not reclassified as interning. Acceptance is not yet claimed for
+this follow-up. Missing-key repr, non-admitted object keys, globals/materializers,
+full exception frames, storages and whole-file loading remain explicit gates.
+
+
+The concrete scalar-unpickler selection now passes **6** isolated CPU tests:
+36 byte streams / 37 loads with exact output/memo/stack owner graphs, None's
+fixed hash and **260** decoder-owner cases, the retained **270** abstract VM
+cases, **57,897** decoding cases and both numeric-object regressions. All-target
+warnings-denied Clippy passes. The input record verified **1,334+189** inputs
+before the key-representation follow-up. Global/tensor/storage/file materializers
+and complete inner error-frame/recursion contexts remain open.
+
+Source inspection found a necessary exception-object detail for the next slice:
+raising KeyError must retain its key without calling repr. Formatting later may
+raise independently (for example after changing the interpreter's decimal digit
+limit). The ongoing native KeyError object therefore owns its args tuple and
+has a fallible deferred message protocol, integrated with retained exception
+roots. Diagnostic Display will use Python's uncaught-format fallback if __str__
+fails; exact Python str(exception) remains an explicit fallible operation. No
+new exception class, numeric tolerance or fallback loader is introduced.
+
+
+The first KeyError selection found an existing shared float-format mismatch:
+Rust Debug chose `-1640186312091859.3` where the locked CPython repr chooses
+`-1640186312091859.2`. The failed selection remains retained. The repair stays
+in the shared Rust formatter: it detects an exact binary/decimal midpoint using
+integer arithmetic, chooses the even shortest decimal only if that alternative
+also round-trips to the identical binary64 payload, and preserves asymmetric
+power-of-two intervals. No epsilon, alternate numerical criterion or test-side
+normalization is introduced. The original CPython dtoa mode-0 and pystrtod repr
+source were read from the same verified release archive; no native CPython code,
+allocator/debug branch or runtime is linked. A separate oracle now captures
+**130,334** repr values spanning every exponent, subnormal/NaN/infinite patterns,
+power-of-two boundaries, dense decimal midpoints and random mantissas. Its new
+native test must pass before this formatting repair is accepted.
+
+
+The repaired KeyError selection passes **7** isolated CPU tests, including
+all **130,334** float repr values, **4,230** scalar/Unicode key representations,
+**18** mutable digit-limit histories and the independent argument/traceback-root
+lifetime case. Existing scalar VM and exception context/frame regressions pass.
+All-target warnings-denied Clippy passes. **1,343+197** input fingerprints were
+verified before the constructor follow-up. The original failed selection remains
+failed; no table/string normalization is applied in the repaired assertions.
+Compound-key representation, recursion/frame ownership and complete args-setter
+sequence conversion remain required. The shared float repair changes text
+representation only, preserving f64 payloads and inference/autotuning policy.
+
+The next original builtin is complex(): typed positional expansion, exact
+single-complex identity, builtin integer-to-float overflow, signed/NaN payloads,
+Unicode decimal/space transformation, underscores and the original string grammar.
+The source oracle has **18,070** calls and **124** builtin float conversions;
+validation is pending. Non-builtin conversion hooks, kwargs/sequence expansion
+and live global registry authorization remain their explicit caller bindings.
+The scalar operation helper is not installed as an allowlist bypass or a hidden
+Python fallback. No H3 learned layer or shared product file is modified.
+
+
+The first complex-constructor selection reached a distinct source error path:
+invalid underscores raise `could not convert string to complex: <original repr>`
+in the shared underscore wrapper, while malformed inner grammar uses the
+separate `complex() arg is a malformed string` error. The original Unicode
+transform also truncates at the first nondecimal/nonspace non-ASCII character;
+NUL termination affects whether the underscore wrapper is entered. The native
+parser now follows those exact branches. The original failed selection is
+retained; no assertion or error-text criterion is relaxed. The expanded oracle
+adds all original Unicode decimal/whitespace code points and control boundaries:
+**1,118** inputs, **19,198** complex calls and **124** builtin float conversions.
+Repaired validation remains pending.
+
+
+The repaired constructor then exposed an operand-order issue for two different
+NaN payloads: LLVM commuted an ordinary Rust fadd. The reference's static
+`complex_new` ELF disassembly confirms ordered `addsd` and `subsd` operations;
+its exact binary hash and disassembly are retained separately. The native
+Linux/x86-64 binding now emits those ordered instructions, retaining both result
+bits and MXCSR behavior. Other architectures keep an explicit required binding
+instead of an approximate fallback. No criterion is changed: all sign/quiet/
+signaling payload bits remain exact assertions in the full constructor matrix.
+The previous two failed selections remain failed and retained. The reference
+Python library is inspected only as a static source/build artifact and is never
+linked or mounted into the native inference worker.
+
+
+The ordered constructor selection now passes the full **19,198-call** matrix
+and **124** builtin float conversions, including all original Unicode decimal/
+whitespace inputs and exact quiet/signaling/signed NaN payloads. All-target
+warnings-denied Clippy passes. **1,348+198** fingerprints were verified before
+the byte-object follow-up. Both earlier failed selections remain retained.
+The next scalar objects are immutable bytes (including original empty/character
+copy caches versus fresh allocation) and mutable bytearray payload owners. They
+must preserve binary type, hash/equality, deferred error representation and
+storage-tag ASCII errors through the unpickler; they are not converted to a
+Python-style list or text at the native value boundary. Generic buffer exports,
+raw constructor coercion, globals and whole checkpoint loading remain open.
+
+
+The first byte-object selection found that the locked bytearray repr escapes
+apostrophes even when it selects double quotes; immutable bytes repr does not.
+The native formatter now preserves that original distinction. The exact
+`Objects/bytearrayobject.c` was added to the source-only acquisition record;
+no Python library/runtime is linked. The failed selection remains retained,
+and the original assertions and **264** source histories are unchanged.
+
+The repaired byte-object selection passes **8** isolated CPU tests, including
+the unchanged 264 byte histories, **52 streams / 53 loads**, **19,218** complex
+calls, deferred KeyError owners, 130,334 float representations and the retained
+Unicode/abstract-VM regressions. All-target warnings-denied Clippy passes.
+The frozen candidate is `4b3b70da165fbbc02ea49f1f391ec783e6aad2c341b08ce5ee4a75718f8b312b`.
+The failed selection remains failed. No whole-loader or Stage 3 completion is
+claimed. The next caller gate is REDUCE's original live dictionary-values
+authorization and sparse registration around actual native calls; GLOBAL must
+still use its distinct live contains/item getters.
+
+The REDUCE selection passes **3** isolated CPU tests: **161** original-body
+histories, the retained **376** GLOBAL histories and the scalar VM owner graphs.
+The actual native complex constructor supplies the successful call results.
+Authorization walks live values with identity-before-rich-equality, detects
+size-changing mutations, re-reads `__self__` after hasattr and keeps the source
+argument-pop/result-replacement boundaries on every failure. Sparse registration
+is after the call and before stack replacement. All-target warnings-denied
+Clippy passes; **1,356+200** input fingerprints were verified. Callable argument
+binding, generic format/attribute/class protocols, complete defaults and whole
+checkpoint loading remain required concrete caller bindings.
+
+The next composition installs original GLOBAL/REDUCE policy as a reusable native
+VM materializer adapter. A concrete process-owned `complex` class retains class
+identity across aliases; it is invoked only after live authorization. This does
+not install a partial default registry. The caller owns the complete defaults,
+user registry and remaining reconstruction protocols. Typed general dictionaries
+now receive the same owned Unicode path key for both GLOBAL getter lookups;
+the existing string-only dictionary ABI remains supported.
+
+Source inspection also found that the VM read the name line before validating
+the module's UTF-8. The source validates each line before reading the next.
+Validation now occurs at those original positions; **eight** new malformed
+module/name streams preserve partial stack/memo state and exact byte positions.
+The expanded scalar oracle has **60 streams / 61 loads**. A separate **49-load**
+composition oracle uses the actual original builtin complex class, protocol-2
+name mapping, typed registries, disappearance between getters and REDUCE values
+authorization through a different alias. Validation of this composition is
+pending; no interpreter, model weight, GPU or shared product change is involved.
+
+That GLOBAL/REDUCE composition passes **5** isolated CPU tests, including all
+49 actual-class loads, 60 scalar streams / 61 loads, the original 161 REDUCE,
+376 GLOBAL and 270 abstract-VM cases. All-target warnings-denied Clippy passes.
+**1,357+200** input fingerprints were verified. NEWOBJ now follows its separate
+Parameter identity / user-values / default-values order and explicit __new__
+protocol, preserving sparse registration only on the non-Parameter branch.
+The expanded pending oracle contains **168 REDUCE + 196 NEWOBJ** controlled
+histories and **98** actual-class GLOBAL loads. AttributeError-subclass matching
+is an explicit caller class-metadata binding for hasattr; it is not guessed
+from diagnostic text. Complete dynamic protocols, BUILD and trained checkpoint
+materialization remain open.
+
+The NEWOBJ selection passes **7** isolated CPU tests, retaining the preceding
+GLOBAL/REDUCE and VM regressions while adding all **196 NEWOBJ** histories and
+**49** actual complex-class NEWOBJ loads. The REDUCE subset now includes **168**
+histories with exact AttributeError-subclass suppression. The original Parameter
+identity branch bypasses registry and sparse checks; the ordinary branch invokes
+the separate __new__ protocol. All-target warnings-denied Clippy passes, and
+**1,358+200** input fingerprints were verified. The special Parameter protocol
+uses controlled own call boundaries here, not a claim of trained Parameter or
+whole checkpoint materialization. BUILD is the next caller body.
+
+The BUILD policy now preserves the separate Tensor / Parameter / OrderedDict
+identity guards, then user-before-default type authorization. Its explicit
+native protocols retain separate hasattr/__setstate__ reads, tuple slot-state
+splitting, truth checks, ordered dictionary updates and live slot iteration.
+Previous slot key/value locals remain alive through the next iterator call;
+completed attribute mutations are not rolled back after a later failure.
+**190** original-body histories use own classes and mappings, including an
+AttributeError subclass and every exercised getter/caller failure boundary.
+No real Tensor/Parameter construction is claimed by those controlled protocols.
+The VM composition checks state-pop/instance-stack and memo identity. Validation
+is pending; complete source load-frame/cycle ownership and caller materializers
+remain open.
+
+The initial BUILD selection stopped at its memo-owner assertion: its test-side
+decoder had constructed legacy value-only None/int atoms instead of the actual
+native scalar owners established by the preceding gate. The fixture materializer
+now uses SourceNone/SourceNumber; the original identity assertion is unchanged.
+The failed selection remains retained and is not recorded as a successful gate.
+
+With concrete scalar owners the repaired BUILD selection passes **4** isolated
+CPU tests: all **190 BUILD** histories plus the 196 NEWOBJ, 168 REDUCE and 270
+abstract-VM regressions. The identity assertion and original data remain exact.
+All-target warnings-denied Clippy passes; **1,362+200** fingerprints were verified.
+The next concrete registry values are source-owned torch.dtype descriptors,
+including all shell/bit/quantized types outside tch::Kind. They must retain actual
+owner identity, original properties/errors and raw ATen codes; unsupported typed
+snapshot consumers must fail explicitly instead of coercing to a nearby dtype.
+
+The concrete dtype oracle now captures **46** scalar-code descriptors and **56**
+public aliases, original itemsize/floating/complex/signed/abbreviation properties,
+quantized/bit errors, real/complex conversions, complex-constructor type errors
+and default GLOBAL alias membership. Native descriptors use actual cached owners,
+generic identity hashing and the original ATen codes. The shared dtype-size and
+builtin dictionary/error protocols now consume them directly; only representable
+tch kinds cross the older Value::DType ABI. Other codes retain their typed
+descriptor and require a raw-code consumer. The test's dtype lookup component
+does not replace or reorder the complete source default registry. Validation is
+pending. Source set construction/iteration in that full registry is being checked
+separately before choosing any acceptance treatment; no new criterion is assumed.
+
+The dtype selection passes **7** isolated CPU tests, including all 46 descriptor
+families / 56 public aliases, shared dtype-size regressions, actual-class
+GLOBAL/REDUCE/NEWOBJ and BUILD restoration. All-target warnings-denied Clippy
+passes. The final shared-owner regression passes **18/18** tests on frozen
+candidate `0b51edbcf45842bfedb94f4c254b3a025f3a3348f905fb0414b6b3dade3b6839`;
+the final input record verifies **1,370+206** implementation/reference inputs.
+These are CPU synthetic checks, not trained-model or GPU acceptance, and not
+the complete Stage 3 registry gate.
+
+The complete weights-only registry reaches a new acceptance decision:
+[D-05-weights-global-identity-set-order](decisions/D-05-weights-global-identity-set-order.md).
+Nine unmodified-source reference processes with hashseed 0 yield different
+default register and rich-comparison orders under every repeated own fixture.
+A duplicate explicit safe-global alias actually selects both own functions,
+returning 1 and 2 across identical repetitions. This is reference-inherited
+execution/alias nondeterminism, not just string formatting. The proposal retains
+the original five set/hash algorithms and exact controlled-order results but
+would relax unconditional equality between independent heaps in this bounded
+path. That new criterion is **not approved or applied**. Full registry acceptance
+pauses for Tomas's explicit decision under design §14.2; no other approval or
+resource blocker is pending. H3 learned layers, shared product/UI and deployed
+workers remain untouched. All resumed core changes/evidence are uncommitted.
+
+Tomas subsequently replied **“ja”** to that exact bounded registry-order/alias
+question. D-05-WEIGHTS-GLOBAL-IDENTITY-SET-ORDER is now explicitly approved.
+Continue the original five set/hash constructions and require exact controlled
+hash/order results. No sorting, numerical tolerance, new algorithm or other
+exception is authorized. The approval is recorded separately from implementation
+and validation; complete Stage 3 remains open. Work resumes with source-faithful
+registry construction and controlled hash replay.
+
+The first approved replay ports the original `_new_dtypes` and tensor-rebuild
+set literals: evaluate every attribute operand before hashing, then execute the
+original forward-order BUILD_SET insertions without sorting. The exact identity
+table is restricted to owners with the original identity-equality contract;
+arbitrary user hash/equality/reentrancy is not silently treated as identity.
+**76** source-bytecode histories cover controlled hash collisions, negative
+hash normalization, duplicate owners and each getter/hash failure boundary.
+The real native dtype-owner binding is checked separately against those same
+literal paths.
+
+A no-argument registry cache follows the locked functools maxsize-one body:
+successful shared/mutable results, retries after errors, recursive inner cache
+publication while returning the distinct outer result, and cache_clear inside
+the builder. **Six** original cache histories retain exact counters and aliases.
+The CPython BUILD_SET, set and functools source files were extracted from the
+same verified 3.12.13 archive, with license and fingerprints preserved. No Python
+code/runtime is linked into the native worker. Validation of this slice is
+pending; full default/user builders and general dynamic owners remain open.
+
+The approved set/cache selection passes **3** isolated CPU tests: all 76 set
+histories, six cache histories and the concrete 46-dtype regression. All-target
+warnings-denied Clippy passes; **1,376+209** input fingerprints were verified.
+This is the bounded controlled-order gate, not complete registry construction.
+
+The complete original default-registry body is now ported with required real
+module/call/iterator providers. Initial literal values and short dtype/qscheme
+lists are evaluated eagerly. Legacy StorageType construction evaluates its RHS
+before the LHS module/name getters, including the independent later name read.
+Previous for-loop locals survive through the next iterator call, and named
+`rc/t/tt/ts/qt/f` owners are retained in the original function's error frame.
+**144** unmodified-source bytecode histories cover all observed getter/call/
+iterator/format/equality failures, reverse input order, key collisions, changing
+storage names and lone-surrogate keys. This validates the body with controlled
+actual provider protocols; it does not fabricate missing model/global objects.
+Validation is pending; concrete full registry materializers remain required.
+
+The complete default-body selection passes **4** isolated CPU tests, including
+all **144** construction histories plus the controlled set/cache and dtype
+regressions. All-target warnings-denied Clippy passes; **1,380+209** fingerprints
+were verified. Native cache composition and concrete full global constructors
+remain required before promoting this to full registry acceptance.
+
+The uncached user-registry body now preserves tuple-subclass protocols: repeated
+len calls in malformed-length errors, repeated indexing in type errors, separate
+unpack results (including a different name/function), and the original raw key
+rather than forced string conversion. Ordinary module/qualname getters both
+finish before updating named locals. **171** original-body histories retain
+exact ordered partial maps and `rc/f/name/module` exception roots. Validation is
+pending. General safe-set union/difference/mutation/GC and arbitrary runtime
+caller objects remain open; no approval beyond the recorded criterion is used.
+
+The user-body selection passes **4** isolated CPU tests, including all **171**
+user histories, 144 default histories and set/cache regressions. All-target
+warnings-denied Clippy passes; **1,384+209** inputs were verified. This closes
+the controlled builder bodies, not the remaining concrete safe-set/runtime
+constructor or whole-registry integration gates.
+
+The next native representation is a mutable general-key set with original
+hash/equality callbacks, table/dummy/resize behavior and sticky iterators.
+Callbacks run with no native table borrow held. Lookup restarts after changed
+table/key identity even after a positive comparison; add preserves the source's
+distinct immediate positive-result short circuit. **96** actual CPython set
+histories cover ordinary/colliding/negative/aliased hashes, callback errors,
+clear/remove/grow reentry, size-changing iterators and overwritten dummy slots.
+The latter reproduces an observed source reference leak without dropping the
+overwritten native owner; initialized own metadata only, no model weights.
+This slice exposes the typed hash-key kernels. Frozenset argument wrappers,
+union/difference, safe-global operators and general cycle collection remain
+required; no partial set API is promoted as complete. Validation is pending.
+
+The general-set kernel selection passes **4** isolated CPU tests, including all
+**96** source histories and the retained user-registry, scalar VM and dtype
+regressions. All-target warnings-denied Clippy passes; **1,388+209** fingerprints
+were verified. EMPTY_SET now constructs a real native set in ScalarBindings;
+the scalar graph oracle grows to **66 streams / 67 loads**, retaining distinct
+empty owners, memo aliases, unhashable keys and the original invalid-target
+type messages. Complex conversion rejects the exact native set type with the
+original first/second-argument errors.
+
+Exact-set copy/merge/union/intersection/difference now use source presizing,
+cached hashes, live internal table traversal, dummy compaction and source
+result/key release order on failures. **549** original operator histories cover
+both size-optimization branches, holes, collisions, aliases, negative hashes,
+self operands and every observed callback error. These typed exact-set kernels
+do not silently substitute for generic iterable/dict/frozenset wrappers.
+Validation of this combined slice is pending.
+
+The combined exact-set selection passes **4** isolated CPU tests, including
+all **549** operator histories, the **96** reentrant key histories,
+**66 streams / 67 loads** in the scalar VM and **171** user-registry histories.
+Warnings-denied all-target Clippy passes. The **1,390+209** source inputs
+were verified before execution. Candidate SHA256:
+`10eb19900781af79167733dfaf4af59a59bd4dbe9ec50137d5add065ba21c2d8`.
+This is a component gate, not complete Stage 3 acceptance.
+
+Exact immutable frozenset owners now retain original table copying, cached
+64-bit hash mixing, nested keys, rich set/frozenset equality and same-owner
+`copy()`. Public contains/discard/remove retry mutable-set keys as temporary
+frozensets only after the source TypeError, and missing remove retains the
+original argument in KeyError. Iterators retain their immutable owner. The
+**48** original histories and callback-cache oracle pass in a **4**-test
+isolated CPU selection with retained set-operator/scalar-VM regressions;
+warnings-denied all-target Clippy passes. **1,393+209** fingerprints verified.
+The first candidate had a test-only `unwrap_err` Debug-bound compilation error,
+fixed without changing oracle or acceptance requirements; the repaired input
+manifest and executable evidence are retained separately. General iterable,
+subclass/protocol, compound representation and cycle-collection contracts
+remain required; this is not complete registry or Stage 3 acceptance.
+
+The exact-set safe-global store now preserves old receiver capture before
+temporary construction, source union/difference, reentrant global rebinding,
+live caller lists, unchanged prior owners, atomic publication and original
+named argument roots on failure. Clearing publishes the fresh set before
+releasing the prior owner. **1,403** original Torch helper histories pass in
+a **4**-test isolated CPU selection, together with frozenset, set-operator and
+user-registry regressions. All-target warnings-denied Clippy passes; the repaired
+source record verifies **1,397+209** inputs. The initial candidate required an
+explicit Rust result type before it compiled; acceptance inputs are unchanged.
+This typed store still requires the concrete iterable/set constructor and
+context-class bindings, arbitrary runtime producers and remaining GC/loader
+integration. It does not claim completion of the approved registry criterion.
+
+Exact native set/frozenset construction now executes list/tuple, Unicode
+(including lone surrogates), bytes, live bytearray, exact-set/frozenset and
+general-dictionary paths. The dictionary path uses live `_PyDict_Next`-style
+stored hashes and original presizing. Frozenset construction from an exact
+frozenset returns that same owner. Unknown runtime classes require their real
+iterator protocol; no snapshot fallback is installed. **98** original
+constructor cases and the colliding dictionary hash/callback oracle pass in
+the **4**-test isolated CPU selection with store/frozenset regressions.
+Warnings-denied all-target Clippy passes; **1,401+209** source inputs verified.
+Concrete class owners/callers, general iterator protocols, context bindings
+and remaining full loader/GC gates are still open.
+
+Process-owned exact set/frozenset class objects now keep canonical identity,
+pointer hashing, key comparison and representation; the existing complex class
+uses the same real key boundary. Constructor and complex conversion preserve
+the original `type` errors. Safe-global store histories now invoke the real
+native set class and constructor rather than a fixture-only list loop. The
+class/constructor/store/scalar selection passes **4** isolated CPU tests.
+The first class-test build accessed a private type helper and was repaired;
+warnings-denied Clippy then identified three test-only redundant one-item
+slice clones, now corrected. Revalidation including context bodies is pending.
+No private/public API was widened to accommodate a test.
+
+The original safe-global context method bodies now preserve setter/getter
+dispatch, helper capture before attribute access, ignored helper results,
+None return and `self/safe_globals/type/value/tb` traceback roots. **24**
+original method histories (including helper replacement during a getter)
+pass in the **5**-test isolated selection with the repaired class, constructor,
+actual-constructor store and scalar VM regressions. All-target warnings-denied
+Clippy now passes; **1,405+209** fingerprints verified. Full concrete runtime
+class/attribute services, generic iterable dispatch and GC remain open.
+
+The generic set iterator kernel now preserves iter/next order without a length
+hint, original hash/comparison calls, partial update state, retained callback
+exception roots and iterator-before-current-key cleanup on add failure.
+**1,268** original iterable/constructor/update histories include exact key,
+iterator and result destruction order before/after traceback release. The
+**4**-test isolated CPU selection passes, with context/store/cached-hash
+regressions; warnings-denied all-target Clippy passes and **1,408+209**
+fingerprints verify. Actual arbitrary user-class iterator dispatch is still a
+required native producer, never a successful placeholder. Whole registry,
+loader, caller/class metadata and GC exit gates remain open.
+
+Remaining exact-set kernels now include symmetric difference/update,
+intersection update, subset/superset/disjoint predicates and pop. Pop preserves
+its original search cursor across clear and body swaps. **543** source
+operator histories and **18** pop/clear/swap sequences pass in the **4**-test
+isolated CPU selection with earlier operators, generic iterators and the
+safe-global store. Warnings-denied all-target Clippy passes;
+**1,410+209** fingerprints verified before execution. This is still a
+component gate, not full Stage 3 acceptance.
+
+### Required decision: corrupt-set cleanup
+
+While checking the original clear/destruction loops, a concrete discrepancy
+was found in the earlier reentrant dummy-slot case: `used=5` but only four
+active entries in an eight-slot smalltable. Three fresh bounded own-metadata
+processes reproduce the prefix and exit before cleanup. Original C cleanup
+has no table-end guard and necessarily reads beyond the valid table in that
+state; native owner release stays within the table. No unsafe cleanup/crash
+was executed by the new diagnostic.
+
+The previous 96-history source fixture's corrupt-case cleanup tail already
+executed that unsafe path. Its historical matching value is not a valid exact
+cleanup oracle; the valid cases and defined prefix remain separate evidence.
+Do not rerun that tail or silently rewrite its acceptance criterion. See
+[D-05-CPython-corrupted-set-cleanup](decisions/D-05-CPython-corrupted-set-cleanup.md)
+for the precise, **not yet approved** proposal. Dependent full registry/loader
+work now stops for Tomas's explicit decision. The latest valid-state checks
+remain passed; Stage 3 is not complete. No numerical/autotuning policy changed,
+no GPU work or production data read occurred, and no new commit/push was made.

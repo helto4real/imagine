@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "b5e385a55ed82437a4189833adeded15f6db6fa5bf0c27428e3a9a1258aeaff2",
+  "execution_root": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "shared_float_repr_tests::original_float_repr_preserves_shortest_nearest_even_decimal_ties_and_asymmetric_power_of_two_roundtrips",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/b5e385a55ed82437a4189833adeded15f6db6fa5bf0c27428e3a9a1258aeaff2/runs/83cb0630dfaa477f9a9261c18f1e4217/00-original_float_repr_preserves_shortest_nearest_even_decimal_ties_and_asymmetric_power_of_two_roundtrips.log",
+      "evidence": "00-original_float_repr_preserves_shortest_nearest_even_decimal_ties_and_asymmetric_power_of_two_roundtrips.json"
+    },
+    {
+      "name": "shared_key_error_tests::native_scalar_keyerrors_preserve_args_identity_exact_repr_and_deferred_mutable_decimal_limit",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/b5e385a55ed82437a4189833adeded15f6db6fa5bf0c27428e3a9a1258aeaff2/runs/83cb0630dfaa477f9a9261c18f1e4217/01-native_scalar_keyerrors_preserve_args_identity_exact_repr_and_deferred_mutable_decimal_limit.log",
+      "evidence": "01-native_scalar_keyerrors_preserve_args_identity_exact_repr_and_deferred_mutable_decimal_limit.json"
+    },
+    {
+      "name": "shared_key_error_tests::native_keyerror_owns_deferred_repr_argument_and_releases_exposed_args_independently_of_traceback_root",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/b5e385a55ed82437a4189833adeded15f6db6fa5bf0c27428e3a9a1258aeaff2/runs/83cb0630dfaa477f9a9261c18f1e4217/02-native_keyerror_owns_deferred_repr_argument_and_releases_exposed_args_independently_of_traceback_root.log",
+      "evidence": "02-native_keyerror_owns_deferred_repr_argument_and_releases_exposed_args_independently_of_traceback_root.json"
+    },
+    {
+      "name": "shared_scalar_unpickler_tests::weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/b5e385a55ed82437a4189833adeded15f6db6fa5bf0c27428e3a9a1258aeaff2/runs/83cb0630dfaa477f9a9261c18f1e4217/03-weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors.log",
+      "evidence": "03-weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors.json"
+    },
+    {
+      "name": "shared_exception_roots_tests::original_exception_context_cause_properties_identity_cycle_breaking_and_finally_root_retention",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/b5e385a55ed82437a4189833adeded15f6db6fa5bf0c27428e3a9a1258aeaff2/runs/83cb0630dfaa477f9a9261c18f1e4217/04-original_exception_context_cause_properties_identity_cycle_breaking_and_finally_root_retention.log",
+      "evidence": "04-original_exception_context_cause_properties_identity_cycle_breaking_and_finally_root_retention.json"
+    },
+    {
+      "name": "shared_exception_roots_tests::original_traceback_frame_clear_and_exposed_dictionary_preserve_independent_roots",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/b5e385a55ed82437a4189833adeded15f6db6fa5bf0c27428e3a9a1258aeaff2/runs/83cb0630dfaa477f9a9261c18f1e4217/05-original_traceback_frame_clear_and_exposed_dictionary_preserve_independent_roots.log",
+      "evidence": "05-original_traceback_frame_clear_and_exposed_dictionary_preserve_independent_roots.json"
+    },
+    {
+      "name": "shared_exception_roots_tests::retained_errors_preserve_identity_nested_frame_order_oom_dispatch_and_reentrant_release",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/b5e385a55ed82437a4189833adeded15f6db6fa5bf0c27428e3a9a1258aeaff2/runs/83cb0630dfaa477f9a9261c18f1e4217/06-retained_errors_preserve_identity_nested_frame_order_oom_dispatch_and_reentrant_release.log",
+      "evidence": "06-retained_errors_preserve_identity_nested_frame_order_oom_dispatch_and_reentrant_release.json"
+    }
+  ],
+  "result": "passed"
+}

@@ -108,3 +108,9 @@ pub mod conditioning_batch;
 
 pub mod python_hash;
 mod source_set;
+
+pub mod source_key_error;
+
+mod python_float_repr;
+
+mod python_float_ops;

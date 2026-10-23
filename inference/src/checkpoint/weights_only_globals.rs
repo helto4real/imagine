@@ -1,6 +1,10 @@
 //! Original GLOBAL policy; a contains test and its later item read use distinct
 //! live registry getter calls, as in the reference's cached/user dictionaries.
-use crate::{execution_value::Value, native::Error, patching::options::Options};
+use crate::{
+    execution_value::Value,
+    native::Error,
+    patching::options::{GeneralMapping, Options, SourceText},
+};
 type NamePair = (&'static str, &'static str);
 type NameMapping = (NamePair, NamePair);
 #[path = "weights_only_globals_data.rs"]
@@ -35,18 +39,30 @@ pub fn resolve(module: &str, name: &str, bindings: &mut dyn Bindings) -> Result<
             "Trying to load unsupported GLOBAL {path} whose module {module} is blocked."
         )));
     }
-    let key = Options::Atom(Value::Text(path.clone()));
+    let key = SourceText::from_utf8(&path);
+    // Preserve the typed Unicode key across both live getters. The older
+    // string-only map is still a supported typed ABI consumer.
+    let legacy_key = Options::Atom(Value::Text(path.clone()));
+    let key_for = |dictionary: &Options| {
+        if GeneralMapping::get(dictionary).is_some() {
+            &key
+        } else {
+            &legacy_key
+        }
+    };
     let allowed = bindings.allowed()?;
-    let present = allowed.contains_item(&key)?;
+    let present = allowed.contains_item(key_for(&allowed))?;
     drop(allowed);
     if present {
-        return bindings.allowed()?.item(&key);
+        let allowed = bindings.allowed()?;
+        return allowed.item(key_for(&allowed));
     }
     let user = bindings.user()?;
-    let present = user.contains_item(&key)?;
+    let present = user.contains_item(key_for(&user))?;
     drop(user);
     if present {
-        return bindings.user()?.item(&key);
+        let user = bindings.user()?;
+        return user.item(key_for(&user));
     }
     if let Some((_, message)) = data::SPECIAL
         .iter()

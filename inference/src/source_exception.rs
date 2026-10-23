@@ -205,7 +205,11 @@ impl Exception {
 }
 impl Error {
     pub fn is_reference(&self, class: &str) -> bool {
-        matches!(self.root(), Self::ReferenceException { class: actual, .. } if *actual == class)
+        match self.root() {
+            Self::ReferenceException { class: actual, .. } => *actual == class,
+            Self::KeyError(_) => class == "KeyError",
+            _ => false,
+        }
     }
     pub fn root(&self) -> &Self {
         match self {

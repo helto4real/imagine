@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "6ae4c12d86eedf5892ea8b9cd05dee7f035f9ccda59a2eb8c2f58ee04a7e1772",
+  "execution_root": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "shared_general_set_tests::original_general_set_key_kernels_preserve_fallible_callbacks_reentrant_positive_add_restart_rules_dummies_resizes_owners_and_sticky_iterators",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/6ae4c12d86eedf5892ea8b9cd05dee7f035f9ccda59a2eb8c2f58ee04a7e1772/runs/944e65fd02f7490890d831923534e773/00-original_general_set_key_kernels_preserve_fallible_callbacks_reentrant_positive_add_restart_rules_dummies_resizes_owners_and_sticky_iterators.log",
+      "evidence": "00-original_general_set_key_kernels_preserve_fallible_callbacks_reentrant_positive_add_restart_rules_dummies_resizes_owners_and_sticky_iterators.json"
+    },
+    {
+      "name": "shared_user_registry_tests::original_user_registry_body_preserves_uncached_live_iteration_tuple_subclasses_repeated_len_index_unpacked_names_partial_maps_and_exception_roots",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/6ae4c12d86eedf5892ea8b9cd05dee7f035f9ccda59a2eb8c2f58ee04a7e1772/runs/944e65fd02f7490890d831923534e773/01-original_user_registry_body_preserves_uncached_live_iteration_tuple_subclasses_repeated_len_index_unpacked_names_partial_maps_and_exception_roots.log",
+      "evidence": "01-original_user_registry_body_preserves_uncached_live_iteration_tuple_subclasses_repeated_len_index_unpacked_names_partial_maps_and_exception_roots.json"
+    },
+    {
+      "name": "shared_scalar_unpickler_tests::weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/6ae4c12d86eedf5892ea8b9cd05dee7f035f9ccda59a2eb8c2f58ee04a7e1772/runs/944e65fd02f7490890d831923534e773/02-weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors.log",
+      "evidence": "02-weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors.json"
+    },
+    {
+      "name": "shared_dtype_objects_tests::concrete_torch_dtype_owners_cover_all_scalar_codes_aliases_properties_original_errors_conversions_keys_and_global_membership_without_kind_coercion",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/6ae4c12d86eedf5892ea8b9cd05dee7f035f9ccda59a2eb8c2f58ee04a7e1772/runs/944e65fd02f7490890d831923534e773/03-concrete_torch_dtype_owners_cover_all_scalar_codes_aliases_properties_original_errors_conversions_keys_and_global_membership_without_kind_coercion.log",
+      "evidence": "03-concrete_torch_dtype_owners_cover_all_scalar_codes_aliases_properties_original_errors_conversions_keys_and_global_membership_without_kind_coercion.json"
+    }
+  ],
+  "result": "passed"
+}

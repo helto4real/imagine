@@ -17,6 +17,9 @@ pub trait DtypeSizeBindings {
 pub struct KindDtypeSizeBindings;
 impl DtypeSizeBindings for KindDtypeSizeBindings {
     fn equals(&self, value: &Options, dtype: Kind) -> Result<bool, Error> {
+        if let Some(value) = crate::checkpoint::dtype_objects::SourceDtype::get(value) {
+            return Ok(value.kind() == Some(dtype));
+        }
         match value {
             Options::Atom(V::DType(value)) => Ok(*value == dtype),
             _ => Err(Error::BindingGap {
@@ -26,6 +29,9 @@ impl DtypeSizeBindings for KindDtypeSizeBindings {
         }
     }
     fn itemsize(&self, value: &Options) -> Result<Options, Error> {
+        if let Some(value) = crate::checkpoint::dtype_objects::SourceDtype::get(value) {
+            return value.property("itemsize");
+        }
         match value {
             Options::Atom(V::DType(value)) => {
                 Ok(Options::Atom(V::Int(value.elt_size_in_bytes() as i64)))

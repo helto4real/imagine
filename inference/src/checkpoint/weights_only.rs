@@ -5,6 +5,21 @@ use crate::{execution_value::Value, native::Error, patching::options::Options};
 use std::{collections::HashMap, rc::Rc};
 
 pub trait Bindings {
+    fn none(&mut self) -> Result<Options, Error> {
+        Ok(Options::Atom(Value::None))
+    }
+    fn boolean(&mut self, value: bool) -> Result<Options, Error> {
+        Ok(Options::Atom(Value::Bool(value)))
+    }
+    fn integer(&mut self, value: i64) -> Result<Options, Error> {
+        Ok(Options::Atom(Value::Int(value)))
+    }
+    fn float(&mut self, value: f64) -> Result<Options, Error> {
+        Ok(Options::Atom(Value::Float(value)))
+    }
+    fn empty_dictionary(&mut self) -> Result<Options, Error> {
+        Ok(Options::dictionary(vec![]))
+    }
     fn global(&mut self, module: &[u8], name: &[u8]) -> Result<Options, Error>;
     fn new_object(&mut self, class: &Options, args: &Options) -> Result<Options, Error>;
     fn reduce(&mut self, function: &Options, args: &Options) -> Result<Options, Error>;
@@ -29,9 +44,6 @@ fn exception(class: &'static str, message: impl Into<String>) -> Error {
 }
 fn unpickling(message: impl Into<String>) -> Error {
     exception("UnpicklingError", message)
-}
-fn atom(value: Value) -> Options {
-    Options::Atom(value)
 }
 #[derive(Default)]
 pub struct Memo {
@@ -169,7 +181,11 @@ impl Unpickler {
                 b'c' => {
                     // readline()[:-1] discards the final byte even without LF.
                     let module = input.line_without_last();
+                    // The source decodes each line before reading the next;
+                    // invalid module UTF-8 must leave the name unread.
+                    crate::python_unicode_codec::utf8(module, false)?;
                     let name = input.line_without_last();
+                    crate::python_unicode_codec::utf8(name, false)?;
                     self.push(bindings.global(module, name)?);
                 }
                 0x81 => {
@@ -246,28 +262,28 @@ impl Unpickler {
                 }
                 0x86 => self.tuple_n(2)?,
                 0x87 => self.tuple_n(3)?,
-                b'N' => self.push(atom(Value::None)),
-                0x89 => self.push(atom(Value::Bool(false))),
-                0x88 => self.push(atom(Value::Bool(true))),
+                b'N' => self.push(bindings.none()?),
+                0x89 => self.push(bindings.boolean(false)?),
+                0x88 => self.push(bindings.boolean(true)?),
                 b')' => self.push(Options::Tuple(Rc::new(vec![]))),
                 b']' => self.push(Options::List(Default::default())),
-                b'}' => self.push(Options::dictionary(vec![])),
+                b'}' => self.push(bindings.empty_dictionary()?),
                 0x8f => self.push(bindings.empty_set()?),
                 b'J' => {
                     let bytes = input.fixed::<4>()?;
-                    self.push(atom(Value::Int(i32::from_le_bytes(bytes).into())));
+                    self.push(bindings.integer(i32::from_le_bytes(bytes).into())?);
                 }
                 b'K' => {
                     let value = input.byte()?;
-                    self.push(atom(Value::Int(value.into())));
+                    self.push(bindings.integer(value.into())?);
                 }
                 b'M' => {
                     let bytes = input.fixed::<2>()?;
-                    self.push(atom(Value::Int(u16::from_le_bytes(bytes).into())));
+                    self.push(bindings.integer(u16::from_le_bytes(bytes).into())?);
                 }
                 b'G' => {
                     let bytes = input.fixed::<8>()?;
-                    self.push(atom(Value::Float(f64::from_be_bytes(bytes))));
+                    self.push(bindings.float(f64::from_be_bytes(bytes))?);
                 }
                 b'X' => {
                     let length = u32::from_le_bytes(input.fixed::<4>()?) as usize;

@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "b9d3824ef2d6c9040769e7503003ee5f865efd8416d59184a30bebad15d0dc53",
+  "execution_root": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "shared_weights_reduce_tests::original_reduce_live_values_authorization_retains_rich_comparison_mutations_argument_pop_bound_self_reaccess_sparse_registration_and_failure_prefixes",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/b9d3824ef2d6c9040769e7503003ee5f865efd8416d59184a30bebad15d0dc53/runs/478626445d464abb9a75f4bce27e3cb1/00-original_reduce_live_values_authorization_retains_rich_comparison_mutations_argument_pop_bound_self_reaccess_sparse_registration_and_failure_prefixes.log",
+      "evidence": "00-original_reduce_live_values_authorization_retains_rich_comparison_mutations_argument_pop_bound_self_reaccess_sparse_registration_and_failure_prefixes.json"
+    },
+    {
+      "name": "shared_weights_globals_tests::original_restricted_global_policy_preserves_name_before_module_mapping_blocked_imports_two_live_registry_getters_none_aliases_disappearance_and_error_prefixes",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/b9d3824ef2d6c9040769e7503003ee5f865efd8416d59184a30bebad15d0dc53/runs/478626445d464abb9a75f4bce27e3cb1/01-original_restricted_global_policy_preserves_name_before_module_mapping_blocked_imports_two_live_registry_getters_none_aliases_disappearance_and_error_prefixes.log",
+      "evidence": "01-original_restricted_global_policy_preserves_name_before_module_mapping_blocked_imports_two_live_registry_getters_none_aliases_disappearance_and_error_prefixes.json"
+    },
+    {
+      "name": "shared_scalar_unpickler_tests::weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/b9d3824ef2d6c9040769e7503003ee5f865efd8416d59184a30bebad15d0dc53/runs/478626445d464abb9a75f4bce27e3cb1/02-weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors.log",
+      "evidence": "02-weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors.json"
+    }
+  ],
+  "result": "passed"
+}

@@ -8,6 +8,7 @@ pub struct SourceText {
     points: Vec<u32>,
 }
 thread_local! {
+    static LATIN1:Vec<Options>=(0_u32..=255).map(|v|MetadataObject::wrap(SourceText{points:vec![v]})).collect();
     static EMPTY: Options = MetadataObject::wrap(SourceText { points: vec![] });
 }
 impl SourceText {
@@ -32,6 +33,14 @@ impl SourceText {
             return Ok(EMPTY.with(Clone::clone));
         }
         Ok(MetadataObject::wrap(Self { points }))
+    }
+    /// CPython's ASCII/UTF-8 decoder returns cached single-character Latin-1
+    /// strings. General string allocation remains separate from decoding.
+    pub fn decoded_codepoints(points: Vec<u32>) -> Result<Options, Error> {
+        if points.len() == 1 && points[0] <= 255 {
+            return Ok(LATIN1.with(|v| v[points[0] as usize].clone()));
+        }
+        Self::from_codepoints(points)
     }
     pub fn get(value: &Options) -> Option<&Self> {
         let Options::Object(value) = value else {

@@ -133,6 +133,19 @@ impl GeneralDictionary {
             .map(|entry| (entry.key.clone(), entry.value.clone()))
             .collect()
     }
+    /// _PyDict_Next for exact-dict consumers. Walk the live entry array without
+    /// a public iterator's size guard and reuse the stored key hash.
+    pub fn next_key_hash(&self, position: &mut usize) -> Option<(Options, i64)> {
+        let data = self.0.borrow();
+        while *position < data.entries.len() {
+            let current = *position;
+            *position += 1;
+            if let Some(entry) = &data.entries[current] {
+                return Some((entry.key.clone(), entry.hash));
+            }
+        }
+        None
+    }
     pub fn layout(&self) -> DictionaryLayout {
         let data = self.0.borrow();
         DictionaryLayout {

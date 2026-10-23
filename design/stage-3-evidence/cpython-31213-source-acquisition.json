@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "source_url": "https://www.python.org/ftp/python/3.12.13/Python-3.12.13.tar.xz",
+  "archive_sha256": "c08bc65a81971c1dd5783182826503369466c7e67374d1646519adf05207b684",
+  "version": "3.12.13",
+  "not_runtime_dependency": true,
+  "files": {
+    "Objects/complexobject.c": {
+      "sha256": "646008be8d40e20058b3829ea948c3a720cdf7c93fd93302234c3b0574ef8078",
+      "git_blob": "eff173802984b6c298015d287891378cc575552d",
+      "bytes": 32273
+    },
+    "Objects/longobject.c": {
+      "sha256": "315c71c11dacfcffcbc33bc2d778533297f162438d02780ec02de569871a2879",
+      "git_blob": "c366034fe4bf90d7f2680647f38b47703a2080f3",
+      "bytes": 204954
+    },
+    "Objects/floatobject.c": {
+      "sha256": "d558f168de7ec864b64ffad7ee2b056bda4efca1ee68ca690189354b893ccc76",
+      "git_blob": "92d40e8acad48115573199dee44b6fdfebf5e737",
+      "bytes": 72465
+    },
+    "Objects/bytesobject.c": {
+      "sha256": "ba826eab3af4004103dd8ad99dff4ed6d23c35c516ec9fd773f77eddc4942c2d",
+      "git_blob": "dae84127a7df4b7aa2bb328285b733a9896bc01d",
+      "bytes": 104600
+    },
+    "Objects/object.c": {
+      "sha256": "59a16a78aa9a3da68a68b7efd99528c7b014e0ac0d4db8b55e0502e67bb604f9",
+      "git_blob": "706719116da3e2444106c1023bb610c8c0d64d05",
+      "bytes": 74419
+    },
+    "Objects/tupleobject.c": {
+      "sha256": "924295e1827f08034877cf0f61c475a4f9abdb8f333581726e6610366735c833",
+      "git_blob": "918654fae898e7dd1cd2d1c705b49fbb2b9bf1ec",
+      "bytes": 35261
+    },
+    "Include/internal/pycore_long.h": {
+      "sha256": "84c0c7bd7ba0c2fbbfb106561e32328e478d8350afe756af6a4862c95d921a06",
+      "git_blob": "64c00cb147548018897a39cd68cd4bdabc035c2b",
+      "bytes": 7805
+    },
+    "LICENSE": {
+      "sha256": "3b2f81fe21d181c499c59a256c8e1968455d6689d269aa85373bfb6af41da3bf",
+      "git_blob": "f26bcf4d2de6eb136e31006ca3ab447d5e488adf",
+      "bytes": 13936
+    },
+    "Python/errors.c": {
+      "sha256": "d38cf667e13fb9f298a278759daf6117167f45a08d2c5bae7f279d9ba86a2454",
+      "git_blob": "79cf4e07f3e0107560403bc2aae9a84a2c0be018",
+      "bytes": 55402
+    },
+    "Objects/unicodeobject.c": {
+      "sha256": "dd21107aaed90e06b85cae80de86f43f09e6c0bcb35b00037344cf96960bd431",
+      "git_blob": "5accbd6d1ddcbb4e314e4234e865d66651a8bec9",
+      "bytes": 468976
+    },
+    "Lib/traceback.py": {
+      "sha256": "2c44af2848836d9af0c7b3547469695cd22586c64274d362eafcf466af284bd6",
+      "git_blob": "6de428bf59bba8c9bd58b9350a5e4c62a7dfa440",
+      "bytes": 46393
+    },
+    "Objects/exceptions.c": {
+      "sha256": "623128614c3b2ada233875e3e0f0627b75653bc9042013d1e1cf242f3139e839",
+      "git_blob": "c579563db75275d8813fdc7e698299953f79313e",
+      "bytes": 110638
+    },
+    "Python/dtoa.c": {
+      "sha256": "4c55833dc0ea9eb7c396ed6da0c6a21406f6b4fa2d0c631c5f10c60f0f835e2e",
+      "bytes": 79610,
+      "git_blob": "564497f87bdb8edfe1cf815e54d118dfe1573515"
+    },
+    "Python/pystrtod.c": {
+      "sha256": "ee2682937b45e61b707819e614d7581dc669a9cd0c5a2e097a0f675ac5a06f1a",
+      "bytes": 41061,
+      "git_blob": "9bb060e3d11979cdb59aba2e29963e69cb0b4505"
+    },
+    "Include/internal/pycore_dtoa.h": {
+      "sha256": "c83a4aa972a4845cdf36abdac4769ea30e877aae1997fc4999d020bc3e183c1e",
+      "bytes": 1615,
+      "git_blob": "899d413b05e865d9d08da888213f3da2aff0eb7b"
+    },
+    "Include/internal/pycore_pymath.h": {
+      "sha256": "6dd3ea0f9a84bfa3a2eb0a2b7fa1af1dc8aadad3e74305e13f194a1586815376",
+      "bytes": 8600,
+      "git_blob": "7a4e1c1eb714f732a399baaecb81848b8d0f5527"
+    },
+    "Objects/bytearrayobject.c": {
+      "sha256": "371795e3559821c7b0870febca595adf370c5156f76acde0cf3530fed7a0bd1d",
+      "bytes": 73528,
+      "git_blob": "07c20ac63163cbb127ea9c42ff69a5df11fd3010"
+    },
+    "Python/bytecodes.c": {
+      "sha256": "f8c050621f1498d953d4898aaf29457e154620fec7f8bb987b4d3fde6f5a1d84",
+      "git_blob": "6ee3bda6f703bfb9859f3b118f8618e25cfae79c",
+      "bytes": 143622
+    },
+    "Objects/setobject.c": {
+      "sha256": "e633e7ae4e427ecead8879965910e27427d34ae0fc5b956142bc337f741a367c",
+      "git_blob": "763f9a3d204f533c28104280462b7f6d50beed45",
+      "bytes": 74585
+    },
+    "Modules/_functoolsmodule.c": {
+      "sha256": "91deca5b43b6a1d41bcb9ed3a180058c62ed3e84cac4093e19c320ca7e05615a",
+      "git_blob": "a6d1b83984bcfa5cc4e3c63ea1fbb3ddbea2901e",
+      "bytes": 46896
+    }
+  },
+  "complex_blob_identity_verified_with_gh_axi": true
+}

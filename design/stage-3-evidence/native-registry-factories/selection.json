@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "375392e49c1c32535ed2a3163a9da8f344ec944228a7ace50ab5e807e98cc23e",
+  "execution_root": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "shared_registry_factories_tests::original_registry_identity_literals_preserve_eager_getters_hash_failure_prefixes_collisions_aliases_and_exact_controlled_set_order",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/375392e49c1c32535ed2a3163a9da8f344ec944228a7ace50ab5e807e98cc23e/runs/7d22c10158b94244a267b9f02a3ef442/00-original_registry_identity_literals_preserve_eager_getters_hash_failure_prefixes_collisions_aliases_and_exact_controlled_set_order.log",
+      "evidence": "00-original_registry_identity_literals_preserve_eager_getters_hash_failure_prefixes_collisions_aliases_and_exact_controlled_set_order.json"
+    },
+    {
+      "name": "shared_registry_factories_tests::original_no_argument_registry_cache_preserves_mutable_aliases_errors_recursive_inner_winner_outer_return_clear_and_cache_statistics",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/375392e49c1c32535ed2a3163a9da8f344ec944228a7ace50ab5e807e98cc23e/runs/7d22c10158b94244a267b9f02a3ef442/01-original_no_argument_registry_cache_preserves_mutable_aliases_errors_recursive_inner_winner_outer_return_clear_and_cache_statistics.log",
+      "evidence": "01-original_no_argument_registry_cache_preserves_mutable_aliases_errors_recursive_inner_winner_outer_return_clear_and_cache_statistics.json"
+    },
+    {
+      "name": "shared_dtype_objects_tests::concrete_torch_dtype_owners_cover_all_scalar_codes_aliases_properties_original_errors_conversions_keys_and_global_membership_without_kind_coercion",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/375392e49c1c32535ed2a3163a9da8f344ec944228a7ace50ab5e807e98cc23e/runs/7d22c10158b94244a267b9f02a3ef442/02-concrete_torch_dtype_owners_cover_all_scalar_codes_aliases_properties_original_errors_conversions_keys_and_global_membership_without_kind_coercion.log",
+      "evidence": "02-concrete_torch_dtype_owners_cover_all_scalar_codes_aliases_properties_original_errors_conversions_keys_and_global_membership_without_kind_coercion.json"
+    }
+  ],
+  "result": "passed"
+}

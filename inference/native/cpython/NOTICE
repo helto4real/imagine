@@ -1,0 +1,7 @@
+The native CPython-compatible host-object/hash/dictionary/codec algorithms are
+source-mapped to CPython 3.12.13, with own differential fixtures executed by that
+exact development interpreter. CPython is not linked into the inference worker.
+The accompanying LICENSE is copied byte-for-byte from that release archive.
+See design/stage-3-evidence/cpython-31213-source-acquisition.json for its source
+URL, archive fingerprint and selected-file fingerprints. Additional existing
+source locks and per-selection evidence retain their original scopes.

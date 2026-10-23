@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "1e25e83bddf5f999925c193da66a9b98cdfb8a9129acdd4f12b0b7c4a39493c6",
+  "execution_root": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "shared_general_set_tests::original_remaining_exact_set_operators_predicates_pop_cursor_clear_and_body_swap_preserve_order_errors_and_partial_mutations",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/1e25e83bddf5f999925c193da66a9b98cdfb8a9129acdd4f12b0b7c4a39493c6/runs/bc006cfcd3374bc49aa712533d7c6e3e/00-original_remaining_exact_set_operators_predicates_pop_cursor_clear_and_body_swap_preserve_order_errors_and_partial_mutations.log",
+      "evidence": "00-original_remaining_exact_set_operators_predicates_pop_cursor_clear_and_body_swap_preserve_order_errors_and_partial_mutations.json"
+    },
+    {
+      "name": "shared_general_set_tests::original_set_copy_merge_union_intersection_difference_preserve_cached_hashes_holes_resize_thresholds_aliases_and_partial_error_prefixes",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/1e25e83bddf5f999925c193da66a9b98cdfb8a9129acdd4f12b0b7c4a39493c6/runs/bc006cfcd3374bc49aa712533d7c6e3e/01-original_set_copy_merge_union_intersection_difference_preserve_cached_hashes_holes_resize_thresholds_aliases_and_partial_error_prefixes.log",
+      "evidence": "01-original_set_copy_merge_union_intersection_difference_preserve_cached_hashes_holes_resize_thresholds_aliases_and_partial_error_prefixes.json"
+    },
+    {
+      "name": "shared_set_iterable_tests::original_generic_set_iterable_path_preserves_next_hash_comparisons_partial_updates_exception_roots_and_iterator_key_result_release_order",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/1e25e83bddf5f999925c193da66a9b98cdfb8a9129acdd4f12b0b7c4a39493c6/runs/bc006cfcd3374bc49aa712533d7c6e3e/02-original_generic_set_iterable_path_preserves_next_hash_comparisons_partial_updates_exception_roots_and_iterator_key_result_release_order.log",
+      "evidence": "02-original_generic_set_iterable_path_preserves_next_hash_comparisons_partial_updates_exception_roots_and_iterator_key_result_release_order.json"
+    },
+    {
+      "name": "shared_safe_globals_tests::original_safe_global_store_preserves_captured_receivers_live_lists_nested_removal_reentrant_rebinding_and_partial_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/1e25e83bddf5f999925c193da66a9b98cdfb8a9129acdd4f12b0b7c4a39493c6/runs/bc006cfcd3374bc49aa712533d7c6e3e/03-original_safe_global_store_preserves_captured_receivers_live_lists_nested_removal_reentrant_rebinding_and_partial_errors.log",
+      "evidence": "03-original_safe_global_store_preserves_captured_receivers_live_lists_nested_removal_reentrant_rebinding_and_partial_errors.json"
+    }
+  ],
+  "result": "passed"
+}

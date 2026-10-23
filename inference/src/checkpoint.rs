@@ -22,6 +22,8 @@ pub mod model_registry;
 mod prepared;
 pub mod rebuild_versions;
 mod registry_data;
+pub mod safe_global_context;
+pub mod safe_globals;
 pub mod state_dict;
 pub mod storage_rebuild;
 pub mod torch_archive;
@@ -452,3 +454,18 @@ fn header_decode_error(error: Error, path: &Path) -> Error {
         .expect("an exception is a valid explicit cause");
     Error::Retained(raised)
 }
+
+pub mod builtin_keys;
+pub mod scalar_bindings;
+
+pub mod builtin_scalar_ops;
+pub mod builtin_set_ops;
+pub mod default_registry;
+pub mod dtype_objects;
+pub mod registry_cache;
+pub mod registry_sets;
+pub mod restricted_bindings;
+pub mod user_registry;
+pub mod weights_only_build;
+pub mod weights_only_newobj;
+pub mod weights_only_reduce;

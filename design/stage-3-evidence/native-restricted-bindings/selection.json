@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "becb350a9405639c0606f3e9a9537b61cd5785bf78115533753e138701158c53",
+  "execution_root": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "shared_weights_reduce_tests::concrete_complex_global_reduce_binding_preserves_class_identity_alias_authorization_live_registry_changes_and_original_stream_failures",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/becb350a9405639c0606f3e9a9537b61cd5785bf78115533753e138701158c53/runs/75b92367e1914691b4cd62ba15383013/00-concrete_complex_global_reduce_binding_preserves_class_identity_alias_authorization_live_registry_changes_and_original_stream_failures.log",
+      "evidence": "00-concrete_complex_global_reduce_binding_preserves_class_identity_alias_authorization_live_registry_changes_and_original_stream_failures.json"
+    },
+    {
+      "name": "shared_weights_reduce_tests::original_reduce_live_values_authorization_retains_rich_comparison_mutations_argument_pop_bound_self_reaccess_sparse_registration_and_failure_prefixes",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/becb350a9405639c0606f3e9a9537b61cd5785bf78115533753e138701158c53/runs/75b92367e1914691b4cd62ba15383013/01-original_reduce_live_values_authorization_retains_rich_comparison_mutations_argument_pop_bound_self_reaccess_sparse_registration_and_failure_prefixes.log",
+      "evidence": "01-original_reduce_live_values_authorization_retains_rich_comparison_mutations_argument_pop_bound_self_reaccess_sparse_registration_and_failure_prefixes.json"
+    },
+    {
+      "name": "shared_weights_globals_tests::original_restricted_global_policy_preserves_name_before_module_mapping_blocked_imports_two_live_registry_getters_none_aliases_disappearance_and_error_prefixes",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/becb350a9405639c0606f3e9a9537b61cd5785bf78115533753e138701158c53/runs/75b92367e1914691b4cd62ba15383013/02-original_restricted_global_policy_preserves_name_before_module_mapping_blocked_imports_two_live_registry_getters_none_aliases_disappearance_and_error_prefixes.log",
+      "evidence": "02-original_restricted_global_policy_preserves_name_before_module_mapping_blocked_imports_two_live_registry_getters_none_aliases_disappearance_and_error_prefixes.json"
+    },
+    {
+      "name": "shared_scalar_unpickler_tests::weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/becb350a9405639c0606f3e9a9537b61cd5785bf78115533753e138701158c53/runs/75b92367e1914691b4cd62ba15383013/03-weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors.log",
+      "evidence": "03-weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors.json"
+    },
+    {
+      "name": "shared_weights_only_tests::original_restricted_unpickler_byte_machine_preserves_primitives_memo_cycles_stack_mark_partial_errors_warnings_positions_and_repeated_loads",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/becb350a9405639c0606f3e9a9537b61cd5785bf78115533753e138701158c53/runs/75b92367e1914691b4cd62ba15383013/04-original_restricted_unpickler_byte_machine_preserves_primitives_memo_cycles_stack_mark_partial_errors_warnings_positions_and_repeated_loads.log",
+      "evidence": "04-original_restricted_unpickler_byte_machine_preserves_primitives_memo_cycles_stack_mark_partial_errors_warnings_positions_and_repeated_loads.json"
+    }
+  ],
+  "result": "passed"
+}

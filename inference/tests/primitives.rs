@@ -24,6 +24,18 @@ mod native_av_preprocessing_tests;
 mod native_av_streams_tests;
 #[path = "support/native_av_tokenizer.rs"]
 mod native_av_tokenizer_tests;
+#[path = "support/shared_byte_objects.rs"]
+mod shared_byte_objects_tests;
+#[path = "support/shared_complex_constructor.rs"]
+mod shared_complex_constructor_tests;
+#[path = "support/shared_float_repr.rs"]
+mod shared_float_repr_tests;
+#[path = "support/shared_key_error.rs"]
+mod shared_key_error_tests;
+#[path = "support/shared_numeric_objects.rs"]
+mod shared_numeric_objects_tests;
+#[path = "support/shared_scalar_unpickler.rs"]
+mod shared_scalar_unpickler_tests;
 use imagine_inference::{
     eager,
     native::{KernelArg, Kitchen},
@@ -37,10 +49,18 @@ mod native_av_component_tests;
 mod shared_ar_video_tests;
 #[path = "support/shared_checkpoint_headers.rs"]
 mod shared_checkpoint_headers_tests;
+#[path = "support/shared_default_registry.rs"]
+mod shared_default_registry_tests;
 #[path = "support/shared_dpm_call.rs"]
 mod shared_dpm_call_tests;
+#[path = "support/shared_dtype_objects.rs"]
+mod shared_dtype_objects_tests;
 #[path = "support/shared_exception_roots.rs"]
 mod shared_exception_roots_tests;
+#[path = "support/shared_frozen_set.rs"]
+mod shared_frozen_set_tests;
+#[path = "support/shared_general_set.rs"]
+mod shared_general_set_tests;
 #[path = "support/shared_inpaint_state.rs"]
 mod shared_inpaint_state_tests;
 #[path = "support/shared_lora_host_metadata.rs"]
@@ -59,8 +79,14 @@ mod shared_patch_binding_gap_tests;
 mod shared_public_sample_tests;
 #[path = "support/shared_rebuild_versions.rs"]
 mod shared_rebuild_versions_tests;
+#[path = "support/shared_registry_factories.rs"]
+mod shared_registry_factories_tests;
 #[path = "support/shared_runtime_errors.rs"]
 mod shared_runtime_errors_tests;
+#[path = "support/shared_safe_global_context.rs"]
+mod shared_safe_global_context_tests;
+#[path = "support/shared_safe_globals.rs"]
+mod shared_safe_globals_tests;
 #[path = "support/shared_sampler_argument_roots.rs"]
 mod shared_sampler_argument_roots_tests;
 #[path = "support/shared_sampler_factory.rs"]
@@ -69,6 +95,10 @@ mod shared_sampler_factory_tests;
 mod shared_sampler_state_tests;
 #[path = "support/shared_sde_prelude.rs"]
 mod shared_sde_prelude_tests;
+#[path = "support/shared_set_constructors.rs"]
+mod shared_set_constructors_tests;
+#[path = "support/shared_set_iterable.rs"]
+mod shared_set_iterable_tests;
 #[path = "support/shared_shape_metadata.rs"]
 mod shared_shape_metadata_tests;
 #[path = "support/shared_storage_rebuild.rs"]
@@ -79,10 +109,16 @@ mod shared_tensor_host_tests;
 mod shared_torch_archive_tests;
 #[path = "support/shared_unicode_decode.rs"]
 mod shared_unicode_decode_tests;
+#[path = "support/shared_user_registry.rs"]
+mod shared_user_registry_tests;
+#[path = "support/shared_weights_build.rs"]
+mod shared_weights_build_tests;
 #[path = "support/shared_weights_globals.rs"]
 mod shared_weights_globals_tests;
 #[path = "support/shared_weights_only.rs"]
 mod shared_weights_only_tests;
+#[path = "support/shared_weights_reduce.rs"]
+mod shared_weights_reduce_tests;
 
 #[path = "support/shared_pin_registry.rs"]
 mod shared_pin_registry_tests;

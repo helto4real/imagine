@@ -19,6 +19,15 @@ pub use mapping::{GeneralMapping, MappingKeyBindings};
 #[path = "options_text.rs"]
 mod source_text;
 pub use source_text::SourceText;
+#[path = "options_number.rs"]
+mod source_number;
+pub use source_number::{NumericKeyBindings, SourceNone, SourceNumber};
+#[path = "options_bytes.rs"]
+mod source_bytes;
+pub use source_bytes::{SourceByteArray, SourceBytes};
+#[path = "options_set.rs"]
+mod source_set;
+pub use source_set::{FrozenSet, GeneralSet, GeneralSetIterator, WeakGeneralSet, set_equal};
 #[path = "options_metadata.rs"]
 mod metadata;
 pub(crate) use metadata::{MetadataObject, MetadataValue};

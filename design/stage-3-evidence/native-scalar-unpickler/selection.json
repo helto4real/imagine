@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "scope": "selected synthetic primitive tests",
+  "stage3_registry_complete": false,
+  "trained_model_weights": 0,
+  "binary_sha256": "be6049865242cc5f59a3774fa1fdbcfb5acbefadff45d4aaab179d1d8748487c",
+  "execution_root": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020",
+  "cpu_only": true,
+  "tests": [
+    {
+      "name": "shared_scalar_unpickler_tests::weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/be6049865242cc5f59a3774fa1fdbcfb5acbefadff45d4aaab179d1d8748487c/runs/062200069d004313a4dcd9791dd671a7/00-weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors.log",
+      "evidence": "00-weights_only_scalar_constructors_preserve_real_builtin_owners_memo_stacks_keys_and_original_errors.json"
+    },
+    {
+      "name": "shared_scalar_unpickler_tests::concrete_none_hash_and_decoder_singletons_match_locked_cpython_without_interning_general_allocations",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/be6049865242cc5f59a3774fa1fdbcfb5acbefadff45d4aaab179d1d8748487c/runs/062200069d004313a4dcd9791dd671a7/01-concrete_none_hash_and_decoder_singletons_match_locked_cpython_without_interning_general_allocations.log",
+      "evidence": "01-concrete_none_hash_and_decoder_singletons_match_locked_cpython_without_interning_general_allocations.json"
+    },
+    {
+      "name": "shared_weights_only_tests::original_restricted_unpickler_byte_machine_preserves_primitives_memo_cycles_stack_mark_partial_errors_warnings_positions_and_repeated_loads",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/be6049865242cc5f59a3774fa1fdbcfb5acbefadff45d4aaab179d1d8748487c/runs/062200069d004313a4dcd9791dd671a7/02-original_restricted_unpickler_byte_machine_preserves_primitives_memo_cycles_stack_mark_partial_errors_warnings_positions_and_repeated_loads.log",
+      "evidence": "02-original_restricted_unpickler_byte_machine_preserves_primitives_memo_cycles_stack_mark_partial_errors_warnings_positions_and_repeated_loads.json"
+    },
+    {
+      "name": "shared_unicode_decode_tests::original_cpython_utf8_strict_surrogatepass_and_ascii_preserve_codepoints_and_complete_error_messages_at_all_byte_boundaries",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/be6049865242cc5f59a3774fa1fdbcfb5acbefadff45d4aaab179d1d8748487c/runs/062200069d004313a4dcd9791dd671a7/03-original_cpython_utf8_strict_surrogatepass_and_ascii_preserve_codepoints_and_complete_error_messages_at_all_byte_boundaries.log",
+      "evidence": "03-original_cpython_utf8_strict_surrogatepass_and_ascii_preserve_codepoints_and_complete_error_messages_at_all_byte_boundaries.json"
+    },
+    {
+      "name": "shared_numeric_objects_tests::native_numeric_objects_match_cpython_cache_payload_truth_exact_integer_and_key_hashes",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/be6049865242cc5f59a3774fa1fdbcfb5acbefadff45d4aaab179d1d8748487c/runs/062200069d004313a4dcd9791dd671a7/04-native_numeric_objects_match_cpython_cache_payload_truth_exact_integer_and_key_hashes.log",
+      "evidence": "04-native_numeric_objects_match_cpython_cache_payload_truth_exact_integer_and_key_hashes.json"
+    },
+    {
+      "name": "shared_numeric_objects_tests::native_numeric_dictionary_retains_original_first_key_owners_cross_type_collisions_and_distinct_nan_keys",
+      "returncode": 0,
+      "log": "/home/thhel/ChatGPT/imagine/comfyui/stage3-core-20261020/stage3-validation/be6049865242cc5f59a3774fa1fdbcfb5acbefadff45d4aaab179d1d8748487c/runs/062200069d004313a4dcd9791dd671a7/05-native_numeric_dictionary_retains_original_first_key_owners_cross_type_collisions_and_distinct_nan_keys.log",
+      "evidence": "05-native_numeric_dictionary_retains_original_first_key_owners_cross_type_collisions_and_distinct_nan_keys.json"
+    }
+  ],
+  "result": "passed"
+}

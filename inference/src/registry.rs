@@ -166,7 +166,7 @@ pub(crate) fn python_float(value: f64) -> String {
     }
     // Debug retains the .0 and signed zero of a float. Python also spells
     // exponents with a sign and at least two digits.
-    let text = format!("{value:?}");
+    let text = crate::python_float_repr::shortest(value);
     if let Some((mantissa, exponent)) = text.split_once('e') {
         let exponent: i32 = exponent.parse().unwrap();
         format!("{mantissa}e{exponent:+03}")

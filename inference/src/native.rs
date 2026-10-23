@@ -18,6 +18,7 @@ pub enum Error {
         operation: String,
     },
     Native(String),
+    KeyError(std::rc::Rc<crate::source_key_error::KeyError>),
     ReferenceException {
         class: &'static str,
         message: String,
@@ -376,6 +377,10 @@ impl std::fmt::Display for Error {
                 write!(f, "Unbound development operation {backend}:{operation}")
             }
             Self::Native(message) => f.write_str(message),
+            Self::KeyError(error) => match error.message() {
+                Ok(message) => f.write_str(&message),
+                Err(_) => f.write_str("<exception str() failed>"),
+            },
             Self::ReferenceException { message, .. } => f.write_str(message),
             Self::AcceleratorException { message, .. } => f.write_str(message),
             Self::Torch(error) => error.fmt(f),
