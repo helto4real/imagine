@@ -1084,3 +1084,39 @@ mod storage_tests {
         assert!(!home.join(".config").exists());
     }
 }
+
+/// A readable sentence for a private-storage error code; other text is kept.
+pub fn storage_message(error: &str) -> String {
+    match error {
+        "private_storage_unavailable"
+        | "video_volume_not_mounted"
+        | "video_destination_unavailable" => {
+            "The encrypted Imagine volume is not available. Mount it, then restart Imagine.".into()
+        }
+        "video_volume_mismatch" => {
+            "Another volume is mounted where the encrypted Imagine volume is expected.".into()
+        }
+        "video_destination_read_only" | "video_destination_not_writable" => {
+            "The encrypted Imagine volume is read-only.".into()
+        }
+        "video_destination_invalid" => "The Imagine storage folder is invalid.".into(),
+        "private_storage_read_failed" => "Could not read the private settings.".into(),
+        "private_storage_write_failed" => "Could not write the private settings.".into(),
+        "private_storage_write_unconfirmed" => {
+            "Could not confirm that the private settings were written.".into()
+        }
+        "runtime_directory_unavailable" => "The runtime directory is unavailable.".into(),
+        other => other.into(),
+    }
+}
+#[cfg(test)]
+mod storage_message_tests {
+    #[test]
+    fn storage_codes_become_sentences_and_other_text_is_kept() {
+        assert!(super::storage_message("private_storage_unavailable").starts_with("The encrypted"));
+        assert_eq!(
+            super::storage_message("Own readable error."),
+            "Own readable error."
+        );
+    }
+}

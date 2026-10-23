@@ -218,7 +218,7 @@ impl ImagineApp {
             self.prefs.output_folder.clear();
         }
         self.preferences_store = store;
-        self.settings_error = warning;
+        self.settings_error = warning.map(|w| crate::settings::storage_message(&w));
         self
     }
     fn desk_for(&self, workspace: Workspace) -> &GenerationDesk {
@@ -237,6 +237,14 @@ impl ImagineApp {
     }
     fn desk(&self) -> &GenerationDesk {
         self.desk_for(self.workspace)
+    }
+    /// Show an error where the user is looking; Video has no generation desk.
+    fn report_error(&mut self, message: String) {
+        if self.workspace == Workspace::Video {
+            self.timeline_report_error(message);
+        } else {
+            self.desk_mut().error = Some(message);
+        }
     }
     fn desk_mut(&mut self) -> &mut GenerationDesk {
         self.desk_for_mut(self.workspace)
@@ -358,7 +366,7 @@ impl ImagineApp {
                     }
                 }
                 Message::ClipboardFailed => {
-                    self.desk_mut().error = Some("Could not preserve the clipboard after closing Imagine. Keep the app open and copy again.".into());
+                    self.report_error("Could not preserve the clipboard after closing Imagine. Keep the app open and copy again.".into());
                 }
                 Message::Connected(value) => {
                     self.connecting = false;
@@ -436,7 +444,14 @@ impl ImagineApp {
                             texture,
                         });
                     }
-                    Err(e) => self.desk_for_mut(workspace).error = Some(e.message),
+                    Err(e) => {
+                        // Keep every failed file of one upload batch, not just the last.
+                        let state = self.desk_for_mut(workspace);
+                        state.error = Some(match state.error.take() {
+                            Some(earlier) if state.uploading => format!("{earlier}\n{}", e.message),
+                            _ => e.message,
+                        });
+                    }
                 },
                 Message::UploadsFinished(workspace) => {
                     self.desk_for_mut(workspace).uploading = false
@@ -450,7 +465,10 @@ impl ImagineApp {
                     self.prefs = prefs;
                     self.settings_error =
                         self.preferences_store.save(&self.prefs).err().map(|error| {
-                            format!("Folder choice is kept in memory but was not saved: {error}")
+                            format!(
+                                "Folder choice is kept in memory but was not saved. {}",
+                                crate::settings::storage_message(&error.to_string())
+                            )
                         });
                 }
                 Message::Folder(None) => self.picking_folder = false,
@@ -735,11 +753,12 @@ impl ImagineApp {
             self.settings_error = Some("Enter a finite LoRA strength before saving.".into());
             return;
         }
-        self.settings_error = self
-            .preferences_store
-            .save(&self.prefs)
-            .err()
-            .map(|error| format!("Settings are kept in memory but were not saved: {error}"));
+        self.settings_error = self.preferences_store.save(&self.prefs).err().map(|error| {
+            format!(
+                "Settings are kept in memory but were not saved. {}",
+                crate::settings::storage_message(&error.to_string())
+            )
+        });
     }
 }
 

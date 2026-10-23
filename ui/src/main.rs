@@ -1,12 +1,32 @@
-use anyhow::{Context, Result};
+#[cfg(feature = "ui-preview")]
+use anyhow::Context;
+use anyhow::Result;
 use imagine_ui::{
     app::ImagineApp,
     settings::{Connection, DEFAULT_API_URL, PreferencesStore},
 };
 use std::path::PathBuf;
+const USAGE: &str =
+    "imagine-ui [--project PATH] [--api http://127.0.0.1:8189/imagine] [--title TITLE]";
+/// A command-line mistake. Only these are printed; other startup errors can
+/// name private paths and stay generic.
+#[derive(Debug)]
+struct Usage(String);
+impl std::fmt::Display for Usage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+impl std::error::Error for Usage {}
+fn usage(message: impl Into<String>) -> anyhow::Error {
+    Usage(message.into()).into()
+}
 fn main() {
-    if run().is_err() {
-        eprintln!("Imagine UI could not start or close successfully.");
+    if let Err(error) = run() {
+        match error.downcast_ref::<Usage>() {
+            Some(usage) => eprintln!("imagine-ui: {usage}\n{USAGE}"),
+            None => eprintln!("Imagine UI could not start or close successfully."),
+        }
         std::process::exit(1);
     }
 }
@@ -65,18 +85,27 @@ fn run() -> Result<()> {
                     args.next().context("--qa-script needs a path")?,
                 ))
             }
-            "--project" => project = PathBuf::from(args.next().context("--project needs a path")?),
-            "--api" => url = args.next().context("--api needs a URL")?,
-            "--title" => title = args.next().context("--title needs a window title")?,
+            "--project" => {
+                project = PathBuf::from(args.next().ok_or_else(|| usage("--project needs a path"))?)
+            }
+            "--api" => url = args.next().ok_or_else(|| usage("--api needs a URL"))?,
+            "--title" => {
+                title = args
+                    .next()
+                    .ok_or_else(|| usage("--title needs a window title"))?
+            }
             "--help" => {
-                println!(
-                    "imagine-ui [--project PATH] [--api http://127.0.0.1:8189/imagine] [--title TITLE]"
-                );
+                println!("{USAGE}");
                 return Ok(());
             }
-            _ => anyhow::bail!("Unknown option: {arg}"),
+            _ => return Err(usage(format!("Unknown option: {arg}"))),
         }
     }
+    // Checked before any settings are opened.
+    let connection = Connection { url };
+    connection
+        .validate()
+        .map_err(|error| usage(error.to_string()))?;
     let project = project.canonicalize()?;
     // Only explicit QA inputs use the old source-owned fixture API. The normal
     // entry never reads project/.imagine/ui-settings.json or migrates user data.
@@ -99,8 +128,6 @@ fn run() -> Result<()> {
         PreferencesStore::system()?
     };
     let (prefs, settings_warning) = settings_store.load()?;
-    let connection = Connection { url };
-    connection.validate()?;
     let mut options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_title(title.clone())

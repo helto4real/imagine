@@ -129,6 +129,9 @@ impl ImagineApp {
             })
             .map_or_else(|| "Video scene".into(), |n| format!("Scene {}", n + 1))
     }
+    pub(in crate::app) fn timeline_report_error(&mut self, message: String) {
+        self.timeline.error = Some(message);
+    }
     /// The video service was checked and no session could be opened.
     pub(in crate::app) fn timeline_unreachable(&self) -> bool {
         self.timeline.session_checked && self.timeline.session.is_none() && !self.timeline.busy

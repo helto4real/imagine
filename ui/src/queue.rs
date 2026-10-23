@@ -468,7 +468,7 @@ impl ImagineApp {
                             .and_then(|r| r.elapsed);
                         self.show_queue_result(ctx, id, done, elapsed);
                     }
-                    Err(error) => self.image.error = Some(error),
+                    Err(error) => self.report_error(error),
                     _ => {}
                 }
             }
