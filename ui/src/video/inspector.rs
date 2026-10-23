@@ -97,15 +97,21 @@ impl ImagineApp {
                         *count += 1;
                         let ordinal = *count;
                         ui.group(|ui| {
-                            ui.label(format!(
-                                "{} {}",
-                                match asset.kind {
-                                    MediaKind::Image => "Image",
-                                    MediaKind::Video => "Video",
-                                    MediaKind::Audio => "Audio",
-                                },
-                                ordinal
-                            ));
+                            // Media names are often file names; they follow Hide previews.
+                            let kind = match asset.kind {
+                                MediaKind::Image => "Image",
+                                MediaKind::Video => "Video",
+                                MediaKind::Audio => "Audio",
+                            };
+                            let name = if asset.name.is_empty()
+                                || !helto::reveal_in_viewport(ui, self.prefs.privacy_mode)
+                            {
+                                format!("{kind} {ordinal}")
+                            } else {
+                                asset.name.clone()
+                            };
+                            ui.add(egui::Label::new(name).truncate());
+                            self.timeline_thumbnail(ui, d, asset);
                             ui.horizontal(|ui| {
                                 if asset.kind == MediaKind::Audio {
                                     let response = helto::action(
