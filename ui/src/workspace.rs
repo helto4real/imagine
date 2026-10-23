@@ -1303,7 +1303,16 @@ impl ImagineApp {
                         .id_salt("generation-error")
                         .max_height(38.)
                         .show(ui, |ui| {
-                            ui.colored_label(helto::ERROR, error);
+                            // Error details can name files; they reveal on hover like the queue.
+                            let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+                            ui.colored_label(
+                                helto::ERROR,
+                                if revealed {
+                                    error.as_str()
+                                } else {
+                                    "Hidden error"
+                                },
+                            );
                         });
                 });
             }
@@ -1564,7 +1573,15 @@ impl ImagineApp {
                     });
                     if let Some(error) = &self.settings_error {
                         ui.add_space(14.);
-                        ui.colored_label(helto::ERROR, error);
+                        let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+                        ui.colored_label(
+                            helto::ERROR,
+                            if revealed {
+                                error.as_str()
+                            } else {
+                                "Hidden error"
+                            },
+                        );
                     }
                 });
         });

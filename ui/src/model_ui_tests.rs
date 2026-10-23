@@ -923,3 +923,41 @@ fn bf16_variant_switch_preserves_qwen_loras_and_request_precision() {
             .ends_with("qwen_image_2.1_bf16.safetensors")
     );
 }
+
+#[test]
+fn lora_window_hides_file_names_in_hide_mode() {
+    let root = tempfile::tempdir().unwrap();
+    let ctx = egui::Context::default();
+    ctx.enable_accesskit();
+    let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+    app.accept_library(catalog(root.path()));
+    for (privacy, expected) in [(false, true), (true, false)] {
+        app.prefs.privacy_mode = privacy;
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(520., 420.),
+                )),
+                events: vec![egui::Event::PointerGone],
+                focused: true,
+                ..Default::default()
+            },
+            |ui| app.loras_content(ui),
+        );
+        output.textures_delta.clear();
+        let named = output
+            .platform_output
+            .accesskit_update
+            .unwrap()
+            .nodes
+            .iter()
+            .any(|(_, n)| {
+                n.label()
+                    .into_iter()
+                    .chain(n.value())
+                    .any(|t| t.contains("style.safetensors"))
+            });
+        assert_eq!(named, expected, "privacy={privacy}");
+    }
+}

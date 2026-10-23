@@ -537,130 +537,143 @@ impl ImagineApp {
                 }
             });
         });
-        ui.add_enabled_ui(self.editable() && !self.models.loading, |ui| {
-            let search = ui.label("Add LoRA");
-            let search_changed = ui
-                .add(
-                    egui::TextEdit::singleline(&mut self.models.search)
-                        .hint_text("Search…")
-                        .desired_width(f32::INFINITY),
-                )
-                .labelled_by(search.id)
-                .changed();
-            let search = self.models.search.to_lowercase();
-            let terms: Vec<_> = search.split_whitespace().collect();
-            let mut results = egui::ScrollArea::vertical()
-                .id_salt("lora-search")
-                .max_height(110.);
-            if search_changed {
-                results = results.vertical_scroll_offset(0.);
-            }
-            results.show(ui, |ui| {
-                for file in library.files.iter().filter(|f| {
-                    if f.kind != "loras" {
-                        return false;
-                    }
-                    let path = f.path.to_lowercase();
-                    terms.iter().all(|term| path.contains(term))
-                }) {
-                    if group.loras.iter().any(|l| l.id == file.id) {
-                        continue;
-                    }
-                    ui.horizontal(|ui| {
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if helto::icon_button(
-                                ui,
-                                Icon::Plus,
-                                &format!("Add {}", file.path),
-                                false,
-                            )
-                            .clicked()
-                            {
-                                group.loras.push(LoraSetting {
-                                    id: file.id.clone(),
-                                    name: file.path.clone(),
-                                    strength: 1.,
-                                    enabled: true,
-                                });
-                            }
+        // LoRA file names follow Hide previews, like the video LoRA catalog.
+        let hidden = !helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+        let editable = self.editable() && !self.models.loading;
+        helto::private_scope(ui, hidden, |ui| {
+            ui.add_enabled_ui(editable, |ui| {
+                let search = ui.label("Add LoRA");
+                let search_changed = ui
+                    .add(
+                        egui::TextEdit::singleline(&mut self.models.search)
+                            .hint_text("Search…")
+                            .desired_width(f32::INFINITY),
+                    )
+                    .labelled_by(search.id)
+                    .changed();
+                let search = self.models.search.to_lowercase();
+                let terms: Vec<_> = search.split_whitespace().collect();
+                let mut results = egui::ScrollArea::vertical()
+                    .id_salt("lora-search")
+                    .max_height(110.);
+                if search_changed {
+                    results = results.vertical_scroll_offset(0.);
+                }
+                results.show(ui, |ui| {
+                    for file in library.files.iter().filter(|f| {
+                        if f.kind != "loras" {
+                            return false;
+                        }
+                        let path = f.path.to_lowercase();
+                        terms.iter().all(|term| path.contains(term))
+                    }) {
+                        if group.loras.iter().any(|l| l.id == file.id) {
+                            continue;
+                        }
+                        ui.horizontal(|ui| {
                             ui.with_layout(
-                                egui::Layout::left_to_right(egui::Align::Center),
+                                egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
-                                    ui.add(egui::Label::new(&file.path).truncate())
-                                        .on_hover_text(&file.path);
+                                    if helto::icon_button(
+                                        ui,
+                                        Icon::Plus,
+                                        &format!("Add {}", file.path),
+                                        false,
+                                    )
+                                    .clicked()
+                                    {
+                                        group.loras.push(LoraSetting {
+                                            id: file.id.clone(),
+                                            name: file.path.clone(),
+                                            strength: 1.,
+                                            enabled: true,
+                                        });
+                                    }
+                                    ui.with_layout(
+                                        egui::Layout::left_to_right(egui::Align::Center),
+                                        |ui| {
+                                            ui.add(egui::Label::new(&file.path).truncate())
+                                                .on_hover_text(&file.path);
+                                        },
+                                    );
                                 },
                             );
                         });
-                    });
-                }
-            });
-            ui.separator();
-            let mut remove = None;
-            let mut shift = None;
-            egui::ScrollArea::vertical()
-                .id_salt("selected-loras")
-                .show(ui, |ui| {
-                    let count = group.loras.len();
-                    for (index, lora) in group.loras.iter_mut().enumerate() {
-                        ui.push_id(index, |ui| {
-                            let status = (!library
-                                .files
-                                .iter()
-                                .any(|f| f.id == lora.id && f.kind == "loras"))
-                            .then_some("Missing");
-                            ui.horizontal(|ui| {
-                                let enabled = ui.checkbox(&mut lora.enabled, "");
-                                let label = ui
-                                    .add(egui::Label::new(&lora.name).truncate())
-                                    .on_hover_text(&lora.name);
-                                enabled.labelled_by(label.id).on_hover_text("Enable LoRA");
-                                if let Some(status) = status {
-                                    ui.label(RichText::new(status).color(helto::ERROR));
-                                }
-                                if helto::icon_button(
-                                    ui,
-                                    Icon::Trash,
-                                    &format!("Remove {}", lora.name),
-                                    false,
-                                )
-                                .clicked()
-                                {
-                                    remove = Some(index);
-                                }
-                            });
-                            ui.horizontal(|ui| {
-                                ui.add(
-                                    egui::Slider::new(&mut lora.strength, -2.0..=2.0)
-                                        .clamping(egui::SliderClamping::Never)
-                                        .text("Strength"),
-                                );
-                                if ui
-                                    .add_enabled_ui(index > 0, |ui| {
-                                        helto::icon_button(ui, Icon::Up, "Move LoRA up", false)
-                                    })
-                                    .inner
-                                    .clicked()
-                                {
-                                    shift = Some((index, index - 1));
-                                }
-                                if ui
-                                    .add_enabled_ui(index + 1 < count, |ui| {
-                                        helto::icon_button(ui, Icon::Down, "Move LoRA down", false)
-                                    })
-                                    .inner
-                                    .clicked()
-                                {
-                                    shift = Some((index, index + 1));
-                                }
-                            });
-                        });
                     }
                 });
-            if let Some(index) = remove {
-                group.loras.remove(index);
-            } else if let Some((a, b)) = shift {
-                group.loras.swap(a, b);
-            }
+                ui.separator();
+                let mut remove = None;
+                let mut shift = None;
+                egui::ScrollArea::vertical()
+                    .id_salt("selected-loras")
+                    .show(ui, |ui| {
+                        let count = group.loras.len();
+                        for (index, lora) in group.loras.iter_mut().enumerate() {
+                            ui.push_id(index, |ui| {
+                                let status = (!library
+                                    .files
+                                    .iter()
+                                    .any(|f| f.id == lora.id && f.kind == "loras"))
+                                .then_some("Missing");
+                                ui.horizontal(|ui| {
+                                    let enabled = ui.checkbox(&mut lora.enabled, "");
+                                    let label = ui
+                                        .add(egui::Label::new(&lora.name).truncate())
+                                        .on_hover_text(&lora.name);
+                                    enabled.labelled_by(label.id).on_hover_text("Enable LoRA");
+                                    if let Some(status) = status {
+                                        ui.label(RichText::new(status).color(helto::ERROR));
+                                    }
+                                    if helto::icon_button(
+                                        ui,
+                                        Icon::Trash,
+                                        &format!("Remove {}", lora.name),
+                                        false,
+                                    )
+                                    .clicked()
+                                    {
+                                        remove = Some(index);
+                                    }
+                                });
+                                ui.horizontal(|ui| {
+                                    ui.add(
+                                        egui::Slider::new(&mut lora.strength, -2.0..=2.0)
+                                            .clamping(egui::SliderClamping::Never)
+                                            .text("Strength"),
+                                    );
+                                    if ui
+                                        .add_enabled_ui(index > 0, |ui| {
+                                            helto::icon_button(ui, Icon::Up, "Move LoRA up", false)
+                                        })
+                                        .inner
+                                        .clicked()
+                                    {
+                                        shift = Some((index, index - 1));
+                                    }
+                                    if ui
+                                        .add_enabled_ui(index + 1 < count, |ui| {
+                                            helto::icon_button(
+                                                ui,
+                                                Icon::Down,
+                                                "Move LoRA down",
+                                                false,
+                                            )
+                                        })
+                                        .inner
+                                        .clicked()
+                                    {
+                                        shift = Some((index, index + 1));
+                                    }
+                                });
+                            });
+                        }
+                    });
+                if let Some(index) = remove {
+                    group.loras.remove(index);
+                } else if let Some((a, b)) = shift {
+                    group.loras.swap(a, b);
+                }
+            })
         });
         if group != before {
             self.prefs
@@ -673,7 +686,9 @@ impl ImagineApp {
             self.models.dirty = false;
         }
         if let Some(error) = self.models.error.as_ref().or(self.settings_error.as_ref()) {
-            ui.label(RichText::new(error).color(helto::ERROR));
+            ui.label(
+                RichText::new(if hidden { "Hidden error" } else { error }).color(helto::ERROR),
+            );
         }
     }
 }
