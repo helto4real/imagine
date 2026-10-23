@@ -411,12 +411,18 @@ impl ImagineApp {
                     {
                         self.connect(ui.ctx());
                     }
+                    let problem = self.connection_error.is_some()
+                        || self.workspace == Workspace::Video && self.timeline_unreachable();
                     let text = if self.connecting {
                         "Connecting"
-                    } else if self.client.is_some() {
-                        "Connected"
-                    } else {
+                    } else if self.client.is_none() {
                         "Disconnected"
+                    } else if self.connection_error.is_some() {
+                        "Connection error"
+                    } else if problem {
+                        "Video service unavailable"
+                    } else {
+                        "Connected"
                     };
                     if rect.width() >= 760. {
                         ui.label(RichText::new(text).color(helto::DIM));
@@ -426,10 +432,12 @@ impl ImagineApp {
                     ui.painter().circle_filled(
                         dot.center(),
                         3.5,
-                        if self.client.is_some() {
-                            helto::OK
-                        } else {
+                        if self.client.is_none() || self.connecting {
                             helto::DIM
+                        } else if problem {
+                            helto::ERROR
+                        } else {
+                            helto::OK
                         },
                     );
                     response.on_hover_text(text);

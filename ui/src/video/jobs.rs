@@ -115,6 +115,10 @@ impl ImagineApp {
             .iter()
             .any(|j| j.error.is_some() || j.terminal() && j.observation["status"] != "succeeded")
     }
+    /// The video service was checked and no session could be opened.
+    pub(in crate::app) fn timeline_unreachable(&self) -> bool {
+        self.timeline.session_checked && self.timeline.session.is_none() && !self.timeline.busy
+    }
     /// Timeline work shown in the queue dock; growth means new work was submitted.
     pub(in crate::app) fn timeline_queue_work(&self) -> usize {
         self.timeline.jobs.len()

@@ -210,9 +210,11 @@ impl ImagineApp {
                         self.timeline.sync_draft();
                     }
                     if self.timeline.boundary {
-                        self.timeline_assembly_boundary(ui, d, &scene, commands);
                         ui.strong("Boundary");
+                        ui.separator();
+                        // Edits made while busy would be dropped, so the controls wait too.
                         ui.add_enabled_ui(enabled, |ui| {
+                            self.timeline_assembly_boundary(ui, d, &scene, commands);
                             self.timeline_continuity(ui, d, &scene, commands)
                         });
                         return;

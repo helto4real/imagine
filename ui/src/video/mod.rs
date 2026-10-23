@@ -643,7 +643,10 @@ impl ImagineApp {
                             if self.timeline.selected.is_empty() {
                                 self.timeline.boundary = false;
                             }
-                            if self.timeline.selected.is_empty()
+                            // Select the first scene of a newly opened project only; a
+                            // cleared selection stays cleared across later refreshes.
+                            if replace
+                                && self.timeline.selected.is_empty()
                                 && let Some(scene) = snapshot.project.scenes.first()
                             {
                                 self.timeline.selected.insert(scene.id.clone());
@@ -1001,6 +1004,8 @@ impl ImagineApp {
         }
         let (Some(client), Some(session)) = (self.client.clone(), self.timeline.session.clone())
         else {
+            self.timeline.error =
+                Some("Not connected to the video service. Reconnect and try again.".into());
             return;
         };
         self.timeline.busy = true;

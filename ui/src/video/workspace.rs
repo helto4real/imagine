@@ -176,6 +176,13 @@ impl ImagineApp {
                 }
             });
         }
+        // Save also works while typing; pending text drafts are saved with it.
+        if enabled
+            && document.is_some()
+            && ui.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::S))
+        {
+            action = Some(PostAction::Save);
+        }
         if enabled && !ui.ctx().text_edit_focused() {
             // Delete belongs to the Timeline, never to a floating dialog or text field.
             // The active Timeline remains the shortcut scope after a drag or
@@ -194,9 +201,6 @@ impl ImagineApp {
             {
                 commands.extend(self.timeline.draft_edits());
                 commands.extend(self.timeline.delete_selection());
-            }
-            if ui.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::S)) {
-                action = Some(PostAction::Save);
             }
             let redo = egui::Modifiers {
                 ctrl: true,
@@ -684,6 +688,74 @@ impl ImagineApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cleared_selection_stays_cleared_and_opening_selects_the_first_scene() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.client = None;
+        let p = super::super::media_picker::tests::project();
+        let raw = json!({"project":p,"persistence":{"state":"saved"}});
+        let refresh = |app: &mut ImagineApp, replace: bool| {
+            let epoch = app.timeline.epoch;
+            app.timeline_message(
+                &ctx,
+                Event::Document {
+                    epoch,
+                    replace,
+                    before: None,
+                    history: 0,
+                    result: Ok(raw.clone()),
+                },
+            );
+        };
+        refresh(&mut app, true);
+        assert!(app.timeline.selected.contains(&p.scenes[0].id));
+        app.timeline.selected.clear();
+        refresh(&mut app, false);
+        assert!(app.timeline.selected.is_empty());
+    }
+
+    #[test]
+    fn header_reports_an_unreachable_video_service() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.workspace = Workspace::Video;
+        let labels = |app: &mut ImagineApp| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 800.),
+                    )),
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            output.textures_delta.clear();
+            output
+                .platform_output
+                .accesskit_update
+                .unwrap()
+                .nodes
+                .into_iter()
+                .filter_map(|(_, n)| n.label().or(n.value()).map(str::to_owned))
+                .collect::<Vec<_>>()
+        };
+        app.timeline.session = Some("own-synthetic-session".into());
+        app.timeline.session_checked = true;
+        let first = labels(&mut app);
+        assert!(first.iter().any(|l| l == "Connected"), "{first:?}");
+        app.timeline.session = None;
+        assert!(
+            labels(&mut app)
+                .iter()
+                .any(|l| l == "Video service unavailable")
+        );
+    }
+
     #[test]
     fn replacing_an_unsaved_project_waits_for_confirmation() {
         let root = tempfile::tempdir().unwrap();
