@@ -11,7 +11,7 @@ pub(super) struct Pending {
     key: Option<String>,
     run: Option<String>,
 }
-fn needs_generation(project: &VideoProject) -> bool {
+pub(super) fn needs_generation(project: &VideoProject) -> bool {
     project
         .scenes
         .iter()

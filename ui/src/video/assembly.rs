@@ -49,6 +49,9 @@ impl State {
         self.error=pending.then(||"Final continuation ended because the project changed. The existing Run remains in the queue.".into());
     }
 }
+const UNFINISHED: &str = "Scenes without an accepted Take are generated first, with fresh seeds.";
+const KEPT_EXPORT: &str =
+    "The encoded export is kept for this session. Retry export in the queue to save it.";
 fn assembly_phase_label(phase: &str) -> &'static str {
     match phase {
         "queued" => "Waiting in queue…",
@@ -580,6 +583,95 @@ impl ImagineApp {
         ));
         self.timeline_submit_pending(ctx);
     }
+    /// Optional inspection of a frozen plan before rendering it.
+    fn assembly_plan_section(
+        &self,
+        ui: &mut egui::Ui,
+        document: &Option<Snapshot>,
+        busy: bool,
+    ) -> (bool, bool) {
+        let (mut capture, mut submit) = (false, false);
+        let state = &self.timeline.assembly;
+        egui::CollapsingHeader::new(helto::section("Frozen plan"))
+            .id_salt("assembly-plan-section")
+            .open(state.plan.is_some().then_some(true))
+            .show(ui, |ui| {
+                let r = helto::action(
+                    ui,
+                    crate::icons::Icon::Lock,
+                    "Freeze current montage plan",
+                    false,
+                    if document.is_none() {
+                        Some("Create or open a project first.")
+                    } else {
+                        busy.then_some("Wait for the current operation.")
+                    },
+                );
+                control(ui, "assembly-freeze", &r);
+                capture = r.clicked();
+                let Some(plan) = &state.plan else {
+                    return;
+                };
+                let fps = imagine_video_contract::assembly::seconds(plan.delivery.fps);
+                ui.label(format!(
+                    "{} × {} · {:.3} fps · {} frames · {:.2} s",
+                    plan.delivery.width,
+                    plan.delivery.height,
+                    fps,
+                    plan.frames,
+                    plan.frames as f64 / fps
+                ));
+                ui.weak(format!(
+                    "Revision {} · {} clips · {} timeline audio segments",
+                    plan.project_revision,
+                    plan.clips.len(),
+                    plan.audio.len()
+                ));
+                if document
+                    .as_ref()
+                    .is_some_and(|d| earlier_snapshot(plan, state.plan_project.as_deref(), d))
+                {
+                    let r = ui.colored_label(
+                        helto::ACCENT,
+                        "This is an earlier project snapshot. Freeze again to include current edits.",
+                    );
+                    control(ui, "assembly-snapshot-warning", &r);
+                }
+                egui::ScrollArea::vertical()
+                    .id_salt("assembly-plan")
+                    .max_height(140.)
+                    .show(ui, |ui| {
+                        for (i, clip) in plan.clips.iter().enumerate() {
+                            let source = if clip.take_id.is_some() {
+                                "selected Take"
+                            } else {
+                                "imported video"
+                            };
+                            ui.label(format!(
+                                "Scene {} · {:?} · {} frames / {} overlap · {source}",
+                                i + 1,
+                                clip.boundary,
+                                clip.frames,
+                                clip.overlap
+                            ));
+                        }
+                        for warning in &plan.warnings {
+                            ui.colored_label(helto::ACCENT, warning);
+                        }
+                    });
+                let r = helto::action(
+                    ui,
+                    crate::icons::Icon::Generate,
+                    "Render frozen plan",
+                    true,
+                    (busy || self.timeline.admitting || self.timeline.pending.is_some())
+                        .then_some("Wait for the current operation."),
+                );
+                control(ui, "assembly-render", &r);
+                submit = r.clicked();
+            });
+        (capture, submit)
+    }
     pub(super) fn timeline_assembly_window(&mut self, ctx: &egui::Context) {
         if !self.timeline.assembly.open {
             return;
@@ -588,83 +680,138 @@ impl ImagineApp {
         let mut capture = false;
         let mut submit = false;
         let mut preview = None;
-        let mut close = false;
         let mut render_current = false;
         let mut retry = false;
         let document = self.timeline.document.clone();
         let busy = self.timeline.assembly.busy;
         let before = self.timeline.assembly.options.clone();
-        egui::Window::new("Final video").id(egui::Id::new("video-final-montage")).open(&mut open).default_width(590_f32.min((ctx.content_rect().width()-24.).max(240.))).max_width((ctx.content_rect().width()-24.).max(240.)).max_height((ctx.content_rect().height()-70.).max(160.)).vscroll(true).resizable(true).show(ctx,|ui|{
-            ui.set_max_width((ctx.content_rect().width()-48.).max(216.));
-            #[cfg(feature="ui-preview")] {
-                let r=ui.interact(ui.clip_rect(),ui.id().with("qa-assembly-scroll"),egui::Sense::hover());
-                control(ui,"assembly-scroll",&r);
-            }
-            let hidden=!helto::reveal_in_viewport(ui,self.prefs.privacy_mode);
-            helto::private_scope(ui,hidden,|ui|{
-            ui.horizontal_wrapped(|ui|{
-                let r=helto::icon_button(ui,crate::icons::Icon::Back,"Back to Timeline",false);control(ui,"assembly-close",&r);close=r.clicked();
-                let r=helto::action(ui,crate::icons::Icon::Generate,"Render current Timeline",true,if document.is_none(){Some("Create or open a project first.")}else{(busy||self.timeline.busy||self.timeline.admitting||self.timeline.pending.is_some()||self.timeline.assembly.pending_final.is_some()).then_some("Wait for the current operation.")});control(ui,"assembly-render-current",&r);render_current=r.clicked();
-            });
-            if self.timeline.assembly.retry_request().is_some() {
-                let r=helto::icon_button(ui,crate::icons::Icon::Retry,"Retry Final preparation",false);control(ui,"assembly-retry-preparation",&r);retry=r.clicked();
-                ui.weak("Retry uses the original Timeline revision and export choices. Render current Timeline uses your current choices.");
-            }
-            if let Some(error)=&self.timeline.assembly.error{ui.colored_label(helto::ERROR,error);}
-            ui.label("Montage in scene order · MP4 / H.264 · CRF 19 · AAC stereo / 44.1 kHz");
-            ui.weak("A frozen plan keeps its selected media even if the project changes. Deliveries appear below and in the queue.");
-            ui.weak("An unfinished Timeline runs AllFreshSeeds first and accepts its results through the Run rules before export. Stop/Cancel remains in the queue.");
-            if self.timeline.assembly.pending_final.is_some(){ui.strong("Final pending · generating all scenes with fresh seeds…");}
-            ui.horizontal(|ui|{
-                let label=ui.label("Filename");
-                let mut name=self.timeline.assembly.options.output_filename.clone().unwrap_or_default();
-                let r=ui.add(egui::TextEdit::singleline(&mut name).hint_text("Automatic numbered filename · MP4").desired_width(f32::INFINITY)).labelled_by(label.id);
-                control(ui,"assembly-output-filename",&r);
-                if r.changed(){self.timeline.assembly.options.output_filename=(!name.is_empty()).then_some(name);}
-            });
-            ui.add_enabled_ui(!busy,|ui|{
-                let options=&mut self.timeline.assembly.options;
-                ui.horizontal(|ui|{
-                    ui.label("Audio");
-                    for (mode,label,name) in [(MixMode::Generated,"Generated","assembly-audio-generated"),(MixMode::Timeline,"Timeline","assembly-audio-timeline"),(MixMode::Combined,"Combined","assembly-audio-combined")]{let r=ui.selectable_value(&mut options.audio_mode,mode,label);control(ui,name,&r);}
-                });
-                ui.horizontal(|ui|{
-                    ui.label("Generated gain");ui.add(egui::DragValue::new(&mut options.generated_gain).speed(0.05).range(0. ..=f64::MAX));
-                    ui.label("Timeline gain");ui.add(egui::DragValue::new(&mut options.timeline_gain).speed(0.05).range(0. ..=f64::MAX));
-                });
-                let r=ui.checkbox(&mut options.normalize_mix,"Normalize final mix · Director RMS −18 dB / peak −1 dB / max gain 2×");control(ui,"assembly-normalize",&r);
-                ui.horizontal(|ui|{let r=ui.checkbox(&mut options.duck_generated,"Duck generated audio under timeline audio");control(ui,"assembly-duck",&r);ui.add(egui::DragValue::new(&mut options.ducking_strength).speed(0.05).range(0. ..=1.));});
-                ui.checkbox(&mut options.continuous_tone_match,"Match luminance at Continuous Shot boundaries");
-                ui.horizontal(|ui|{ui.label("Color depth");ui.selectable_value(&mut options.bit_depth,8,"8-bit · standard");ui.selectable_value(&mut options.bit_depth,10,"10-bit");});
-            });
-            ui.separator();
-            ui.weak("Render freezes the current montage internally. Frozen-plan inspection below is optional.");
-            let response=helto::action(ui,crate::icons::Icon::Lock,"Freeze current montage plan",false,if document.is_none(){Some("Create or open a project first.")}else{busy.then_some("Wait for the current operation.")});control(ui,"assembly-freeze",&response);capture=response.clicked();
-            if busy{ui.spinner();}
-            if let Some(plan)=&self.timeline.assembly.plan{
-                let fps=imagine_video_contract::assembly::seconds(plan.delivery.fps);
-                ui.label(format!("{} × {} · {:.6} fps · {} frames · {:.6} s",plan.delivery.width,plan.delivery.height,fps,plan.frames,plan.frames as f64/fps));
-                ui.weak(format!("Project revision {} · {} clips · {} timeline audio segments · {} samples/channel",plan.project_revision,plan.clips.len(),plan.audio.len(),plan.samples));
-                if document.as_ref().is_some_and(|d|earlier_snapshot(plan,self.timeline.assembly.plan_project.as_deref(),d)){let response=ui.colored_label(helto::ACCENT,"This is an earlier project snapshot. Freeze again to include current edits.");control(ui,"assembly-snapshot-warning",&response);}
-                egui::ScrollArea::vertical().id_salt("assembly-plan").max_height(140.).show(ui,|ui|{
-                    for (i,clip) in plan.clips.iter().enumerate(){ui.label(format!("Scene {} · {:?} · {} frames / {} overlap · {}",i+1,clip.boundary,clip.frames,clip.overlap,if clip.take_id.is_some(){"selected Take"}else{"imported video"}));}
-                    for warning in &plan.warnings{ui.colored_label(helto::ACCENT,warning);}
-                });
-                let r=helto::action(ui,crate::icons::Icon::Generate,"Render frozen plan",true,(busy||self.timeline.admitting||self.timeline.pending.is_some()).then_some("Wait for the current operation."));control(ui,"assembly-render",&r);submit=r.clicked();
-            }
-            if let Some(phase)=self.timeline.assembly.progress["phase"].as_str(){let response=ui.weak(assembly_phase_label(phase));control(ui,"assembly-progress",&response);}
-            if self.timeline.assembly.progress["rendered_result_available"]==true{ui.weak("The encoded export is retained in this session. Retry export in the queue to save it again.");}
-            ui.separator();ui.weak("Saved deliveries");
-            if let Some(d)=&document{
-                for (i,delivery) in d.view.deliveries.iter().enumerate(){
-                    let r=ui.button(format!("Delivery {} · revision {}",i+1,delivery.plan.project_revision));control(ui,&format!("assembly-delivery-{i}"),&r);
-                    if r.clicked(){preview=d.runtime_asset(&delivery.asset_id.0).map(str::to_owned);}
+        let wait = busy
+            || self.timeline.busy
+            || self.timeline.admitting
+            || self.timeline.pending.is_some()
+            || self.timeline.assembly.pending_final.is_some();
+        let unfinished = document
+            .as_ref()
+            .is_some_and(|d| flow::needs_generation(&d.project));
+        let width = (ctx.content_rect().width() - 24.).max(240.);
+        egui::Window::new("Final video")
+            .id(egui::Id::new("video-final-montage"))
+            .open(&mut open)
+            .default_width(540_f32.min(width))
+            .default_height(640.)
+            .max_width(width)
+            .max_height((ctx.content_rect().height() - 70.).max(160.))
+            .vscroll(true)
+            .resizable(true)
+            .show(ctx, |ui| {
+                ui.set_max_width((ctx.content_rect().width() - 48.).max(216.));
+                #[cfg(feature = "ui-preview")]
+                {
+                    let r = ui.interact(
+                        ui.clip_rect(),
+                        ui.id().with("qa-assembly-scroll"),
+                        egui::Sense::hover(),
+                    );
+                    control(ui, "assembly-scroll", &r);
                 }
-            }
-            ui.weak("Exports are separate deliveries. They do not replace Accepted Takes.");
+                let hidden = !helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+                helto::private_scope(ui, hidden, |ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        let r = helto::action(
+                            ui,
+                            crate::icons::Icon::Generate,
+                            "Render current Timeline",
+                            true,
+                            if document.is_none() {
+                                Some("Create or open a project first.")
+                            } else {
+                                wait.then_some("Wait for the current operation.")
+                            },
+                        );
+                        control(ui, "assembly-render-current", &r);
+                        render_current = r.clicked();
+                        if busy {
+                            ui.spinner();
+                        }
+                        if let Some(phase) = self.timeline.assembly.progress["phase"].as_str() {
+                            let r = ui.weak(assembly_phase_label(phase));
+                            control(ui, "assembly-progress", &r);
+                        }
+                    });
+                    if self.timeline.assembly.pending_final.is_some() {
+                        ui.colored_label(
+                            helto::ACCENT,
+                            "Generating scenes without a Take, with fresh seeds…",
+                        );
+                    } else if unfinished {
+                        ui.weak(UNFINISHED);
+                    }
+                    if self.timeline.assembly.retry_request().is_some() {
+                        ui.horizontal_wrapped(|ui| {
+                            let r = helto::icon_button(
+                                ui,
+                                crate::icons::Icon::Retry,
+                                "Retry Final preparation",
+                                false,
+                            );
+                            control(ui, "assembly-retry-preparation", &r);
+                            retry = r.clicked();
+                            ui.weak("Retry uses the original Timeline revision and choices.");
+                        });
+                    }
+                    if let Some(error) = &self.timeline.assembly.error {
+                        ui.colored_label(helto::ERROR, error);
+                    }
+                    if self.timeline.assembly.progress["rendered_result_available"] == true {
+                        ui.weak(KEPT_EXPORT);
+                    }
+                    ui.add_space(8.);
+                    ui.horizontal(|ui| {
+                        ui.label(helto::section("Output"));
+                        ui.weak("MP4 · H.264 CRF 19 · AAC stereo 44.1 kHz");
+                    });
+                    ui.add_enabled_ui(!busy, |ui| {
+                        export_options(ui, &mut self.timeline.assembly.options)
+                    });
+                    ui.add_space(8.);
+                    let (frozen, render) = self.assembly_plan_section(ui, &document, busy);
+                    capture = frozen;
+                    submit = render;
+                    ui.add_space(8.);
+                    ui.label(helto::section("Deliveries"));
+                    let deliveries = document
+                        .as_ref()
+                        .map_or(&[][..], |d| &d.view.deliveries[..]);
+                    if deliveries.is_empty() {
+                        ui.weak("No deliveries yet.");
+                    }
+                    for (i, delivery) in deliveries.iter().enumerate() {
+                        let plan = &delivery.plan;
+                        let fps = imagine_video_contract::assembly::seconds(plan.delivery.fps);
+                        let r = ui
+                            .selectable_label(
+                                false,
+                                format!(
+                                    "Delivery {} · revision {} · {} × {} · {:.1} s",
+                                    i + 1,
+                                    plan.project_revision,
+                                    plan.delivery.width,
+                                    plan.delivery.height,
+                                    plan.frames as f64 / fps
+                                ),
+                            )
+                            .on_hover_text("Show in the viewer");
+                        control(ui, &format!("assembly-delivery-{i}"), &r);
+                        if r.clicked() {
+                            preview = document
+                                .as_ref()
+                                .and_then(|d| d.runtime_asset(&delivery.asset_id.0))
+                                .map(str::to_owned);
+                        }
+                    }
+                });
             });
-        });
-        self.timeline.assembly.open = open && !close;
+        self.timeline.assembly.open = open;
         if before != self.timeline.assembly.options {
             self.timeline.assembly.plan = None;
             self.timeline.assembly.plan_project = None;
@@ -709,6 +856,100 @@ impl ImagineApp {
             self.assembly_call(ctx, true);
         }
     }
+}
+/// Filename, picture and audio choices for the next export.
+fn export_options(ui: &mut egui::Ui, options: &mut Options) {
+    egui::Grid::new("assembly-output")
+        .num_columns(2)
+        .spacing([12., 6.])
+        .show(ui, |ui| {
+            let label = ui.label("Filename");
+            let mut name = options.output_filename.clone().unwrap_or_default();
+            let r = ui
+                .add(
+                    egui::TextEdit::singleline(&mut name)
+                        .hint_text("Automatic numbered name")
+                        .desired_width(300.),
+                )
+                .labelled_by(label.id);
+            control(ui, "assembly-output-filename", &r);
+            if r.changed() {
+                options.output_filename = (!name.is_empty()).then_some(name);
+            }
+            ui.end_row();
+            ui.label("Color depth");
+            ui.horizontal(|ui| {
+                ui.selectable_value(&mut options.bit_depth, 8, "8-bit");
+                ui.selectable_value(&mut options.bit_depth, 10, "10-bit");
+            });
+            ui.end_row();
+            ui.label("Continuous shots");
+            ui.checkbox(&mut options.continuous_tone_match, "Match luminance");
+            ui.end_row();
+        });
+    ui.add_space(8.);
+    ui.label(helto::section("Audio"));
+    egui::Grid::new("assembly-audio")
+        .num_columns(2)
+        .spacing([12., 6.])
+        .show(ui, |ui| {
+            ui.label("Source");
+            ui.horizontal(|ui| {
+                for (mode, label, name) in [
+                    (MixMode::Generated, "Generated", "assembly-audio-generated"),
+                    (MixMode::Timeline, "Timeline", "assembly-audio-timeline"),
+                    (MixMode::Combined, "Combined", "assembly-audio-combined"),
+                ] {
+                    let r = ui.selectable_value(&mut options.audio_mode, mode, label);
+                    control(ui, name, &r);
+                }
+            });
+            ui.end_row();
+            if options.audio_mode != MixMode::Timeline {
+                ui.label("Generated gain");
+                ui.add(
+                    egui::DragValue::new(&mut options.generated_gain)
+                        .speed(0.05)
+                        .range(0. ..=f64::MAX)
+                        .suffix("×"),
+                );
+                ui.end_row();
+            }
+            if options.audio_mode != MixMode::Generated {
+                ui.label("Timeline gain");
+                ui.add(
+                    egui::DragValue::new(&mut options.timeline_gain)
+                        .speed(0.05)
+                        .range(0. ..=f64::MAX)
+                        .suffix("×"),
+                );
+                ui.end_row();
+            }
+            ui.label("Level");
+            let r = ui
+                .checkbox(&mut options.normalize_mix, "Normalize mix")
+                .on_hover_text("RMS −18 dB · peak −1 dB · at most 2× gain");
+            control(ui, "assembly-normalize", &r);
+            ui.end_row();
+            if options.audio_mode == MixMode::Combined {
+                ui.label("Ducking");
+                ui.horizontal(|ui| {
+                    let r = ui.checkbox(
+                        &mut options.duck_generated,
+                        "Duck generated under timeline audio",
+                    );
+                    control(ui, "assembly-duck", &r);
+                    ui.add_enabled(
+                        options.duck_generated,
+                        egui::DragValue::new(&mut options.ducking_strength)
+                            .speed(0.05)
+                            .range(0. ..=1.),
+                    )
+                    .on_hover_text("Ducking strength");
+                });
+                ui.end_row();
+            }
+        });
 }
 // A new seam uses Director's three-frame overlap; persisted boundaries retain
 // their explicit overlap when reopened or when only their mode is edited.
@@ -804,6 +1045,88 @@ mod tests {
             asset_id: AssetId(id.into()),
             plan: plan.clone(),
         });
+    }
+    #[test]
+    fn final_video_groups_choices_and_shows_only_the_relevant_audio_controls() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let (mut document, plan) = snapshot_and_plan();
+        publish_delivery(&mut document, &plan, "own-delivery");
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.document = Some(document);
+        app.timeline.assembly.open = true;
+        let frame = |app: &mut ImagineApp| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 900.),
+                    )),
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            let nodes = output
+                .platform_output
+                .accesskit_update
+                .take()
+                .unwrap()
+                .nodes;
+            (output, nodes)
+        };
+        let has = |nodes: &Vec<(egui::accesskit::NodeId, egui::accesskit::Node)>, text: &str| {
+            nodes.iter().any(|(_, n)| {
+                n.label()
+                    .into_iter()
+                    .chain(n.value())
+                    .any(|t| t.contains(text))
+            })
+        };
+        ctx.global_style_mut(|style| style.animation_time = 0.);
+        let mut output = egui::FullOutput::default();
+        let mut nodes = vec![];
+        for _ in 0..4 {
+            let (o, n) = frame(&mut app);
+            output.append(o);
+            nodes = n;
+        }
+        if let Some(dir) = std::env::var_os("IMAGINE_UI_PREVIEW_DIR") {
+            crate::app::tests::render(&ctx, output, 1280, 900)
+                .save(std::path::PathBuf::from(dir).join("final.png"))
+                .unwrap();
+        } else {
+            output.textures_delta.clear();
+        }
+        for text in [
+            "Render current Timeline",
+            "Output",
+            "Filename",
+            "Audio",
+            "Generated gain",
+            "Timeline gain",
+            "Ducking",
+            "Frozen plan",
+            "Deliveries",
+            "Delivery 1 · revision",
+            UNFINISHED,
+        ] {
+            assert!(has(&nodes, text), "{text}");
+        }
+        assert!(!has(&nodes, "Render frozen plan"));
+        app.timeline.assembly.options.audio_mode = MixMode::Generated;
+        let (mut o, nodes) = frame(&mut app);
+        o.textures_delta.clear();
+        assert!(has(&nodes, "Generated gain"));
+        assert!(!has(&nodes, "Timeline gain") && !has(&nodes, "Ducking"));
+        app.timeline.assembly.plan = Some(plan);
+        let (mut o, nodes) = frame(&mut app);
+        o.textures_delta.clear();
+        assert!(has(&nodes, "Render frozen plan"));
     }
     #[test]
     fn final_phases_distinguish_encoding_saving_and_saved() {
