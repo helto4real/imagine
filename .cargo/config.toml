@@ -1,4 +1,4 @@
-# Candidate builds must never replace the configured next-start product binaries.
-# Explicit product packaging remains an intentional separate operation.
+# Ad-hoc Cargo builds use a separate cache. Normal launchers use the shared
+# main-checkout builder and copy verified artifacts into versioned directories.
 [build]
 target-dir = "comfyui/h3-video-night-20261021/target"

@@ -26,10 +26,13 @@ On this configured machine:
 ./start-server.sh
 ```
 
-This incrementally builds the Rust worker and release server, verifies the
-prepared local dependencies and starts at `http://127.0.0.1:8080`. The worker
-and CUDA start only after a scheduled job acquires the GPU reservation.
-The launcher uses the proxy GPU queue at `.imagine/gpu.sock`; start
+The three launchers build product code from the local `main` checkout, including
+uncommitted product edits. The Rust inference core and native dependencies stay
+pinned. See [product builds and native lock](docs/PRODUCT-BUILDS.md) for the
+boundary, build-only checks, build reports and explicit rollback.
+The server starts at `http://127.0.0.1:8080`. Workers and CUDA start only after a
+scheduled job acquires the GPU reservation. The launchers use the proxy GPU queue
+at `$XDG_RUNTIME_DIR/imagine/gpu.sock`; start
 `./start-proxy.sh` with your backend options before submitting jobs.
 The server starts without a password, YubiKey login or API token. Prompts and job history stay in memory; temporary images are ordinary
 files removed at session end. See [session privacy](docs/PRIVACY.md).

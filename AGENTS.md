@@ -27,3 +27,14 @@ form is `native/upstream-lock.json` plus the two complete patches under
 `native/patches/`. Include new CUDA files when updating those patches. Verify
 patch restoration and source hashes before publishing native changes; do not
 assume an outer Git commit includes edits inside the ignored checkout.
+
+## Product startup and native lock
+
+Read `docs/PRODUCT-BUILDS.md` before changing launch/build behavior.
+Normal start scripts build the local `main` checkout (including dirty product
+changes) through `tools/product_build.py`; they never select `active-product.sh`.
+`native/product/build-lock.json` explicitly separates main's product adapters
+from the pinned Rust inference core, compiler, headers and native libraries.
+Do not expand its product allowlist to bypass a core lock, rebuild CUDA during
+normal startup, or silently accept changed dependency hashes. Use build-only
+preparation for validation; service restarts and GPU runs are separate actions.

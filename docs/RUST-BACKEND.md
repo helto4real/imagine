@@ -6,10 +6,12 @@
 ./start-server.sh
 ```
 
-The launcher incrementally builds the independent Rust worker and release
-server, writes the verified local runtime manifest and starts the server.
+The launcher builds the main-checkout server and the allowlisted image/H3
+adapters over the pinned Rust core, writes a verified combined runtime manifest
+and starts the server. See [product builds](PRODUCT-BUILDS.md) for the source
+boundary, build profile, update procedure and explicit rollback.
 This uses the already prepared local dependencies; it does not install
-packages, download models, launch Python or rebuild CUDA libraries. Startup
+packages, download models, launch Python inference or rebuild CUDA libraries. Startup
 validates paths/hashes. The first scheduled generation launches the worker
 after acquiring the existing shared GPU reservation.
 
@@ -98,19 +100,18 @@ numerical/kernel and autotuning policies are unchanged.
 
 ## Local dependency deployment
 
-On this machine, `prepare-rust-backend.sh` defaults to the prepared
-`comfyui/moss-20261018` dependency/build root and the installed Comfy environment's
-LibTorch shared libraries. It uses Cargo offline. Override these build locations
-with `IMAGINE_RUST_DEPENDENCIES` and `IMAGINE_RUST_SITE` when deliberately
-preparing another local deployment. Missing artifacts fail with a path; there
-is no automatic dependency installation. The worker currently uses the selected
-Cargo development build, not a claimed tuned production benchmark executable.
+`prepare-rust-backend.sh` uses `native/product/build-lock.json` and the same
+build path as normal server startup. It builds the server and both workers
+without launching services or models. The lock records prepared library paths,
+hashes, compiler versions and headers. Missing or changed artifacts stop the
+build. Legacy `IMAGINE_RUST_DEPENDENCIES` and `IMAGINE_RUST_SITE` overrides are
+no longer used by this preparation path.
 
-The ignored `comfyui/runtime-current.json` records the worker/native-library
-hashes, compiler profile and approved launch environment. The server checks it
-at construction and before launching a new worker. For an independently
-prepared deployment, skip the launcher's default preparation and select its
-manifest explicitly:
+The completed artifact directory contains `runtime.json` and `build.json`;
+the script prints its path. Normal startup passes this versioned manifest
+explicitly, rather than selecting `comfyui/runtime-current.json`.
+For an independently prepared, caller-managed deployment, skip the launcher's
+default native preparation and select its manifest explicitly:
 
 ```sh
 ./start-server.sh --backend rust --rust-runtime /absolute/path/runtime.json

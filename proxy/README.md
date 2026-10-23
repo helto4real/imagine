@@ -39,9 +39,9 @@ cd /home/thhel/ChatGPT/imagine
   --mcp-output-dir /run/media/veracrypt1/imagine/.mcp-cache
 ```
 
-`start-proxy.sh` defaults to chat port **5002**, image port **8189**, and enabled MCP on **8190**, matching `st-stack.zsh`. ComfyUI defaults to upstream port 8188 and KoboldCpp to 5001. MCP output defaults to `/run/media/veracrypt1/imagine/.mcp-cache`, as a direct child of the trusted Imagine media destination. Reference input defaults to `/run/media/veracrypt1/mcp-inputs`. Environment variables and CLI arguments can override these defaults.
+`start-proxy.sh` defaults to chat port **5002**, image port **8189**, and enabled MCP on **8190**, matching `st-stack.zsh`. ComfyUI defaults to upstream port 8188 and KoboldCpp to 5001. The root launcher uses private storage and does not inject a legacy fixed MCP output directory. Reference input defaults to `/run/media/veracrypt1/mcp-inputs`. Environment variables and CLI arguments can override these defaults.
 
-`./start-proxy.sh` without arguments incrementally builds the release binaries and runs `proxy/st-stack.zsh` in **all** mode. It starts or reuses KoboldCpp, TabbyAPI, Prism, SC117, Orca, SC117 128k and Orca 128k, waits for readiness, then starts the proxy with the combined `backend/model` catalog that Pi expects. Models are activated on demand through the shared GPU coordinator. Imagine must be started separately first. Ctrl-C or `./start-proxy.sh --stop` stops the stack; `--log` shows backend logs. Set `ST_PROXY_LLM_BACKEND` to select another stack backend.
+`./start-proxy.sh` without arguments incrementally builds the local `main` binaries through the [shared product builder](../docs/PRODUCT-BUILDS.md) and runs `proxy/st-stack.zsh` in **all** mode. It starts or reuses KoboldCpp, TabbyAPI, Prism, SC117, Orca, SC117 128k and Orca 128k, waits for readiness, then starts the proxy with the combined `backend/model` catalog that Pi expects. Models are activated on demand through the shared GPU coordinator. Imagine must be started separately first. Ctrl-C or `./start-proxy.sh --stop` stops the stack; `--log` shows backend logs. Set `ST_PROXY_LLM_BACKEND` to select another stack backend.
 
 Proxy CLI options and unambiguous abbreviations configure the supervised stack too: `./start-proxy.sh --llm-b sc117 --chat-port 5002` starts that backend and the proxy. Use `--proxy-only` to connect to independently managed backends without starting them. `--help` lists existing CLI options plus the integration options. The usual `ST_PROXY_*` variables work; the new ones are `ST_PROXY_COORDINATOR_SOCKET` and `ST_PROXY_IMAGINE_URL`. `ST_PROXY_MCP_TOKEN` remains environment-only. Tokens are not logged.
 
@@ -65,7 +65,7 @@ routes then use the same image port outside `/imagine`, and confirmed Comfy GPU
 release is required during handoffs. An unreachable enabled Comfy is never ignored.
 
 The root `start-server.sh` / `start-proxy.sh` launchers default to the shared
-`.imagine/gpu.sock`. Custom data paths no longer require credential configuration.
+`$XDG_RUNTIME_DIR/imagine/gpu.sock`. Custom data paths no longer require credential configuration.
 `--imagine-access-file` and `ST_PROXY_IMAGINE_ACCESS_FILE` have been removed.
 The UI needs only `--api`. Existing services must be restarted to use the updated
 binaries together.
