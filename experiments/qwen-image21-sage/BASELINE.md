@@ -1,4 +1,10 @@
-# Current frozen Qwen Image 2.1 baseline: v2
+# Frozen Qwen Image 2.1 comparison baseline: v2
+
+The app's subsequent combined standard is documented in
+[native/qwen-default](../../native/qwen-default/README.md). It retains this
+immutable v2 control and its common settings, combines the accepted reference
+cache with prepared INT8 LoRA weights, and selects runtime adapters when needed.
+The acceptance and selection statements below describe the original v2 profile.
 
 Accepted by Tomas on 2026-10-15: **qwen-image21-1600x896-v2**.
 The internal strip algorithm is dynamic and has no resolution whitelist.

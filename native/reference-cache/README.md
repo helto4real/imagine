@@ -1,5 +1,10 @@
 # Qwen reference cache
 
+The app's subsequent [combined Qwen default](../qwen-default/README.md) includes
+these reference optimizations alongside automatic INT8 LoRA preparation. The
+separately pinned executable here remains a verified fallback and comparison
+control. The original acceptance/selection account follows.
+
 Accepted reference baseline: **2026-10-16**, for the documented Qwen Image 2.1
 workloads. See [retained optimization material](REPRODUCIBILITY.md) for local
 controls, test inputs and cleanup policy.

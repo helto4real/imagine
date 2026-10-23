@@ -12,7 +12,11 @@ SOURCE=OUT/'source'
 BUILD=OUT/'build'
 p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--run',action='store_true')
+p.add_argument('--candidate', choices=['lora-merge','qwen-default'],default='lora-merge')
 a=p.parse_args()
+OUT=ROOT/'.imagine'/a.candidate
+SOURCE=OUT/'source'
+BUILD=OUT/'build'
 
 def save(path,items):
     header={};data=bytearray()
@@ -33,6 +37,9 @@ up=struct.pack('<'+str(128*32)+'e',*((i*3%17-8)/128 for i in range(128*32)))
 down=struct.pack('<'+str(32*512)+'e',*((i*7%19-9)/128 for i in range(32*512)))
 save(OUT/'synthetic-lora.safetensors',[(key+'.lora_up.weight','F16',[128,32],up),
     (key+'.lora_down.weight','F16',[32,512],down),(key+'.alpha','F32',[],struct.pack('<f',32))])
+if a.candidate=='qwen-default':
+    save(OUT/'synthetic-lora.safetensors.rank257',[(key+'.lora_up.weight','F16',[128,257],b'\0'*(128*257*2)),
+        (key+'.lora_down.weight','F16',[257,512],b'\0'*(257*512*2))])
 fused=key.replace('attn.to_q','img_mlp.gate_up')
 save(OUT/'synthetic-fused-model.safetensors',[(fused+'.weight','I8',[256,512],q+q),
     (fused+'.weight_scale','F32',[256],scales+scales),(fused+'.comfy_quant','U8',[len(config)],config)])
@@ -45,7 +52,7 @@ save(OUT/'synthetic-fused-lora.safetensors',items)
 save(OUT/'synthetic-full-fused-lora.safetensors',[(fused+'.lora_up.weight','F16',[256,32],up+up),
     (fused+'.lora_down.weight','F16',[32,512],down),(fused+'.alpha','F32',[],struct.pack('<f',32))])
 obj=OUT/'test-lifecycle.o';binary=OUT/'test-lifecycle'
-subprocess.run(['g++','-std=c++17','-O2','-I'+str(SOURCE/'include'),'-I'+str(SOURCE/'src'),
+subprocess.run(['g++','-std=c++17','-O2',*(['-DIMAGINE_TEST_AUTO_MERGE'] if a.candidate=='qwen-default' else []),'-I'+str(SOURCE/'include'),'-I'+str(SOURCE/'src'),
                 '-I'+str(SOURCE/'ggml/include'),'-c',str(Path(__file__).with_suffix('.cpp')),'-o',str(obj)],check=True)
 link=subprocess.check_output(['ninja','-t','commands','bin/sd-server'],cwd=BUILD,text=True).splitlines()[-1]
 assert link.startswith(': && ') and link.endswith(' && :')

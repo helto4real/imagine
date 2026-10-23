@@ -107,6 +107,16 @@ async fn reference_cache_binary(project: &std::path::Path) -> Option<std::path::
         }
     }
 }
+async fn qwen_default_binary(project: &std::path::Path) -> Option<std::path::PathBuf> {
+    let lock: Value = serde_json::from_str(include_str!("../native/qwen-default/source-lock.json"))
+        .expect("Qwen default source lock");
+    let expected = lock["candidate_binary_sha256"].as_str()?;
+    let binary = project.join("native/qwen-default/bin/sd-server");
+    match tokio::fs::read(&binary).await {
+        Ok(bytes) if hash(&bytes) == expected => Some(binary),
+        _ => None,
+    }
+}
 impl Native {
     pub fn new(config: Config, state: watch::Sender<EngineState>) -> Result<Self> {
         Ok(Self {
@@ -206,8 +216,19 @@ impl Native {
         {
             bail!(EngineError("frozen_binary_hash_mismatch"));
         }
+        let qwen_default = if request.model == crate::contract::MODEL {
+            qwen_default_binary(&self.config.project).await
+        } else {
+            None
+        };
+        if let Some(path) = &qwen_default {
+            binary = path.clone();
+        }
         let reference_cache = if profile == NativeProfile::ReferenceCache {
-            reference_cache_binary(&self.config.project).await
+            match &qwen_default {
+                Some(path) => Some(path.clone()),
+                None => reference_cache_binary(&self.config.project).await,
+            }
         } else {
             None
         };
@@ -322,8 +343,12 @@ impl Native {
                 command.env_remove(key);
             }
         }
+        command.envs(env);
+        if qwen_default.is_some() {
+            command.env("SD_QWEN21_MERGE_LORA_INT8", "auto");
+            command.env("GGML_CUDA_FUSED_LORA_OUTPUT", "1");
+        }
         command
-            .envs(env)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())
@@ -654,6 +679,15 @@ mod tests {
         assert!(reference_cache_binary(root.path()).await.is_none());
     }
     #[tokio::test]
+    async fn absent_or_unverified_default_executable_falls_back() {
+        let root = tempfile::tempdir().unwrap();
+        assert!(qwen_default_binary(root.path()).await.is_none());
+        let binary = root.path().join("native/qwen-default/bin/sd-server");
+        std::fs::create_dir_all(binary.parent().unwrap()).unwrap();
+        std::fs::write(binary, b"not the accepted binary").unwrap();
+        assert!(qwen_default_binary(root.path()).await.is_none());
+    }
+    #[tokio::test]
     async fn changing_reference_profile_stops_the_previous_native_process() {
         // A harmless child exercises the actual reuse/stop path without a GPU.
         for (loaded, count) in [
@@ -690,6 +724,89 @@ mod tests {
             assert!(native.ready(&synthetic_pass(count)).await.is_err());
             assert!(native.child.is_none());
         }
+    }
+    #[tokio::test]
+    #[ignore = "requires the accepted Qwen default binary and an idle CUDA GPU"]
+    async fn qwen_default_live_reference_and_fallback() {
+        let project = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        assert!(qwen_default_binary(&project).await.is_some());
+        let root = tempfile::tempdir().unwrap();
+        let (mut config, _lock) = Config::load(
+            project.clone(),
+            root.path().join("data"),
+            "127.0.0.1:0".parse().unwrap(),
+        )
+        .unwrap();
+        config.model_root = std::env::var("IMAGINE_TEST_MODEL_ROOT")
+            .expect("explicit test model root")
+            .into();
+        let lora = std::env::var("IMAGINE_TEST_LORA").expect("explicit test LoRA");
+        let (state, _) = watch::channel(EngineState::default());
+        let mut native = Native::new(config, state).unwrap();
+        let mut pass = synthetic_pass(0);
+        pass.prompt = "A photographic portrait of an adult woman wearing a blue cotton shirt, neutral expression, looking at the camera, soft natural window light, realistic skin texture, simple light gray background, waist-up composition.".into();
+        pass.sampling.cfg_scale = 2.5;
+        pass.model_options.qwen_image_2_1.workflow = Some(serde_json::from_value(json!({
+            "diffusion_model":"diffusion_models/qwen-image2.1/qwen_image_2.1_int8_convrot.safetensors",
+            "text_encoder":"text_encoders/qwen-image2.1/qwen3vl_8b_int8_convrot.safetensors",
+            "vae":"vae/qwen-image2.1/qwen_image_2.1_vae_bf16.safetensors",
+            "loras":[{"path":lora,"strength":1.0}]
+        })).unwrap());
+        pass.references = vec![
+            crate::workflow_image::encode(&image::DynamicImage::ImageRgb8(
+                image::RgbImage::from_pixel(256, 256, image::Rgb([80, 120, 160])),
+            ))
+            .unwrap()
+            .into(),
+        ];
+        for case in [
+            "reference_lora_first",
+            "reference_lora_warm",
+            "reference_removed",
+            "runtime_rank257",
+            "merged_return",
+        ] {
+            if case == "reference_removed" {
+                pass.model_options
+                    .qwen_image_2_1
+                    .workflow
+                    .as_mut()
+                    .unwrap()
+                    .loras
+                    .clear();
+            }
+            if case == "runtime_rank257" {
+                pass.references.clear();
+                pass.sampling.cfg_scale = 1.0;
+                pass.model_options.qwen_image_2_1.workflow.as_mut().unwrap().loras = serde_json::from_value(json!([
+                    {"path":project.join(".imagine/qwen-default/synthetic-lora.safetensors.rank257"),"strength":1.0}
+                ])).unwrap();
+            }
+            if case == "merged_return" {
+                pass.model_options
+                    .qwen_image_2_1
+                    .workflow
+                    .as_mut()
+                    .unwrap()
+                    .loras = serde_json::from_value(json!([
+                    {"path":lora,"strength":1.0}
+                ]))
+                .unwrap();
+            }
+            let start = std::time::Instant::now();
+            let result = native.generate(&pass).await;
+            let ok = result.is_ok();
+            drop(result);
+            eprintln!(
+                "QWEN_ACCEPTANCE {case} seconds={:.6} success={ok}",
+                start.elapsed().as_secs_f64()
+            );
+            if !ok {
+                native.stop().await.unwrap();
+            }
+            assert!(ok, "controlled Qwen acceptance case failed");
+        }
+        native.stop().await.unwrap();
     }
     #[test]
     fn native_pass_prepares_every_reference_in_order_without_touching_output_size() {

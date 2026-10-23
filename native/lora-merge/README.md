@@ -1,5 +1,9 @@
 # Experimental Qwen INT8 / ConvRot LoRA merge
 
+The subsequent [combined app default](../qwen-default/README.md) incorporates
+this implementation, the loader wait fix and the accepted reference-cache
+overlays. This separate candidate remains the preserved LoRA comparison control.
+
 Validated experimental candidate on the frozen v2 + LoRA-output overlay.
 `SD_QWEN21_MERGE_LORA_INT8=1` requests prepared INT8 weights. Default is off.
 No application engine selection or frozen executable is changed.

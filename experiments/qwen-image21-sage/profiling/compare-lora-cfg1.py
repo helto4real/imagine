@@ -74,8 +74,9 @@ def main():
                         help="Verified separate native candidate; frozen baseline is still checked")
     parser.add_argument("--lora-output", choices=("0", "1"),
                         help="Only with --candidate-manifest: toggle the LoRA output fusion")
-    parser.add_argument("--lora-merge", choices=("0", "1"),
+    parser.add_argument("--lora-merge", choices=("0", "1", "auto"),
                         help="Separate INT8/ConvRot merge candidate; requires --candidate-manifest")
+    parser.add_argument('--candidate-source-lock',type=Path)
     args = parser.parse_args()
     manifest = json.loads((BASELINE / "manifest.json").read_text())
     for name, expected in manifest["files_sha256"].items():
@@ -89,7 +90,7 @@ def main():
         parser.error("--candidate-manifest requires --lora-output or --lora-merge")
     if args.candidate_manifest:
         candidate = json.loads(args.candidate_manifest.read_text())
-        source_lock = PROJECT / ("native/lora-merge/source-lock.json" if args.lora_merge is not None else "native/lora-output/source-lock.json")
+        source_lock = args.candidate_source_lock or PROJECT / ("native/lora-merge/source-lock.json" if args.lora_merge is not None else "native/lora-output/source-lock.json")
         if (hashlib.sha256(source_lock.read_bytes()).hexdigest() != candidate["source_lock_sha256"]
                 or candidate["base_binary_sha256"] != manifest["binary_sha256"]):
             raise RuntimeError("Candidate provenance does not match the source lock and frozen baseline")

@@ -1,0 +1,13 @@
+{
+  "id": "qwen-image21-native-v3",
+  "binary_path": "native/qwen-default/bin/sd-server",
+  "binary_sha256": "3c14f14b3930ef468cea2ca6c8e0baaa313e323098345ec403ce4b9a26787852",
+  "source_lock_sha256": "d5176018bbf304bd36ae577791e98efcc6b0344964de6208753127b10eb77320",
+  "common_profile": "experiments/qwen-image21-sage/baselines/1600x896-v2",
+  "environment": {
+    "SD_QWEN21_MERGE_LORA_INT8": "auto",
+    "GGML_CUDA_FUSED_LORA_OUTPUT": "1"
+  },
+  "reference_model_args": "qwen_image_2_1_prefix_cache_device=hybrid,qwen_image_2_1_prefix_cache_prefetch=true",
+  "acceptance": "Installed as the app default at the explicit user request; no additional tests after the no-tests instruction. This is an interim implementation, not full Comfy adapter parity."
+}

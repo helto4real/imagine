@@ -47,6 +47,21 @@ static void check_lifecycle(const char *model, const char *lora,
   spec.path = lora;
   spec.multiplier = 1;
   spec.required = true;
+#ifdef IMAGINE_TEST_AUTO_MERGE
+  if (!fused) {
+    auto unsupported = spec;
+    unsupported.path += ".rank257";
+    std::vector<ModelManager::LoraSpec> rejected{unsupported};
+    assert(manager->prepare_lora_sources(rejected));
+    assert(!manager->can_merge_int8_loras(rejected, VERSION_QWEN_IMAGE_2_1));
+    assert(sample() == original);
+  }
+  std::vector<ModelManager::LoraSpec> specs{spec};
+  assert(manager->prepare_lora_sources(specs));
+  assert(manager->can_merge_int8_loras(specs, VERSION_QWEN_IMAGE_2_1));
+  assert(!manager->can_merge_int8_loras(specs, VERSION_COUNT));
+  spec = specs.front();
+#endif
   assert(manager->set_loras({spec}, VERSION_QWEN_IMAGE_2_1));
   auto merged = sample();
   assert(merged != original);
@@ -73,7 +88,11 @@ static void check_lifecycle(const char *model, const char *lora,
 
 int main(int argc, char **argv) {
   assert(argc == 6);
+#ifdef IMAGINE_TEST_AUTO_MERGE
+  setenv("SD_QWEN21_MERGE_LORA_INT8", "auto", 1);
+#else
   setenv("SD_QWEN21_MERGE_LORA_INT8", "1", 1);
+#endif
   auto cuda = ggml_backend_cuda_init(0);
   auto cpu = ggml_backend_cpu_init();
   assert(cuda && cpu);
