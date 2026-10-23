@@ -69,8 +69,10 @@ def run(args):
     readonly=[(profile,profile),(lock,lock),(checkpoint,checkpoint)]
     environment=dict(H3_MEMORY_GEOMETRY=args.geometry,H3_MEMORY_VARIANT=args.variant,H3_MEMORY_CAPTURE=str(int(args.capture)))
     if args.oom:environment['H3_MEMORY_OOM']='1'
+    if args.terminal_release:environment['H3_MEMORY_TERMINAL_RELEASE']='1'
     record=dict(schema=1,engine=args.engine,variant=args.variant,geometry=args.geometry,reference=args.reference,capture=args.capture,trace=args.trace,oom=args.oom,phase=args.phase,result='preflight',output_root=str(work),selected_component=entry,profile_sha256=sha(profile),model_lock_sha256=sha(lock))
     evidence=work/(args.phase+'-selection.json')
+    record['terminal_release']=args.terminal_release
     assert not evidence.exists()
     if args.engine=='native':
         built=OWN/'target/debug/h3-memory-probe'
@@ -129,7 +131,13 @@ def run(args):
     passed=(record['returncode']==0 and not args.cancel and not args.oom)or(cancelled and record['returncode']!=0 and lifecycle.get('worker',{}).get('state')=='cancelled')
     if args.oom and (output/'phase.json').exists():
         phase=json.loads((output/'phase.json').read_text())
-        passed=record['returncode']!=0 and 'out of memory' in phase.get('error','').lower() and 'cleanup_error'not in phase and phase['unloaded']['placement']['loaded_bytes']==0 and phase['unloaded']['pinned_bytes']==0
+        released=phase.get('released',{})
+        clean=(released.get('model_alive')is False and released.get('registrations')==0 and released.get('pinned_bytes')==0)if args.terminal_release else(phase['unloaded']['placement']['loaded_bytes']==0 and phase['unloaded']['pinned_bytes']==0)
+        passed=record['returncode']!=0 and 'out of memory' in phase.get('error','').lower() and 'cleanup_error'not in phase and clean
+    if args.terminal_release and not args.cancel:
+        phase=json.loads((output/'phase.json').read_text())if(output/'phase.json').exists()else{}
+        released=phase.get('released',{})
+        passed=passed and 'cleanup_error'not in phase and released.get('model_alive')is False and released.get('registrations')==0 and released.get('pinned_bytes')==0
     if args.trace and not args.cancel:
         trace=work/(args.phase+'-activity.tsv')
         passed=passed and trace.exists() and trace.read_text().rstrip().endswith('# dropped_records=0')
@@ -148,7 +156,8 @@ if __name__=='__main__':
     p.add_argument('--geometry',choices=['short','large'],required=True)
     p.add_argument('--phase',choices=['text','reference','dit','video','audio'],required=True)
     p.add_argument('--inputs',type=Path)
-    for flag in ('capture','reference','trace','cancel','oom'):p.add_argument('--'+flag,action='store_true')
+    for flag in ('capture','reference','trace','cancel','oom','terminal-release'):p.add_argument('--'+flag,action='store_true')
     a=p.parse_args();assert not a.cancel or a.phase=='dit'
     assert not a.oom or (a.engine=='native'and a.phase=='dit'and not a.cancel)
+    assert not a.terminal_release or a.engine=='native'
     run(a)

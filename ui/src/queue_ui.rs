@@ -378,6 +378,7 @@ impl ImagineApp {
         };
         let mut open = true;
         if ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+            self.queue.parked_drafts = Some(drafts);
             return;
         }
         let mut enqueue = false;
@@ -444,10 +445,12 @@ impl ImagineApp {
             drafts.remove(index);
         }
         if enqueue && self.enqueue_prompts(ctx, drafts.clone()) {
-            open = false;
+            return;
         }
         if open {
             self.queue.drafts = Some(drafts);
+        } else {
+            self.queue.parked_drafts = Some(drafts);
         }
     }
 }

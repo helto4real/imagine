@@ -38,6 +38,8 @@ pub(super) struct Queue {
     pub follow: bool,
     pub collapsed: bool,
     pub drafts: Option<Vec<String>>,
+    /// Drafts from a closed Multiple prompts window, restored on reopen.
+    pub parked_drafts: Option<Vec<String>>,
     pub draft_error: Option<String>,
 }
 impl Default for Queue {
@@ -50,6 +52,7 @@ impl Default for Queue {
             follow: true,
             collapsed: false,
             drafts: None,
+            parked_drafts: None,
             draft_error: None,
         }
     }

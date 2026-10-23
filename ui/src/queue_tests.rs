@@ -506,6 +506,12 @@ fn multi_prompt_editor_keeps_paragraphs_separate_and_can_add_remove_and_close() 
         modifiers: egui::Modifiers::NONE,
     }]);
     assert!(desk.app.queue.drafts.is_none());
+    desk.click("Multiple prompts");
+    assert_eq!(
+        desk.app.queue.drafts.as_ref().unwrap()[1],
+        "One prompt\n\nwith paragraphs",
+        "closing the window must not discard typed prompts"
+    );
 }
 
 #[tokio::test]

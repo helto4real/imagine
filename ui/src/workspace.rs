@@ -1123,7 +1123,10 @@ impl ImagineApp {
                         .inner
                         .clicked()
                 {
-                    self.queue.drafts = Some(vec![self.image.prompt.clone(), String::new()]);
+                    let restored = self.queue.parked_drafts.take();
+                    self.queue.drafts = Some(
+                        restored.unwrap_or_else(|| vec![self.image.prompt.clone(), String::new()]),
+                    );
                     self.queue.draft_error = None;
                 }
                 if !editing

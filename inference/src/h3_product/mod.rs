@@ -1,5 +1,6 @@
 //! One-request H3 product worker boundary. The frozen replay/core remain controls.
 pub mod deployment;
+mod lifecycle;
 mod memory_budget;
 mod native;
 #[path = "../../../shared/h3_protocol.rs"]

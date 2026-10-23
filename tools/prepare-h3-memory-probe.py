@@ -19,9 +19,11 @@ def replace_once(source, old, new):
 def prepare(source):
     path = source / 'inference/src/bin/h3-stage4.rs'
     native = path.read_text()
-    native = replace_once(native, 'fn sha(path: &Path)', '''use imagine_inference::h3_product::protocol;
+    native = replace_once(native, 'fn sha(path: &Path)', '''use imagine_inference::{h3_product::protocol, memory, models, native};
 #[path = "../h3_product/memory_budget.rs"]
 mod memory_budget;
+#[path = "../h3_product/lifecycle.rs"]
+mod lifecycle;
 fn geometry() -> protocol::Shape {
     match std::env::var("H3_MEMORY_GEOMETRY").unwrap().as_str() {
         "short" => protocol::Shape::default(),
@@ -105,6 +107,24 @@ fn sha(path: &Path)''')
     native = native.replace('[1, 3, 39, 256, 384]', '[1, 3, shape.frames as i64, shape.height as i64, shape.width as i64]')
     native = native.replace('[1, 2, 52000]', '[1, 2, shape.native_audio_samples() as i64]')
     native = replace_once(native, '    report["cuda_after_release"]', '    report["host_after_release"] = host_metrics();\n    report["cuda_after_release"]')
+    native = replace_once(native, '''    let cleanup = manager.unload_all(dev, &mut services);
+    report["unloaded"] = memory(&model.owner.borrow(), pins.bytes());''', '''    let terminal = std::env::var_os("H3_MEMORY_TERMINAL_RELEASE").is_some();
+    let mut retained = Some((model, patcher));
+    let cleanup = if terminal {
+        let (model, patcher) = retained.take().unwrap();
+        let weak = std::rc::Rc::downgrade(&model);
+        let result = lifecycle::release_component(model, patcher, &mut manager);
+        report["released"] = json!({"model_alive":weak.upgrade().is_some(),"registrations":manager.registrations(),"pinned_bytes":pins.bytes(),"host":host_metrics()});
+        result
+    } else {
+        let result = manager.unload_all(dev, &mut services);
+        report["unloaded"] = memory(&retained.as_ref().unwrap().0.owner.borrow(), pins.bytes());
+        result
+    };''')
+    native = replace_once(native, '    drop(patcher);\n    drop(model);', '''    if let Some((model, patcher)) = retained {
+        drop(patcher);
+        drop(model);
+    }''')
     native = replace_once(native, '    let mut args = std::env::args_os().skip(1);', '''    let _ = (geometry(), candidate());
     let mut args = std::env::args_os().skip(1);''')
     target = source / 'inference/src/bin/h3-memory-probe.rs'

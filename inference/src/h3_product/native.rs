@@ -300,9 +300,7 @@ fn component<T>(
             .and_then(|value| rt.native.synchronize_device(0).map(|_| value))
             .map_err(|error| classify(&error, ErrorCode::GenerationFailed))
     })();
-    let cleanup = manager.unload_all(Device::Cuda(0), &mut memory);
-    drop(patcher);
-    drop(model);
+    let cleanup = super::lifecycle::release_component(model, patcher, &mut manager);
     drop(manager);
     drop(memory);
     drop(pins);
