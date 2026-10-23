@@ -203,6 +203,7 @@ impl ImagineApp {
         let mut selection = None;
         let mut follow_latest = false;
         let mut reuse = None;
+        let mut dismissed = None;
         region(ui, "queue-results", results_rect, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
@@ -308,11 +309,38 @@ impl ImagineApp {
                                         ),
                                         egui::StrokeKind::Inside,
                                     );
-                                    if let Some(reason) = select_blocked {
-                                        response.on_hover_text(reason);
-                                    } else if response.clicked() {
+                                    // The prompt and file follow the dock's reveal boundary.
+                                    let file = asset.file.clone();
+                                    let prompt = item
+                                        .snapshot
+                                        .as_ref()
+                                        .map(|s| s.prompt.lines().next().unwrap_or("").to_owned())
+                                        .filter(|p| revealed && !p.is_empty());
+                                    let response = match (&prompt, select_blocked) {
+                                        (Some(prompt), Some(reason)) => {
+                                            response.on_hover_text(format!("{prompt}\n{reason}"))
+                                        }
+                                        (Some(prompt), None) => response.on_hover_text(prompt),
+                                        (None, Some(reason)) => response.on_hover_text(reason),
+                                        (None, None) => response,
+                                    };
+                                    if select_blocked.is_none() && response.clicked() {
                                         selection = Some(item.id.clone());
                                     }
+                                    response.context_menu(|ui| {
+                                        if ui.button("Copy file path").clicked() {
+                                            ui.ctx().copy_text(file.display().to_string());
+                                            ui.close();
+                                        }
+                                        if ui.button("Open containing folder").clicked() {
+                                            open_folder(&file);
+                                            ui.close();
+                                        }
+                                        if ui.button("Remove from results").clicked() {
+                                            dismissed = Some(item.id.clone());
+                                            ui.close();
+                                        }
+                                    });
                                     ui.horizontal(|ui| {
                                         ui.label(
                                             RichText::new(format!("#{}", index + 1))
@@ -362,6 +390,13 @@ impl ImagineApp {
         }
         if let Some(id) = reuse {
             self.reuse_queue_settings(&id);
+        }
+        // Only the list entry is removed; the saved image stays where it is.
+        if let Some(id) = dismissed {
+            self.queue.gallery.retain(|item| item.id != id);
+            if self.queue.selected.as_deref() == Some(&id) {
+                self.queue.selected = None;
+            }
         }
     }
 
@@ -441,4 +476,21 @@ impl ImagineApp {
             self.queue.parked_drafts = Some(drafts);
         }
     }
+}
+
+/// Shows the result's folder in the desktop file manager.
+fn open_folder(file: &std::path::Path) {
+    let Some(folder) = file.parent().map(std::path::Path::to_path_buf) else {
+        return;
+    };
+    // Reaped on its own thread so the opener never lingers as a zombie.
+    std::thread::spawn(move || {
+        let _ = std::process::Command::new("xdg-open")
+            .arg(folder)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .and_then(|mut child| child.wait());
+    });
 }

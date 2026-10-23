@@ -698,3 +698,37 @@ fn cancelled_jobs_stay_listed_until_dismissed() {
     desk.click("Dismiss job 1");
     assert!(desk.app.queue.jobs.is_empty());
 }
+
+#[test]
+fn gallery_menu_removes_only_the_list_entry() {
+    let mut desk = Desk::new();
+    let ids = stage(&mut desk, &["Own gallery prompt"]);
+    let done = completed(desk._root.path(), "gallery-menu", [5, 6, 7, 255]);
+    let file = done.assets[0].file.clone();
+    desk.app.queue_message(
+        &desk.ctx,
+        Event::Finished(ids[0].clone(), Ok(Completion::new(done))),
+    );
+    desk.app.queue.collapsed = false;
+    desk.frame(vec![]);
+    let thumb = desk.control("View result 1").bounds().unwrap();
+    let pos = egui::pos2(
+        ((thumb.x0 + thumb.x1) / 2.) as f32,
+        ((thumb.y0 + thumb.y1) / 2.) as f32,
+    );
+    for pressed in [true, false] {
+        desk.frame(vec![
+            egui::Event::PointerMoved(pos),
+            egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Secondary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            },
+        ]);
+    }
+    desk.frame(vec![]);
+    desk.click("Remove from results");
+    assert!(desk.app.queue.gallery.is_empty());
+    assert!(file.exists(), "the saved image is kept");
+}
