@@ -306,6 +306,15 @@ impl ImagineApp {
             ui.weak("Conditions the next Scene's ordinary Take. Generate that Scene again to apply changed boundary inputs. Final joins the resulting Takes; it does not add a third transition clip.");
         }
         if before != boundary {
+            if let Some(continuity) =
+                linked_continuity(&d.project, scene, &left.id, &before.mode, &boundary.mode)
+            {
+                commands.extend(self.timeline.draft_edits());
+                commands.push(Edit::SetContinuity {
+                    scene_id: scene.id.clone(),
+                    continuity,
+                });
+            }
             commands.push(Edit::SetAssemblyBoundary { boundary });
         }
         ui.separator();
@@ -1005,6 +1014,39 @@ pub(super) fn boundary_for(
             ..Boundary::new(left.clone(), right.clone())
         })
 }
+/// A Continuous shot also starts the Scene from the previous Scene's last frame;
+/// a Hard cut removes that again. Other continuity the user chose is kept.
+fn linked_continuity(
+    project: &VideoProject,
+    scene: &Scene,
+    left: &SceneId,
+    before: &imagine_video_contract::assembly::BoundaryMode,
+    after: &imagine_video_contract::assembly::BoundaryMode,
+) -> Option<Option<Continuity>> {
+    use imagine_video_contract::assembly::BoundaryMode;
+    use imagine_video_contract::creative::SceneKind;
+    let last_frame = Continuity {
+        source_scene: left.clone(),
+        method: ContinuityMethod::LastFrameFirstFrame,
+        include_audio: false,
+    };
+    match (before, after) {
+        (_, BoundaryMode::ContinuousShot)
+            if scene.continuity.is_none()
+                && ![left, &scene.id]
+                    .into_iter()
+                    .any(|id| project.scene_kind(id) == SceneKind::Imported) =>
+        {
+            Some(Some(last_frame))
+        }
+        (BoundaryMode::ContinuousShot, BoundaryMode::HardCut)
+            if scene.continuity.as_ref() == Some(&last_frame) =>
+        {
+            Some(None)
+        }
+        _ => None,
+    }
+}
 fn fitted_clip(
     scene_duration: Time,
     asset: AssetId,
@@ -1246,6 +1288,75 @@ mod tests {
         let baseline = snapshot_and_plan().0.project;
         document.project.id = ProjectId("other-project".into());
         assert!(earlier_snapshot(&plan, Some(&baseline), &document));
+    }
+    #[test]
+    fn a_continuous_shot_starts_from_the_previous_last_frame_and_a_hard_cut_removes_it() {
+        use imagine_video_contract::assembly::BoundaryMode::*;
+        use imagine_video_contract::creative::SceneKind;
+        let mut project = media_picker::tests::project();
+        let left = project.scenes[0].id.clone();
+        let mut scene = project.scenes[0].clone();
+        scene.id = SceneId("own-right-scene".into());
+        scene.start = Time { num: 2, den: 1 };
+        scene.sections.clear();
+        project.scenes.push(scene.clone());
+        let link = |project: &VideoProject, scene: &Scene, before, after| {
+            linked_continuity(project, scene, &left, &before, &after)
+        };
+        let last_frame = Continuity {
+            source_scene: left.clone(),
+            method: ContinuityMethod::LastFrameFirstFrame,
+            include_audio: false,
+        };
+        assert_eq!(
+            link(&project, &scene, HardCut, ContinuousShot),
+            Some(Some(last_frame.clone()))
+        );
+        let mut boundary = boundary_for(&project, &left, &scene.id);
+        boundary.mode = ContinuousShot;
+        let revision = project.project_revision;
+        imagine_video_contract::editing::apply(
+            &mut project,
+            EditRequest {
+                schema_version: 1,
+                expected_project_revision: revision,
+                commands: vec![
+                    Edit::SetContinuity {
+                        scene_id: scene.id.clone(),
+                        continuity: Some(last_frame.clone()),
+                    },
+                    Edit::SetAssemblyBoundary { boundary },
+                ],
+            },
+        )
+        .unwrap();
+        let scene = project.scenes[1].clone();
+        assert_eq!(scene.continuity, Some(last_frame.clone()));
+        assert_eq!(link(&project, &scene, ContinuousShot, HardCut), Some(None));
+        // Blend seams and transitions keep it; the Scene already continues.
+        for after in [BlendSeam, Transition] {
+            assert_eq!(link(&project, &scene, ContinuousShot, after), None);
+        }
+        assert_eq!(link(&project, &scene, BlendSeam, ContinuousShot), None);
+        // Continuity the user chose stays through a Hard cut.
+        let mut motion = scene.clone();
+        motion.continuity = Some(Continuity {
+            method: ContinuityMethod::MotionContext,
+            ..last_frame
+        });
+        assert_eq!(link(&project, &motion, ContinuousShot, HardCut), None);
+        assert_eq!(link(&project, &motion, HardCut, ContinuousShot), None);
+        // An imported clip has no Take to take a last frame from.
+        let mut fresh = scene.clone();
+        fresh.continuity = None;
+        for id in [&left, &fresh.id] {
+            let mut imported = project.clone();
+            imported
+                .creative
+                .scene_kinds
+                .insert(id.clone(), SceneKind::Imported);
+            assert_eq!(link(&imported, &fresh, HardCut, ContinuousShot), None);
+        }
     }
     #[test]
     fn new_seam_uses_three_frames_but_reopened_edited_overlap_is_preserved() {
