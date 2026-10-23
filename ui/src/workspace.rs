@@ -687,13 +687,18 @@ impl ImagineApp {
                 format!("Version {index}")
             }
         };
+        // Every version is one click away instead of hidden in a menu.
         ui.add_enabled_ui(self.editable(), |ui| {
-            egui::ComboBox::from_id_salt("edit-version")
-                .selected_text(name(selected))
-                .show_ui(ui, |ui| {
-                    for index in 0..self.edit.versions.len() {
-                        ui.selectable_value(&mut selected, index, name(index));
-                    }
+            egui::ScrollArea::horizontal()
+                .id_salt("edit-versions")
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        for index in 0..self.edit.versions.len() {
+                            if helto::select_button(ui, &name(index), index == selected).clicked() {
+                                selected = index;
+                            }
+                        }
+                    });
                 });
         });
         if selected != self.edit.selected {

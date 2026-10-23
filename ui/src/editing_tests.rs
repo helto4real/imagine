@@ -568,3 +568,23 @@ fn headless_edit_layout_and_privacy() {
         }
     }
 }
+
+#[test]
+fn edit_versions_are_tabs_that_select_the_version() {
+    let mut desk = Desk::new();
+    enter(&mut desk);
+    desk.app
+        .tx
+        .send(Message::Finished(
+            Workspace::ImageEdit,
+            Ok(completed(&desk, "v1")),
+        ))
+        .unwrap();
+    desk.app.receive(&desk.ctx);
+    desk.frame(vec![]);
+    assert_eq!(desk.app.edit.selected, 1);
+    desk.click("Original");
+    assert_eq!(desk.app.edit.selected, 0);
+    desk.click("Version 1");
+    assert_eq!(desk.app.edit.selected, 1);
+}
