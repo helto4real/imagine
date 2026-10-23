@@ -358,8 +358,10 @@ impl ImagineApp {
             .cloned();
         let weights: &[f32] = if self.timeline.boundary {
             &[1., 1.]
-        } else {
+        } else if section.is_some() {
             &[1.35, 1., 0.8]
+        } else {
+            &[0.85, 1.25, 1., 0.85]
         };
         for (index, column) in columns(body, weights).into_iter().enumerate() {
             chrome::region(ui, &format!("timeline-inspector-{index}"), column, |ui| {
@@ -391,7 +393,8 @@ impl ImagineApp {
                                 }
                             } else {
                                 match index {
-                                    0 => {
+                                    0 => self.timeline_take_card(ui, d, &scene),
+                                    1 => {
                                         self.timeline_scene_fields(ui, d, &scene, &["title"], commands);
                                         self.timeline_enhance_label(
                                             ui,
@@ -420,7 +423,7 @@ impl ImagineApp {
                                         dialogue_warnings(ui, &self.timeline.draft_description);
                                         self.timeline_scene_fields(ui, d, &scene, &["summary"], commands);
                                     }
-                                    1 => {
+                                    2 => {
                                         self.timeline_scene_blockers_list(ui);
                                         self.timeline_scene_fields(
                                             ui,

@@ -9,11 +9,14 @@ pub(in crate::app) enum Reply {
 }
 impl Timeline {
     pub(super) fn has_active_run(&self) -> bool {
-        self.document.as_ref().is_some_and(|d| {
-            self.runs
-                .iter()
-                .any(|r| r.project_id == d.project.id && !r.status.terminal())
-        })
+        self.active_run().is_some()
+    }
+    /// The open project's unfinished run, if any.
+    pub(super) fn active_run(&self) -> Option<&Run> {
+        let d = self.document.as_ref()?;
+        self.runs
+            .iter()
+            .find(|r| r.project_id == d.project.id && !r.status.terminal())
     }
 }
 impl ImagineApp {
@@ -223,7 +226,7 @@ impl ImagineApp {
             }
         }
     }
-    fn timeline_stop_run(&mut self, ctx: &egui::Context, id: String, cancel: bool) {
+    pub(super) fn timeline_stop_run(&mut self, ctx: &egui::Context, id: String, cancel: bool) {
         let (Some(client), Some(session)) = (self.client.clone(), self.timeline.session.clone())
         else {
             return;

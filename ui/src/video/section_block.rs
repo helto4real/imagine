@@ -114,7 +114,13 @@ impl ImagineApp {
                 frame,
             } => {
                 // H3 keeps the accepted Take's last frame; other Takes show only the chip.
-                let texture = (revealed && frame)
+                let stored = self.timeline.document.as_ref().is_some_and(|d| {
+                    d.view
+                        .resources
+                        .iter()
+                        .any(|r| r.kind() == "h3_endpoint" && r.take_id() == Some(take.0.as_str()))
+                });
+                let texture = (revealed && frame && stored)
                     .then(|| {
                         let asset = Asset {
                             id: AssetId(format!("last-frame-{}", take.0)),
@@ -384,7 +390,8 @@ mod tests {
         app.timeline.document = Some(Snapshot::with(
             p.clone(),
             json!({"runtime_assets":{"image":"own-runtime"},
-                "takes":[{"id":"own-take","scene_id":"own-a","status":"accepted","provenance":null}]}),
+                "takes":[{"id":"own-take","scene_id":"own-a","status":"accepted","provenance":null}],
+                "resources":[{"id":"own-end","kind":{"kind":"h3_endpoint","take_id":"own-take"},"sha256":""}]}),
         ));
         let mut output = egui::FullOutput::default();
         for _ in 0..3 {
@@ -401,7 +408,45 @@ mod tests {
             ));
         }
         crate::app::tests::render(&ctx, output, 1600, 1000)
-            .save(std::path::PathBuf::from(dir).join("timeline-director.png"))
+            .save(std::path::PathBuf::from(&dir).join("timeline-director.png"))
+            .unwrap();
+        // The first Scene itself: its take card leads the inspector.
+        let ctx = egui::Context::default();
+        let mut scene_app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        scene_app.client = None;
+        scene_app.workspace = Workspace::Video;
+        scene_app.timeline.session = app.timeline.session.clone();
+        scene_app.timeline.session_checked = true;
+        scene_app.timeline.zoom = 120.;
+        scene_app.timeline.selected.insert(p.scenes[0].id.clone());
+        let texture = picture(&ctx, "last-frame-own-take", [60, 40, 80]);
+        scene_app.timeline.thumbnails.insert(
+            (p.id.clone(), AssetId("last-frame-own-take".into())),
+            1,
+            texture,
+        );
+        let texture = picture(&ctx, "image", [42, 35, 71]);
+        scene_app
+            .timeline
+            .thumbnails
+            .insert((p.id.clone(), AssetId("image".into())), 1, texture);
+        scene_app.timeline.document = app.timeline.document.clone();
+        let mut output = egui::FullOutput::default();
+        for _ in 0..3 {
+            output.append(ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1600., 1000.),
+                    )),
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| scene_app.content(ui),
+            ));
+        }
+        crate::app::tests::render(&ctx, output, 1600, 1000)
+            .save(std::path::PathBuf::from(dir).join("timeline-scene.png"))
             .unwrap();
     }
 }

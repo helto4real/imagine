@@ -50,6 +50,7 @@ mod selection;
 #[cfg(test)]
 mod selection_oracle;
 mod story;
+mod take_card;
 mod take_selection;
 mod thumbnails;
 #[path = "timeline.rs"]

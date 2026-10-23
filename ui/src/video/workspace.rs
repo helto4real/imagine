@@ -671,22 +671,57 @@ impl ImagineApp {
         action: &mut Option<PostAction>,
     ) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            // While a run works, the button carries its progress, as Director's does.
+            let progress = self.timeline.active_run().map(|run| {
+                (
+                    run.id.clone(),
+                    run.completed(),
+                    run.targets.len(),
+                    run.status,
+                )
+            });
             let run_button = ui
                 .add_enabled_ui(
-                    enabled && document.is_some() && self.timeline.pending.is_none(),
+                    document.is_some()
+                        && (progress.is_some() || enabled && self.timeline.pending.is_none()),
                     |ui| {
                         helto::icon_button(
                             ui,
                             crate::icons::Icon::Down,
-                            "Generation Run options",
-                            false,
+                            &match &progress {
+                                Some((_, done, total, _)) => {
+                                    format!("Generating: {done} of {total} Scenes. Run options")
+                                }
+                                None => "Generation Run options".into(),
+                            },
+                            progress.is_some(),
                         )
                     },
                 )
                 .inner;
+            if let Some((_, done, total, _)) = &progress {
+                helto::badge(ui, run_button.rect, &format!("{done}/{total}"));
+            }
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, "run-menu".into(), &run_button);
             egui::Popup::menu(&run_button).show(|ui| {
+                if let Some((id, _, _, status)) = &progress {
+                    let stopping = *status != imagine_video_contract::runs::Status::Running
+                        || self.timeline.run_acting;
+                    for (cancel, label) in [
+                        (false, "Stop after current Scene"),
+                        (true, "Cancel run and current Scene"),
+                    ] {
+                        if ui
+                            .add_enabled(!stopping, egui::Button::new(label))
+                            .clicked()
+                        {
+                            self.timeline_stop_run(ui.ctx(), id.clone(), cancel);
+                            ui.close();
+                        }
+                    }
+                    ui.separator();
+                }
                 for (mode, name, label) in [
                     (
                         imagine_video_contract::runs::Mode::MissingOnly,

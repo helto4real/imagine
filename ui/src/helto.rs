@@ -227,6 +227,23 @@ pub fn install(ctx: &egui::Context) {
         ctx.set_fonts(fonts);
     }
 }
+/// A small count pinned to the top-right corner of `anchor`, such as run progress.
+pub fn badge(ui: &egui::Ui, anchor: egui::Rect, text: &str) {
+    let galley = ui
+        .painter()
+        .layout_no_wrap(text.into(), egui::FontId::proportional(10.), SURFACE);
+    let size = egui::vec2(galley.size().x + 8., 15.);
+    let rect = egui::Rect::from_min_size(
+        egui::pos2(anchor.right() - size.x + 6., anchor.top() - 6.),
+        size,
+    );
+    let painter = ui.painter().clone().with_layer_id(egui::LayerId::new(
+        egui::Order::Foreground,
+        ui.id().with("badge"),
+    ));
+    painter.rect_filled(rect, 7, ACCENT);
+    painter.galley(rect.center() - galley.size() / 2., galley, SURFACE);
+}
 /// Icon-only button; its label is the accessible name and the hover text,
 /// also while disabled.
 pub(crate) fn icon_button(
