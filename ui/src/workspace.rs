@@ -662,6 +662,8 @@ impl ImagineApp {
                     .on_hover_text("Use Reference 1, Reference 2, … in the prompt.");
                     self.enhancement_field(ui, &response, Field::Prompt);
                     focus_prompt_shortcut(response);
+                    ui.add_space(8.);
+                    self.advanced_settings(ui);
                     ui.add_space(12.);
                     self.command_button(ui, Command::Generate);
                     if let Some(result) = self.edit.desk.selected_result() {
@@ -981,6 +983,8 @@ impl ImagineApp {
                             });
                         ui.add_space(18.);
                         self.image_controls(ui);
+                        ui.add_space(12.);
+                        self.advanced_settings(ui);
                     });
                 });
             #[cfg(feature = "ui-preview")]
@@ -1008,6 +1012,73 @@ impl ImagineApp {
                 });
             });
         }
+    }
+
+    /// Sampling settings shared by every image desk, collapsed by default.
+    fn advanced_settings(&mut self, ui: &mut Ui) {
+        egui::CollapsingHeader::new("Advanced")
+            .id_salt("advanced-sampling")
+            .show(ui, |ui| {
+                let before = self.prefs.generation.clone();
+                egui::Grid::new("generation-settings")
+                    .num_columns(2)
+                    .spacing([18., 10.])
+                    .show(ui, |ui| {
+                        let label = ui.label("Steps");
+                        settings_number(
+                            ui,
+                            egui::DragValue::new(&mut self.prefs.generation.steps)
+                                .range(1..=u32::MAX),
+                        )
+                        .labelled_by(label.id);
+                        ui.end_row();
+                        let label = ui.label("CFG");
+                        settings_number(
+                            ui,
+                            egui::DragValue::new(&mut self.prefs.generation.cfg_scale).speed(0.1),
+                        )
+                        .labelled_by(label.id);
+                        ui.end_row();
+                        sampling_setting(
+                            ui,
+                            self.metadata.as_ref(),
+                            "Sampler",
+                            "sampler",
+                            &mut self.prefs.generation.sampler,
+                        );
+                        sampling_setting(
+                            ui,
+                            self.metadata.as_ref(),
+                            "Scheduler",
+                            "scheduler",
+                            &mut self.prefs.generation.scheduler,
+                        );
+                        let label = ui.label("Reference size");
+                        let mut megapixels =
+                            f64::from(self.prefs.generation.reference_max_pixels_per_image)
+                                / 1_000_000.;
+                        if settings_number(
+                            ui,
+                            egui::DragValue::new(&mut megapixels)
+                                .range(0.262144..=4.0)
+                                .speed(0.1)
+                                .min_decimals(1)
+                                .max_decimals(6)
+                                .suffix(" MP"),
+                        )
+                        .labelled_by(label.id)
+                        .on_hover_text("Maximum megapixels per reference image during generation.")
+                        .changed()
+                        {
+                            self.prefs.generation.reference_max_pixels_per_image =
+                                (megapixels * 1_000_000.).round() as u32;
+                        }
+                        ui.end_row();
+                    });
+                if self.prefs.generation != before {
+                    self.prefs_dirty = true;
+                }
+            });
     }
 
     fn image_controls(&mut self, ui: &mut Ui) {
@@ -1519,59 +1590,6 @@ impl ImagineApp {
                             .num_columns(2)
                             .spacing([18., 10.])
                             .show(ui, |ui| {
-                                let label = ui.label("Steps");
-                                settings_number(
-                                    ui,
-                                    egui::DragValue::new(&mut self.prefs.generation.steps)
-                                        .range(1..=u32::MAX),
-                                )
-                                .labelled_by(label.id);
-                                ui.end_row();
-                                let label = ui.label("CFG");
-                                settings_number(
-                                    ui,
-                                    egui::DragValue::new(&mut self.prefs.generation.cfg_scale)
-                                        .speed(0.1),
-                                )
-                                .labelled_by(label.id);
-                                ui.end_row();
-                                sampling_setting(
-                                    ui,
-                                    self.metadata.as_ref(),
-                                    "Sampler",
-                                    "sampler",
-                                    &mut self.prefs.generation.sampler,
-                                );
-                                sampling_setting(
-                                    ui,
-                                    self.metadata.as_ref(),
-                                    "Scheduler",
-                                    "scheduler",
-                                    &mut self.prefs.generation.scheduler,
-                                );
-                                let label = ui.label("Reference size");
-                                let mut megapixels =
-                                    f64::from(self.prefs.generation.reference_max_pixels_per_image)
-                                        / 1_000_000.;
-                                if settings_number(
-                                    ui,
-                                    egui::DragValue::new(&mut megapixels)
-                                        .range(0.262144..=4.0)
-                                        .speed(0.1)
-                                        .min_decimals(1)
-                                        .max_decimals(6)
-                                        .suffix(" MP"),
-                                )
-                                .labelled_by(label.id)
-                                .on_hover_text(
-                                    "Maximum megapixels per reference image during generation.",
-                                )
-                                .changed()
-                                {
-                                    self.prefs.generation.reference_max_pixels_per_image =
-                                        (megapixels * 1_000_000.).round() as u32;
-                                }
-                                ui.end_row();
                                 let label = ui.label("Upscale target");
                                 egui::ComboBox::from_id_salt("upscale-target")
                                     .width(ui.available_width().max(120.))

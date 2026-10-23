@@ -257,7 +257,7 @@ fn model_picker_roundtrip_keeps_cold_and_switched_requests_identical() {
 fn sampling_widgets_persist_and_reach_the_server_without_overriding_turbo_sigmas() {
     let mut desk = Desk::new();
     install(&mut desk);
-    desk.click("Settings");
+    desk.open_advanced();
     desk.click("Sampler");
     desk.click("euler");
     desk.click("Scheduler");
@@ -568,16 +568,10 @@ fn settings_scrollbar_leaves_the_privacy_toggle_visible_and_clickable() {
             .unwrap()
             .bounds()
             .unwrap();
-        let mut first: Option<(f64, f64)> = None;
-        let mut text_left: Option<f32> = None;
-        for (name, value) in [
-            ("Steps", "40"),
-            ("CFG", "2.5"),
-            ("Sampler", "er_sde"),
-            ("Scheduler", "beta"),
-            ("Reference size", "1.0"),
-            ("Upscale target", "2K"),
-        ] {
+        // The one remaining Generation row; sampling moved to the prompt panel.
+        let first;
+        {
+            let (name, value) = ("Upscale target", "2K");
             let bounds = nodes
                 .iter()
                 .map(|(_, n)| n)
@@ -597,14 +591,7 @@ fn settings_scrollbar_leaves_the_privacy_toggle_visible_and_clickable() {
                 "{name}: {bounds:?}, {scrollbar:?}"
             );
             assert!((bounds.height() - 32.).abs() < 1., "{name}: {bounds:?}");
-            if let Some((left, right)) = first {
-                assert!(
-                    (bounds.x0 - left).abs() < 1. && (bounds.x1 - right).abs() < 1.,
-                    "{name}: {bounds:?}"
-                );
-            } else {
-                first = Some((bounds.x0, bounds.x1));
-            }
+            first = Some((bounds.x0, bounds.x1));
             let text = output
                 .shapes
                 .iter()
@@ -613,11 +600,6 @@ fn settings_scrollbar_leaves_the_privacy_toggle_visible_and_clickable() {
                     _ => None,
                 })
                 .unwrap_or_else(|| panic!("Missing rendered value: {value}"));
-            if let Some(left) = text_left {
-                assert!((text.pos.x - left).abs() < 1., "{name}: {:?}", text.pos);
-            } else {
-                text_left = Some(text.pos.x);
-            }
             assert!(
                 (f64::from(text.pos.y + text.galley.size().y / 2.) - (bounds.y0 + bounds.y1) / 2.)
                     .abs()

@@ -65,6 +65,24 @@ impl Desk {
             .min_by(|a, b| a.bounds().unwrap().y0.total_cmp(&b.bounds().unwrap().y0))
             .unwrap_or_else(|| panic!("Missing control: {name}"))
     }
+    /// Opens the prompt panel's Advanced section and scrolls it into view.
+    fn open_advanced(&mut self) {
+        self.click("Advanced");
+        let panel = self.control("Advanced").bounds().unwrap();
+        let pos = egui::pos2(((panel.x0 + panel.x1) / 2.) as f32, panel.y0 as f32);
+        for _ in 0..3 {
+            self.frame(vec![
+                egui::Event::PointerMoved(pos),
+                egui::Event::MouseWheel {
+                    unit: egui::MouseWheelUnit::Point,
+                    delta: egui::vec2(0., -1000.),
+                    phase: egui::TouchPhase::Move,
+                    modifiers: egui::Modifiers::NONE,
+                },
+            ]);
+        }
+        self.frame(vec![egui::Event::PointerGone]);
+    }
     fn click(&mut self, name: &str) {
         let rect = self.control(name).bounds().unwrap();
         let pos = egui::pos2(
@@ -372,7 +390,11 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
         "Next negative prompt"
     );
     desk.click("Settings");
-    for name in ["Steps", "CFG", "Reference size", "Choose output folder"] {
+    assert!(!desk.control("Choose output folder").is_disabled());
+    desk.click("Close settings");
+    // Sampling settings live in the prompt panel's Advanced section.
+    desk.open_advanced();
+    for name in ["Steps", "CFG", "Reference size"] {
         assert!(!desk.control(name).is_disabled(), "{name}");
     }
     let steps = desk.control("Steps").bounds().unwrap();
@@ -449,7 +471,7 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
 #[test]
 fn settings_controls_save_and_report_write_failures() {
     let mut desk = Desk::new();
-    desk.click("Settings");
+    desk.open_advanced();
     desk.click("Steps");
     desk.frame(vec![
         egui::Event::Key {
@@ -476,7 +498,6 @@ fn settings_controls_save_and_report_write_failures() {
             .steps,
         24
     );
-    desk.click("Close settings");
     let saved = desk._root.path().join(".imagine/ui-settings.json");
     std::fs::remove_file(&saved).unwrap();
     std::fs::create_dir(&saved).unwrap();

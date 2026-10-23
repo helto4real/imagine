@@ -175,8 +175,10 @@ that point: its accepted Take, or its imported clip. **Play from playhead** play
 scene after scene from there, and the playhead follows the viewer. A scene
 without an accepted Take stops playback with a note.
 
-The gear opens a separate native **Settings** window with **Generation** (Steps,
-CFG, Reference size, Upscale target), **Models**, **Prompt enhancement**,
+Steps, CFG, Sampler, Scheduler and Reference size are in the prompt panel's
+collapsed **Advanced** section (also in Edit); they apply to every image desk.
+The gear opens a separate native **Settings** window with **Generation** (Upscale
+target), **Models**, **Prompt enhancement**,
 **Storage** (output folder) and **Privacy** (Hide previews). Switches save at once;
 typed and dragged values save when you leave the field or release the pointer. The close icon or Escape closes only Settings. A failed preference
 write shows **Not saved** and the error; it is never reported as saved. On backends
