@@ -1,0 +1,70 @@
+{
+  "mode": "built-in image_gen",
+  "sourceFiles": [
+    "ui/src/app.rs",
+    "ui/src/settings.rs",
+    "docs/UI.md"
+  ],
+  "designSystem": "/home/thhel/.codex/skills/helto-design-system/assets/tokens.css",
+  "runtimeDataAccessed": false,
+  "applicationCodeChanged": false,
+  "computerUse": false,
+  "finals": [
+    {
+      "id": "01-studio",
+      "name": "Studio",
+      "file": "/home/thhel/ChatGPT/imagine/design/ui-prototypes/2026-10-15/01-studio.png"
+    },
+    {
+      "id": "02-canvas",
+      "name": "Canvas",
+      "file": "/home/thhel/ChatGPT/imagine/design/ui-prototypes/2026-10-15/02-canvas.png"
+    },
+    {
+      "id": "03-right-inspector",
+      "name": "Right inspector",
+      "file": "/home/thhel/ChatGPT/imagine/design/ui-prototypes/2026-10-15/03-right-inspector.png"
+    },
+    {
+      "id": "04-reference-desk",
+      "name": "Reference desk",
+      "file": "/home/thhel/ChatGPT/imagine/design/ui-prototypes/2026-10-15/04-reference-desk.png"
+    },
+    {
+      "id": "05-top-composer",
+      "name": "Top composer",
+      "file": "/home/thhel/ChatGPT/imagine/design/ui-prototypes/2026-10-15/05-top-composer.png"
+    },
+    {
+      "id": "06-lower-workbench",
+      "name": "Lower workbench",
+      "file": "/home/thhel/ChatGPT/imagine/design/ui-prototypes/2026-10-15/06-lower-workbench.png"
+    },
+    {
+      "id": "07-floating-dock",
+      "name": "Floating dock",
+      "file": "/home/thhel/ChatGPT/imagine/design/ui-prototypes/2026-10-15/07-floating-dock-v2.png"
+    },
+    {
+      "id": "08-vertical-tabs",
+      "name": "Vertical tabs",
+      "file": "/home/thhel/ChatGPT/imagine/design/ui-prototypes/2026-10-15/08-vertical-tabs.png"
+    },
+    {
+      "id": "09-compact-console",
+      "name": "Compact console",
+      "file": "/home/thhel/ChatGPT/imagine/design/ui-prototypes/2026-10-15/09-compact-console.png"
+    },
+    {
+      "id": "10-focus",
+      "name": "Focus",
+      "file": "/home/thhel/ChatGPT/imagine/design/ui-prototypes/2026-10-15/10-focus.png"
+    }
+  ],
+  "revision07": {
+    "prompt": "Use case: ui-mockup. Repair this Imagine UI prototype's framing only. The supplied image is the edit target. Its entire top is accidentally cropped off. Rebuild and zoom out to show the COMPLETE application and COMPLETE separate Settings window within a landscape 3:2 design board with generous 40px outer safe margins. Restore a complete top header over the left app with \"Imagine\", \"Qwen Image 2.1\", two ICON-ONLY tabs: image selected peach and film/video inactive, plus gear and eye icons. Restore complete Settings title row and x close icon over the right window. Preserve the existing floating prompt dock layout, reference strip, synthetic lake imagery, Helto Mocha #181825/#1e1e2e/#313244 surfaces, #fab387 peach accents, existing labels and settings fields. Settings has Steps 40, CFG 2.5, Save to ~/Pictures/Imagine, Hide previews off. All action buttons icon-only. Keep prompt floating inside canvas lower left. The whole image viewport, all four window edges, header and footer must be fully inside output. Do not crop anything. Keep landscape image aspect without stretching. Small external caption \"07 / Floating dock\". No extra controls or features.",
+    "reason": "Restore cropped header and show both tabs and complete Settings window",
+    "original": "07-floating-dock.png",
+    "final": "07-floating-dock-v2.png"
+  }
+}

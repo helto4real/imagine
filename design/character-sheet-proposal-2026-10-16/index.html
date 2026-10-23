@@ -1,0 +1,25 @@
+<!doctype html><html lang="sv"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Imagine · Karaktärskort — UI-förslag</title>
+<style>
+:root{color-scheme:dark;font:14px/1.6 system-ui;color:#cdd6f4;background:#181825}body{margin:24px auto;max-width:1280px;padding:0 16px}h1{font-size:20px;margin:0 0 12px}nav{display:flex;gap:8px;margin-bottom:16px}button{font:inherit;color:#cdd6f4;background:linear-gradient(#45475a,#313244);border:1px solid #45475a;border-radius:5px;padding:6px 12px;cursor:pointer}button[aria-pressed=true]{color:#fddcc4;background:linear-gradient(#4f3a2a,#3d2d20);border-color:#93664a}button:focus-visible{outline:2px solid #89b4fa;outline-offset:2px}button:hover{filter:brightness(1.15)}img{display:block;width:100%;height:auto}p,ul{max-width:900px}.note{color:#a6adc8}code{color:#fab387}li{margin:6px 0}
+</style>
+<h1>Karaktärskort · UI-förslag</h1>
+<nav aria-label="Jämför layouter"><button aria-pressed="true" data-view="character-sheet">Ny flik</button><button aria-pressed="false" data-view="image-comparison">Bildflikens grundlayout</button></nav>
+<img id="mock" src="character-sheet.svg" width="1280" height="800" alt="Förslag på karaktärskortsfliken med referenser till vänster, resultat i mitten och beskrivningsfält till höger.">
+<p class="note">Källbaserad skiss, inte en skärmbild av appen. Illustrationer, beskrivningar, seed och status är syntetiska. Knapparna inne i skissen visar placering; jämförelseknapparna ovan fungerar.</p>
+<p>Samma tre paneler, proportioner, färger, 32 px ikonknappar, marginaler och verktygsplacering som i den nuvarande bildfliken. Engelska etiketter följer det befintliga gränssnittet.</p>
+<ul>
+<li><strong>Ny flik:</strong> en ikon för karaktärskort mellan Image och Video, med tooltip och tillgängligt namn ”Character sheets”.</li>
+<li><strong>Vänster:</strong> samma referenslista med lägg till, numrering, flytta och ta bort. Gränsen blir 8 identitetsreferenser. Noll referenser tillåts om Character är ifyllt.</li>
+<li><strong>Höger:</strong> Prompt ersätts av Character och Clothing &amp; accessories. Samma textfältskomponent med storleksändring, rullning och integritetsläge. Negative prompt och Seed återanvänds.</li>
+<li><strong>Storlek:</strong> Ratio visar låst 16:9. Max side blir Width, 512–4096 i steg om 512, förvalt 1536 × 864. Porträttandelen behåller API-standardvärdet 45 %. Inget nytt layoutreglage.</li>
+<li><strong>Mitten:</strong> Sheet / Portrait / Views väljer vilket av samma jobs tre resultat som visas. Fit, 1:1 och panorering används för vald bild. Återställ zoom/panorering vid byte av resultatvy.</li>
+<li><strong>Generering:</strong> samma Generate / Generate again / Cancel och samma fel- och progressyta. Fasen visas där befintlig samplingsstatus står: ”Portrait · Sampling 12 / 40”, ”Views · Sampling 12 / 40”, sedan ”Composing”. Procent gäller aktuell fas, inte hela jobbet. Inga separata genereringsknappar per delbild.</li>
+<li><strong>Sparande:</strong> samma inställda målmapp och automatiska sparflöde, utökat till kort, porträtt och kroppsvyer. Visa Saved först när alla tre har sparats. Återanvänd befintligt återförsök vid sparfel.</li>
+<li><strong>Inställningar:</strong> befintligt inställningsfönster för steg, CFG och referensstorlek. Tabbspecifika beskrivningar och storlek hålls åtskilda från den vanliga bildflikens formulär.</li>
+<li><strong>Smalt fönster:</strong> samma brytpunkt, bildvisaren överst och referenser/beskrivningar under. Resultatväljaren får en egen rad om den annars krockar med bildverktygen.</li>
+<li><strong>Integritet:</strong> samma dölj/visa-kontroll för båda beskrivningarna, referenserna och alla resultatvyer, inklusive byte av flik eller resultat.</li>
+</ul>
+<p class="note">Underlag: ui/src/workspace.rs, ui/src/helto.rs, ui/src/icons.rs samt src/character_sheet.rs och src/model_adapter.rs. Förslaget tillför inga fria extraprompter eller klädreferensroller. Det ändrar inga appfiler och anropar inget API.</p>
+<script>
+for(const b of document.querySelectorAll('[data-view]'))b.addEventListener('click',()=>{for(const x of document.querySelectorAll('[data-view]'))x.setAttribute('aria-pressed',String(x===b));const img=document.getElementById('mock');img.src=b.dataset.view+'.svg';img.alt=b.dataset.view==='character-sheet'?'Förslag på karaktärskortsfliken.':'Schematisk rekonstruktion av bildflikens befintliga grundlayout.'});
+</script></html>
