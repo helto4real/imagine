@@ -341,6 +341,35 @@ impl ImagineApp {
                     whole,
                     seconds(project.delivery.fps)
                 ));
+                ui.separator();
+                self.timeline_edit_tools(ui, project, enabled, commands);
+                let duplicate = ui
+                    .add_enabled_ui(enabled, |ui| {
+                        helto::icon_button(
+                            ui,
+                            crate::icons::Icon::Duplicate,
+                            "Duplicate selection",
+                            false,
+                        )
+                    })
+                    .inner;
+                #[cfg(feature = "ui-preview")]
+                super::qa::control(ui, "timeline-duplicate".into(), &duplicate);
+                if duplicate.clicked() {
+                    commands.extend(self.timeline.duplicate_selection(project));
+                }
+                let delete = ui
+                    .add_enabled_ui(enabled, |ui| {
+                        helto::icon_button(ui, crate::icons::Icon::Trash, "Delete selection", false)
+                    })
+                    .inner;
+                #[cfg(feature = "ui-preview")]
+                super::qa::control(ui, "timeline-delete".into(), &delete);
+                if delete.clicked() {
+                    commands.extend(self.timeline.draft_edits());
+                    commands.extend(self.timeline.delete_selection());
+                }
+                ui.separator();
                 // Director's mode menus: one icon each, the current choice in its name.
                 let display = self.timeline.navigation.display;
                 let menu = helto::icon_button(
@@ -456,32 +485,6 @@ impl ImagineApp {
                 super::qa::control(ui, "timeline-toggle-inspector".into(), &inspector);
                 if inspector.clicked() {
                     self.timeline.inspector_collapsed = !self.timeline.inspector_collapsed;
-                }
-                let duplicate = ui
-                    .add_enabled_ui(enabled, |ui| {
-                        helto::icon_button(
-                            ui,
-                            crate::icons::Icon::Duplicate,
-                            "Duplicate selection",
-                            false,
-                        )
-                    })
-                    .inner;
-                #[cfg(feature = "ui-preview")]
-                super::qa::control(ui, "timeline-duplicate".into(), &duplicate);
-                if duplicate.clicked() {
-                    commands.extend(self.timeline.duplicate_selection(project));
-                }
-                let delete = ui
-                    .add_enabled_ui(enabled, |ui| {
-                        helto::icon_button(ui, crate::icons::Icon::Trash, "Delete selection", false)
-                    })
-                    .inner;
-                #[cfg(feature = "ui-preview")]
-                super::qa::control(ui, "timeline-delete".into(), &delete);
-                if delete.clicked() {
-                    commands.extend(self.timeline.draft_edits());
-                    commands.extend(self.timeline.delete_selection());
                 }
                 if group_commands::overflow(project) {
                     for (all, label, key) in [

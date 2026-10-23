@@ -604,8 +604,21 @@ impl ImagineApp {
                 helto::DIM
             }),
         );
-        ui.separator();
         ui.add_enabled_ui(enabled && document.is_some(), |ui| {
+            self.command_button(ui, crate::app::Command::TimelineSave);
+        });
+    }
+
+    /// The Timeline's own editing tools, at the head of its tool row: create
+    /// Scenes, Sections and audio, then Undo and Redo.
+    pub(super) fn timeline_edit_tools(
+        &mut self,
+        ui: &mut egui::Ui,
+        project: &VideoProject,
+        enabled: bool,
+        commands: &mut Vec<Edit>,
+    ) {
+        ui.add_enabled_ui(enabled, |ui| {
             let add_scene = helto::icon_button(ui, crate::icons::Icon::Scene, "Add Scene", false);
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, "timeline-add-scene".into(), &add_scene);
@@ -616,11 +629,9 @@ impl ImagineApp {
                 helto::icon_button(ui, crate::icons::Icon::Audio, "Add Audio Track", false);
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, "add-audio".into(), &audio_button);
-            if audio_button.clicked()
-                && let Some(d) = &document
-            {
+            if audio_button.clicked() {
                 commands.extend(self.timeline.draft_edits());
-                commands.push(self.timeline.add_audio(&d.project, None));
+                commands.push(self.timeline.add_audio(project, None));
             }
             let attach = helto::icon_button(ui, crate::icons::Icon::Import, "Attach Audio", false);
             #[cfg(feature = "ui-preview")]
@@ -631,10 +642,8 @@ impl ImagineApp {
             let add = helto::icon_button(ui, crate::icons::Icon::Plus, "Add Section", false);
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, "timeline-add-section".into(), &add);
-            if add.clicked()
-                && let Some(d) = &document
-            {
-                match group_commands::prepared(&d.project, self.timeline.draft_edits()) {
+            if add.clicked() {
+                match group_commands::prepared(project, self.timeline.draft_edits()) {
                     Ok(current) => {
                         let result = group_commands::add(
                             &current,
@@ -642,7 +651,7 @@ impl ImagineApp {
                             self.timeline.snap,
                         );
                         if !result.edits.is_empty() {
-                            commands.extend(editing::difference(&d.project, &current));
+                            commands.extend(editing::difference(project, &current));
                             commands.extend(result.edits);
                             self.timeline.after_edit =
                                 Some(PostAction::SelectGroup(result.sections, result.audio));
@@ -658,10 +667,8 @@ impl ImagineApp {
             }
             self.command_button(ui, crate::app::Command::TimelineUndo);
             self.command_button(ui, crate::app::Command::TimelineRedo);
-            self.command_button(ui, crate::app::Command::TimelineSave);
         });
     }
-
     fn timeline_toolbar_right(
         &mut self,
         ui: &mut egui::Ui,
