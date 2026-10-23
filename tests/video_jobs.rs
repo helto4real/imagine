@@ -998,5 +998,30 @@ async fn manual_take_review_conflicts_invalidation_and_reopen_keep_media_and_pro
     assert_eq!(reopened["take_states"], saved["take_states"]);
     assert_eq!(reopened["runtime_takes"].as_object().unwrap().len(), 2);
     assert_ne!(reopened["runtime_takes"], saved["runtime_takes"]);
+    // Project Take cleanup previews, refuses a stale revision, then clears.
+    let cleanup = format!(
+        "/v1/video/projects/{}/takes/cleanup",
+        reopened["project"]["id"].as_str().unwrap()
+    );
+    let revision = reopened["project"]["project_revision"].as_u64().unwrap();
+    let body = |revision: u64, apply: bool| json!({"schema_version":1,"expected_project_revision":revision,"apply":apply});
+    let (code, preview) = call(&h, "POST", &cleanup, body(revision, false), None).await;
+    assert_eq!(code, 200, "{preview}");
+    assert_eq!(preview["preview"]["takes"], 2);
+    assert!(
+        preview["preview"]["owned_files"].as_u64().unwrap() > 0,
+        "{preview}"
+    );
+    let (code, _) = call(&h, "POST", &cleanup, body(revision - 1, true), None).await;
+    assert_eq!(code, 409);
+    let (code, cleared) = call(&h, "POST", &cleanup, body(revision, true), None).await;
+    assert_eq!(code, 200, "{cleared}");
+    assert_eq!(cleared["takes"], json!([]));
+    assert!(cleared["project"]["scenes"][0]["accepted_take"].is_null());
+    assert!(cleared["runtime_takes"].as_object().unwrap().is_empty());
+    assert!(
+        cleared["cleanup_result"]["cleanup_warning"].is_null(),
+        "{cleared}"
+    );
     stop(h).await;
 }

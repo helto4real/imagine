@@ -182,6 +182,11 @@ pub(super) struct Timeline {
     drag: Option<tracks::Drag>,
 }
 pub(super) enum Event {
+    CleanupPreview {
+        epoch: u64,
+        revision: u64,
+        result: Result<Value, client::TimelineFailure>,
+    },
     Capabilities {
         epoch: u64,
         result: Result<Value, client::TimelineFailure>,
@@ -457,6 +462,15 @@ impl ImagineApp {
         }
         match event {
             Event::Animated { .. } => unreachable!(),
+            Event::CleanupPreview {
+                epoch,
+                revision,
+                result,
+            } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline_cleanup_reply(revision, result);
+                }
+            }
             Event::Capabilities { epoch, result } => {
                 if epoch == self.timeline.epoch {
                     self.timeline_capabilities_reply(result);

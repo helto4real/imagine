@@ -317,7 +317,92 @@ pub fn apply(document: &ProjectDocument, request: Request) -> Result<Change, Sto
     })
 }
 
+/// What clearing every Take and Capture would remove; see `clear`.
+#[derive(Debug, serde::Serialize)]
+pub struct CleanupPreview {
+    pub project_revision: u64,
+    pub takes: usize,
+    /// Project-owned files that would be deleted.
+    pub owned_files: usize,
+    /// Files kept because they are user originals or still shared.
+    pub kept_files: usize,
+}
+
+/// Director's project cleanup: removes every Take, Capture and Take-owned
+/// resource and clears accepted and locked Takes. References and their
+/// files stay, and a user's original files are never deleted.
+pub fn clear(document: &ProjectDocument) -> Result<ProjectDocument, StorageError> {
+    let mut candidate = document.clone();
+    candidate.takes.clear();
+    candidate.captures.clear();
+    candidate.locked_takes.clear();
+    candidate
+        .resources
+        .retain(|r| matches!(r.kind, ResourceKind::Reference { .. }));
+    for scene in &mut candidate.project.scenes {
+        scene.accepted_take = None;
+    }
+    review::invalidate_changed(&document.project, &mut candidate)?;
+    candidate.project.project_revision = document
+        .project
+        .project_revision
+        .checked_add(1)
+        .filter(|n| *n <= MAX_INTEGER)
+        .ok_or_else(|| StorageError::new("invalid_revision"))?;
+    candidate.validate()?;
+    Ok(candidate)
+}
+
+/// Owned blobs `after` no longer uses, and how many removed resources keep their file.
+fn released(before: &ProjectDocument, after: &ProjectDocument) -> (Vec<BlobKey>, usize) {
+    let retained: std::collections::BTreeSet<_> =
+        after.resources.iter().map(Resource::key).collect();
+    let removed: Vec<_> = before
+        .resources
+        .iter()
+        .filter(|r| !after.resources.iter().any(|a| a.id == r.id))
+        .collect();
+    let mut owned: Vec<_> = removed
+        .iter()
+        .filter(|r| r.source.is_none() && !retained.contains(&r.key()))
+        .map(|r| r.key())
+        .collect();
+    owned.sort();
+    owned.dedup();
+    let kept = removed
+        .iter()
+        .filter(|r| r.source.is_some() || retained.contains(&r.key()))
+        .count();
+    (owned, kept)
+}
+
 impl ProjectSession {
+    pub fn cleanup_preview(&self) -> Result<CleanupPreview, StorageError> {
+        let after = clear(self.document())?;
+        let (owned, kept) = released(self.document(), &after);
+        Ok(CleanupPreview {
+            project_revision: self.document().project.project_revision,
+            takes: self.document().takes.len(),
+            owned_files: owned.len(),
+            kept_files: kept,
+        })
+    }
+    /// Clears every Take and Capture at `expected` revision; returns a warning
+    /// when some owned files could not be deleted.
+    pub fn clear_takes(
+        &mut self,
+        expected: u64,
+        staging: &SessionStaging,
+    ) -> Result<Option<String>, StorageError> {
+        if self.document().project.project_revision != expected {
+            return Err(StorageError::new("revision_conflict"));
+        }
+        let after = clear(self.document())?;
+        let (owned, _) = released(self.document(), &after);
+        let prepared = self.prepare_update(expected, after, BTreeMap::new(), staging)?;
+        self.commit_atomic(prepared)?;
+        Ok(self.prune_capture_files(&owned).err().map(|e| e.code))
+    }
     pub fn import_take(
         &mut self,
         request: Import,

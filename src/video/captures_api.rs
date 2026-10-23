@@ -4,6 +4,53 @@ pub(super) fn routes() -> Router<App> {
     Router::new()
         .route("/v1/video/projects/{id}/captures", post(mutate))
         .route("/v1/video/projects/{id}/captures/import", post(import))
+        .route("/v1/video/projects/{id}/takes/cleanup", post(cleanup))
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Cleanup {
+    schema_version: u32,
+    expected_project_revision: u64,
+    /// False previews the counts; true clears at the previewed revision.
+    apply: bool,
+}
+
+/// Director's project Take cleanup: preview, then apply at the same revision.
+async fn cleanup(
+    State(app): State<App>,
+    Path(id): Path<String>,
+    body: Result<Json<Cleanup>, JsonRejection>,
+) -> Result<Json<Value>, Error> {
+    let request = input(body)?;
+    schema(request.schema_version)?;
+    let id = ProjectId(id);
+    let staging = staging(&app)?;
+    let mut service = app.video.lock().await;
+    if !request.apply {
+        let session = service.projects.session(&id)?;
+        if session.document().project.project_revision != request.expected_project_revision {
+            return Err(StorageError::new("revision_conflict").into());
+        }
+        let preview = session.cleanup_preview()?;
+        return Ok(Json(json!({"schema_version":1,"preview":preview})));
+    }
+    let warning = match service
+        .projects
+        .session_mut(&id)?
+        .clear_takes(request.expected_project_revision, &staging)
+    {
+        Ok(warning) => warning,
+        Err(error) => {
+            let mut error = Error::from(error);
+            error.snapshot = service.snapshot(&id).ok().map(Box::new);
+            return Err(error);
+        }
+    };
+    service.runtime_takes.remove(&id);
+    let mut reply = serde_json::to_value(service.snapshot(&id)?).map_err(internal)?;
+    reply["cleanup_result"] = json!({"cleanup_warning": warning});
+    Ok(Json(reply))
 }
 
 async fn import(

@@ -262,6 +262,7 @@ impl ImagineApp {
         self.timeline_media_health_window(ui.ctx());
         self.timeline_assembly_window(ui.ctx());
         self.timeline_replace_window(ui.ctx());
+        self.timeline_cleanup_window(ui.ctx());
     }
     /// Shelf media dropped on the Timeline: images and videos become inputs of
     /// the scene or Section, audio a clip at the scene start, as their pickers
@@ -549,6 +550,13 @@ impl ImagineApp {
                     super::qa::control(ui, "project-export-compatible".into(), &r);
                     if r.clicked() {
                         *action = Some(PostAction::ExportCompatible);
+                        ui.close();
+                    }
+                    let r = ui.button("Clear Takes and Captures…");
+                    #[cfg(feature = "ui-preview")]
+                    super::qa::control(ui, "project-take-cleanup".into(), &r);
+                    if r.clicked() {
+                        self.timeline_cleanup_preview(ui.ctx());
                         ui.close();
                     }
                     if ui.button("Refresh").clicked() {

@@ -6,9 +6,124 @@ use imagine_video_contract::captures::{Action, Request};
 pub(super) struct State {
     pub open: bool,
     pub(super) confirm: Option<TakeId>,
+    /// Project Take cleanup: its preview at a project revision, once loaded.
+    pub(super) cleanup: Option<Option<(u64, Value)>>,
 }
 
 impl ImagineApp {
+    /// Asks the server what clearing every Take and Capture would remove.
+    pub(super) fn timeline_cleanup_preview(&mut self, ctx: &egui::Context) {
+        let (Some(client), Some(session), Some(d)) = (
+            self.client.clone(),
+            self.timeline.session.clone(),
+            self.timeline.document.as_ref(),
+        ) else {
+            return;
+        };
+        let revision = d.project.project_revision;
+        let path = format!("/v1/video/projects/{}/takes/cleanup", d.project.id.0);
+        self.timeline.captures.cleanup = Some(None);
+        let (epoch, tx, ctx) = (self.timeline.epoch, self.tx.clone(), ctx.clone());
+        std::thread::spawn(move || {
+            let body =
+                json!({"schema_version":1,"expected_project_revision":revision,"apply":false});
+            let result =
+                runtime().block_on(client.timeline_request(&session, true, &path, Some(&body)));
+            send(
+                &tx,
+                &ctx,
+                Message::Timeline(Event::CleanupPreview {
+                    epoch,
+                    revision,
+                    result,
+                }),
+            );
+        });
+    }
+    pub(super) fn timeline_cleanup_reply(
+        &mut self,
+        revision: u64,
+        result: Result<Value, client::TimelineFailure>,
+    ) {
+        match result {
+            Ok(value) if self.timeline.captures.cleanup.is_some() => {
+                self.timeline.captures.cleanup = Some(Some((revision, value["preview"].clone())));
+            }
+            Ok(_) => {}
+            Err(error) => {
+                self.timeline.captures.cleanup = None;
+                self.timeline.error = Some(error.message);
+            }
+        }
+    }
+    /// Confirms clearing every Take and Capture with the previewed counts.
+    pub(super) fn timeline_cleanup_window(&mut self, ctx: &egui::Context) {
+        let Some(state) = self.timeline.captures.cleanup.clone() else {
+            return;
+        };
+        let current = self
+            .timeline
+            .document
+            .as_ref()
+            .map(|d| d.project.project_revision);
+        let mut decision = None;
+        egui::Window::new("Clear Takes and Captures")
+            .id(egui::Id::new("video-take-cleanup"))
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                let Some((revision, preview)) = &state else {
+                    ui.spinner();
+                    return;
+                };
+                let stale = current != Some(*revision);
+                let answer = helto::confirm(
+                    ui,
+                    &format!(
+                        "Clear {} Takes and delete {} project files? {} files are kept because they are your originals or still shared. Accepted Takes are cleared, and this cannot be undone.",
+                        preview["takes"], preview["owned_files"], preview["kept_files"]
+                    ),
+                    (crate::icons::Icon::Trash, "Clear Takes"),
+                    "Keep Takes",
+                    if stale {
+                        Some("The project changed. Close and preview again.")
+                    } else if self.timeline.busy {
+                        Some("Wait for the current timeline operation.")
+                    } else {
+                        None
+                    },
+                );
+                #[cfg(feature = "ui-preview")]
+                {
+                    control(ui, "take-cleanup-confirm", &answer.yes);
+                    control(ui, "take-cleanup-keep", &answer.no);
+                }
+                if answer.yes.clicked() {
+                    decision = Some(Some(*revision));
+                } else if answer.no.clicked() {
+                    decision = Some(None);
+                }
+            });
+        let Some(decision) = decision else {
+            return;
+        };
+        self.timeline.captures.cleanup = None;
+        if let (Some(revision), Some(d)) = (decision, self.timeline.document.clone()) {
+            self.timeline.clear_preview();
+            self.timeline.selected_take = None;
+            // Undo would point at removed Takes.
+            self.timeline.history = Default::default();
+            self.timeline_request(
+                ctx,
+                true,
+                format!("/v1/video/projects/{}/takes/cleanup", d.project.id.0),
+                Some(json!({"schema_version":1,"expected_project_revision":revision,"apply":true})),
+                false,
+                None,
+            );
+        }
+    }
     pub(super) fn timeline_import_take(
         &mut self,
         ctx: &egui::Context,
@@ -287,5 +402,59 @@ mod tests {
             1,
             "Presenting a releasable receipt must not silently delete it"
         );
+    }
+}
+
+#[cfg(test)]
+mod cleanup_tests {
+    use super::*;
+    #[test]
+    fn cleanup_confirms_previewed_counts_and_refuses_a_changed_project() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let project = media_picker::tests::project();
+        let revision = project.project_revision;
+        app.timeline.document = Some(Snapshot::with(project, json!({})));
+        app.timeline.session = Some("own-session".into());
+        // A reply nobody asked for is ignored.
+        app.timeline_cleanup_reply(revision, Ok(json!({"preview":{}})));
+        assert!(app.timeline.captures.cleanup.is_none());
+        app.timeline.captures.cleanup = Some(None);
+        app.timeline_cleanup_reply(
+            revision,
+            Ok(json!({"preview":{"takes":3,"owned_files":5,"kept_files":1}})),
+        );
+        let disabled = |app: &mut ImagineApp| {
+            // A new window's first frame is egui's sizing pass.
+            let mut output = egui::FullOutput::default();
+            for _ in 0..2 {
+                output = ctx.run_ui(Default::default(), |ui| {
+                    app.timeline_cleanup_window(ui.ctx())
+                });
+                output.textures_delta.clear();
+            }
+            let nodes = output.platform_output.accesskit_update.unwrap().nodes;
+            assert!(nodes.iter().any(|(_, n)| {
+                n.label()
+                    .or(n.value())
+                    .is_some_and(|l| l.contains("Clear 3 Takes and delete 5 project files"))
+            }));
+            nodes
+                .iter()
+                .find(|(_, n)| n.label() == Some("Clear Takes"))
+                .unwrap()
+                .1
+                .is_disabled()
+        };
+        assert!(!disabled(&mut app));
+        app.timeline
+            .document
+            .as_mut()
+            .unwrap()
+            .project
+            .project_revision += 1;
+        assert!(disabled(&mut app));
     }
 }
