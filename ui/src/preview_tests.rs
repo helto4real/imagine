@@ -351,6 +351,26 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
     let negative = negative.bounds().unwrap();
     replace(&mut desk, negative, "Next negative prompt");
     assert_eq!(desk.app.prefs.negative_prompt, "Next negative prompt");
+    // Typing is saved once the field is left, not on every keystroke.
+    assert_ne!(
+        Preferences::load(desk._root.path())
+            .unwrap()
+            .negative_prompt,
+        "Next negative prompt"
+    );
+    desk.frame(vec![egui::Event::Key {
+        key: egui::Key::Escape,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    }]);
+    assert_eq!(
+        Preferences::load(desk._root.path())
+            .unwrap()
+            .negative_prompt,
+        "Next negative prompt"
+    );
     desk.click("Settings");
     for name in ["Steps", "CFG", "Reference size", "Choose output folder"] {
         assert!(!desk.control(name).is_disabled(), "{name}");
@@ -1507,6 +1527,10 @@ fn headless_icon_sheet() {
         Download,
         Back,
         Lock,
+        Info,
+        Scene,
+        PanelLeft,
+        PanelRight,
     ];
     let ctx = egui::Context::default();
     helto::install(&ctx);

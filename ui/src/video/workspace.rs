@@ -450,7 +450,7 @@ impl ImagineApp {
         );
         ui.separator();
         ui.add_enabled_ui(enabled && document.is_some(), |ui| {
-            let add_scene = helto::icon_button(ui, crate::icons::Icon::Video, "Add Scene", false);
+            let add_scene = helto::icon_button(ui, crate::icons::Icon::Scene, "Add Scene", false);
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, "timeline-add-scene".into(), &add_scene);
             if add_scene.clicked() {
@@ -466,7 +466,7 @@ impl ImagineApp {
                 commands.extend(self.timeline.draft_edits());
                 commands.push(self.timeline.add_audio(&d.project, None));
             }
-            let attach = helto::icon_button(ui, crate::icons::Icon::Folder, "Attach Audio", false);
+            let attach = helto::icon_button(ui, crate::icons::Icon::Import, "Attach Audio", false);
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, "attach-audio".into(), &attach);
             if attach.clicked() {

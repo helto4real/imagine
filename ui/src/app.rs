@@ -135,6 +135,8 @@ pub struct ImagineApp {
     #[cfg(feature = "ui-preview")]
     qa_manual_picker_root: Option<PathBuf>,
     clipboard: Option<crate::clipboard::Clipboard>,
+    /// Preferences edited by typing or dragging; saved once the edit settles.
+    prefs_dirty: bool,
     connection: Connection,
     prefs: Preferences,
     preferences_store: crate::settings::PreferencesStore,
@@ -182,6 +184,7 @@ impl ImagineApp {
             #[cfg(feature = "ui-preview")]
             qa_manual_picker_root: None,
             clipboard: None,
+            prefs_dirty: false,
             preferences_store: crate::settings::PreferencesStore::Fixture(project),
             connection,
             prefs,
@@ -742,6 +745,14 @@ impl ImagineApp {
             send(&tx, &ctx, Message::Cancelled(workspace, job, result));
         });
     }
+    /// Save typed or dragged preferences after the pointer is released and
+    /// no text field has focus, instead of on every keystroke or drag frame.
+    fn save_settled_preferences(&mut self, ctx: &egui::Context) {
+        if self.prefs_dirty && !ctx.input(|i| i.pointer.any_down()) && !ctx.text_edit_focused() {
+            self.prefs_dirty = false;
+            self.save_preferences();
+        }
+    }
     fn save_preferences(&mut self) {
         if self
             .prefs
@@ -956,7 +967,7 @@ fn texture(ctx: &egui::Context, preview: &Preview, id: &str) -> egui::TextureHan
 impl eframe::App for ImagineApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.pause_timeline();
-        if self.models.dirty {
+        if self.models.dirty || self.prefs_dirty {
             self.save_preferences();
         }
         if let Some(clipboard) = &self.clipboard {

@@ -162,15 +162,16 @@ with the selected image as its first frame; there is no separate single-clip des
 Disabled actions name themselves and give the reason on hover.
 
 The gear opens a separate native **Settings** window with **Generation** (Steps,
-CFG, Reference size, Upscale target), **Storage** (output folder), and **Privacy** (Hide previews). Changes save
-automatically. The close icon or Escape closes only Settings. A failed preference
+CFG, Reference size, Upscale target), **Models**, **Prompt enhancement**,
+**Storage** (output folder) and **Privacy** (Hide previews). Switches save at once;
+typed and dragged values save when you leave the field or release the pointer. The close icon or Escape closes only Settings. A failed preference
 write shows **Not saved** and the error; it is never reported as saved. On backends
 without native child windows the same settings content uses egui's embedded window.
 
 No references means `text_to_image`; one or more means `image_edit`. The client
 starts with 1600×896, 40 steps and CFG 2.5. **Steps**, **CFG**, **Seed**, **Ratio**
 and **Max side (px)** are editable and saved automatically. The seed selector
-offers **Random each time** (default) and **Fixed seed** (0–4,294,967,295). Random
+offers **Random** (default) and **Fixed** (0–4,294,967,295). Random
 mode sends a null seed so each new job resolves its own seed; retries reuse the
 accepted job and seed. The result displays the resolved seed.
 

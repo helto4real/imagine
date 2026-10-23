@@ -166,7 +166,7 @@ impl ImagineApp {
                 }
                 let shelf = helto::icon_button(
                     ui,
-                    crate::icons::Icon::Image,
+                    crate::icons::Icon::PanelLeft,
                     "Toggle media shelf",
                     !self.timeline.shelf_collapsed,
                 );
@@ -177,7 +177,7 @@ impl ImagineApp {
                 }
                 let inspector = helto::icon_button(
                     ui,
-                    crate::icons::Icon::Settings,
+                    crate::icons::Icon::PanelRight,
                     "Toggle inspector",
                     !self.timeline.inspector_collapsed,
                 );

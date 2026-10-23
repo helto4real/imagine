@@ -52,6 +52,9 @@ pub enum Icon {
     Back,
     Lock,
     Info,
+    Scene,
+    PanelLeft,
+    PanelRight,
 }
 
 pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
@@ -193,6 +196,21 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
                 [16., 6.],
                 [16., 10.],
             ]);
+        }
+        Icon::Scene => {
+            box_at(3., 9., 18., 12., 2);
+            line(&[[3., 9.], [4., 4.], [20., 2.], [21., 7.], [3., 9.]]);
+            line(&[[9., 3.5], [11., 8.]]);
+            line(&[[15., 2.8], [17., 7.5]]);
+        }
+        Icon::PanelLeft | Icon::PanelRight => {
+            box_at(3., 4., 18., 16., 2);
+            let x = if matches!(icon, Icon::PanelLeft) {
+                9.
+            } else {
+                15.
+            };
+            line(&[[x, 4.], [x, 20.]]);
         }
         Icon::Info => {
             painter.circle_stroke(pos(12., 12.), 9.5 * s, stroke);

@@ -199,6 +199,15 @@ impl ImagineApp {
     }
 
     pub fn content(&mut self, ui: &mut Ui) {
+        self.frame_content(ui);
+        // After this frame's widgets, so an Enter that ends an edit also saves it.
+        // The Settings viewport has its own pointer state and flushes its own edits.
+        if !self.settings_open {
+            self.save_settled_preferences(ui.ctx());
+        }
+    }
+
+    fn frame_content(&mut self, ui: &mut Ui) {
         helto::set_privacy_mode(ui.ctx(), self.prefs.privacy_mode);
         self.receive(ui.ctx());
         if self.workspace != Workspace::Video {
@@ -808,7 +817,7 @@ impl ImagineApp {
                                     )
                                     .changed()
                                     {
-                                        self.save_preferences();
+                                        self.prefs_dirty = true;
                                     }
                                 });
                             });
@@ -951,7 +960,7 @@ impl ImagineApp {
             ui.colored_label(helto::ERROR, e.to_string());
         }
         if *settings != before || self.prefs.sheet_width != before_width {
-            self.save_preferences();
+            self.prefs_dirty = true;
         }
     }
 
@@ -1345,6 +1354,11 @@ impl ImagineApp {
     }
 
     pub(super) fn settings_content(&mut self, ui: &mut Ui, native: bool) {
+        self.settings_frame(ui, native);
+        self.save_settled_preferences(ui.ctx());
+    }
+
+    fn settings_frame(&mut self, ui: &mut Ui, native: bool) {
         let rect = ui.max_rect();
         helto::gradient(ui.painter(), rect, 10., helto::FIELD, helto::BG);
         ui.painter().rect_stroke(
@@ -1497,7 +1511,7 @@ impl ImagineApp {
                     if self.prefs.generation != before
                         || self.prefs.upscale_target != before_upscale
                     {
-                        self.save_preferences();
+                        self.prefs_dirty = true;
                     }
                     ui.add_space(24.);
                     ui.separator();
