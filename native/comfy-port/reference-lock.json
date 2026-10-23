@@ -1,0 +1,92 @@
+{
+  "comfy_revision": "ba994879b88d0ebd9950b1e5c1e923d928f216ba",
+  "sources": {
+    "comfy/lora.py": "24ace0806193466947662dc408642e2615f255259f5a45393043b67a47174f17",
+    "comfy/model_patcher.py": "7edc88d9eae6a88637625d257dc73684cfc012a29446bf88e70d22e3a6be3994",
+    "comfy/model_management.py": "045ab96003386a43e647c8ab96f22fbf3be6c577e2fc578ea31c6faa22facbd5",
+    "comfy/ops.py": "a0b8c7f32a146b383a795363bef35e480ffa84b5b3e9c9503f323b1446876f45",
+    "comfy/weight_adapter/__init__.py": "d9fe388a6bd3b93212a5e04b8921759841e2cf88939cfcc3a7bf59e16505edd0",
+    "comfy/weight_adapter/base.py": "484f0d83a96e700f80c793e4bcc6a897d633233e51a59191d91da5e59da345c7",
+    "comfy/weight_adapter/lora.py": "e506062b4eb189be4c36f88270e0fd4dcce038c79a98f7163604ed6b44efe4b5",
+    "comfy/weight_adapter/loha.py": "579ca1e33e0d244e0d7eedd30fb727913341f8e7bfbd74b51221f567612286d5",
+    "comfy/weight_adapter/lokr.py": "b4763cc32215a47e4d906cfa6cbad9cf893f6a1329ada2225fda81fd99fcfeb4",
+    "comfy/weight_adapter/glora.py": "31cdd03f5b0beaa0df055512560128930f4f26b219ba57602d21abb086425b09",
+    "comfy/weight_adapter/oft.py": "88be3c32f610478bc6900a10009eaadf6fe2af973ed4861731e4f21e1afacf89",
+    "comfy/weight_adapter/boft.py": "2850e0b4c2295cd87445415e287061fa3bfd69e88bd0aeb3eb16064864bd078d",
+    "comfy/float.py": "3a6e6c6fb306b5827378f8b2a551984d89b2b9719c24cff39abc423fc1f37c01",
+    "comfy/utils.py": "9320cf5c624e96acc1d9ec92ff120ed6387a2142707f3194cb21dd0d11ac2500"
+  },
+  "approved_exception": "External Python hooks and external Python adapter classes are excluded.",
+  "dependency_constraint": "Use the current native/CUDA libraries; no Python runtime or LibTorch/ATen dependency.",
+  "torch_version": "2.13.0+cu130",
+  "torch_revision": "cf30153c4c131c8164ee7798e5022d810682e2cb",
+  "torch_source_urls": {
+    "BatchLinearAlgebra.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/native/BatchLinearAlgebra.cpp",
+    "cuda/linalg/BatchLinearAlgebra.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/native/cuda/linalg/BatchLinearAlgebra.cpp",
+    "aten/src/ATen/cuda/CUDABlas.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/cuda/CUDABlas.cpp",
+    "aten/src/ATen/native/Linear.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/native/Linear.cpp",
+    "aten/src/ATen/TensorUtils.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/TensorUtils.cpp",
+    "aten/src/ATen/TensorIterator.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/TensorIterator.cpp",
+    "aten/src/ATen/ExpandUtils.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/ExpandUtils.cpp",
+    "aten/src/ATen/native/TensorConversions.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/native/TensorConversions.cpp",
+    "aten/src/ATen/native/LinearAlgebra.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/native/LinearAlgebra.cpp",
+    "aten/src/ATen/native/cuda/linalg/BatchLinearAlgebraLib.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/native/cuda/linalg/BatchLinearAlgebraLib.cpp",
+    "aten/src/ATen/native/cuda/linalg/BatchLinearAlgebraLibBlas.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/native/cuda/linalg/BatchLinearAlgebraLibBlas.cpp",
+    "aten/src/ATen/native/cuda/linalg/CUDASolver.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/native/cuda/linalg/CUDASolver.cpp",
+    "aten/src/ATen/native/cuda/ReduceNormKernel.cu": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/native/cuda/ReduceNormKernel.cu",
+    "aten/src/ATen/native/cuda/ReduceSumProdKernel.cu": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/native/cuda/ReduceSumProdKernel.cu",
+    "aten/src/ATen/native/cuda/Blas.cpp": "https://github.com/pytorch/pytorch/blob/cf30153c4c131c8164ee7798e5022d810682e2cb/aten/src/ATen/native/cuda/Blas.cpp"
+  },
+  "torch_local_sources": {
+    "torch/functional.py": "4a36b10e59119ea1e98d473d38ef9f4fd84082540f68971ed51f168a8c12de1a",
+    "torch/backends/opt_einsum/__init__.py": "c5d2fdc3ebf552d7b2ac93c5bd585e625c4da9e4c1ed9d872e96a7a799a0324c",
+    "torch/include/ATen/Context.h": "a105f5c34b3c8616ee838645b79003c9226dd06cfe7c3e2f580b31492d03ad63",
+    "torch/include/torch/headeronly/util/Half.h": "9a60499ac1d14850733fb1c792e39f24f15c726d4c7d7d1a61f4dc3a02f8b8b7",
+    "torch/include/torch/headeronly/util/BFloat16.h": "cd57705b38b05660840228071eb0ee6dac46f350d1bdfa11496eca643790be69",
+    "torch/include/ATen/native/cuda/Reduce.cuh": "ef9bea8fdfd03cec2d7e7421cbe75d98fddfdaafddb4f25a1ed655c5861dfb65",
+    "torch/include/ATen/native/SharedReduceOps.h": "75a6bad9a3c7f47572ab8264fd66487697e2a77bb9fba1b0d555d967aac18b5e",
+    "torch/include/ATen/TensorIterator.h": "078c3720cfc9e4b211f5ca5d21e6c2b2068ae35d723527e138c2eb214cf13116",
+    "torch/include/ATen/cuda/CUDAConfig.h": "bc687070857e3f1fbe2d799fff221bb809560327f02a9778401c3f2324a495e8"
+  },
+  "einsum_reference_configuration": {
+    "path": "left-to-right",
+    "evidence": "opt_einsum package absent in the inspected ComfyUI virtual environment; include-system-site-packages=false; torch.functional fallback forwards no contraction path. External Python hooks remain excluded."
+  },
+  "approved_inverse_exception": {
+    "scope": "OFT/BOFT inverse LU factorization only",
+    "reference_branch": "MAGMA for batch > 1, square width > 16 and (width > 128 or batch > 16)",
+    "native_branch": "Use the same CUDA cuSOLVER/cuBLAS factor dispatch used by the non-MAGMA reference path. Preserve identity solve, scalar dtypes, cast boundaries and patch ordering. Last-bit LU differences are accepted.",
+    "authorization": "User explicitly approved: Ja, använd CUDA:s LU-lösare för dessa fall"
+  },
+  "kitchen_source": {
+    "version": "0.2.37",
+    "repository": "https://github.com/Comfy-Org/comfy-kitchen",
+    "git_tree": "be003b7c23c5b01328657955b8bc5d3f073d868e",
+    "files": {
+      "int8_linear.cu": {
+        "git_blob": "0f74c7cb617ac58adbbb9b805a516fd8d16cbd78",
+        "sha256": "3fd6d36a43e9b40aa4f0fc0e1de226fca5b1e58090e777dd81e4db676fe39b45"
+      },
+      "utils.cuh": {
+        "git_blob": "b52439b3daf9525d4f8ff5d5adc2a52e6f60d59b",
+        "sha256": "a3482d9911029f017c64b39dae5198f76a4c9585b8ede5c734643bcc18d04a4d"
+      },
+      "dtype_dispatch.cuh": {
+        "git_blob": "43de1ed1315cd1bae6d401e15a84ee939cb1f525",
+        "sha256": "5a155c3bf2123604a0689ad792016b703c45d9676a389381b482ac1f1afb23bc"
+      },
+      "input_act_codes.h": {
+        "git_blob": "f09b2400faab6eab613ca44024d431a2b0d2f04f",
+        "sha256": "d94f60af4acc70fe96faf2a2824ec6eb98606ad5f37e0e340366b5a239b46b24"
+      }
+    },
+    "local_python_sources": {
+      "backends/cuda/__init__.py": "4b32e00e230d451e8bdc9c1fbd6917d8e7d2cc0d439dec13e3107e0539252ffd",
+      "backends/eager/quantization.py": "0c90a8510419409306dd1975bc9c34c9225ed4493718e1df2c30d5cddcf2017e",
+      "tensor/int8.py": "df5fea37f408a224060c7d89d5a074e4c59eda4937020fcc5693c465934cb3a0",
+      "tensor/int8_utils.py": "4776532e7394c56262cc02c48217a20b520d123c2bf9539eaf77cf0ff32ff1b8",
+      "tensor/base.py": "1779b95ec16d2f3db1adcdbf448b931104ad6f609849afec7d03c999cfc819eb"
+    },
+    "build_flags_source": "https://github.com/Comfy-Org/comfy-kitchen/blob/v0.2.37/comfy_kitchen/backends/cuda/CMakeLists.txt"
+  }
+}

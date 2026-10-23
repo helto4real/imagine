@@ -1,0 +1,14 @@
+The adapter loader and weight policy are behavioral ports of ComfyUI sources.
+Reference revision: ba994879b88d0ebd9950b1e5c1e923d928f216ba.
+Original project: https://github.com/Comfy-Org/ComfyUI
+Original lora.py copyright: Copyright (C) 2024 Comfy.
+The GPL-3.0-or-later terms are preserved in the source headers and LICENSE.
+Exact reference source hashes are recorded in reference-lock.json.
+
+PyTorch-derived tensor layout, contraction and reduction algorithms retain
+their original license in PYTORCH-LICENSE.
+
+kitchen/ contains unchanged Comfy Kitchen 0.2.37 CUDA kernel source and headers
+under Apache-2.0. Its original LICENSE and NOTICE are retained in that directory.
+Only native CUDA code is compiled here; this port does not link the Python,
+PyTorch or nanobind dependencies mentioned in the upstream Kitchen NOTICE.
