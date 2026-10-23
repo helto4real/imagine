@@ -15,7 +15,9 @@ impl Timeline {
         let mut c = AudioClip::new(id.clone(), start, time(1.), &project.audio);
         c.asset = asset;
         self.audio_selected = BTreeSet::from([id.clone()]);
+        self.audio_selection_order = vec![id.clone()];
         self.audio_primary = Some(id);
+        self.section_selection.clear();
         self.section = None;
         self.project_audio = false;
         self.audio_draft = Some(c.clone());
@@ -30,6 +32,7 @@ impl Timeline {
     }
     pub(super) fn clear_audio_selection(&mut self) {
         self.audio_selected.clear();
+        self.audio_selection_order.clear();
         self.audio_primary = None;
         self.audio_draft = None;
         self.project_audio = false;

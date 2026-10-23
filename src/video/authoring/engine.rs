@@ -163,14 +163,31 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
     let mut commands = vec![];
     let mut creative = base.creative.clone();
     match request.operation {
-        Operation::EnhanceScene => commands.push(Edit::SetSceneDescription {
-            scene_id: request.scene_id.clone().ok_or("scene_not_found")?,
-            description: draft
+        Operation::EnhanceScene => {
+            let scene_id = request.scene_id.clone().ok_or("scene_not_found")?;
+            base.scene(&scene_id).map_err(|_| "scene_not_found")?;
+            let text = draft
                 .text
                 .clone()
                 .filter(|t| !t.trim().is_empty())
-                .ok_or("authoring_empty_draft")?,
-        }),
+                .ok_or("authoring_empty_draft")?;
+            match request.scene_field.unwrap_or_default() {
+                SceneField::Description => commands.push(Edit::SetSceneDescription {
+                    scene_id,
+                    description: text,
+                }),
+                field => {
+                    let source = creative.scene_prompts.entry(scene_id).or_default();
+                    match field {
+                        SceneField::Summary => source.summary = text,
+                        SceneField::AmbientSound => source.ambient_sound = text,
+                        SceneField::NonDiegeticMusic => source.non_diegetic_music = text,
+                        SceneField::Description => unreachable!(),
+                    }
+                    commands.push(Edit::SetCreative { creative });
+                }
+            }
+        }
         Operation::EnhanceSection => {
             let scene = base
                 .scene(request.scene_id.as_ref().ok_or("scene_not_found")?)
@@ -209,6 +226,9 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
             if request.destination == Destination::Replace {
                 creative.sections.clear();
                 creative.scene_prompts.clear();
+                creative.scene_loras.clear();
+                creative.scene_kinds.clear();
+                commands.push(Edit::SetAudioTracks { tracks: vec![] });
                 for s in &base.scenes {
                     commands.push(Edit::RemoveScene {
                         scene_id: s.id.clone(),
@@ -281,6 +301,7 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                     let mut images = vec![];
                     for image_id in scene.image_ids.iter().chain(&source.image_ids) {
                         images.push(ImageBinding {
+                            anchor: None,
                             image_id: image_id.clone(),
                             asset: asset_for(image_id)?,
                             role: InputRole::VisualReference,
@@ -293,6 +314,7 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                         if !image_id.is_empty() {
                             let asset = asset_for(image_id)?;
                             images.push(ImageBinding {
+                                anchor: None,
                                 image_id: image_id.clone(),
                                 asset: asset.clone(),
                                 role: role.clone(),
@@ -313,6 +335,7 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                             section.id.clone(),
                             SectionSource {
                                 videos: vec![],
+                                media_order: vec![],
                                 images,
                                 dialogue_intent: source.dialogue_intent.clone(),
                             },

@@ -264,9 +264,8 @@ impl JobRequest {
         {
             return Err("invalid_prompt_length");
         }
-        if !(1..=100).contains(&self.sampling.steps)
+        if self.sampling.steps == 0
             || !self.sampling.cfg_scale.is_finite()
-            || !(0.0..=20.0).contains(&self.sampling.cfg_scale)
             || (!matches!(
                 self.sampling.sampler.as_str(),
                 "er_sde" | "euler" | "res_multistep"
@@ -288,7 +287,10 @@ impl JobRequest {
             return Err("unsupported_sampling");
         }
         if !self.sampling.custom_sigmas.is_empty()
-            && (self.sampling.custom_sigmas.len() != self.sampling.steps as usize + 1
+            && (usize::try_from(self.sampling.steps)
+                .ok()
+                .and_then(|n| n.checked_add(1))
+                != Some(self.sampling.custom_sigmas.len())
                 || self.sampling.custom_sigmas.last() != Some(&0.)
                 || self.sampling.custom_sigmas[0] <= 0.
                 || self.sampling.custom_sigmas.windows(2).any(|s| s[1] > s[0]))
@@ -488,8 +490,8 @@ pub fn model(id: &str) -> Option<Value> {
                 "dimensions":{"min":128,"max":4096,"multiple":32,"min_max_side":256},
                 "validated_resolutions":[{"width":1600,"height":896}],
                 "resolution_note":"Other dimensions use the same runtime configuration but are not locally validated; memory requirements vary",
-                "steps":{"min":1,"max":100},
-                "cfg_scale":{"min":0,"max":20}, "samplers":["er_sde"], "schedulers":["beta"],
+                "steps":{"min":1},
+                "cfg_scale":{"finite":true}, "samplers":["er_sde"], "schedulers":["beta"],
                 "output_formats":["png"],"max_output_count":1,"loras":false,
                 "reference_images":{"max_count":10,"locally_validated_count":1,"ordered":true,
                     "pixel_limit_min":262144,"pixel_limit_max":4000000,"pixel_limit_scope":"per_image",

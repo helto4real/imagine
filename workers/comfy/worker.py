@@ -110,8 +110,8 @@ def serve(reader, writer, runtime):
                 or not isinstance(request_id, str) or not 0 < len(request_id) <= 64):
             raise WorkerError("comfy_protocol_error")
 
-        def emit(event, **values):
-            write_frame(writer, {"type": event, "id": request_id, **values})
+        def emit(event, payload=b"", **values):
+            write_frame(writer, {"type": event, "id": request_id, **values}, payload)
 
         try:
             result = runtime.generate(header, references(header, payload), emit)
@@ -126,6 +126,16 @@ def serve(reader, writer, runtime):
             return  # A failed generation discards all GPU/model state.
 
 
+def private_temporary_directory():
+    """An explicit pinned temp directory must never trigger Python's /tmp fallback."""
+    path = os.environ.get("IMAGINE_PRIVATE_TMP")
+    if path is not None:
+        import tempfile
+        # Do not call gettempdir(): it probes alternatives when this disk is full
+        # or read-only. Explicit tempdir instead reports the actual write error.
+        tempfile.tempdir = path
+
+
 def main():
     # Reserve a private output descriptor before importing noisy third party code.
     writer = os.fdopen(os.dup(1), "wb", buffering=0)
@@ -134,6 +144,7 @@ def main():
         os.dup2(sink.fileno(), 2)
     sys.dont_write_bytecode = True
     try:
+        private_temporary_directory()
         import argparse
         parser = argparse.ArgumentParser()
         parser.add_argument("--comfy-root", required=True)

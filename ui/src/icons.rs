@@ -4,12 +4,16 @@ use eframe::egui::{self, Color32, Painter, Rect, Stroke};
 #[derive(Clone, Copy)]
 pub enum Icon {
     Image,
+    Save,
     Edit,
     Enhance,
     Duplicate,
+    Copy,
+    Insert,
     Lora,
     CharacterSheet,
     Video,
+    Audio,
     Settings,
     Eye,
     EyeOff,
@@ -26,8 +30,12 @@ pub enum Icon {
     Stop,
     Folder,
     Close,
+    Check,
     Undo,
     Redo,
+    Compare,
+    Swap,
+    Unlink,
 }
 
 pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
@@ -50,6 +58,47 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
         );
     };
     match icon {
+        Icon::Unlink => {
+            line(&[
+                [9., 6.],
+                [7., 6.],
+                [4., 9.],
+                [4., 13.],
+                [7., 16.],
+                [9., 16.],
+            ]);
+            line(&[
+                [15., 8.],
+                [17., 8.],
+                [20., 11.],
+                [20., 15.],
+                [17., 18.],
+                [15., 18.],
+            ]);
+            line(&[[13., 3.], [11., 8.]]);
+            line(&[[13., 16.], [11., 21.]]);
+        }
+        Icon::Compare => {
+            box_at(3., 4., 18., 16., 2);
+            line(&[[12., 4.], [12., 20.]]);
+            line(&[[6., 10.], [9., 10.]]);
+            line(&[[15., 14.], [18., 14.]]);
+        }
+        Icon::Swap => {
+            line(&[[4., 8.], [20., 8.], [16., 4.]]);
+            line(&[[20., 16.], [4., 16.], [8., 20.]]);
+        }
+        Icon::Audio => {
+            for (x, a, b) in [
+                (4., 9., 15.),
+                (8., 5., 19.),
+                (12., 2., 22.),
+                (16., 6., 18.),
+                (20., 9., 15.),
+            ] {
+                line(&[[x, a], [x, b]]);
+            }
+        }
         Icon::Undo => {
             line(&[[9., 4.], [4., 9.], [9., 14.]]);
             line(&[[4., 9.], [14., 9.], [19., 13.], [19., 20.]]);
@@ -65,7 +114,14 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
             line(&[[18., 1.], [18., 5.]]);
             line(&[[16., 3.], [20., 3.]]);
         }
-        Icon::Duplicate => {
+        Icon::Insert => {
+            line(&[[4., 5.], [20., 5.]]);
+            line(&[[4., 10.], [12., 10.]]);
+            line(&[[4., 20.], [20., 20.]]);
+            line(&[[17., 9.], [17., 16.], [13., 12.]]);
+            line(&[[17., 16.], [21., 12.]]);
+        }
+        Icon::Duplicate | Icon::Copy => {
             box_at(8., 8., 13., 13., 2);
             line(&[[5., 16.], [3., 16.], [3., 3.], [16., 3.], [16., 5.]]);
         }
@@ -157,6 +213,12 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
             };
             line(&[[12., y(20.)], [12., y(4.)]]);
             line(&[[5., y(11.)], [12., y(4.)], [19., y(11.)]]);
+        }
+        Icon::Check => line(&[[4., 12.], [9., 17.], [20., 6.]]),
+        Icon::Save => {
+            box_at(4., 3., 16., 18., 1);
+            box_at(7., 3., 9., 6., 0);
+            box_at(7., 13., 10., 8., 0);
         }
         Icon::Trash => {
             line(&[[4., 6.], [20., 6.]]);

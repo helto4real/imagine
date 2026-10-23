@@ -6,6 +6,25 @@ pub const DEFAULT_SYSTEM_PROMPT: &str = "Improve the user's image-generation pro
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum StoryTransport {
+    #[default]
+    Koboldcpp,
+    Ollama,
+}
+impl StoryTransport {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Koboldcpp => "koboldcpp",
+            Self::Ollama => "ollama",
+        }
+    }
+    pub fn is_default(&self) -> bool {
+        *self == Self::Koboldcpp
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum TokenParameter {
     #[default]
     MaxTokens,
@@ -21,8 +40,10 @@ impl TokenParameter {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(remote = "Self", deny_unknown_fields)]
 pub struct Profile {
+    #[serde(default, skip_serializing_if = "StoryTransport::is_default")]
+    pub story_transport: StoryTransport,
     pub id: String,
     pub name: String,
     pub base_url: String,
@@ -35,12 +56,11 @@ pub struct Profile {
     /// Optional provider parameters; omitted values retain server defaults.
     #[serde(default)]
     pub parameters: serde_json::Map<String, serde_json::Value>,
-    #[serde(default)]
-    pub has_api_key: bool,
 }
 impl Default for Profile {
     fn default() -> Self {
         Self {
+            story_transport: StoryTransport::default(),
             id: "proxy".into(),
             name: "Proxy".into(),
             base_url: DEFAULT_BASE_URL.into(),
@@ -50,27 +70,47 @@ impl Default for Profile {
             token_parameter: TokenParameter::default(),
             temperature: None,
             parameters: Default::default(),
-            has_api_key: false,
         }
     }
 }
 
 #[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(remote = "Self", deny_unknown_fields)]
 pub struct ProfileUpdate {
     pub profile: Profile,
-    /// None preserves the saved key; an empty string clears it.
-    pub api_key: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(remote = "Self", deny_unknown_fields)]
 pub struct ModelsRequest {
     pub profile_id: String,
     pub base_url: String,
-    /// None uses the saved key only if the saved server address still matches.
-    pub api_key: Option<String>,
 }
+
+// Read only the former credential field names for compatibility. Their values
+// are discarded before constructing the current type and can never be sent or
+// serialized again. Remote derives retain each type's ordinary field validation.
+macro_rules! without_legacy_credentials {
+    ($name:ident, $($legacy:literal),+ $(,)?) => {
+        impl Serialize for $name {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                $name::serialize(self, serializer)
+            }
+        }
+        impl<'de> Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                let mut value = serde_json::Value::deserialize(deserializer)?;
+                if let Some(fields) = value.as_object_mut() {
+                    $(fields.remove($legacy);)+
+                }
+                $name::deserialize(value).map_err(serde::de::Error::custom)
+            }
+        }
+    };
+}
+without_legacy_credentials!(Profile, "has_api_key", "api_key");
+without_legacy_credentials!(ProfileUpdate, "api_key");
+without_legacy_credentials!(ModelsRequest, "api_key");
 
 /// These fields are controlled by the enhancement operation or dedicated controls.
 pub fn reserved_parameter(name: &str) -> bool {

@@ -41,8 +41,6 @@ struct Proposal {
 pub(super) struct EnhancementUi {
     pub profiles: Vec<Profile>,
     draft: Option<Profile>,
-    api_key: String,
-    clear_key: bool,
     loading: bool,
     saving: bool,
     loaded: bool,
@@ -84,13 +82,6 @@ impl ImagineApp {
         Some(ModelsRequest {
             profile_id: draft.id.clone(),
             base_url: draft.base_url.clone(),
-            api_key: if self.enhancement.clear_key {
-                Some(String::new())
-            } else if self.enhancement.api_key.is_empty() {
-                None
-            } else {
-                Some(self.enhancement.api_key.clone())
-            },
         })
     }
     fn load_enhancement_models(&mut self, ctx: &egui::Context) {
@@ -110,8 +101,6 @@ impl ImagineApp {
     fn enhancement_profile_dirty(&self) -> bool {
         self.enhancement.draft.as_ref().is_some_and(|draft| {
             self.enhancement.profiles.iter().find(|p| p.id == draft.id) != Some(draft)
-                || !self.enhancement.api_key.is_empty()
-                || self.enhancement.clear_key
                 || self.enhancement.extra_error.is_some()
         })
     }
@@ -215,8 +204,6 @@ impl ImagineApp {
                             .and_then(|id| profiles.iter().find(|p| p.id == id).cloned())
                             .or_else(|| profiles.first().cloned());
                         self.enhancement.profiles = profiles;
-                        self.enhancement.api_key.clear();
-                        self.enhancement.clear_key = false;
                         self.enhancement.loaded = true;
                         self.enhancement.settings_error = None;
                         self.enhancement.extra_profile = None;
@@ -542,6 +529,21 @@ impl ImagineApp {
                 }
             });
     }
+    pub(super) fn enhancement_provider_settings(&mut self, ui: &mut egui::Ui) {
+        if !self.enhancement.loaded {
+            self.load_enhancement_profiles(ui.ctx());
+        }
+        ui.add_enabled_ui(
+            !self.enhancement.saving && !self.enhancement.loading,
+            |ui| self.enhancement_profile_editor(ui),
+        );
+        if self.enhancement.loading || self.enhancement.saving {
+            ui.spinner();
+        }
+        if let Some(error) = &self.enhancement.settings_error {
+            ui.colored_label(helto::ERROR, error);
+        }
+    }
     fn enhancement_profile_editor(&mut self, ui: &mut egui::Ui) {
         // Leave room for the text area's border inside the settings clip rect.
         ui.set_max_width((ui.available_width() - 8.).max(120.));
@@ -568,8 +570,6 @@ impl ImagineApp {
                     name: "New profile".into(),
                     ..Default::default()
                 });
-                self.enhancement.api_key.clear();
-                self.enhancement.clear_key = false;
             }
             if let Some(draft) = self.enhancement.draft.clone() {
                 if helto::icon_button(ui, Icon::Duplicate, "Duplicate enhancement profile", false)
@@ -578,11 +578,8 @@ impl ImagineApp {
                     self.enhancement.draft = Some(Profile {
                         id: uuid::Uuid::new_v4().to_string(),
                         name: format!("{} copy", draft.name),
-                        has_api_key: false,
                         ..draft.clone()
                     });
-                    self.enhancement.api_key.clear();
-                    self.enhancement.clear_key = false;
                 }
                 if helto::icon_button(ui, Icon::Trash, "Delete enhancement profile", false)
                     .clicked()
@@ -603,8 +600,6 @@ impl ImagineApp {
                     .find(|p| p.id == id)
                     .cloned()
             });
-            self.enhancement.api_key.clear();
-            self.enhancement.clear_key = false;
         }
         let Some(draft) = &mut self.enhancement.draft else {
             return;
@@ -629,31 +624,26 @@ impl ImagineApp {
             ui.add(egui::TextEdit::singleline(value).desired_width(f32::INFINITY))
                 .labelled_by(label.id);
         }
-        let label = ui.label("API key");
-        ui.add(
-            egui::TextEdit::singleline(&mut self.enhancement.api_key)
-                .password(true)
-                .hint_text(if draft.has_api_key && !self.enhancement.clear_key {
-                    "Saved"
-                } else {
-                    "Optional"
-                })
-                .desired_width(f32::INFINITY),
-        )
-        .labelled_by(label.id);
-        if draft.has_api_key {
-            ui.checkbox(&mut self.enhancement.clear_key, "Clear saved key");
-        }
+        ui.horizontal(|ui| {
+            ui.label("Story API");
+            egui::ComboBox::from_id_salt("enhancement-story-transport")
+                .selected_text(draft.story_transport.name())
+                .show_ui(ui, |ui| {
+                    for transport in [
+                        crate::enhancement_types::StoryTransport::Koboldcpp,
+                        crate::enhancement_types::StoryTransport::Ollama,
+                    ] {
+                        ui.selectable_value(
+                            &mut draft.story_transport,
+                            transport,
+                            transport.name(),
+                        );
+                    }
+                });
+        });
         let lookup = Some(ModelsRequest {
             profile_id: draft.id.clone(),
             base_url: draft.base_url.clone(),
-            api_key: if self.enhancement.clear_key {
-                Some(String::new())
-            } else if self.enhancement.api_key.is_empty() {
-                None
-            } else {
-                Some(self.enhancement.api_key.clone())
-            },
         });
         let have_models = self.enhancement.models_for == lookup;
         let loading_models = self.enhancement.models_pending == lookup;
@@ -842,13 +832,6 @@ impl ImagineApp {
         let Some(profile) = self.enhancement.draft.clone() else {
             return;
         };
-        let api_key = if self.enhancement.clear_key {
-            Some(String::new())
-        } else if self.enhancement.api_key.is_empty() {
-            None
-        } else {
-            Some(self.enhancement.api_key.clone())
-        };
         self.enhancement.saving = true;
         let tx = self.tx.clone();
         let ctx = ctx.clone();
@@ -859,7 +842,7 @@ impl ImagineApp {
                     client.delete_enhancement_profile(&id).await
                 } else {
                     client
-                        .save_enhancement_profile(ProfileUpdate { profile, api_key })
+                        .save_enhancement_profile(ProfileUpdate { profile })
                         .await
                 }
             });

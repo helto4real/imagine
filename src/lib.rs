@@ -8,9 +8,20 @@ pub mod engine;
 pub mod enhancement;
 #[path = "../shared/enhancement.rs"]
 pub mod enhancement_types;
+pub(crate) mod image_sampling_preview;
+#[path = "../shared/private_storage.rs"]
+pub mod private_storage;
 pub mod progress;
+pub mod sampling_preview;
 pub mod scheduler;
+#[path = "../shared/settings_store.rs"]
+pub mod settings_store;
 pub mod storage;
+#[path = "../shared/storage_layout.rs"]
+pub mod storage_layout;
+#[cfg(test)]
+#[path = "../shared/task_fixtures.rs"]
+mod task_fixtures;
 
 pub mod coordination;
 

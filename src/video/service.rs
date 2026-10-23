@@ -8,6 +8,7 @@ use std::{
 
 #[derive(Default)]
 pub struct Service {
+    pub reference_cache: Option<std::sync::Arc<dyn super::reference_cache::Control>>,
     pub assemblies: BTreeMap<String, super::assembly::Entry>,
     pub authoring: std::sync::Arc<super::authoring::drafts::Service>,
     pub libraries: BTreeMap<String, super::library::LibrarySession>,
@@ -30,6 +31,14 @@ pub struct Snapshot {
     pub take_states: BTreeMap<TakeId, super::review::TakeState>,
 }
 impl Service {
+    pub fn with_reference_cache(
+        reference_cache: Option<std::sync::Arc<dyn super::reference_cache::Control>>,
+    ) -> Self {
+        Self {
+            reference_cache,
+            ..Default::default()
+        }
+    }
     pub fn snapshot(&self, id: &ProjectId) -> Result<Snapshot, Issue> {
         let project = self.projects.session(id)?;
         Ok(Snapshot {
@@ -79,5 +88,17 @@ impl Service {
         copied.save_to(path)?;
         let new_id = self.projects.insert(copied)?;
         Ok(new_id)
+    }
+    pub fn copy_private(
+        &mut self,
+        id: &ProjectId,
+        root: &crate::private_storage::Root,
+        staging: &SessionStaging,
+    ) -> Result<ProjectId, StorageError> {
+        let source = self.projects.session(id)?;
+        let mut copied =
+            ProjectSession::from_copy(source.document().clone(), source.files()?, staging)?;
+        copied.save_private(root)?;
+        Ok(self.projects.insert(copied)?)
     }
 }

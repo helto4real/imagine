@@ -1,4 +1,35 @@
 use super::*;
+#[test]
+fn namespaced_model_catalog_preserves_ui_selection_across_save_and_restart() {
+    let root = tempfile::tempdir().unwrap();
+    let models = root.path().join("own-models");
+    std::fs::create_dir(&models).unwrap();
+    let path = root.path().join("home/.config/imagine/models.json");
+    let runtime = root.path().join("runtime/imagine");
+    let selection = json!({"model_group":"own-alternative-model","model_groups":{"own-alternative-model":{"variant":"own-file.safetensors","loras":[]}}});
+    crate::settings_store::write_namespace(&path, "selection", selection.clone(), &runtime)
+        .unwrap();
+    let mut library =
+        Library::load_namespaced(models.clone(), path.clone(), runtime.clone()).unwrap();
+    let mut settings = library.settings.clone();
+    settings.components.insert(
+        "own-model".into(),
+        Components {
+            text_encoder: "own-other-encoder".into(),
+            vae: "own-other-vae".into(),
+        },
+    );
+    library.update(settings.clone()).unwrap();
+    assert_eq!(
+        crate::settings_store::read_namespace(&path, "selection").unwrap(),
+        Some(selection)
+    );
+    let restored = Library::load_namespaced(models, path, runtime).unwrap();
+    assert_eq!(
+        serde_json::to_value(restored.settings).unwrap(),
+        serde_json::to_value(settings).unwrap()
+    );
+}
 #[path = "../shared/model_catalog_fixture.rs"]
 mod fixture;
 fn setup() -> (tempfile::TempDir, Library) {

@@ -1,8 +1,7 @@
 //! Synthetic job events and egui frames only; no installed service or user data.
 use super::*;
+use crate::test_destination as destination;
 use queue::{Completion, Event};
-#[path = "../tests/support/destination.rs"]
-mod destination;
 
 fn stage(desk: &mut Desk, prompts: &[&str]) -> Vec<String> {
     desk.app.metadata = Some(imagine_server::contract::model(client::MODEL).unwrap());

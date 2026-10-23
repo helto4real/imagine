@@ -1,4 +1,4 @@
-use super::editing::{move_clips, resize_clip};
+use super::editing::resize_clip;
 use super::*;
 use egui::{Rect, Sense, Stroke};
 impl ImagineApp {
@@ -33,6 +33,7 @@ impl ImagineApp {
                         helto::FIELD
                     },
                 );
+                self.timeline_waveform(ui, project, c, bar);
                 let response = ui.interact(
                     bar,
                     ui.id().with((&c.id.0, "audio")),
@@ -45,28 +46,77 @@ impl ImagineApp {
                     },
                 );
                 #[cfg(feature = "ui-preview")]
-                super::qa::control(ui, format!("audio-clip-{index}"), &response);
-                if response.clicked() {
-                    commands.extend(self.timeline.draft_edits());
-                    if !ui.input(|i| i.modifiers.command || i.modifiers.shift) {
-                        self.timeline.audio_selected.clear();
-                    }
-                    self.timeline.audio_selected.insert(c.id.clone());
-                    self.timeline.audio_primary = Some(c.id.clone());
-                    self.timeline.project_audio = false;
-                    self.timeline.section = None;
-                    self.timeline.sync_draft();
+                {
+                    super::qa::control(ui, format!("audio-clip-{index}"), &response);
+                    super::qa::control(ui, format!("audio-clip-id-{}", c.id.0), &response);
                 }
-                if response.drag_started() && !selected {
-                    self.timeline.audio_selected = BTreeSet::from([c.id.clone()]);
-                    self.timeline.audio_primary = Some(c.id.clone());
-                    self.timeline.project_audio = false;
-                    self.timeline.section = None;
-                    self.timeline.sync_draft();
+                if response.clicked() || response.secondary_clicked() {
+                    response.request_focus();
+                    self.timeline.keyboard_focus = Some(response.id);
+                    commands.extend(self.timeline.draft_edits());
+                    let modifiers = ui.input(|i| i.modifiers);
+                    self.timeline.pick_item(
+                        project,
+                        crate::app::timeline::selection::Item::Audio(c.id.clone()),
+                        modifiers.ctrl || modifiers.command,
+                        modifiers.shift,
+                        response.secondary_clicked(),
+                    );
+                }
+                response.context_menu(|ui| {
+                    if let Some(asset) = &c.asset {
+                        let failures = self
+                            .timeline
+                            .waveform
+                            .values
+                            .iter()
+                            .filter(|((id, _, _), _)| id == asset)
+                            .filter_map(|(_, v)| v.as_ref().err())
+                            .cloned()
+                            .collect::<Vec<_>>();
+                        if let Some(error) = failures.first() {
+                            ui.label(format!("Waveform unavailable: {error}"));
+                            if ui.button("Retry waveform").clicked() {
+                                self.timeline
+                                    .waveform
+                                    .values
+                                    .retain(|(id, _, _), _| id != asset);
+                                ui.close();
+                            }
+                        }
+                    }
+                    let r = ui.add_enabled(enabled, egui::Button::new("Duplicate selection"));
+                    #[cfg(feature = "ui-preview")]
+                    crate::app::timeline::qa::control(ui, "audio-context-duplicate".into(), &r);
+                    if r.clicked() {
+                        commands.extend(self.timeline.duplicate_selection(project));
+                        ui.close();
+                    }
+                    let r = ui.add_enabled(enabled, egui::Button::new("Delete selection"));
+                    #[cfg(feature = "ui-preview")]
+                    crate::app::timeline::qa::control(ui, "audio-context-delete".into(), &r);
+                    if r.clicked() {
+                        commands.extend(self.timeline.draft_edits());
+                        commands.extend(self.timeline.delete_selection());
+                        ui.close();
+                    }
+                });
+                if response.drag_started() {
+                    let modifiers = ui.input(|i| i.modifiers);
+                    if modifiers.shift || modifiers.ctrl || modifiers.command || !selected {
+                        commands.extend(self.timeline.draft_edits());
+                        self.timeline.pick_item(
+                            project,
+                            crate::app::timeline::selection::Item::Audio(c.id.clone()),
+                            modifiers.ctrl || modifiers.command,
+                            modifiers.shift,
+                            false,
+                        );
+                    }
                 }
                 if enabled
                     && !c.locked
-                    && let Some((before, dx, done)) = crate::app::timeline::tracks::gesture(
+                    && let Some((before, dx, done)) = crate::app::timeline::tracks::move_gesture(
                         &mut self.timeline,
                         &response,
                         project,
@@ -79,11 +129,10 @@ impl ImagineApp {
                         egui::StrokeKind::Inside,
                     );
                     if done {
-                        commands.extend(move_clips(
+                        commands.extend(self.timeline.move_selection(
                             &before,
-                            &self.timeline.audio_selected,
+                            seconds(c.start),
                             f64::from(dx / self.timeline.zoom),
-                            self.timeline.snap,
                         ));
                     }
                 }
@@ -108,6 +157,18 @@ impl ImagineApp {
                         format!("audio-edge-{index}-{end}"),
                         &response,
                     );
+                    if response.drag_started() {
+                        commands.extend(self.timeline.draft_edits());
+                        self.timeline.pick_item(
+                            project,
+                            crate::app::timeline::selection::Item::Audio(c.id.clone()),
+                            false,
+                            false,
+                            false,
+                        );
+                        response.request_focus();
+                        self.timeline.keyboard_focus = Some(response.id);
+                    }
                     if let Some((before, dx, done)) = crate::app::timeline::tracks::gesture(
                         &mut self.timeline,
                         &response,
@@ -135,19 +196,36 @@ impl ImagineApp {
                 } else {
                     c.name.clone()
                 };
-                ui.painter()
-                    .with_clip_rect(bar.intersect(ui.clip_rect()))
-                    .text(
-                        bar.left_center() + egui::vec2(7., 0.),
+                let painter = ui.painter().with_clip_rect(bar.intersect(ui.clip_rect()));
+                let position = bar.left_center() + egui::vec2(7., 0.);
+                // Director keeps its label above the waveform with a dark
+                // text shadow. Outline the native-sized text for the same
+                // legibility without obscuring the waveform's timing.
+                for offset in [
+                    egui::vec2(-1., 0.),
+                    egui::vec2(1., 0.),
+                    egui::vec2(0., -1.),
+                    egui::vec2(0., 1.),
+                ] {
+                    painter.text(
+                        position + offset,
                         egui::Align2::LEFT_CENTER,
-                        text,
+                        &text,
                         egui::FontId::proportional(11.),
-                        if selected {
-                            helto::ACCENT_TEXT
-                        } else {
-                            helto::TEXT
-                        },
+                        helto::BG,
                     );
+                }
+                painter.text(
+                    position,
+                    egui::Align2::LEFT_CENTER,
+                    text,
+                    egui::FontId::proportional(11.),
+                    if selected {
+                        helto::ACCENT_TEXT
+                    } else {
+                        helto::TEXT
+                    },
+                );
             }
             offset += track
                 .clips

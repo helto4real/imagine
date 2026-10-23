@@ -9,7 +9,37 @@ pub enum Method {
     MotionContext,
     MotionContextExp,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Geometry of the trained two-stage handoff which produced the physical tail.
+/// The canonical tail always remains at the final (high) resolution.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HandoffUpscale {
+    pub base_width: u32,
+    pub base_height: u32,
+    pub factor: f64,
+}
+impl HandoffUpscale {
+    pub fn from_sampling(sampling: &super::sampling::Sampling) -> Option<Self> {
+        let upscale = sampling.second.as_ref()?.upscale.as_ref()?;
+        (upscale.factor > 1.).then_some(Self {
+            base_width: upscale.base_width,
+            base_height: upscale.base_height,
+            factor: upscale.factor,
+        })
+    }
+    fn valid(&self, output: Shape) -> bool {
+        self.factor.is_finite()
+            && self.factor > 1.
+            && self.factor <= 4.
+            && self.base_width > 0
+            && self.base_height > 0
+            && self.base_width.is_multiple_of(32)
+            && self.base_height.is_multiple_of(32)
+            && super::geometry::upscale_canvas(self.base_width, self.base_height, self.factor)
+                == Some((output.width, output.height))
+    }
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Descriptor {
     pub schema_version: u32,
@@ -17,6 +47,8 @@ pub struct Descriptor {
     pub sampled_frames: u32,
     pub visible_end_frame: u32,
     pub selected_end_frame: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handoff_upscale: Option<HandoffUpscale>,
 }
 impl Descriptor {
     pub fn valid(&self) -> bool {
@@ -27,6 +59,10 @@ impl Descriptor {
         self.schema_version == 1
             && self.shape.valid()
             && sampled.valid()
+            && self
+                .handoff_upscale
+                .as_ref()
+                .is_none_or(|u| u.valid(self.shape))
             && self.visible_end_frame >= 22
             && self.visible_end_frame <= self.sampled_frames
             && self.selected_end_frame == self.visible_end_frame
@@ -62,10 +98,38 @@ pub struct Input {
 }
 impl Input {
     pub fn valid(&self, target: Shape) -> bool {
+        self.valid_sampling(target, None)
+    }
+    /// Director's Exp reuse requires the same authored base geometry and handoff
+    /// factor, even when two different factors round to the same final canvas.
+    pub fn valid_sampling(
+        &self,
+        output: Shape,
+        sampling: Option<&super::sampling::Sampling>,
+    ) -> bool {
+        let target = sampling.map_or(output, |s| s.input_shape(output));
+        let target_upscale = sampling.and_then(HandoffUpscale::from_sampling);
+        let geometry_matches = if self.method == Method::MotionContextExp {
+            match (&self.descriptor.handoff_upscale, target_upscale) {
+                (Some(source), Some(target)) => {
+                    source == &target
+                        && (self.descriptor.shape.width, self.descriptor.shape.height)
+                            == (output.width, output.height)
+                }
+                (None, None) => {
+                    (self.descriptor.shape.width, self.descriptor.shape.height)
+                        == (target.width, target.height)
+                }
+                _ => false,
+            }
+        } else {
+            (self.descriptor.shape.width, self.descriptor.shape.height)
+                == (target.width, target.height)
+        };
         self.descriptor.valid()
             && super::is_sha256(&self.sha256)
-            && (self.descriptor.shape.width, self.descriptor.shape.height)
-                == (target.width, target.height)
+            && sampling.is_none_or(|s| s.valid() && s.valid_shape(output))
+            && geometry_matches
             && runtime(target, self.method).is_some()
     }
 }

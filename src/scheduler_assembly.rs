@@ -61,7 +61,9 @@ pub(super) async fn generate(
     let flag = cancelled.clone();
     let worker_progress = progress.clone();
     let mut task = tokio::task::spawn_blocking(move || -> Result<crate::generation::Generated> {
-        let destination = store.videos.destination().map_err(EngineError)?;
+        let destination = store
+            .output_destination(Some(&frozen.plan.project_id.0), true)
+            .map_err(EngineError)?;
         let proof = destination.proof().map_err(EngineError)?;
         let pending = destination
             .reserve(&json!(proof), 64 * 1024 * 1024)

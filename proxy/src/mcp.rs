@@ -32,7 +32,6 @@ pub struct Mcp {
 struct Inner {
     config: Config,
     client: Client,
-    root: PathBuf,
     roots: Vec<PathBuf>,
     references: Mutex<HashMap<String, Reference>>,
     jobs: Mutex<HashMap<String, Job>>,
@@ -45,7 +44,6 @@ struct Inner {
     epoch: std::sync::atomic::AtomicU64,
 }
 struct Job {
-    directory: PathBuf,
     fingerprint: Vec<u8>,
     result: watch::Sender<Value>,
     task: Option<tokio::task::JoinHandle<()>>,
@@ -129,12 +127,6 @@ impl Mcp {
             ));
         }
         let client = Client::new(&config).await?;
-        let root = PathBuf::from(
-            config
-                .mcp_output_dir
-                .as_ref()
-                .ok_or_else(|| anyhow!("MCP requires output directory"))?,
-        );
         let input = PathBuf::from(&config.mcp_input_dir);
         let input = std::fs::canonicalize(&input).unwrap_or(input);
         let proof = client
@@ -143,8 +135,7 @@ impl Mcp {
             .context("MCP needs a reachable Imagine with a verified encrypted media destination")?;
         let proof: crate::media_destination::Proof = serde_json::from_value(proof)?;
         let media_root = proof.config.root.clone();
-        let storage = crate::mcp_storage::Storage::open(&root, &input, proof)?;
-        let root = storage.root.clone();
+        let storage = crate::mcp_storage::Storage::open(proof)?;
         let mut key = [0u8; 32];
         use std::io::Read;
         std::fs::File::open("/dev/urandom")?.read_exact(&mut key)?;
@@ -153,7 +144,6 @@ impl Mcp {
             inner: Arc::new(Inner {
                 config,
                 client,
-                root: root.clone(),
                 roots: vec![input, media_root],
                 references: Default::default(),
                 jobs: Default::default(),
@@ -197,7 +187,7 @@ impl Mcp {
         self.inner.stop.cancel();
         let _guard = self.inner.gate.lock().await;
         if self.clear_session().await.is_err() {
-            log(40, "st_proxy.mcp", "MCP temporary cleanup failed");
+            log(40, "st_proxy.mcp", "MCP session cleanup failed");
         }
     }
     async fn clear_session(&self) -> Result<()> {
@@ -212,7 +202,7 @@ impl Mcp {
             .values_mut()
             .filter_map(|job| job.task.take())
             .collect();
-        // Stop every writer before unlinking exports. Abort is also joined.
+        // Join every owned task before discarding session-only references/results.
         for task in tasks {
             task.abort();
             let _ = task.await;
@@ -221,7 +211,7 @@ impl Mcp {
         self.inner.references.lock().unwrap().clear();
         *self.inner.session.lock().unwrap() = None;
         let _writes = self.inner.writes.lock().unwrap();
-        self.inner.storage.clear()
+        Ok(())
     }
     async fn refresh_session(&self) -> Result<()> {
         if self.inner.stop.is_cancelled() {
@@ -320,7 +310,7 @@ impl Mcp {
                 "wait for the job to finish before confirming saved images",
             ));
         }
-        // Validate the whole acknowledgement before deleting any file. Locations are
+        // Validate the whole acknowledgement without changing any file. Locations are
         // indices into our own result, never paths supplied by the caller.
         let mut locations = Vec::new();
         let items: Vec<_> = if let Some(items) = snapshot["items"].as_array() {
@@ -336,14 +326,13 @@ impl Mcp {
             }
             if !saved.saved_path.is_absolute()
                 || saved.saved_path.file_name().is_none()
-                || saved.saved_path.starts_with(&self.inner.root)
                 || saved
                     .saved_path
                     .components()
                     .any(|c| matches!(c, std::path::Component::ParentDir))
             {
                 return Err(validation(
-                    "saved_path must be an absolute local file path outside MCP output storage, without ..",
+                    "saved_path must be the existing absolute Imagine output path, without ..",
                 ));
             }
             self.inner
@@ -366,7 +355,7 @@ impl Mcp {
             })?;
             if image["bytes"].as_u64() != Some(saved.bytes) || image["sha256"] != saved.sha256 {
                 return Err(validation(
-                    "file size or SHA-256 does not match; keep the temporary image and verify the local copy",
+                    "file size or SHA-256 does not match the published Imagine output",
                 ));
             }
             let destination = json!(saved.saved_path);
@@ -389,40 +378,12 @@ impl Mcp {
             }
             locations.push((item_index, image_index));
         }
-        let mut failure = None;
-        let mut confirmed = Vec::new();
-        job.result.send_modify(|result| {
-            for (saved, (item_index, image_index)) in args.images.iter().zip(locations) {
-                let item = if result["items"].is_array() {
-                    &mut result["items"][item_index]
-                } else {
-                    &mut *result
-                };
-                let image = &mut item["images"][image_index];
-                if image["storage"] != "saved" {
-                    // One output per Imagine item. Derive the filename on the server.
-                    if self
-                        .inner
-                        .storage
-                        .remove(&job.directory, &format!("{item_index}.png"))
-                        .is_err()
-                    {
-                        failure = Some(Fault::new(
-                            "storage",
-                            "temporary image could not be removed; retry the same confirmation",
-                        ));
-                        break;
-                    }
-                    image["storage"] = json!("saved");
-                    image["saved_path"] = json!(saved.saved_path);
-                    image["path"] = json!(saved.saved_path);
-                }
-                confirmed.push(image.clone());
-            }
-        });
-        if let Some(error) = failure {
-            return Err(error);
-        }
+        // Compatibility acknowledgement only. Persistent Imagine files are
+        // already saved, so confirmation never copies, renames or unlinks them.
+        let confirmed = locations
+            .into_iter()
+            .map(|(item_index, image_index)| items[item_index]["images"][image_index].clone())
+            .collect::<Vec<_>>();
         Ok(json!({"job_id":args.job_id,"images":confirmed}))
     }
     async fn profile(&self, args: &Value) -> std::result::Result<Value, Fault> {
@@ -459,31 +420,43 @@ impl Mcp {
             .ok_or_else(|| validation("image path must be absolute"))?;
         let path = PathBuf::from(path);
         let roots = self.inner.roots.clone();
-        let inner = self.inner.clone();
-        let epoch = inner.epoch.load(std::sync::atomic::Ordering::SeqCst);
+        let epoch = self.inner.epoch.load(std::sync::atomic::Ordering::SeqCst);
         let prepared = tokio::task::spawn_blocking(move || {
-            let data = references::read_image(&path, &roots)?;
-            let (data, width, height) = references::normalize(&data)?;
-            let _writes = inner.writes.lock().unwrap();
-            if epoch != inner.epoch.load(std::sync::atomic::Ordering::SeqCst) {
-                anyhow::bail!("session ended");
-            }
-            let (path, digest) = references::store_preview(&inner.storage, &data)?;
-            Ok::<_, anyhow::Error>((data, width, height, path, digest))
+            let path = path.canonicalize()?;
+            let original = references::read_image(&path, &roots)?;
+            let digest = references::hash(&original);
+            let bytes = original.len() as u64;
+            let (preview, width, height) = references::normalize(&original)?;
+            Ok::<_, anyhow::Error>((path, digest, bytes, preview, width, height))
         })
         .await
-        .map_err(|_| validation("reference could not be read, decoded or stored"))?
+        .map_err(|_| validation("reference could not be read or decoded"))?
         .map_err(|e| {
             if e.downcast_ref::<std::io::Error>().is_some()
                 || e.downcast_ref::<image::ImageError>().is_some()
             {
-                validation("reference could not be read, decoded or stored")
+                validation("reference could not be read or decoded")
             } else {
                 validation(e)
             }
         })?;
-        let (data, width, height, path, digest) = prepared;
-        let asset = self.client.upload(data).await.map_err(validation)?;
+        let (path, digest, bytes, preview, width, height) = prepared;
+        let linked = self.client.link(&path).await.map_err(validation)?;
+        if linked["sha256"].as_str() != Some(digest.as_str())
+            || linked["bytes"].as_u64() != Some(bytes)
+        {
+            return Err(validation(
+                "registered reference has changed; register the image again",
+            ));
+        }
+        let asset = linked["id"]
+            .as_str()
+            .ok_or_else(|| validation("invalid reference storage response"))?
+            .to_owned();
+        let _writes = self.inner.writes.lock().unwrap();
+        if epoch != self.inner.epoch.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(Fault::new("privacy", "Imagine session ended"));
+        }
         let r = Reference {
             workflow: args["profile"].as_str().unwrap().into(),
             asset,
@@ -491,6 +464,11 @@ impl Mcp {
             width,
             height,
             digest,
+            mime_type: linked["mime_type"]
+                .as_str()
+                .unwrap_or("image/png")
+                .to_owned(),
+            preview_png: Arc::new(preview),
         };
         let id = uuid::Uuid::new_v4().simple().to_string();
         let result = r.result(&id);
@@ -635,7 +613,7 @@ impl Mcp {
                     })?;
                 let verify = image.clone();
                 let inner = self.inner.clone();
-                tokio::task::spawn_blocking(move || verify.verify(&inner.storage))
+                tokio::task::spawn_blocking(move || verify.verify(&inner.roots))
                     .await
                     .map_err(|_| {
                         validation("registered reference is unavailable; register it again")
@@ -697,23 +675,16 @@ impl Mcp {
                     json!({"job_id":id,"profile":wid,"status":"preparing","parameters":public[0],"images":[],"error":null})
                 };
                 let (tx, _) = watch::channel(result);
-                let directory = self
-                    .inner
-                    .storage
-                    .directory(&format!("job-{}", uuid::Uuid::new_v4().simple()))
-                    .map_err(|e| Fault::new("storage", e))?;
                 let this = self.clone();
                 let job_id = id.to_string();
                 let sender = tx.clone();
-                let output = directory.clone();
                 let epoch = self.inner.epoch.load(std::sync::atomic::Ordering::SeqCst);
                 let task = tokio::spawn(async move {
-                    this.run(job_id, values, batch, sender, output, epoch).await;
+                    this.run(job_id, values, batch, sender, epoch).await;
                 });
                 jobs.insert(
                     id.into(),
                     Job {
-                        directory,
                         fingerprint,
                         result: tx,
                         task: Some(task),
@@ -730,7 +701,6 @@ impl Mcp {
         values: Vec<Value>,
         batch: bool,
         tx: watch::Sender<Value>,
-        directory: PathBuf,
         epoch: u64,
     ) {
         let result = async {
@@ -806,9 +776,8 @@ impl Mcp {
             for (index, native_id) in ids.into_iter().enumerate() {
                 let this = self.clone();
                 let tx = tx.clone();
-                let directory = directory.clone();
                 futures.push(async move {
-                    this.finish_item(&native_id, index, batch, &tx, &directory, epoch).await;
+                    this.finish_item(&native_id, index, batch, &tx, epoch).await;
                 });
             }
             futures_util::future::join_all(futures).await;
@@ -870,7 +839,6 @@ impl Mcp {
         index: usize,
         batch: bool,
         tx: &watch::Sender<Value>,
-        directory: &std::path::Path,
         epoch: u64,
     ) {
         let update = |status: &str, images: Option<Vec<Value>>, error: Option<Value>| {
@@ -947,27 +915,15 @@ impl Mcp {
                         };
                         update("saving", None, None);
                         stage = "result";
-                        let asset = job["output"]["assets"][0]["id"]
-                            .as_str()
-                            .ok_or_else(|| Fault::new("result", "image outputs are missing"))?;
-                        let bytes = match self.client.download(asset).await {
-                            Ok(bytes) => bytes,
-                            Err(_) => {
-                                update("recovering", None, Some(json!({"category":"connection","message":"Imagine result is unavailable; recovering the same job"})));
-                                tokio::time::sleep(Duration::from_secs_f64(self.inner.config.poll_interval.max(0.1))).await;
-                                continue;
-                            }
-                        };
-                        let directory = directory.to_path_buf();
+                        let asset = job["output"]["assets"][0].clone();
                         let inner = self.inner.clone();
                         let images = tokio::task::spawn_blocking(move || {
                             let _writes = inner.writes.lock().unwrap();
                             if epoch != inner.epoch.load(std::sync::atomic::Ordering::SeqCst) {
                                 anyhow::bail!("session ended");
                             }
-                            references::save_result(&inner.storage, &directory, index, &bytes)
-                        })
-                        .await
+                            references::persistent_result(&inner.storage, &asset)
+                        }).await
                         .map_err(|_| Fault::new("result", "image job failed during result"))?
                         .map_err(|e| Fault::new("result", e))?;
                         return Ok(images);
@@ -1372,7 +1328,6 @@ mod profile_tests {
         mcp.inner.jobs.lock().unwrap().insert(
             "retry".into(),
             Job {
-                directory: dir.path().join("output/retry"),
                 fingerprint: mcp.fingerprint(false, &args),
                 result,
                 task: None,
@@ -1392,17 +1347,17 @@ mod profile_tests {
 mod delivery_tests;
 
 #[cfg(test)]
-fn test_destination(root: &std::path::Path) -> Value {
+use crate::task_fixtures;
+
+#[cfg(test)]
+pub(crate) fn test_destination(root: &std::path::Path) -> Value {
     use crate::media_destination as d;
-    assert!(
-        root.to_string_lossy()
-            .starts_with("/run/media/veracrypt1/imagine/.codex-")
-    );
+    assert!(task_fixtures::is_owned(root));
     let config = d::Config {
         root: root.into(),
-        mount: "/run/media/veracrypt1".into(),
-        source: "/dev/mapper/veracrypt1".into(),
-        filesystem: "ext3".into(),
+        mount: task_fixtures::MOUNT.into(),
+        source: task_fixtures::SOURCE.into(),
+        filesystem: task_fixtures::FILESYSTEM.into(),
         fsid: d::fsid(&d::directory(root).unwrap()).unwrap(),
     };
     json!(d::inspect(&config, &d::System).unwrap().0)

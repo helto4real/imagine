@@ -5,11 +5,16 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 pub type Emit<'a> = dyn FnMut(&Event, &[u8]) -> Result<(), ErrorCode> + 'a;
 pub trait Generator {
-    fn generate(&mut self, request: &Request, emit: &mut Emit<'_>) -> Result<(), ErrorCode>;
+    fn generate(
+        &mut self,
+        request: &Request,
+        emit: &mut Emit<'_>,
+        input: &mut dyn Read,
+    ) -> Result<(), ErrorCode>;
 }
 pub fn write(out: &mut impl Write, event: &Event, payload: &[u8]) -> Result<(), ErrorCode> {
     let header = serde_json::to_vec(event).map_err(|_| ErrorCode::GenerationFailed)?;
-    if header.len() > p::MAX_HEADER || payload.len() > p::MAX_PAYLOAD {
+    if header.len() > p::MAX_HEADER || payload.len() > event.payload_limit() {
         return Err(ErrorCode::GenerationFailed);
     }
     out.write_all(&(header.len() as u32).to_be_bytes())
@@ -138,7 +143,7 @@ pub fn serve<G: Generator>(
                 .map_err(|_| ErrorCode::GenerationFailed)?;
             write(output, event, payload)
         };
-        generator.generate(&request, &mut emit)
+        generator.generate(&request, &mut emit, input)
     }))
     .unwrap_or(Err(ErrorCode::GenerationFailed));
     match result {

@@ -1,7 +1,13 @@
 use anyhow::Result;
 use st_proxy::{config::Config, logging::log, service::Service};
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
+    if run().await.is_err() {
+        eprintln!("st-proxy: startup or shutdown failed");
+        std::process::exit(1);
+    }
+}
+async fn run() -> Result<()> {
     let limit = libc::rlimit {
         rlim_cur: 0,
         rlim_max: 0,
@@ -11,8 +17,8 @@ async fn main() -> Result<()> {
     }
     let (config, cli) = match Config::parse(std::env::args().skip(1), &std::env::vars().collect()) {
         Ok(v) => v,
-        Err(e) => {
-            eprintln!("st-proxy: error: {e}");
+        Err(_) => {
+            eprintln!("st-proxy: invalid command line or configuration");
             std::process::exit(2)
         }
     };

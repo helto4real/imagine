@@ -18,6 +18,7 @@ pub struct LinearPolicy {
 }
 #[derive(Default, Clone)]
 pub struct PreparedParameters {
+    pub dynamic_modules: BTreeMap<String, std::sync::Arc<super::dynamic::Module>>,
     pub values: BTreeMap<String, Value>,
     /// ComfyAttention stores decoded Python config, not a registered Tensor.
     pub attention_configs: BTreeMap<String, serde_json::Value>,
@@ -33,6 +34,7 @@ impl std::ops::Deref for PreparedParameters {
 impl PreparedParameters {
     pub fn plain(values: BTreeMap<String, Value>) -> Self {
         Self {
+            dynamic_modules: BTreeMap::new(),
             values,
             attention_configs: BTreeMap::new(),
             linear_policies: BTreeMap::new(),

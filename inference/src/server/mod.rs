@@ -2,9 +2,13 @@
 //! No development profiles, tensor dumps, prompts or images are written to disk.
 #[path = "../../../shared/component_error.rs"]
 pub mod component_error;
+mod image_preview;
 mod load_error;
 mod moss;
+mod preview_callback;
 mod qwen;
+mod sampling_values;
+pub use crate::h3_product::protocol::preview;
 use crate::{
     attention::{Attention, AttentionMethod},
     checkpoint::{Aimdo, PreparedParameters, Safetensors},
@@ -47,11 +51,18 @@ pub struct Request {
     pub loras: Vec<Lora>,
     #[serde(default)]
     pub zero_negative_conditioning: bool,
+    #[serde(default)]
+    pub sampling_preview: Option<preview::Settings>,
 }
 pub enum Event {
     Phase(&'static str),
     Step(i64),
     LoadFailure(component_error::LoadDiagnostic),
+    Preview {
+        metadata: preview::Metadata,
+        pixels: Vec<u8>,
+    },
+    PreviewWarning,
 }
 pub type Observer<'a> = dyn FnMut(Event) -> Result<(), Error> + 'a;
 pub(super) fn attention() -> Attention {
@@ -118,15 +129,13 @@ pub fn generate(
     {
         return Err(Error::Native("Unsupported model".into()));
     }
-    if !(1..=100).contains(&r.sampling.steps)
+    if !sampling_values::valid(r.sampling.steps, r.sampling.cfg_scale)
         || r.width < 32
         || r.height < 32
         || r.width > 8192
         || r.height > 8192
         || r.width % 32 != 0
         || r.height % 32 != 0
-        || !r.sampling.cfg_scale.is_finite()
-        || !(0.0..=20.0).contains(&r.sampling.cfg_scale)
     {
         return Err(Error::Native("Invalid inference request".into()));
     }
@@ -145,7 +154,10 @@ pub fn generate(
     }
     let s = &r.sampling.custom_sigmas;
     if !s.is_empty()
-        && (s.len() != r.sampling.steps as usize + 1
+        && (usize::try_from(r.sampling.steps)
+            .ok()
+            .and_then(|n| n.checked_add(1))
+            != Some(s.len())
             || s.last() != Some(&0.)
             || s[0] <= 0.
             || s.iter().any(|v| !v.is_finite() || *v < 0.)

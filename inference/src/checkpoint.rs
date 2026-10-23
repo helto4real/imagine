@@ -16,6 +16,8 @@ pub mod detection;
 mod detector_program;
 mod detector_values;
 mod diffusers_program;
+pub mod dynamic;
+pub(crate) mod dynamic_vbar;
 mod embedding;
 mod metadata_json;
 pub mod model_registry;
@@ -41,6 +43,7 @@ type Get = unsafe extern "C" fn(*mut c_void) -> *mut u8;
 type FileHandle = unsafe extern "C" fn(*mut c_void) -> u64;
 type Free = unsafe extern "C" fn(*mut c_void);
 struct AimdoLibrary {
+    path: PathBuf,
     handle: NonNull<c_void>,
     allocate: Allocate,
     get: Get,
@@ -88,6 +91,7 @@ impl Aimdo {
         }
         let result = (|| unsafe {
             Ok(AimdoLibrary {
+                path: PathBuf::from(std::ffi::OsStr::from_bytes(path.as_bytes())),
                 handle,
                 allocate: symbol(handle, c"model_mmap_allocate")?,
                 get: symbol(handle, c"model_mmap_get")?,
@@ -104,6 +108,9 @@ impl Aimdo {
                 Err(e)
             }
         }
+    }
+    pub fn path(&self) -> &Path {
+        &self.0.path
     }
     fn map(&self, path: &Path, size: usize) -> Result<Arc<Mapping>, Error> {
         let filename = CString::new(path.as_os_str().as_bytes())

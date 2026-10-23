@@ -63,8 +63,14 @@ pub fn images(input: &wire::Input, shape: Shape, pillow_path: &Path) -> Result<V
     input
         .images
         .iter()
-        .map(|image| {
-            let (w, h, pw, ph) = geometry(image.width, image.height, &input.quality, shape)?;
+        .enumerate()
+        .map(|(index, image)| {
+            let quality = if input.manifest["images"][index]["role"] == "boundary_first_frame" {
+                "match"
+            } else {
+                &input.quality
+            };
+            let (w, h, pw, ph) = geometry(image.width, image.height, quality, shape)?;
             let rgb = if (w, h) == (image.width, image.height) {
                 image.rgb.clone()
             } else {

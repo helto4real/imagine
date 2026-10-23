@@ -12,7 +12,6 @@ use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, io::Write, path::PathBuf};
-use tokio::io::AsyncWriteExt;
 #[path = "assembly_api.rs"]
 mod assembly;
 #[path = "authoring_api.rs"]
@@ -21,6 +20,17 @@ mod authoring;
 mod libraries;
 #[path = "runs_api.rs"]
 mod runs;
+
+#[path = "captures_api.rs"]
+mod captures;
+#[path = "lora_catalog_api.rs"]
+mod lora_catalog;
+#[path = "media_health_api.rs"]
+mod media_health;
+#[path = "reference_cache_api.rs"]
+mod reference_cache;
+#[path = "streaming_import_api.rs"]
+mod streaming_import;
 
 pub struct Error {
     status: StatusCode,
@@ -40,6 +50,7 @@ impl From<StorageError> for Error {
     fn from(error: StorageError) -> Self {
         let status = match error.code.as_str() {
             "revision_conflict"
+            | "asset_revision_conflict"
             | "storage_conflict"
             | "storage_root_changed"
             | "project_already_open" => StatusCode::CONFLICT,
@@ -86,16 +97,15 @@ fn media_error(code: &'static str) -> Error {
     Error::new(StatusCode::UNPROCESSABLE_ENTITY, code)
 }
 fn staging(app: &App) -> Result<SessionStaging, Error> {
-    let proof = app
-        .store
-        .videos
-        .destination()
-        .and_then(|d| d.proof())
-        .map_err(media_error)?;
-    SessionStaging::select(&proof.config.root).map_err(Into::into)
+    let path = app.store.staging_directory().map_err(media_error)?;
+    SessionStaging::select(&path).map_err(Into::into)
 }
 pub fn routes() -> Router<App> {
     Router::new()
+        .merge(reference_cache::routes())
+        .merge(captures::routes())
+        .merge(lora_catalog::routes())
+        .merge(media_health::routes())
         .merge(libraries::routes())
         .merge(runs::routes())
         .merge(authoring::routes())
@@ -114,13 +124,62 @@ pub fn routes() -> Router<App> {
         .route("/v1/video/projects/{id}/assets", post(attach))
         .route("/v1/video/projects/{id}/save", post(save))
         .route("/v1/video/projects/{id}/save-as", post(save_as))
+        .route(
+            "/v1/video/projects/{id}/export-compatible",
+            post(export_compatible),
+        )
         .route("/v1/video/assets", post(upload))
         .route("/v1/video/assets/{id}", get(asset))
+        .route("/v1/video/assets/{id}/waveform", get(waveform))
+}
+#[derive(Deserialize)]
+struct WaveformQuery {
+    #[serde(default = "waveform_peaks")]
+    peaks: usize,
+}
+fn waveform_peaks() -> usize {
+    96
+}
+async fn waveform(
+    State(app): State<App>,
+    Path(id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<WaveformQuery>,
+) -> Result<Json<super::waveform::Waveform>, Error> {
+    let info = app
+        .store
+        .asset(&id, "local")
+        .await
+        .map_err(internal)?
+        .ok_or_else(|| Error::new(StatusCode::NOT_FOUND, "asset_not_found"))?;
+    let file = app
+        .store
+        .open_media(&id)
+        .map_err(internal)?
+        .ok_or_else(|| Error::new(StatusCode::NOT_FOUND, "asset_not_found"))?;
+    let mime = info["mime_type"].as_str().unwrap_or("").to_owned();
+    // The lease follows the blocking decoder, including if the HTTP caller leaves.
+    static LIMIT: std::sync::OnceLock<std::sync::Arc<tokio::sync::Semaphore>> =
+        std::sync::OnceLock::new();
+    let lease = LIMIT
+        .get_or_init(|| std::sync::Arc::new(tokio::sync::Semaphore::new(2)))
+        .clone()
+        .acquire_owned()
+        .await
+        .map_err(internal)?;
+    Ok(Json(
+        tokio::task::spawn_blocking(move || {
+            let _lease = lease;
+            super::waveform::decode(&file, &mime, query.peaks)
+        })
+        .await
+        .map_err(internal)?
+        .map_err(media_error)?,
+    ))
 }
 async fn capabilities() -> Json<Value> {
     Json(
-        json!({"schema_version":1,"media":{"mime_types":media::MIME_TYPES,"max_upload_bytes":media::MAX_UPLOAD},
-        "project_operations":["create","read","edits","review","attach_asset","save","open","save_as"],"models":[]}),
+        json!({"schema_version":1,"media":{"mime_types":media::MIME_TYPES,"max_upload_bytes":null,"streaming":true,"max_buffered_image_bytes":media::MAX_UPLOAD},
+        "project_operations":["create","read","edits","review","attach_asset","save","open","save_as","export_compatible"],"models":[]}),
     )
 }
 async fn create(
@@ -129,7 +188,11 @@ async fn create(
 ) -> Result<(StatusCode, Json<Snapshot>), Error> {
     let request = input(body)?;
     let mut service = app.video.lock().await;
-    let project = service.projects.create(request)?;
+    let project = if let Some(root) = app.store.private_root() {
+        service.projects.create_private(request, root)?
+    } else {
+        service.projects.create(request)?
+    };
     Ok((StatusCode::CREATED, Json(service.snapshot(&project.id)?)))
 }
 async fn read(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Snapshot>, Error> {
@@ -226,7 +289,18 @@ async fn save(
         .map(|id| service.location(id))
         .transpose()?;
     let session = service.projects.session_mut(&id)?;
-    let saved = if let Some(path) = path {
+    let saved = if let Some(root) = app.store.private_root() {
+        if let Some(path) = path
+            && !session.is_at(&path)?
+        {
+            return Err(media_error("private_storage_location_required"));
+        }
+        if !session.is_bound() {
+            session.save_private(root)
+        } else {
+            session.save()
+        }
+    } else if let Some(path) = path {
         session.save_to(&path)
     } else {
         session.save()
@@ -251,22 +325,64 @@ async fn save_as(
     if service.projects.read(&id)?.project_revision != request.expected_project_revision {
         return Err(Error::new(StatusCode::CONFLICT, "revision_conflict"));
     }
-    let location = request
-        .location_id
-        .ok_or_else(|| media_error("location_required"))?;
-    let path = service.location(&location)?;
-    let copied = service.copy_to(&id, &path, &staging)?;
+    let copied = if let Some(root) = app.store.private_root() {
+        if request.location_id.is_some() {
+            return Err(media_error("private_storage_location_required"));
+        }
+        service.copy_private(&id, root, &staging)?
+    } else {
+        let location = request
+            .location_id
+            .ok_or_else(|| media_error("location_required"))?;
+        let path = service.location(&location)?;
+        service.copy_to(&id, &path, &staging)?
+    };
     let bindings = service.runtime_assets.get(&id).cloned().unwrap_or_default();
     service.runtime_assets.insert(copied.clone(), bindings);
     let takes = service.runtime_takes.get(&id).cloned().unwrap_or_default();
     service.runtime_takes.insert(copied.clone(), takes);
     Ok((StatusCode::CREATED, Json(service.snapshot(&copied)?)))
 }
+async fn export_compatible(
+    State(app): State<App>,
+    Path(id): Path<String>,
+    body: Result<Json<Save>, JsonRejection>,
+) -> Result<Json<Value>, Error> {
+    let request = input(body)?;
+    schema(request.schema_version)?;
+    let id = ProjectId(id);
+    let mut service = app.video.lock().await;
+    if service.projects.read(&id)?.project_revision != request.expected_project_revision {
+        return Err(Error::new(StatusCode::CONFLICT, "revision_conflict"));
+    }
+    let report = if let Some(root) = app.store.private_root() {
+        if request.location_id.is_some() {
+            return Err(media_error("private_storage_location_required"));
+        }
+        service
+            .projects
+            .session_mut(&id)?
+            .export_compatible_private(root)?
+    } else {
+        let location = request
+            .location_id
+            .ok_or_else(|| media_error("location_required"))?;
+        let path = service.location(&location)?;
+        service
+            .projects
+            .session_mut(&id)?
+            .export_compatible(&path)?
+    };
+    let mut snapshot = serde_json::to_value(service.snapshot(&id)?).map_err(internal)?;
+    snapshot["compatibility_export"] = serde_json::to_value(report).map_err(internal)?;
+    Ok(Json(snapshot))
+}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Open {
     schema_version: u32,
-    location_id: String,
+    location_id: Option<String>,
+    project_id: Option<ProjectId>,
 }
 enum ResourceBinding {
     Reference(AssetId, u64),
@@ -280,30 +396,54 @@ async fn open(
     schema(request.schema_version)?;
     let path = {
         let service = app.video.lock().await;
-        let path = service.location(&request.location_id)?;
+        let path = if let Some(id) = request.project_id {
+            let root = app
+                .store
+                .private_root()
+                .ok_or_else(|| media_error("location_required"))?;
+            root.proof().map_err(media_error)?;
+            root.layout().project(&id.0).map_err(media_error)?.root
+        } else {
+            service.location(
+                request
+                    .location_id
+                    .as_deref()
+                    .ok_or_else(|| media_error("location_required"))?,
+            )?
+        };
         if let Some(id) = service.projects.at_location(&path)? {
             // Reattach the live session; reopening its disk snapshot would discard state.
             return Ok(Json(service.snapshot(&id)?));
         }
         path
     };
-    let project = tokio::task::spawn_blocking(move || ProjectSession::open(&path))
-        .await
-        .map_err(internal)??;
+    let private = app.store.private_root().cloned();
+    let project = tokio::task::spawn_blocking(move || match private {
+        Some(root) => ProjectSession::open_for_private(&root, &path),
+        None => ProjectSession::open(&path),
+    })
+    .await
+    .map_err(internal)??;
     let mut service = app.video.lock().await;
     register_project(&app, &mut service, project).await
 }
 async fn register_project(
     app: &App,
     service: &mut super::service::Service,
-    project: ProjectSession,
+    mut project: ProjectSession,
 ) -> Result<Json<Snapshot>, Error> {
+    if let Some(root) = app.store.private_root()
+        && !project.is_bound()
+    {
+        project.save_private(root)?;
+    }
     let id = project.document().project.id.clone();
     if service.projects.session(&id).is_ok() {
         return Err(Error::new(StatusCode::CONFLICT, "project_already_open"));
     }
     let mut sources = vec![];
     let mut identities = vec![];
+    let mut origins = vec![];
     for resource in &project.document().resources {
         let binding = match &resource.kind {
             ResourceKind::Reference { asset_id, revision } => {
@@ -313,14 +453,22 @@ async fn register_project(
             _ => None,
         };
         if let Some(binding) = binding {
-            let file = project.resource_file(&resource.id)?;
-            let (file, info) =
-                tokio::task::spawn_blocking(move || media::detect(&file).map(|info| (file, info)))
-                    .await
-                    .map_err(internal)?
-                    .map_err(media_error)?;
+            let file = match project.resource_file(&resource.id) {
+                Ok(file) => file,
+                // The project metadata remains editable so a missing/changed
+                // original can be repaired explicitly with Check Media/Relink.
+                Err(_) if resource.source.is_some() => continue,
+                Err(error) => return Err(error.into()),
+            };
+            let (file, info) = tokio::task::spawn_blocking(move || {
+                media::detect_streamed(&file).map(|info| (file, info))
+            })
+            .await
+            .map_err(internal)?
+            .map_err(media_error)?;
             sources.push((file, info));
             identities.push(binding);
+            origins.push(resource.source.clone());
         }
     }
     // Inspect every file before registering any asset. Cancellation or an invalid later
@@ -332,7 +480,12 @@ async fn register_project(
         .map_err(internal)?;
     let mut bindings = BTreeMap::new();
     let mut takes = BTreeMap::new();
-    for (binding, value) in identities.into_iter().zip(values) {
+    for ((binding, value), origin) in identities.into_iter().zip(values).zip(origins) {
+        if let Some(path) = origin {
+            app.store
+                .remember_original(value["id"].as_str().unwrap(), path, &value)
+                .map_err(internal)?;
+        }
         match binding {
             ResourceBinding::Reference(asset_id, revision)
                 if project
@@ -358,6 +511,10 @@ async fn register_project(
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Attach {
+    #[serde(default)]
+    library_source: Option<LibraryMediaSource>,
+    #[serde(default)]
+    name: String,
     schema_version: u32,
     expected_project_revision: u64,
     asset_id: String,
@@ -390,21 +547,28 @@ async fn attach(
         file
     };
     let mime = info["mime_type"].as_str().unwrap_or("").to_owned();
-    let (returned, inspected) =
-        tokio::task::spawn_blocking(move || media::inspect(&file, &mime).map(|info| (file, info)))
-            .await
-            .map_err(internal)?
-            .map_err(media_error)?;
+    let (returned, inspected) = tokio::task::spawn_blocking(move || {
+        media::inspect_streamed(&file, &mime).map(|info| (file, info))
+    })
+    .await
+    .map_err(internal)?
+    .map_err(media_error)?;
     file = returned;
     let asset_id = AssetId(format!("project_asset_{}", uuid::Uuid::new_v4().simple()));
-    let resource = Resource::inspect(
-        format!("resource_{}", uuid::Uuid::new_v4().simple()),
-        ResourceKind::Reference {
-            asset_id: asset_id.clone(),
-            revision: 1,
-        },
-        &mut file,
-    )?;
+    let resource_id = format!("resource_{}", uuid::Uuid::new_v4().simple());
+    let resource_kind = ResourceKind::Reference {
+        asset_id: asset_id.clone(),
+        revision: 1,
+    };
+    let resource = if let Some(path) = app
+        .store
+        .original_path(&request.asset_id)
+        .map_err(internal)?
+    {
+        Resource::external(resource_id, resource_kind, &path, &mut file)?
+    } else {
+        Resource::inspect(resource_id, resource_kind, &mut file)?
+    };
     if resource.sha256 != info["sha256"].as_str().unwrap_or("")
         || Some(resource.bytes) != info["bytes"].as_u64()
     {
@@ -416,6 +580,8 @@ async fn attach(
     document.project.assets.insert(
         asset_id.clone(),
         Asset {
+            library_source: request.library_source,
+            name: request.name,
             id: asset_id.clone(),
             revision: 1,
             kind: inspected.kind,
@@ -455,64 +621,9 @@ async fn upload(
     State(app): State<App>,
     request: Request,
 ) -> Result<(StatusCode, Json<Value>), Error> {
-    let mime = request
-        .headers()
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_owned();
-    if !media::MIME_TYPES.contains(&mime.as_str()) {
-        return Err(Error::new(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            "unsupported_media_type",
-        ));
-    }
-    if let Some(length) = request.headers().get(header::CONTENT_LENGTH) {
-        let length = length
-            .to_str()
-            .ok()
-            .and_then(|v| v.parse::<u64>().ok())
-            .ok_or_else(|| Error::new(StatusCode::BAD_REQUEST, "invalid_content_length"))?;
-        if length > media::MAX_UPLOAD {
-            return Err(Error::new(StatusCode::PAYLOAD_TOO_LARGE, "media_too_large"));
-        }
-    }
-    let _permit = app
-        .uploads
-        .clone()
-        .try_acquire_owned()
-        .map_err(|_| Error::new(StatusCode::TOO_MANY_REQUESTS, "upload_busy"))?;
-    let staging = staging(&app)?;
-    let mut file = tokio::fs::File::from_std(staging.temporary()?);
-    let mut stream = request.into_body().into_data_stream();
-    let mut bytes = 0u64;
-    while let Some(chunk) = tokio::time::timeout(std::time::Duration::from_secs(30), stream.next())
-        .await
-        .map_err(|_| media_error("upload_timeout"))?
-    {
-        let chunk = chunk.map_err(|_| media_error("upload_interrupted"))?;
-        bytes = bytes
-            .checked_add(chunk.len() as u64)
-            .ok_or_else(|| media_error("media_too_large"))?;
-        if bytes > media::MAX_UPLOAD {
-            return Err(Error::new(StatusCode::PAYLOAD_TOO_LARGE, "media_too_large"));
-        }
-        file.write_all(&chunk).await.map_err(internal)?;
-    }
-    file.flush().await.map_err(internal)?;
-    let file = file.into_std().await;
-    let (file, info) =
-        tokio::task::spawn_blocking(move || media::inspect(&file, &mime).map(|info| (file, info)))
-            .await
-            .map_err(internal)?
-            .map_err(media_error)?;
-    let result = app
-        .store
-        .register_media("local", file, &info)
-        .await
-        .map_err(internal)?;
-    Ok((StatusCode::CREATED, Json(result)))
+    streaming_import::upload(app, request).await
 }
+
 async fn asset(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Error> {
     let mut value = app
         .store
@@ -536,7 +647,7 @@ async fn asset(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Va
     let mime = value["mime_type"].as_str().unwrap_or("").to_owned();
     let (info, digest, bytes) = tokio::task::spawn_blocking(move || {
         let mut file = file;
-        let info = media::inspect(&file, &mime).map_err(media_error)?;
+        let info = media::inspect_streamed(&file, &mime).map_err(media_error)?;
         let (digest, bytes) = super::bundle::digest(&mut file)?;
         Ok::<_, Error>((info, digest, bytes))
     })

@@ -1,0 +1,50 @@
+schema_version: "1.0"
+mode: merge
+namespaces:
+  - key: video_edit
+    label: Source Video Editing
+    description: Explicit source-video replacement while preserving the source video's intended motion and environment.
+    choices:
+      - key: replace_person_preserve_source
+        aliases: [replace-subject, preserve-source-motion]
+        label: Replace a person and preserve source behavior
+        append: none
+        segments:
+          - text: "Replace "
+          - placeholder:
+              id: source_person
+              label: Source person
+              initial_text: "the person in the source video"
+              hint: "Describe the person or subject to replace"
+          - text: " with "
+          - placeholder:
+              id: replacement
+              label: Replacement character
+              initial_text: "@replacement"
+              hint: "Free text or an optional Director @reference"
+          - text: " while preserving the source video's camera movement, timing, background, physical interactions, and object motion."
+
+      - key: replace_subject_preserve_selected_traits
+        aliases: [targeted-video-edit, preserve-video-properties]
+        label: Replace a subject and name preserved source properties
+        append: none
+        segments:
+          - text: "Replace "
+          - placeholder:
+              id: source_subject
+              label: Source subject
+              initial_text: "the source subject"
+              hint: "Describe the subject to replace"
+          - text: " with "
+          - placeholder:
+              id: replacement
+              label: Replacement
+              initial_text: "@replacement"
+              hint: "Free text or an optional Director @reference"
+          - text: " while preserving "
+          - placeholder:
+              id: preserved_properties
+              label: Preserved properties
+              initial_text: "camera movement, motion timing, background, physical interactions, and object motion"
+              hint: "List only the source-video properties that must remain"
+          - text: "."

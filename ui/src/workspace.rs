@@ -216,6 +216,7 @@ impl ImagineApp {
         ui.painter().rect_filled(bounds, 0, helto::BG);
         let header = Rect::from_min_size(bounds.min, egui::vec2(bounds.width(), 64.));
         self.header(ui, header);
+        self.sampling_preview_poll(ui.ctx());
         let dock_height = if self.queue.collapsed {
             44.
         } else {
@@ -236,13 +237,22 @@ impl ImagineApp {
                 ui.push_id(self.workspace, |ui| self.image_workspace(ui, body));
             }
             Workspace::Image | Workspace::ImageEdit | Workspace::CharacterSheet => {
-                egui::ScrollArea::vertical()
+                let _scroll = egui::ScrollArea::vertical()
                     .id_salt("compact-workspace")
                     .show(ui, |ui| {
                         let size = egui::vec2(ui.available_width(), body.height().max(920.));
                         let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
                         ui.push_id(self.workspace, |ui| self.image_workspace(ui, rect));
                     });
+                #[cfg(feature = "ui-preview")]
+                crate::app::timeline::qa::scroll_area(
+                    ui,
+                    "image-workspace-scroll",
+                    _scroll.id,
+                    _scroll.state.offset,
+                    _scroll.inner_rect,
+                    _scroll.content_size,
+                );
             }
             Workspace::Video => self.video_workspace(ui, body),
         });
@@ -339,14 +349,15 @@ impl ImagineApp {
                         Workspace::Image
                     };
                 }
-                if helto::icon_button(
+                let sheet_tab = helto::icon_button(
                     ui,
                     Icon::CharacterSheet,
                     "Character sheets",
                     self.workspace == Workspace::CharacterSheet,
-                )
-                .clicked()
-                {
+                );
+                #[cfg(feature = "ui-preview")]
+                crate::app::timeline::qa::control(ui, "workspace-sheet".into(), &sheet_tab);
+                if sheet_tab.clicked() {
                     self.workspace = Workspace::CharacterSheet;
                 }
                 let video_tab = helto::icon_button(
@@ -716,7 +727,7 @@ impl ImagineApp {
             egui::pos2(ui.max_rect().right(), bottom - 30.),
         );
         region(ui, "prompt-fields", content, |ui| {
-            egui::ScrollArea::vertical()
+            let _scroll = egui::ScrollArea::vertical()
                 .id_salt("prompt-scroll")
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
@@ -764,6 +775,8 @@ impl ImagineApp {
                                 true,
                             )
                             .labelled_by(label.id);
+                            #[cfg(feature = "ui-preview")]
+                            crate::app::timeline::qa::control(ui, "image-prompt".into(), &response);
                             self.enhancement_field(ui, &response, Field::Prompt);
                             focus_prompt_shortcut(response);
                         }
@@ -794,6 +807,15 @@ impl ImagineApp {
                         self.image_controls(ui);
                     });
                 });
+            #[cfg(feature = "ui-preview")]
+            crate::app::timeline::qa::scroll_area(
+                ui,
+                "image-inspector-scroll",
+                _scroll.id,
+                _scroll.state.offset,
+                _scroll.inner_rect,
+                _scroll.content_size,
+            );
         });
         if let Some(seed) = self.desk().result.as_ref().and_then(|r| r.seed) {
             let footer = Rect::from_min_max(
@@ -890,7 +912,7 @@ impl ImagineApp {
                     ui.end_row();
                 }
                 let label = ui.label("Seed");
-                egui::ComboBox::from_id_salt("seed-mode")
+                let _seed_mode = egui::ComboBox::from_id_salt("seed-mode")
                     .width(field_width)
                     .selected_text(if settings.random_seed {
                         "Random"
@@ -903,6 +925,8 @@ impl ImagineApp {
                     })
                     .response
                     .labelled_by(label.id);
+                #[cfg(feature = "ui-preview")]
+                crate::app::timeline::qa::control(ui, "image-seed-mode".into(), &_seed_mode);
                 ui.end_row();
                 if !settings.random_seed {
                     let label = ui.label("Seed value");
@@ -966,6 +990,7 @@ impl ImagineApp {
             ),
             |ui| {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    self.sampling_preview_controls(ui);
                     if self.workspace == Workspace::Image
                         && ui
                             .add_enabled_ui(self.can_edit_image(), |ui| {
@@ -976,15 +1001,17 @@ impl ImagineApp {
                     {
                         self.start_editing();
                     }
-                    if self.workspace == Workspace::Image
-                        && ui
+                    if self.workspace == Workspace::Image {
+                        let animate = ui
                             .add_enabled_ui(self.can_animate_image(), |ui| {
                                 helto::select_button(ui, "Animate", false)
                             })
-                            .inner
-                            .clicked()
-                    {
-                        self.start_animating();
+                            .inner;
+                        #[cfg(feature = "ui-preview")]
+                        timeline::qa::control(ui, "image-animate".into(), &animate);
+                        if animate.clicked() {
+                            self.start_animating(ui.ctx());
+                        }
                     }
                     ui.add_enabled_ui(self.desk().result.is_some(), |ui| {
                         if helto::icon_button(
@@ -1043,6 +1070,9 @@ impl ImagineApp {
             bounds.max - egui::vec2(0., footer_height),
         );
         region(ui, "image", image_rect, |ui| {
+            if self.sampling_preview_viewer(ui) {
+                return;
+            }
             let privacy = self.prefs.privacy_mode;
             let before = self
                 .edit_comparison_source()
@@ -1093,8 +1123,8 @@ impl ImagineApp {
             let ready =
                 self.client.is_some() && !self.connecting && !self.busy() && !self.picking_folder;
             ui.horizontal(|ui| {
-                if !editing
-                    && ui
+                if !editing {
+                    let generate = ui
                         .add_enabled_ui(
                             ready && self.desk().pending.is_none() && self.can_generate(),
                             |ui| {
@@ -1110,10 +1140,12 @@ impl ImagineApp {
                                 )
                             },
                         )
-                        .inner
-                        .clicked()
-                {
-                    self.generate(ui.ctx());
+                        .inner;
+                    #[cfg(feature = "ui-preview")]
+                    crate::app::timeline::qa::control(ui, "image-generate".into(), &generate);
+                    if generate.clicked() {
+                        self.generate(ui.ctx());
+                    }
                 }
                 if self.workspace == Workspace::Image
                     && ui
@@ -1156,13 +1188,14 @@ impl ImagineApp {
                 {
                     self.upscale(ui.ctx());
                 }
-                if ui
+                let cancel = ui
                     .add_enabled_ui(activity.can_cancel, |ui| {
                         helto::icon_button(ui, Icon::Stop, "Cancel generation", false)
                     })
-                    .inner
-                    .clicked()
-                {
+                    .inner;
+                #[cfg(feature = "ui-preview")]
+                crate::app::timeline::qa::control(ui, "image-cancel".into(), &cancel);
+                if cancel.clicked() {
                     if let Some((id, _)) = &activity.queue_job {
                         self.cancel_queue_job(ui.ctx(), id);
                     } else {
@@ -1374,7 +1407,7 @@ impl ImagineApp {
                                 settings_number(
                                     ui,
                                     egui::DragValue::new(&mut self.prefs.generation.steps)
-                                        .range(1..=100),
+                                        .range(1..=u32::MAX),
                                 )
                                 .labelled_by(label.id);
                                 ui.end_row();
@@ -1382,7 +1415,6 @@ impl ImagineApp {
                                 settings_number(
                                     ui,
                                     egui::DragValue::new(&mut self.prefs.generation.cfg_scale)
-                                        .range(0.0..=20.0)
                                         .speed(0.1),
                                 )
                                 .labelled_by(label.id);
@@ -1463,7 +1495,11 @@ impl ImagineApp {
                     ui.horizontal(|ui| {
                         let width =
                             (ui.available_width() - 32. - ui.spacing().item_spacing.x).max(80.);
-                        let text = self.prefs.output_folder.display().to_string();
+                        let text = if self.prefs.output_folder.as_os_str().is_empty() {
+                            "Server-managed private project output".into()
+                        } else {
+                            self.prefs.output_folder.display().to_string()
+                        };
                         egui::Frame::new()
                             .fill(helto::FIELD)
                             .stroke(Stroke::new(1., helto::RAISED))
@@ -1476,12 +1512,18 @@ impl ImagineApp {
                                 )
                                 .on_hover_text(text);
                             });
-                        if ui
-                            .add_enabled_ui(!self.picking_folder, |ui| {
-                                helto::icon_button(ui, Icon::Folder, "Choose output folder", false)
-                            })
-                            .inner
-                            .clicked()
+                        if !self.preferences_store.server_owned_output()
+                            && ui
+                                .add_enabled_ui(!self.picking_folder, |ui| {
+                                    helto::icon_button(
+                                        ui,
+                                        Icon::Folder,
+                                        "Choose output folder",
+                                        false,
+                                    )
+                                })
+                                .inner
+                                .clicked()
                         {
                             self.choose_folder(ui.ctx());
                         }

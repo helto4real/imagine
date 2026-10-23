@@ -7,13 +7,14 @@ umask 077
 
 typeset -gr SCRIPT_PATH=${0:A}
 typeset -gr SCRIPT_DIR=${SCRIPT_PATH:h}
+typeset -gr SOURCE_DIR="${ST_STACK_SOURCE_DIR:-${SCRIPT_DIR}}"
 
 typeset -gr SILLY_DIR="${HOME}/git/SillyTavern"
 typeset -gr POCKETTTS_DIR="${HOME}/git/alltalk-pocket-tts-integraion"
 typeset -gr ALLTALK_DIR="${HOME}/git/alltalk_tts"
 typeset -gr ALLTALK_COMMAND="${HOME}/.dotfiles/config/dotconfig/scripts/start_all_talk.sh"
-typeset -gr PROXY_COMMAND="${SCRIPT_DIR}/../comfyui/h3-main-20261020/target-product/debug/st-proxy"
-typeset -gr PROXY_PATH="${SCRIPT_DIR}/../comfyui/h3-main-20261020/target-product/debug/st-proxy"
+typeset -gr PROXY_COMMAND="${ST_STACK_PROXY_BINARY:-${SCRIPT_DIR}/../comfyui/h3-main-20261020/target-product/debug/st-proxy}"
+typeset -gr PROXY_PATH="${PROXY_COMMAND}"
 typeset -gr COMFY_URL="${ST_PROXY_COMFY_URL:-http://127.0.0.1:8188}"
 
 typeset -g LLM_BACKEND="${ST_PROXY_LLM_BACKEND:-koboldcpp}"
@@ -180,8 +181,14 @@ with_llm_backend() (
     "$@"
 )
 
-typeset -gr RUNTIME_BASE="${XDG_RUNTIME_DIR:-/tmp}"
-typeset -gr RUNTIME_DIR="${RUNTIME_BASE}/st-stack-${UID}"
+if [[ "${IMAGINE_PRIVATE_STORAGE:-0}" == 1 ]]; then
+    [[ "${XDG_RUNTIME_DIR:-}" == /* ]] || { print -ru2 -- "Runtime directory unavailable"; exit 2; }
+    typeset -gr RUNTIME_BASE="${XDG_RUNTIME_DIR}"
+    typeset -gr RUNTIME_DIR="${RUNTIME_BASE}/imagine/st-stack-${UID}"
+else
+    typeset -gr RUNTIME_BASE="${XDG_RUNTIME_DIR:-/tmp}"
+    typeset -gr RUNTIME_DIR="${RUNTIME_BASE}/st-stack-${UID}"
+fi
 typeset -gr KOBOLD_MODEL_CACHE="${RUNTIME_DIR}/kobold-models.json"
 typeset -gr KOBOLD_DEFAULT_MODEL_FILE="${RUNTIME_DIR}/kobold-default-model"
 typeset -gr LOCK_DIR="${RUNTIME_DIR}/supervisor.lock"
@@ -199,7 +206,7 @@ typeset -g STOP_TIMEOUT="${ST_STACK_STOP_TIMEOUT:-10}"
 typeset -g PROXY_CHAT_PORT="${ST_PROXY_CHAT_PORT:-5002}"
 typeset -g PROXY_IMAGE_PORT="${ST_PROXY_IMAGE_PORT:-8189}"
 typeset -g PROXY_MCP_PORT="${ST_PROXY_MCP_PORT:-8190}"
-typeset -g MCP_WORKFLOWS_DIR="${ST_PROXY_MCP_WORKFLOWS_DIR:-${SCRIPT_DIR}/workflows}"
+typeset -g MCP_WORKFLOWS_DIR="${ST_PROXY_MCP_WORKFLOWS_DIR:-${SOURCE_DIR}/workflows}"
 typeset -g MCP_OUTPUT_DIR="${ST_PROXY_MCP_OUTPUT_DIR:-/run/media/veracrypt1/imagine/.mcp-cache}"
 typeset -g MCP_INPUT_DIR="${ST_PROXY_MCP_INPUT_DIR:-/run/media/veracrypt1/mcp-inputs}"
 typeset -g PROXY_IDLE_TIMEOUT="${ST_PROXY_IDLE_TIMEOUT:-60}"
@@ -417,6 +424,10 @@ prepare_runtime_dir() {
         return 1
     fi
 
+    if [[ "${IMAGINE_PRIVATE_STORAGE:-0}" == 1 ]]; then
+        [[ ! -L "${RUNTIME_BASE}/imagine" ]] || return 1
+        mkdir -p -m 700 -- "${RUNTIME_BASE}/imagine" || return 1
+    fi
     if [[ -e "${RUNTIME_DIR}" ]]; then
         if [[ ! -d "${RUNTIME_DIR}" || -L "${RUNTIME_DIR}" || ! -O "${RUNTIME_DIR}" ]]; then
             log "refusing unsafe runtime path: ${RUNTIME_DIR}"
@@ -793,7 +804,7 @@ ensure_service_started() {
                 --mcp-workflows-dir "${MCP_WORKFLOWS_DIR}" \
                 --mcp-output-dir "${MCP_OUTPUT_DIR}" \
                 --mcp-input-dir "${MCP_INPUT_DIR}" \
-                --model-profiles "${ST_PROXY_MODEL_PROFILES-${SCRIPT_DIR}/config/model-profiles.json}" \
+                --model-profiles "${ST_PROXY_MODEL_PROFILES-${SOURCE_DIR}/config/model-profiles.json}" \
                 --idle-timeout "${PROXY_IDLE_TIMEOUT}" \
                 "${PROXY_ROUTER_ARGS[@]}" "${cache_args[@]}"
             ;;

@@ -37,13 +37,38 @@ pub fn invalidate_changed(before: &VideoProject, after: &mut ProjectDocument) ->
                 (scene.continuity.clone(), source)
             })
         };
-        if dependency(before) != dependency(&after.project) {
+        let selected = after.project.scenes[index]
+            .accepted_take
+            .as_ref()
+            .map(|t| t.id.clone());
+        let tracked = selected
+            .as_ref()
+            .and_then(|id| after.takes.iter().find(|t| &t.id == id))
+            .and_then(|t| t.provenance.as_ref())
+            .and_then(|p| p.boundary.as_ref());
+        let tracked_changed = if let Some(receipt) = tracked {
+            let current =
+                imagine_video_contract::boundary::resolve(&after.project, &id)?.map(|incoming| {
+                    imagine_video_contract::boundary::dependency(
+                        &incoming,
+                        receipt["dependency"]["reference_previous_clip"] == true,
+                    )
+                });
+            receipt["dependency"] != serde_json::json!(current)
+        } else {
+            false
+        };
+        let legacy_changed = dependency(before) != dependency(&after.project);
+        let has_tracking = tracked.is_some();
+        if legacy_changed || tracked_changed {
             if let Some(take) = &after.project.scenes[index].accepted_take {
                 after.locked_takes.insert(id.clone(), take.id.clone());
             }
             after.project.scenes[index].accepted_take = None;
             for take in after.takes.iter_mut().filter(|take| take.scene_id == id) {
-                if take.status != TakeStatus::Rejected {
+                if take.status != TakeStatus::Rejected
+                    && (!has_tracking || selected.as_ref() == Some(&take.id))
+                {
                     take.status = TakeStatus::Outdated;
                 }
             }
@@ -67,6 +92,9 @@ pub fn apply(
         .iter()
         .position(|take| take.id == request.take_id && take.scene_id == request.scene_id)
         .ok_or_else(|| StorageError::new("take_not_found"))?;
+    if !super::captures::attached(document, &request.take_id) {
+        return Err(StorageError::new("take_not_attached"));
+    }
     if !document.resources.iter().any(|resource| matches!(&resource.kind, ResourceKind::TakeVideo { take_id } if take_id == &request.take_id)) {
         return Err(StorageError::new("take_resource_missing"));
     }
@@ -97,11 +125,9 @@ pub fn apply(
         ReviewAction::Candidate => TakeStatus::Candidate,
         ReviewAction::Outdated => TakeStatus::Outdated,
     };
-    let accepted = matches!(request.action, ReviewAction::Accept).then(|| AcceptedTake {
-        id: take.id.clone(),
-        model: take.provenance.model.clone(),
-        source_fingerprint: take.provenance.input_revision.clone(),
-    });
+    let accepted = matches!(request.action, ReviewAction::Accept)
+        .then(|| take.accepted_summary(&candidate.resources))
+        .transpose()?;
     let scene = candidate
         .project
         .scenes

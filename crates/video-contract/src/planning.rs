@@ -94,7 +94,7 @@ pub fn validate_scene(
             .blockers
             .push(Issue::new("runtime_unavailable", "model").scene(id));
     }
-    if let Some(settings) = scene.settings.iter().find(|s| s.model == model) {
+    if let Some(settings) = project.effective_settings(scene) {
         report.blockers.extend(
             adapter
                 .validate_settings(&model, settings)
@@ -179,16 +179,30 @@ pub fn validate_scene(
     Ok(report)
 }
 
+fn input_asset(asset: &Asset) -> serde_json::Value {
+    // Display names identify media in the picker, not numerical generation inputs.
+    serde_json::json!({"id":asset.id,"revision":asset.revision,"kind":asset.kind})
+}
 pub fn input_revision(project: &VideoProject, id: &SceneId) -> Result<String, Issue> {
     project.validate()?;
     let scene = project.scene(id)?;
     let model = project.effective_model(scene);
-    let settings = scene.settings.iter().find(|s| &s.model == model);
+    let settings = project
+        .effective_settings(scene)
+        .cloned()
+        .map(|mut settings| {
+            if model.adapter == "h3"
+                && let Some(values) = settings.values.as_object_mut()
+            {
+                values.remove("stage_two_draft");
+            }
+            settings
+        });
     let bindings: Vec<_> = scene
         .bindings
         .iter()
         .filter(|b| b.enabled)
-        .map(|b| (b, &project.assets[&b.asset]))
+        .map(|b| (b, input_asset(&project.assets[&b.asset])))
         .collect();
     let source = scene
         .continuity
@@ -201,7 +215,7 @@ pub fn input_revision(project: &VideoProject, id: &SceneId) -> Result<String, Is
         section.duration = section.duration.normalized();
     }
     // Include effective intent, not project revision, inactive model slots or own Take status.
-    let audio_references=crate::audio::generation_clips(project,scene).into_iter().map(|clip|serde_json::json!({"id":clip.id,"asset":clip.asset.as_ref().and_then(|id|project.assets.get(id)),"start":clip.start.normalized(),"duration":clip.duration.normalized(),"source_in":clip.source_in.normalized(),"source_out":clip.source_out.map(Time::normalized),"reference":clip.reference})).collect::<Vec<_>>();
+    let audio_references=crate::audio::generation_clips(project,scene).into_iter().map(|clip|serde_json::json!({"id":clip.id,"asset":clip.asset.as_ref().and_then(|id|project.assets.get(id)).map(input_asset),"start":clip.start.normalized(),"duration":clip.duration.normalized(),"source_in":clip.source_in.normalized(),"source_out":clip.source_out.map(Time::normalized),"reference":clip.reference})).collect::<Vec<_>>();
     let mut value = serde_json::json!({
         "schema":project.schema_version,"global_prompt":project.global_prompt,
         "model":model,"settings":settings,"description":scene.description,
@@ -209,22 +223,54 @@ pub fn input_revision(project: &VideoProject, id: &SceneId) -> Result<String, Is
         "bindings":bindings,"continuity":scene.continuity,"source":source,
         "delivery":project.delivery,"audio_references":audio_references,
     });
+    if let Some(boundary) = crate::boundary::resolve(project, id)?
+        && boundary.policy != crate::boundary::Policy::None
+        && boundary.explicit_continuity.as_ref().is_none_or(|c| {
+            matches!(
+                c.method,
+                ContinuityMethod::Combo | ContinuityMethod::Influence
+            )
+        })
+    {
+        value["incoming_boundary"] = serde_json::json!(boundary);
+    }
+    if model.adapter == "h3" {
+        let rows = crate::loras::resolve(
+            &project.creative.h3_loras.clone().unwrap_or_default(),
+            project.creative.scene_loras.get(id),
+        )
+        .active();
+        if !rows.is_empty() {
+            value["resolved_h3_loras"] = serde_json::json!(rows);
+        }
+    }
+    if model.adapter == "h3"
+        && let Some(settings) = &settings
+        && let Ok(h3) = serde_json::from_value::<H3Settings>(settings.values.clone())
+        && let Some(path) = inherited_stage_two_model(project, scene, &h3)
+            .ok()
+            .flatten()
+    {
+        value["stage_two_inherited_model"] = serde_json::json!(path);
+    }
     let audio_manifest = crate::audio::references::entries(project, scene);
     if !audio_manifest.is_empty() {
         value["audio_reference_manifest"] = serde_json::json!(audio_manifest);
     }
-    if let Some(clip) = project.assembly.clips.get(id) {
+    if let Some(clip) = project.scene_clip(id) {
         value["imported_clip"] = serde_json::json!(clip);
     }
     let creative = scene
         .sections
         .iter()
         .filter_map(|s| {
-            project
-                .creative
-                .sections
-                .get(&s.id)
-                .map(|source| (&s.id, source))
+            project.creative.sections.get(&s.id).map(|source| {
+                let mut intent = source.clone();
+                // Cross-type order controls the Timeline label only. Image
+                // and video conditioning retain their own authored arrays.
+                intent.media_order.clear();
+                (&s.id, intent)
+            })
         })
         .collect::<BTreeMap<_, _>>();
     if !creative.is_empty() {
@@ -299,7 +345,7 @@ pub fn input_revision(project: &VideoProject, id: &SceneId) -> Result<String, Is
         value["creative_assets"] = serde_json::json!(
             creative_assets
                 .into_iter()
-                .filter_map(|id| project.assets.get(id).map(|asset| (id, asset)))
+                .filter_map(|id| project.assets.get(id).map(|asset| (id, input_asset(asset))))
                 .collect::<BTreeMap<_, _>>()
         );
     }
@@ -335,23 +381,93 @@ fn base_steps() -> u32 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct H3SecondStage {
+    #[serde(default = "upscale_one", skip_serializing_if = "is_upscale_one")]
+    pub handoff_upscale_factor: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_model_file: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub i2v_model_file: Option<String>,
     pub sampling: H3Stage,
     pub model: ModelSelection,
     pub handoff: H3Handoff,
     pub trained_latent_upscale_model: Option<String>,
 }
+fn upscale_one() -> f64 {
+    1.
+}
+fn is_upscale_one(value: &f64) -> bool {
+    *value == 1.
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct H3StageTwoDraft {
+    pub settings: H3SecondStage,
+    pub raw_sigmas: String,
+}
 /// No image CFG/negative-conditioning defaults. Exact runtime constraints belong to P05.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct H3Settings {
+    #[serde(default)]
+    pub components: H3Components,
+    #[serde(default = "video_shift")]
+    pub shift_video: f64,
+    #[serde(default = "audio_shift")]
+    pub shift_audio: f64,
     #[serde(default = "audio_reference_mode")]
     pub audio_reference_mode: String,
     #[serde(default = "reference_quality")]
     pub ref_image_size: String,
     pub stage_one: H3Stage,
     pub stage_two: Option<H3SecondStage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage_two_draft: Option<H3StageTwoDraft>,
     #[serde(default = "base_steps")]
     pub base_steps_to_run: u32,
+}
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct H3Components {
+    pub model: Option<String>,
+    pub text_encoder: Option<String>,
+    pub video_vae: Option<String>,
+    pub audio_vae: Option<String>,
+}
+/// Stage 2 inherits its original mode's model input, before any Director LoRAs.
+/// It does not inherit that mode's sampler, text encoder or VAE.
+pub fn inherited_stage_two_model(
+    project: &VideoProject,
+    scene: &Scene,
+    settings: &H3Settings,
+) -> Result<Option<String>, Issue> {
+    let Some(second) = &settings.stage_two else {
+        return Ok(None);
+    };
+    let selected = if second.model.variant == "i2v" {
+        &second.i2v_model_file
+    } else {
+        &second.reference_model_file
+    };
+    if selected.as_ref().is_some_and(|s| !s.trim().is_empty()) {
+        return Ok(None);
+    }
+    if &second.model == project.effective_model(scene) {
+        return Ok(settings.components.model.clone());
+    }
+    project
+        .settings_for(scene, &second.model)
+        .map(|slot| {
+            serde_json::from_value::<H3Settings>(slot.values.clone())
+                .map(|s| s.components.model)
+                .map_err(|_| Issue::new("invalid_sampling", "settings.stage_two.model"))
+        })
+        .unwrap_or(Ok(None))
+}
+fn video_shift() -> f64 {
+    12.
+}
+fn audio_shift() -> f64 {
+    3.
 }
 fn reference_quality() -> String {
     "Standard".into()
@@ -361,21 +477,35 @@ fn audio_reference_mode() -> String {
 }
 impl H3Settings {
     pub fn validate(&self) -> Result<(), Issue> {
+        if !self.shift_video.is_finite()
+            || self.shift_video <= 0.
+            || !self.shift_audio.is_finite()
+            || self.shift_audio <= 0.
+        {
+            return Err(Issue::new("invalid_sigma_shift", "settings"));
+        }
         let valid = |stage: &H3Stage| {
-            stage.steps > 0
-                && stage.steps <= 10_000
-                && stage.denoise.is_finite()
-                && stage.denoise > 0.
-                && stage.denoise <= 1.
+            (!stage.sigmas.is_empty()
+                || (stage.steps > 0
+                    && stage.steps <= 10_000
+                    && stage.denoise.is_finite()
+                    && stage.denoise > 0.
+                    && stage.denoise <= 1.
+                    && !stage.scheduler.trim().is_empty()))
                 && stage
                     .sigmas
                     .iter()
-                    .all(|sigma| sigma.is_finite() && *sigma >= 0. && *sigma <= 1.)
+                    .all(|sigma| sigma.is_finite() && *sigma >= 0.)
                 && !stage.sampler.trim().is_empty()
-                && !stage.scheduler.trim().is_empty()
         };
         if !valid(&self.stage_one) || self.stage_two.as_ref().is_some_and(|s| !valid(&s.sampling)) {
             return Err(Issue::new("invalid_sampling", "settings"));
+        }
+        if let Some(s) = &self.stage_two
+            && (!s.handoff_upscale_factor.is_finite()
+                || !(1. ..=4.).contains(&s.handoff_upscale_factor))
+        {
+            return Err(Issue::new("invalid_upscale_factor", "settings.stage_two"));
         }
         if let Some(s) = &self.stage_two
             && s.trained_latent_upscale_model

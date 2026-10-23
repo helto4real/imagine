@@ -1,4 +1,6 @@
 //! Own procedural pixels/PCM only. CPU ffmpeg, no playback/model/GPU.
+#[path = "../shared/task_fixtures.rs"]
+mod task_fixtures;
 use imagine_server::{
     h3_protocol as h3,
     short_av::{self, Av},
@@ -73,8 +75,7 @@ fn cancelled_encode_never_starts_a_codec_or_publishes_a_container() {
 #[test]
 fn mp4_duration_color_and_aac_padding_match_the_frame_clock_for_short_and_five_second_clips() {
     use std::{io::Write, process::Command};
-    let temp = std::env::var("TMPDIR").expect("encrypted test TMPDIR required");
-    assert!(temp.starts_with("/run/media/veracrypt1/imagine/.codex-"));
+    let temp = task_fixtures::env_root("TMPDIR");
     for frames in [22, 39, 124] {
         let shape = h3::Shape {
             width: 64,

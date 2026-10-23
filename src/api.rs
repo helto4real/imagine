@@ -33,6 +33,7 @@ pub struct App {
     pub uploads: Arc<Semaphore>,
 }
 const LOCAL_OWNER: &str = "local";
+mod sampling_preview;
 
 impl IntoResponse for Fault {
     fn into_response(self) -> Response {
@@ -45,10 +46,11 @@ impl IntoResponse for Fault {
 }
 pub fn router(app: App) -> Router {
     Router::new()
+        .merge(sampling_preview::routes())
         .merge(crate::video::api::routes())
         .route("/v1/session", get(session))
         .route("/v1/video-destination", get(video_destination))
-        .route("/v1/media-destination", get(video_destination))
+        .route("/v1/media-destination", get(image_destination))
         .route("/v1/profiles", get(profiles))
         .route("/v1/profiles/{id}", get(profile))
         .route("/v1/jobs/validate", post(validate_job))
@@ -60,6 +62,8 @@ pub fn router(app: App) -> Router {
         .route("/v1/models", get(models))
         .route("/v1/models/{id}", get(model))
         .route("/v1/assets", post(upload))
+        .route("/v1/assets/link", post(link_original))
+        .route("/v1/video/assets/link", post(link_original))
         .route("/v1/assets/{id}", get(download))
         .route("/v1/jobs", post(submit))
         .route("/v1/jobs/batch", post(submit_batch))
@@ -100,17 +104,22 @@ async fn session_guard(State(app): State<App>, request: Request, next: Next) -> 
     response
 }
 async fn video_destination(State(app): State<App>) -> Result<Json<Value>, Fault> {
+    media_destination(&app, true)
+}
+async fn image_destination(State(app): State<App>) -> Result<Json<Value>, Fault> {
+    media_destination(&app, false)
+}
+fn media_destination(app: &App, video: bool) -> Result<Json<Value>, Fault> {
     let proof = app
         .store
-        .videos
-        .destination()
+        .output_destination(None, video)
         .and_then(|d| d.proof())
         .map_err(|e| Fault::new(422, e))?;
     Ok(Json(json!(proof)))
 }
 async fn session(State(app): State<App>) -> Json<Value> {
     // Preserve the response shape for clients that inspect the storage mode.
-    Json(json!({"id": app.store.session.id, "encrypted": false}))
+    Json(json!({"id": app.store.session.id, "encrypted": app.store.private_root().is_some()}))
 }
 async fn models(State(app): State<App>) -> Json<Value> {
     let mut value = contract::models();
@@ -161,6 +170,37 @@ fn model_capability(app: &App, mut value: Value) -> Value {
             json!({"width":384,"height":256,"frames":39,"fps":24,"audio":true,"seed":42});
     }
     value
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct OriginalMedia {
+    path: std::path::PathBuf,
+    #[serde(default)]
+    normalize_image: bool,
+}
+async fn link_original(
+    State(app): State<App>,
+    Json(request): Json<OriginalMedia>,
+) -> Result<(StatusCode, Json<Value>), Fault> {
+    let _permit = app
+        .uploads
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| Fault::new(429, "upload_busy"))?;
+    let value = app
+        .store
+        .register_original_with_normalization(LOCAL_OWNER, request.path, request.normalize_image)
+        .await
+        .map_err(|error| {
+            Fault::new(
+                422,
+                error
+                    .downcast_ref::<crate::engine::EngineError>()
+                    .map(|e| e.0)
+                    .unwrap_or("media_io_failed"),
+            )
+        })?;
+    Ok((StatusCode::CREATED, Json(value)))
 }
 async fn upload(
     State(app): State<App>,

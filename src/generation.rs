@@ -80,8 +80,7 @@ pub async fn generate(
     if request.model == "minimax-h3" {
         let mut input = crate::video::job::request(request).map_err(crate::engine::EngineError)?;
         let pending = store
-            .videos
-            .destination()
+            .destination_for_proof(&request.client_metadata["video_destination"])
             .and_then(|d| {
                 d.reserve(
                     &request.client_metadata["video_destination"],
@@ -157,7 +156,7 @@ async fn generate_images(
     };
     for id in &request.inputs.reference_images {
         pass.references
-            .push(store.read_asset(id, owner).await?.into());
+            .push(store.read_image_asset(id, owner).await?.into());
     }
     match task {
         Task::Image => Ok(vec![Artifact {
@@ -168,7 +167,7 @@ async fn generate_images(
             // Validate/read the guide before spending GPU time on the portrait.
             let sizes = sheet.layout.pass_sizes().map_err(anyhow::Error::msg)?;
             let guide = if let Some(id) = &request.inputs.pose_guide {
-                store.read_asset(id, owner).await?
+                store.read_image_asset(id, owner).await?
             } else {
                 character_sheet::pose_guide(sizes[1].0, sizes[1].1)?
             };

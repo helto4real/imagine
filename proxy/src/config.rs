@@ -229,10 +229,8 @@ impl Config {
     pub fn validate(&mut self) -> Result<()> {
         if let Some(port) = self.mcp_port {
             let _ = port;
-            if self.mcp_workflows_dir.is_empty()
-                || self.mcp_output_dir.as_deref().is_none_or(str::is_empty)
-            {
-                bail!("MCP requires workflow/output directories")
+            if self.mcp_workflows_dir.is_empty() {
+                bail!("MCP requires workflow directory")
             }
         }
         if self.kobold_default_model.trim().is_empty() {

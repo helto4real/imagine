@@ -9,6 +9,7 @@ fn t(n: u64) -> Time {
 }
 fn project() -> VideoProject {
     let mut p = VideoProject::create(CreateProject {
+        generation: None,
         schema_version: 1,
         default_model: ModelSelection {
             adapter: "synthetic".into(),
@@ -63,6 +64,8 @@ fn reference_copy_wording_invalidates_when_the_final_mix_changes() {
     p.assets.insert(
         AssetId("tone".into()),
         Asset {
+            library_source: None,
+            name: String::new(),
             id: AssetId("tone".into()),
             revision: 1,
             kind: MediaKind::Audio,
@@ -199,6 +202,8 @@ fn invalid_audio_batch_is_atomic_and_final_mix_is_not_a_model_input() {
     p.assets.insert(
         AssetId("a".into()),
         Asset {
+            library_source: None,
+            name: String::new(),
             id: AssetId("a".into()),
             kind: MediaKind::Audio,
             revision: 1,

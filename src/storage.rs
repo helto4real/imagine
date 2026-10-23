@@ -20,7 +20,16 @@ pub struct Store {
     media_files: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, std::fs::File>>>,
     uploads:
         std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<[u8]>>>>,
+    originals: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, Original>>>,
+    private: Option<(crate::private_storage::Root, String)>,
     pub session: std::sync::Arc<crate::session::Session>,
+}
+#[derive(Clone)]
+struct Original {
+    path: PathBuf,
+    sha256: String,
+    bytes: u64,
+    normalize_image: bool,
 }
 struct VideoPublication {
     delivery: Option<Box<crate::video::assembly::Plan>>,
@@ -43,6 +52,91 @@ pub fn hash(data: &[u8]) -> String {
 impl Store {
     pub async fn open(data: &Path) -> Result<Self> {
         let session = crate::session::Session::new(data)?;
+        Self::open_session(
+            session,
+            crate::video::output::Outputs::configure(&data.join("video-output.json")),
+            None,
+        )
+        .await
+    }
+    pub async fn open_private(root: crate::private_storage::Root, project: String) -> Result<Self> {
+        let layout = root.project(&project).map_err(anyhow::Error::msg)?;
+        let session = crate::session::Session::new_private(&root, &project)?;
+        let videos = crate::video::output::Outputs {
+            destination: Some(
+                crate::video::output::Destination::private(&root, &layout.images)
+                    .map_err(anyhow::Error::msg)?,
+            ),
+            ..Default::default()
+        };
+        Self::open_session(session, videos, Some((root, project))).await
+    }
+    pub fn private_root(&self) -> Option<&crate::private_storage::Root> {
+        self.private.as_ref().map(|(root, _)| root)
+    }
+    /// The server selects the project and output class. Client folder strings
+    /// are never used to move private bytes outside the mounted project tree.
+    pub fn output_destination(
+        &self,
+        project: Option<&str>,
+        video: bool,
+    ) -> crate::video_destination::Result<crate::video::output::Destination> {
+        if let Some((root, workspace)) = &self.private {
+            let layout = root.project(project.unwrap_or(workspace))?;
+            crate::video::output::Destination::private(
+                root,
+                if video {
+                    &layout.videos
+                } else {
+                    &layout.images
+                },
+            )
+        } else {
+            self.videos.destination().cloned()
+        }
+    }
+    pub fn destination_for_proof(
+        &self,
+        proof: &Value,
+    ) -> crate::video_destination::Result<crate::video::output::Destination> {
+        if let Some((root, _)) = &self.private {
+            let proof: crate::video_destination::Proof =
+                serde_json::from_value(proof.clone()).map_err(|_| "video_destination_invalid")?;
+            let relative = proof
+                .config
+                .root
+                .strip_prefix(root.layout().root())
+                .map_err(|_| "video_destination_invalid")?;
+            let parts = relative.iter().collect::<Vec<_>>();
+            if parts.len() != 4
+                || parts[0] != "projects"
+                || parts[2] != "outputs"
+                || !matches!(parts[3].to_str(), Some("images" | "videos" | "audio"))
+            {
+                return Err("video_destination_invalid");
+            }
+            let destination = crate::video::output::Destination::private(root, &proof.config.root)?;
+            destination.preflight(
+                &serde_json::to_value(proof).map_err(|_| "video_destination_invalid")?,
+                0,
+            )?;
+            Ok(destination)
+        } else {
+            self.videos.destination().cloned()
+        }
+    }
+    pub fn staging_directory(&self) -> crate::video_destination::Result<PathBuf> {
+        if let Some((root, project)) = &self.private {
+            Ok(root.project(project)?.tmp)
+        } else {
+            Ok(self.videos.destination()?.proof()?.config.root)
+        }
+    }
+    async fn open_session(
+        session: std::sync::Arc<crate::session::Session>,
+        videos: crate::video::output::Outputs,
+        private: Option<(crate::private_storage::Root, String)>,
+    ) -> Result<Self> {
         let db = SqlitePoolOptions::new()
             // Retiring the sole SQLite connection would silently destroy the RAM database.
             .min_connections(1)
@@ -80,8 +174,10 @@ impl Store {
             media,
             session,
             uploads: Default::default(),
+            originals: Default::default(),
             media_files: Default::default(),
-            videos: crate::video::output::Outputs::configure(&data.join("video-output.json")),
+            videos,
+            private,
         })
     }
     pub async fn close(&self) -> Result<()> {
@@ -91,6 +187,10 @@ impl Store {
             .clear();
         self.db.close().await;
         self.uploads
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .clear();
+        self.originals
             .lock()
             .map_err(|_| anyhow::anyhow!("storage_error"))?
             .clear();
@@ -174,6 +274,22 @@ impl Store {
         }
         Ok(bytes)
     }
+    pub async fn read_image_asset(&self, id: &str, owner: &str) -> Result<Vec<u8>> {
+        let bytes = self.read_asset(id, owner).await?;
+        let normalize = self
+            .originals
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .get(id)
+            .is_some_and(|original| original.normalize_image);
+        if normalize {
+            tokio::task::spawn_blocking(move || crate::workflow_image::normalize_reference(&bytes))
+                .await?
+                .map_err(|_| crate::engine::EngineError("invalid_reference_image").into())
+        } else {
+            Ok(bytes)
+        }
+    }
 
     pub fn upload_bytes(&self, id: &str) -> Result<Option<std::sync::Arc<[u8]>>> {
         Ok(self
@@ -185,6 +301,28 @@ impl Store {
     }
     pub fn open_media(&self, id: &str) -> Result<Option<std::fs::File>> {
         use std::os::fd::AsRawFd;
+        let original = self
+            .originals
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .get(id)
+            .cloned();
+        if let Some(original) = original {
+            return crate::video::persistence::open_external(
+                &original.path,
+                &original.sha256,
+                original.bytes,
+            )
+            .map(Some)
+            .map_err(|error| {
+                crate::engine::EngineError(match error.code.as_str() {
+                    "source_missing" => "source_missing",
+                    "source_changed" => "source_changed",
+                    _ => "source_unavailable",
+                })
+                .into()
+            });
+        }
         let owned = self
             .media_files
             .lock()
@@ -197,6 +335,86 @@ impl Store {
             return Ok(owned);
         }
         self.videos.open(id).map_err(anyhow::Error::msg)
+    }
+    pub fn original_path(&self, id: &str) -> Result<Option<PathBuf>> {
+        Ok(self
+            .originals
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .get(id)
+            .map(|original| original.path.clone()))
+    }
+    pub fn remember_original(&self, id: &str, path: PathBuf, descriptor: &Value) -> Result<()> {
+        self.originals
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .insert(
+                id.to_owned(),
+                Original {
+                    path,
+                    sha256: descriptor["sha256"]
+                        .as_str()
+                        .context("invalid_media")?
+                        .into(),
+                    bytes: descriptor["bytes"].as_u64().context("invalid_media")?,
+                    normalize_image: false,
+                },
+            );
+        Ok(())
+    }
+    /// The local UI registers an explicitly chosen original. No byte upload or
+    /// file copy is performed; the descriptor and path live only in session RAM.
+    pub async fn register_original(&self, owner: &str, path: PathBuf) -> Result<Value> {
+        self.register_original_with_normalization(owner, path, false)
+            .await
+    }
+    pub async fn register_original_with_normalization(
+        &self,
+        owner: &str,
+        path: PathBuf,
+        normalize_image: bool,
+    ) -> Result<Value> {
+        if !path.is_absolute() {
+            bail!(crate::engine::EngineError("invalid_source_path"));
+        }
+        let chosen = path.clone();
+        let (file, info) = tokio::task::spawn_blocking(move || -> Result<_> {
+            use std::os::unix::fs::OpenOptionsExt;
+            let file = std::fs::OpenOptions::new()
+                .read(true)
+                .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC)
+                .open(&chosen)
+                .map_err(|_| crate::engine::EngineError("source_missing"))?;
+            if !file.metadata()?.is_file() {
+                bail!(crate::engine::EngineError("invalid_source_file"));
+            }
+            let mut info =
+                crate::video::media::detect_streamed(&file).map_err(crate::engine::EngineError)?;
+            if normalize_image {
+                if info.kind != crate::video::contract::MediaKind::Image {
+                    bail!(crate::engine::EngineError("invalid_reference_image"));
+                }
+                let mut raw = vec![];
+                crate::video::bundle::stream(&file, &mut raw)?;
+                let normalized = crate::workflow_image::normalize_reference(&raw)
+                    .map_err(|_| crate::engine::EngineError("invalid_reference_image"))?;
+                (info.width, info.height) = image::ImageReader::new(Cursor::new(normalized))
+                    .with_guessed_format()?
+                    .into_dimensions()?;
+            }
+            Ok((file, info))
+        })
+        .await??;
+        let value = self.register_media(owner, file, &info).await?;
+        let id = value["id"].as_str().context("asset_not_found")?.to_owned();
+        self.remember_original(&id, path, &value)?;
+        self.originals
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .get_mut(&id)
+            .context("asset_not_found")?
+            .normalize_image = normalize_image;
+        Ok(value)
     }
     pub async fn register_media(
         &self,
@@ -254,8 +472,7 @@ impl Store {
         owner: &str,
     ) -> Result<Vec<crate::video::output::Pending>> {
         let destination = self
-            .videos
-            .destination()
+            .destination_for_proof(&request.client_metadata["video_destination"])
             .map_err(crate::engine::EngineError)?;
         let source = if request
             .resolved_profile
@@ -508,7 +725,14 @@ impl Store {
                 json!({"frames":shape.frames,"fps":shape.fps,"duration_seconds":shape.seconds(),"audio":true,"sample_rate":32000,"channels":2,"samples":shape.audio_samples()}),
             )
         };
-        let published = pending.publish(bytes).map_err(crate::engine::EngineError)?;
+        let published = pending
+            .publish_video(
+                bytes,
+                delivery
+                    .as_ref()
+                    .and_then(|p| p.options.output_filename.as_deref()),
+            )
+            .map_err(crate::engine::EngineError)?;
         let digest = hash(bytes);
         let mut output = json!({"format":"mp4","saved_path":published.path,"persistent":true,"assets":[{"id":asset_id,"role":"video","mime_type":crate::short_av::MIME,"width":width,"height":height,"bytes":bytes.len(),"sha256":digest}],"video":video});
         if let Some(plan) = delivery {

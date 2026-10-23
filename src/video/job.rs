@@ -59,6 +59,8 @@ pub fn request(job: &JobRequest) -> Result<h3::Request, &'static str> {
         return Err("metadata_too_large");
     }
     let mut r = h3::Request {
+        preview: None,
+        options: Default::default(),
         capture_continuation: false,
         continuation: None,
         continuation_bytes: vec![],

@@ -3,10 +3,11 @@ use axum::{Json, Router, extract::State, routing::post};
 use serde_json::{Value, json};
 use std::sync::{
     Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU64, Ordering},
 };
 #[derive(Default)]
 pub struct Fixture {
+    pub delay_ms: AtomicU64,
     pub requests: Mutex<Vec<Value>>,
     pub fail_second_once: AtomicBool,
     pub fail_inventory_once: AtomicBool,
@@ -28,6 +29,10 @@ pub async fn spawn() -> (String, tokio::task::JoinHandle<()>, Arc<Fixture>) {
 }
 async fn reply(State(state): State<Arc<Fixture>>, Json(body): Json<Value>) -> Json<Value> {
     state.requests.lock().unwrap().push(body.clone());
+    let delay = state.delay_ms.load(Ordering::SeqCst);
+    if delay > 0 {
+        tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+    }
     let content = &body["messages"][1]["content"];
     let user = content
         .as_str()

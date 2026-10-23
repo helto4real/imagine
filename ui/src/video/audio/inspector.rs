@@ -99,6 +99,12 @@ impl ImagineApp {
             .unwrap_or_else(|| original.clone());
         let mut changed = false;
         let mut duplicated: Option<AudioClip> = None;
+        let select = ui.add_enabled(enabled, egui::Button::new("Choose audio…"));
+        #[cfg(feature = "ui-preview")]
+        crate::app::timeline::qa::control(ui, "audio-pick-source".into(), &select);
+        if select.clicked() {
+            self.timeline_pick_media(media_picker::Target::AudioClip(id.clone()));
+        }
         ui.strong("Audio clip");
         ui.separator();
         ui.add_enabled_ui(enabled, |ui| {

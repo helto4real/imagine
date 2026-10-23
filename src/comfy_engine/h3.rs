@@ -3,6 +3,11 @@ use super::*;
 use crate::{h3_protocol as wire, short_av::Av};
 impl PipeBackend {
     pub(super) async fn run_video(&mut self, request: &wire::Request) -> Result<Av> {
+        let preview = self.state.borrow().sampling_preview.clone();
+        let public_job = self.state.borrow().job_id.clone();
+        let mut effective = request.clone();
+        effective.preview = Some(preview.settings());
+        let request = &effective;
         if !request.valid()
             || !request.references.valid_payload()
             || !request
@@ -45,7 +50,7 @@ impl PipeBackend {
                 "IMAGINE_H3_DEPLOYMENT",
                 serde_json::to_string(&runtime.identity)?,
             );
-        self.launch(command)
+        self.launch(command, "h3")
             .await
             .map_err(|_| EngineError("h3_startup_failed"))?;
         self.h3_active = true;
@@ -98,14 +103,49 @@ impl PipeBackend {
             frames: Vec::with_capacity(request.shape.frames as usize),
             pcm: Vec::new(),
         };
+        let mut reference_cache =
+            crate::video::reference_cache_owner::Exchange::new(self.reference_cache.clone());
         loop {
             let (event, payload) = read(self.output.as_mut().unwrap()).await?;
             stream.accept(&event, &payload).map_err(EngineError)?;
             match event {
+                wire::Event::BoundaryApplied { receipt, .. } => {
+                    anyhow::ensure!(
+                        request.references.boundary_receipt().as_ref() == Some(&receipt),
+                        EngineError("h3_protocol_error")
+                    );
+                }
+                wire::Event::SamplingPreview { metadata, .. } => {
+                    if let Some(id) = &public_job {
+                        preview.publish(id, metadata, payload);
+                    }
+                }
+                wire::Event::PreviewWarning { code, .. } => {
+                    if let Some(id) = &public_job {
+                        preview.warn(id, &code);
+                    }
+                }
+                wire::Event::ReferenceCache { command, .. } => {
+                    let (reply, bytes) = reference_cache
+                        .handle(command, &payload)
+                        .map_err(EngineError)?;
+                    let header = serde_json::to_vec(&reply)?;
+                    let input = self
+                        .input
+                        .as_mut()
+                        .ok_or(EngineError("h3_protocol_error"))?;
+                    input.write_u32(header.len() as u32).await?;
+                    input.write_all(&header).await?;
+                    input.write_u32(bytes.len() as u32).await?;
+                    input.write_all(&bytes).await?;
+                    input.flush().await?;
+                }
                 wire::Event::Phase { phase, .. } => self.phase(match phase {
                     wire::Phase::LoadingText => "loading_text",
                     wire::Phase::EncodingText => "encoding_text",
                     wire::Phase::LoadingDit => "loading_dit",
+                    wire::Phase::LoadingUpscaler => "loading_upscaler",
+                    wire::Phase::UpscalingLatents => "upscaling_latents",
                     wire::Phase::Sampling => "sampling",
                     wire::Phase::LoadingVideoVae => "loading_video_vae",
                     wire::Phase::DecodingVideo => "decoding_video",
@@ -141,6 +181,11 @@ impl PipeBackend {
                 }
                 wire::Event::Complete { .. } => {
                     anyhow::ensure!(
+                        request.references.boundary_receipt().is_none()
+                            || stream.boundary_applied(),
+                        EngineError("h3_boundary_not_applied")
+                    );
+                    anyhow::ensure!(
                         !request.capture_continuation || result.continuation.is_some(),
                         EngineError("h3_protocol_error")
                     );
@@ -155,6 +200,9 @@ impl PipeBackend {
                     wire::ErrorCode::ComponentLoadFailed => "h3_component_load_failed",
                     wire::ErrorCode::OutOfMemory => "h3_out_of_memory",
                     wire::ErrorCode::GenerationFailed => "h3_generation_failed",
+                    wire::ErrorCode::LatentUpscaleFailed => "h3_latent_upscale_failed",
+                    wire::ErrorCode::LoraLoadFailed => "h3_lora_load_failed",
+                    wire::ErrorCode::UpscaleContextUnavailable => "h3_upscale_context_unavailable",
                 })),
                 wire::Event::Ready { .. } => unreachable!("stream rejects second Ready"),
             }
@@ -178,6 +226,8 @@ async fn read(reader: &mut (impl AsyncRead + Unpin)) -> Result<(wire::Event, Vec
         Ok(b)
     }
     let header = part(reader, wire::MAX_HEADER).await?;
-    let event = serde_json::from_slice(&header).map_err(|_| EngineError("h3_protocol_error"))?;
-    Ok((event, part(reader, wire::MAX_PAYLOAD).await?))
+    let event: wire::Event =
+        serde_json::from_slice(&header).map_err(|_| EngineError("h3_protocol_error"))?;
+    let limit = event.payload_limit();
+    Ok((event, part(reader, limit).await?))
 }

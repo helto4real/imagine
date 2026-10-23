@@ -16,16 +16,31 @@ use std::{
 pub struct Destination {
     config: Config,
     env: Arc<dyn Environment>,
+    flat: bool,
 }
 impl Destination {
     pub fn new(config: Config) -> Self {
         Self {
             config,
             env: Arc::new(System),
+            flat: false,
         }
     }
     pub fn with_environment(config: Config, env: Arc<dyn Environment>) -> Self {
-        Self { config, env }
+        Self {
+            config,
+            env,
+            flat: false,
+        }
+    }
+    /// A project already supplies the output class, so no date directory is
+    /// inserted between outputs/{images,videos,audio} and the published file.
+    pub fn private(root: &crate::private_storage::Root, path: &Path) -> Result<Self> {
+        Ok(Self {
+            config: root.destination(path)?,
+            env: root.environment(),
+            flat: true,
+        })
     }
     pub fn proof(&self) -> Result<Proof> {
         d::inspect(&self.config, self.env.as_ref()).map(|v| v.0)
@@ -54,21 +69,26 @@ impl Destination {
                 .strip_prefix(&self.config.root)
                 .map_err(|_| "video_destination_mismatch")?;
             let parts = relative.components().collect::<Vec<_>>();
-            if parts.len() != 2 {
+            if parts.len() != if self.flat { 1 } else { 2 } {
                 return Err("video_destination_invalid");
             }
-            let folder = parts[0]
-                .as_os_str()
-                .to_str()
-                .ok_or("video_destination_invalid")?;
-            if folder.len() != 10
-                || !folder.bytes().enumerate().all(|(i, b)| {
-                    if i == 4 || i == 7 {
-                        b == b'-'
-                    } else {
-                        b.is_ascii_digit()
-                    }
-                })
+            let folder = if self.flat {
+                ""
+            } else {
+                parts[0]
+                    .as_os_str()
+                    .to_str()
+                    .ok_or("video_destination_invalid")?
+            };
+            if !self.flat
+                && (folder.len() != 10
+                    || !folder.bytes().enumerate().all(|(i, b)| {
+                        if i == 4 || i == 7 {
+                            b == b'-'
+                        } else {
+                            b.is_ascii_digit()
+                        }
+                    }))
             {
                 return Err("video_destination_invalid");
             }
@@ -85,10 +105,11 @@ impl Destination {
             }
             (folder.to_owned(), Some(stem.to_owned()))
         } else {
-            (date()?, None)
+            (if self.flat { String::new() } else { date()? }, None)
         };
-        let name = CString::new(date.clone()).unwrap();
-        if unsafe { libc::mkdirat(root.as_raw_fd(), name.as_ptr(), 0o700) } != 0
+        let name = CString::new(if self.flat { "." } else { &date }).unwrap();
+        if !self.flat
+            && unsafe { libc::mkdirat(root.as_raw_fd(), name.as_ptr(), 0o700) } != 0
             && std::io::Error::last_os_error().raw_os_error() != Some(libc::EEXIST)
         {
             return Err("video_destination_not_writable");
@@ -136,6 +157,7 @@ impl Destination {
             date,
             final_name: None,
             upscale_stem,
+            video_stem: None,
             committed: false,
         })
     }
@@ -210,10 +232,21 @@ pub struct Pending {
     final_name: Option<CString>,
     committed: bool,
     upscale_stem: Option<String>,
+    video_stem: Option<String>,
 }
 impl Pending {
     pub fn publish(&mut self, bytes: &[u8]) -> Result<Published> {
         self.publish_named(bytes, "video", "", "mp4", None)
+    }
+    pub fn publish_video(&mut self, bytes: &[u8], filename: Option<&str>) -> Result<Published> {
+        let filename = crate::video::assembly::output_filename(filename)
+            .map_err(|_| "invalid_output_filename")?;
+        let extension = filename
+            .as_ref()
+            .map(|name| name[name.len() - 3..].to_owned())
+            .unwrap_or_else(|| "mp4".into());
+        self.video_stem = filename.map(|name| name[..name.len() - 4].to_owned());
+        self.publish_named(bytes, "video", "", &extension, None)
     }
     pub fn publish_image(
         &mut self,
@@ -276,6 +309,14 @@ impl Pending {
                     format!("{base}_upscaled")
                 } else {
                     format!("{base}_upscaled_{number}")
+                }
+            } else if prefix == "video"
+                && let Some(stem) = &self.video_stem
+            {
+                if number == 1 {
+                    stem.clone()
+                } else {
+                    format!("{stem}_{number}")
                 }
             } else {
                 format!("{prefix}_{number:04}")

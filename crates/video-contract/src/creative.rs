@@ -7,10 +7,18 @@ use std::collections::{BTreeMap, BTreeSet};
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Creative {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeline_duration: Option<Time>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub h3_loras: Option<crate::loras::Stack>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub scene_loras: BTreeMap<SceneId, crate::loras::Override>,
     pub references: Vec<VisualReference>,
     pub sections: BTreeMap<SectionId, SectionSource>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub scene_prompts: BTreeMap<SceneId, ScenePrompt>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub scene_kinds: BTreeMap<SceneId, SceneKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub visual_references_enabled: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -18,11 +26,63 @@ pub struct Creative {
 }
 impl Creative {
     pub fn is_empty(&self) -> bool {
-        self.references.is_empty()
+        self.timeline_duration.is_none()
+            && self.h3_loras.is_none()
+            && self.scene_loras.is_empty()
+            && self.references.is_empty()
             && self.sections.is_empty()
             && self.scene_prompts.is_empty()
+            && self.scene_kinds.is_empty()
             && self.visual_references_enabled.is_none()
             && self.global_prompt.is_none()
+    }
+}
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SceneKind {
+    #[default]
+    Generated,
+    Imported,
+    Extended,
+    Edited,
+    Placeholder,
+}
+impl SceneKind {
+    pub const ALL: [Self; 5] = [
+        Self::Generated,
+        Self::Imported,
+        Self::Extended,
+        Self::Edited,
+        Self::Placeholder,
+    ];
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Generated => "Generated",
+            Self::Imported => "Imported",
+            Self::Extended => "Extended",
+            Self::Edited => "Edited",
+            Self::Placeholder => "Placeholder",
+        }
+    }
+}
+impl VideoProject {
+    pub fn scene_kind(&self, id: &SceneId) -> SceneKind {
+        self.creative
+            .scene_kinds
+            .get(id)
+            .copied()
+            .unwrap_or_else(|| {
+                if self.assembly.clips.contains_key(id) {
+                    SceneKind::Imported
+                } else {
+                    SceneKind::Generated
+                }
+            })
+    }
+    pub fn scene_clip(&self, id: &SceneId) -> Option<&crate::assembly::ClipInstance> {
+        (self.scene_kind(id) == SceneKind::Imported)
+            .then(|| self.assembly.clips.get(id))
+            .flatten()
     }
 }
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -117,14 +177,163 @@ pub struct SectionSource {
     pub images: Vec<ImageBinding>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub videos: Vec<Binding>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub media_order: Vec<SectionMediaId>,
     pub dialogue_intent: Option<DialogueIntent>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", content = "id", rename_all = "snake_case")]
+pub enum SectionMediaId {
+    Image(String),
+    Video(BindingId),
+}
+impl SectionSource {
+    /// Older documents retain their deterministic image-then-video order.
+    /// Deleted entries are skipped; newly unlisted entries follow that fallback.
+    pub fn ordered_media(&self) -> Vec<(SectionMediaId, &AssetId)> {
+        let mut remaining = self
+            .images
+            .iter()
+            .map(|image| (SectionMediaId::Image(image.image_id.clone()), &image.asset))
+            .chain(
+                self.videos
+                    .iter()
+                    .map(|video| (SectionMediaId::Video(video.id.clone()), &video.asset)),
+            )
+            .collect::<Vec<_>>();
+        let mut ordered = Vec::with_capacity(remaining.len());
+        for id in &self.media_order {
+            if let Some(index) = remaining.iter().position(|(key, _)| key == id) {
+                ordered.push(remaining.remove(index));
+            }
+        }
+        ordered.extend(remaining);
+        ordered
+    }
+    pub fn primary_media_asset(&self) -> Option<&AssetId> {
+        self.ordered_media()
+            .into_iter()
+            .next()
+            .map(|(_, asset)| asset)
+    }
+    pub fn push_image(&mut self, image: ImageBinding) {
+        self.media_order = self.ordered_media().into_iter().map(|(id, _)| id).collect();
+        self.media_order
+            .push(SectionMediaId::Image(image.image_id.clone()));
+        self.images.push(image);
+    }
+    pub fn push_video(&mut self, video: Binding) {
+        self.media_order = self.ordered_media().into_iter().map(|(id, _)| id).collect();
+        self.media_order
+            .push(SectionMediaId::Video(video.id.clone()));
+        self.videos.push(video);
+    }
+}
+#[cfg(test)]
+mod section_media_tests {
+    use super::*;
+    fn image() -> ImageBinding {
+        ImageBinding {
+            anchor: None,
+            image_id: "same".into(),
+            asset: AssetId("own-image".into()),
+            role: InputRole::VisualReference,
+        }
+    }
+    fn video() -> Binding {
+        Binding {
+            id: BindingId("same".into()),
+            asset: AssetId("own-video".into()),
+            role: InputRole::VideoReference,
+            enabled: true,
+            video: None,
+        }
+    }
+    fn assets(source: &SectionSource) -> Vec<&str> {
+        source
+            .ordered_media()
+            .into_iter()
+            .map(|(_, asset)| asset.0.as_str())
+            .collect()
+    }
+    #[test]
+    fn typed_binding_ids_preserve_both_append_orders() {
+        let mut source = SectionSource::default();
+        source.push_video(video());
+        source.push_image(image());
+        assert_eq!(assets(&source), ["own-video", "own-image"]);
+        assert_eq!(
+            source.media_order,
+            [
+                SectionMediaId::Video(BindingId("same".into())),
+                SectionMediaId::Image("same".into())
+            ]
+        );
+        let mut reverse = SectionSource::default();
+        reverse.push_image(image());
+        reverse.push_video(video());
+        assert_eq!(assets(&reverse), ["own-image", "own-video"]);
+    }
+    #[test]
+    fn removing_first_and_readding_it_keeps_surviving_order() {
+        let mut source = SectionSource::default();
+        source.push_video(video());
+        source.push_image(image());
+        source.videos.clear();
+        assert_eq!(assets(&source), ["own-image"]);
+        source.push_video(video());
+        assert_eq!(assets(&source), ["own-image", "own-video"]);
+        source.images.clear();
+        assert_eq!(assets(&source), ["own-video"]);
+    }
+    #[test]
+    fn legacy_arrays_and_json_roundtrip_keep_deterministic_order() {
+        let mut source = SectionSource {
+            images: vec![image()],
+            videos: vec![video()],
+            ..Default::default()
+        };
+        let legacy = serde_json::to_value(&source).unwrap();
+        assert!(legacy.get("media_order").is_none());
+        let restored: SectionSource = serde_json::from_value(legacy).unwrap();
+        assert_eq!(assets(&restored), ["own-image", "own-video"]);
+        source.media_order = vec![
+            SectionMediaId::Video(BindingId("same".into())),
+            SectionMediaId::Image("same".into()),
+        ];
+        let restored: SectionSource =
+            serde_json::from_slice(&serde_json::to_vec(&source).unwrap()).unwrap();
+        assert_eq!(restored, source);
+        assert_eq!(assets(&restored), ["own-video", "own-image"]);
+    }
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ImageBinding {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub anchor: Option<ImageAnchor>,
     pub image_id: String,
     pub asset: AssetId,
     pub role: InputRole,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct ImageAnchor {
+    pub role: String,
+    pub custom_role: String,
+    pub relationship: ReferenceRelationship,
+}
+impl Default for ImageAnchor {
+    fn default() -> Self {
+        Self {
+            role: "auto".into(),
+            custom_role: String::new(),
+            relationship: ReferenceRelationship {
+                marker: "fully_preserved".into(),
+                ..Default::default()
+            },
+        }
+    }
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -183,6 +392,21 @@ pub fn video_bindings<'a>(project: &'a VideoProject, scene: &'a Scene) -> Vec<Vi
 }
 
 /// Director selects used enabled subjects, then follows attribute-transfer targets.
+/// Shared spelling for the editable alias's prompt token. Do not change stored aliases.
+pub fn reference_alias(alias: &str) -> String {
+    let mut value = String::new();
+    let mut invalid = false;
+    for c in alias.trim_matches(|c| matches!(c,'\u{0009}'..='\u{000d}' | ' ' | '\u{00a0}' | '\u{1680}' | '\u{2000}'..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}' | '\u{205f}' | '\u{3000}' | '\u{feff}')).to_lowercase().chars() {
+        if c.is_ascii_lowercase() || c.is_ascii_digit() || c=='_' || c=='-' { value.push(c); invalid=false; }
+        else if !invalid { value.push('_'); invalid=true; }
+    }
+    let value = value.trim_matches(['_', '-']);
+    if value.starts_with(|c: char| c.is_ascii_lowercase()) {
+        value.into()
+    } else {
+        "ref1".into()
+    }
+}
 pub fn selected_references<'a>(
     creative: &'a Creative,
     aliases: &BTreeSet<String>,
@@ -204,9 +428,9 @@ pub fn selected_references<'a>(
         .iter()
         .enumerate()
         .filter_map(|(i, r)| {
-            aliases
-                .contains(&r.alias.trim_start_matches('@').to_lowercase())
-                .then_some(i)
+            (aliases.contains(&reference_alias(&r.alias))
+                || aliases.contains(&r.alias.trim_start_matches('@').to_lowercase()))
+            .then_some(i)
         })
         .collect::<BTreeSet<_>>();
     let mut pending = selected.iter().copied().collect::<Vec<_>>();
@@ -230,6 +454,27 @@ pub fn selected_references<'a>(
 }
 
 pub fn validate(project: &VideoProject) -> Result<(), Issue> {
+    if project
+        .creative
+        .h3_loras
+        .as_ref()
+        .is_some_and(|s| !s.valid())
+        || project
+            .creative
+            .scene_loras
+            .values()
+            .any(|s| !s.main.valid())
+    {
+        return Err(Issue::new("invalid_lora_strength", "creative.loras"));
+    }
+    if project
+        .creative
+        .scene_loras
+        .keys()
+        .any(|id| project.scene(id).is_err())
+    {
+        return Err(Issue::new("scene_not_found", "creative.scene_loras"));
+    }
     let error = || Issue::new("invalid_creative_reference", "creative");
     if project
         .creative
@@ -238,6 +483,14 @@ pub fn validate(project: &VideoProject) -> Result<(), Issue> {
         .any(|id| project.scene(id).is_err())
     {
         return Err(Issue::new("scene_not_found", "creative.scene_prompts"));
+    }
+    if project
+        .creative
+        .scene_kinds
+        .keys()
+        .any(|id| project.scene(id).is_err())
+    {
+        return Err(Issue::new("scene_not_found", "creative.scene_kinds"));
     }
     let mut ids = BTreeSet::new();
     let mut images = BTreeSet::new();
@@ -301,4 +554,109 @@ pub fn validate(project: &VideoProject) -> Result<(), Issue> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod scene_kind_tests {
+    use super::*;
+    use crate::editing::{Edit, EditRequest};
+    fn apply(p: &mut VideoProject, commands: Vec<Edit>) {
+        crate::editing::apply(
+            p,
+            EditRequest {
+                schema_version: 1,
+                expected_project_revision: p.project_revision,
+                commands,
+            },
+        )
+        .unwrap();
+    }
+    #[test]
+    fn director_kind_change_retains_clip_and_duplicate_remove_roundtrip() {
+        let mut p = VideoProject::create(CreateProject {
+            schema_version: 1,
+            generation: None,
+            default_model: crate::generation::h3_model("reference"),
+            delivery: DeliverySettings {
+                width: 416,
+                height: 224,
+                fps: Time { num: 30, den: 1 },
+            },
+        })
+        .unwrap();
+        let id = SceneId("own".into());
+        let scene:Scene=serde_json::from_value(serde_json::json!({"id":"own","start":{"num":0,"den":1},"duration":{"num":2,"den":1},"description":"Own fixture","model":"project_default","settings":[],"sections":[],"bindings":[],"continuity":null,"accepted_take":null})).unwrap();
+        let asset = Asset {
+            id: AssetId("own-video".into()),
+            revision: 1,
+            kind: MediaKind::Video,
+            name: String::new(),
+            library_source: None,
+        };
+        apply(
+            &mut p,
+            vec![
+                Edit::AddScene {
+                    scene: Box::new(scene),
+                },
+                Edit::AddAsset { asset },
+            ],
+        );
+        assert_eq!(p.scene_kind(&id), SceneKind::Generated);
+        let clip = crate::assembly::ClipInstance {
+            asset: AssetId("own-video".into()),
+            source_in: Time { num: 0, den: 1 },
+            source_out: None,
+            speed: 1.,
+            include_audio: true,
+        };
+        apply(
+            &mut p,
+            vec![Edit::SetClipInstance {
+                scene_id: id.clone(),
+                clip: Some(clip.clone()),
+            }],
+        );
+        assert_eq!(p.scene_kind(&id), SceneKind::Imported);
+        for kind in SceneKind::ALL {
+            let scene = p.scene(&id).unwrap().clone();
+            apply(
+                &mut p,
+                vec![Edit::SetSceneKind {
+                    scene_id: id.clone(),
+                    kind,
+                }],
+            );
+            assert_eq!(p.scene(&id).unwrap(), &scene);
+            assert_eq!(p.assembly.clips.get(&id), Some(&clip));
+            assert_eq!(p.scene_kind(&id), kind);
+            assert_eq!(p.scene_clip(&id).is_some(), kind == SceneKind::Imported);
+            assert_eq!(
+                serde_json::from_slice::<VideoProject>(&serde_json::to_vec(&p).unwrap()).unwrap(),
+                p
+            );
+        }
+        let copy = SceneId("copy".into());
+        apply(
+            &mut p,
+            vec![Edit::DuplicateScene {
+                scene_id: id.clone(),
+                new_scene_id: copy.clone(),
+                start: Time { num: 2, den: 1 },
+            }],
+        );
+        assert_eq!(p.scene_kind(&copy), SceneKind::Placeholder);
+        assert_eq!(p.assembly.clips.get(&copy), Some(&clip));
+        apply(
+            &mut p,
+            vec![Edit::RemoveScene {
+                scene_id: copy.clone(),
+            }],
+        );
+        assert!(!p.creative.scene_kinds.contains_key(&copy));
+        assert!(!p.assembly.clips.contains_key(&copy));
+        // Old documents with only a clip binding retain their imported meaning.
+        p.creative.scene_kinds.clear();
+        assert_eq!(p.scene_kind(&id), SceneKind::Imported);
+    }
 }

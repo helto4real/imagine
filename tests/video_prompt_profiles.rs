@@ -66,6 +66,50 @@ fn copy_profiles(destination: &Path) {
     }
 }
 #[test]
+fn legacy_temperature_and_v2_animation_are_resolved_in_memory_without_rewriting_inputs() {
+    let temp = tempfile::tempdir().unwrap();
+    copy_profiles(temp.path());
+    let legacy = temp.path().join("own_legacy");
+    std::fs::create_dir(&legacy).unwrap();
+    let v1=serde_json::to_vec(&json!({"id":"own_legacy","label":"Own legacy","default":false,"order":99,"temperature":0.6})).unwrap();
+    std::fs::write(legacy.join("profile.json"), &v1).unwrap();
+    let v2 = temp.path().join("own_v2");
+    std::fs::create_dir(&v2).unwrap();
+    let bytes=serde_json::to_vec(&json!({"schema_version":2,"id":"own_v2","label":"Own v2","default":false,"order":100,"generation":{"defaults":{"temperature":0.8},"operations":{},"providers":{}}})).unwrap();
+    std::fs::write(v2.join("profile.json"), &bytes).unwrap();
+    let catalog = Catalog::load(temp.path()).unwrap();
+    assert!(catalog.warnings.is_empty(), "{:?}", catalog.warnings);
+    for id in ["own_legacy", "own_v2"] {
+        let profile = catalog.snapshot(id).unwrap();
+        assert!(!profile.fallback);
+        for provider in PROVIDERS {
+            assert_eq!(
+                resolve(&profile.profile.generation, provider, "animate_image").unwrap(),
+                resolve(
+                    &profile.profile.generation,
+                    provider,
+                    "story_scene_expansion"
+                )
+                .unwrap()
+            );
+        }
+    }
+    assert_eq!(
+        catalog
+            .snapshot("own_legacy")
+            .unwrap()
+            .profile
+            .schema_version,
+        1
+    );
+    assert_eq!(
+        catalog.snapshot("own_v2").unwrap().profile.schema_version,
+        3
+    );
+    assert_eq!(std::fs::read(legacy.join("profile.json")).unwrap(), v1);
+    assert_eq!(std::fs::read(v2.join("profile.json")).unwrap(), bytes);
+}
+#[test]
 fn reload_changes_future_snapshots_and_keeps_inflight_prompts_and_parameters() {
     let temp = tempfile::tempdir().unwrap();
     copy_profiles(temp.path());

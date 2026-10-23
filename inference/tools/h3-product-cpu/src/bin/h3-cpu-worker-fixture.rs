@@ -7,7 +7,12 @@ use imagine_h3_product_cpu::{
 use std::{collections::BTreeMap, io, path::PathBuf};
 struct Fake;
 impl Generator for Fake {
-    fn generate(&mut self, r: &Request, emit: &mut Emit<'_>) -> Result<(), ErrorCode> {
+    fn generate(
+        &mut self,
+        r: &Request,
+        emit: &mut Emit<'_>,
+        _: &mut dyn io::Read,
+    ) -> Result<(), ErrorCode> {
         if r.prompt == "SYNTHETIC_PRIVATE_PANIC_CANARY" {
             panic!("{}", r.prompt);
         }

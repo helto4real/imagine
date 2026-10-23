@@ -5,6 +5,7 @@ use crate::video::{contract::*, planning};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
+mod boundary;
 #[path = "bindings/video.rs"]
 mod video;
 #[derive(Serialize)]
@@ -36,6 +37,7 @@ fn add_unique(v: &mut Value, key: &str, value: Value) {
     }
 }
 pub fn compile(project: &VideoProject, scene: &Scene) -> Result<Plan, Issue> {
+    let incoming = boundary::incoming(project, scene)?;
     let mut ordered = scene.sections.iter().collect::<Vec<_>>();
     ordered.sort_by(|a, b| {
         (a.start.num as f64 / a.start.den as f64)
@@ -130,12 +132,11 @@ pub fn compile(project: &VideoProject, scene: &Scene) -> Result<Plan, Issue> {
         usage_order
             .iter()
             .filter_map(|alias| {
-                project
-                    .creative
-                    .references
-                    .iter()
-                    .rev()
-                    .find(|r| r.alias.trim_start_matches('@').eq_ignore_ascii_case(alias))
+                project.creative.references.iter().rev().find(|r| {
+                    imagine_video_contract::creative::reference_alias(&r.alias)
+                        .eq_ignore_ascii_case(alias)
+                        || r.alias.trim_start_matches('@').eq_ignore_ascii_case(alias)
+                })
             })
             .filter(|r| r.enabled && project.creative.visual_references_enabled != Some(false))
             .collect::<Vec<_>>()
@@ -146,7 +147,7 @@ pub fn compile(project: &VideoProject, scene: &Scene) -> Result<Plan, Issue> {
         )
     };
     for r in &refs {
-        let alias = r.alias.trim_start_matches('@').to_ascii_lowercase();
+        let alias = imagine_video_contract::creative::reference_alias(&r.alias);
         let n = subjects.len() + 1;
         let label = format!("<Subject {n}>");
         let mut images = vec![];
@@ -229,6 +230,23 @@ pub fn compile(project: &VideoProject, scene: &Scene) -> Result<Plan, Issue> {
             .unwrap_or(usize::MAX)
     });
     let mut keyframes = json!({"first":null,"last":null});
+    let boundary_opening = scene.continuity.is_some() || incoming.is_some();
+    let mut auto_claimed = boundary_opening
+        || ordered
+            .first()
+            .and_then(|s| project.creative.sections.get(&s.id))
+            .is_some_and(|s| {
+                s.images.iter().any(|b| {
+                    b.anchor
+                        .as_ref()
+                        .map_or(b.role == InputRole::FirstFrame, |a| a.role == "first_frame")
+                })
+            })
+        || scene
+            .bindings
+            .iter()
+            .any(|b| b.enabled && b.role == InputRole::FirstFrame);
+
     for (i, section) in ordered.iter().enumerate() {
         let mut bindings = project
             .creative
@@ -237,18 +255,45 @@ pub fn compile(project: &VideoProject, scene: &Scene) -> Result<Plan, Issue> {
             .map(|s| {
                 s.images
                     .iter()
-                    .map(|b| (b.asset.clone(), b.role.clone()))
+                    .map(|b| {
+                        (
+                            b.asset.clone(),
+                            b.role.clone(),
+                            b.anchor.clone().map(|a| (b.image_id.clone(), a)),
+                        )
+                    })
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
         if i == 0 {
             for b in scene.bindings.iter().filter(|b| b.enabled) {
-                if !bindings.contains(&(b.asset.clone(), b.role.clone())) {
-                    bindings.push((b.asset.clone(), b.role.clone()));
+                if !bindings
+                    .iter()
+                    .any(|(asset, role, _)| asset == &b.asset && role == &b.role)
+                {
+                    bindings.push((b.asset.clone(), b.role.clone(), None));
                 }
             }
         }
-        for (asset, role) in bindings {
+        for (asset, role, anchor) in bindings {
+            let legacy_role = match role {
+                InputRole::FirstFrame => "first_frame",
+                InputRole::LastFrame => "last_frame",
+                _ => "influence",
+            };
+            let authored = anchor
+                .as_ref()
+                .map_or(legacy_role, |(_, a)| a.role.as_str());
+            let resolved = if authored == "auto" {
+                if i == 0 && !auto_claimed {
+                    auto_claimed = true;
+                    "first_frame"
+                } else {
+                    "influence"
+                }
+            } else {
+                authored
+            };
             if role == InputRole::VideoReference
                 && !i2v
                 && project
@@ -265,26 +310,26 @@ pub fn compile(project: &VideoProject, scene: &Scene) -> Result<Plan, Issue> {
                 issues.insert("h3_section_reference_unavailable".into());
                 continue;
             }
-            if i == 0 && role == InputRole::FirstFrame {
+            if i == 0 && resolved == "first_frame" {
                 keyframes["first"] = json!({"asset_id":asset});
             }
-            if role == InputRole::LastFrame {
+            if resolved == "last_frame" {
                 keyframes["last"] = json!({"asset_id":asset});
             }
-            if i2v && (i != 0 || role != InputRole::FirstFrame) {
+            if i2v && (i != 0 || resolved != "first_frame") {
                 issues.insert("h3_section_reference_unavailable".into());
             }
             let p = image(&mut pictures, &asset);
-            let role = match role {
-                InputRole::FirstFrame => "first_frame",
-                InputRole::LastFrame => "last_frame",
-                _ => "influence",
-            };
             add_unique(&mut pictures[p], "roles", json!("section_picture"));
             if pictures[p].get("section_bindings").is_none() {
                 pictures[p]["section_bindings"] = json!([]);
             }
-            pictures[p]["section_bindings"].as_array_mut().unwrap().push(json!({"binding_id":null,"section_id":section.id,"internal_shot_index":i,"authored_role":role,"resolved_role":role,"custom_role":"","relationship":{"marker":"fully_preserved","note":"","target_reference_id":null},"source_reference_id":null,"continuation_conflict":false}));
+            let relationship = anchor.as_ref().map_or(
+                json!({"marker":"fully_preserved","note":"","target_reference_id":null}),
+                |(_, a)| json!(a.relationship),
+            );
+            let custom = anchor.as_ref().map_or("", |(_, a)| a.custom_role.pytrim());
+            pictures[p]["section_bindings"].as_array_mut().unwrap().push(json!({"binding_id":anchor.as_ref().map(|(id,_)|id),"section_id":section.id,"internal_shot_index":i,"authored_role":authored,"resolved_role":resolved,"custom_role":custom,"relationship":relationship,"source_reference_id":null,"continuation_conflict":anchor.is_some()&&authored=="first_frame"&&i==0&&boundary_opening}));
             add_unique(&mut pictures[p], "section_ids", json!(section.id));
             add_unique(&mut pictures[p], "internal_shot_indices", json!(i));
         }
@@ -358,13 +403,19 @@ pub fn compile(project: &VideoProject, scene: &Scene) -> Result<Plan, Issue> {
         .iter()
         .filter(|a| !a["paired_video_key"].is_null())
         .count();
-    let manifest = json!({"mode":"Reference","frame0_guide":{"enabled":false},"subjects":subjects,"images":pictures,"videos":videos,"audios":audios,
+    let mut manifest = json!({"mode":"Reference","frame0_guide":{"enabled":false},"subjects":subjects,"images":pictures,"videos":videos,"audios":audios,
         "motion_context":if motion.is_some(){json!({"enabled":true,"include_audio":motion.is_some_and(|c|c.include_audio),"context_frames":0})}else{json!({"enabled":false})},
         "presentation_order":presentation_order,"dialogue":{"cues":dialogue_cues,"speaker_by_alias":speakers},
         "counts":{"images":pictures.len(),"subjects":subjects.len(),"videos":videos.len(),"paired_video_audios":paired_count,"standalone_audios":audios.len()-paired_count,"audios":audios.len(),"files":pictures.len()+videos.len()+audios.len()},
         "helto_limits":{"images":9,"videos":null,"audios":null,"files":null}});
 
+    let boundary_prompt = incoming
+        .as_ref()
+        .map(|incoming| boundary::apply(incoming, i2v, &mut manifest, &mut keyframes))
+        .transpose()?
+        .unwrap_or_default();
     let input = prompt::Input {
+        boundary_prompt,
         sections,
         reference_manifest: manifest.clone(),
         global_prompt: global,
@@ -372,7 +423,6 @@ pub fn compile(project: &VideoProject, scene: &Scene) -> Result<Plan, Issue> {
         text_references: text_references.clone(),
         keyframes,
         effective_duration_seconds: effective_shape.seconds(),
-        ..Default::default()
     };
     let output = if i2v {
         prompt::compile_i2v(&input)

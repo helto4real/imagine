@@ -35,3 +35,7 @@ mod coordinator_socket;
 
 #[path = "../../shared/video_destination.rs"]
 pub mod media_destination;
+
+#[cfg(test)]
+#[path = "../../shared/task_fixtures.rs"]
+mod task_fixtures;

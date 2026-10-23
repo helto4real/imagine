@@ -1,7 +1,8 @@
-//! CPU montage acceptance with procedural frames/tones on the own encrypted test volume.
+//! CPU montage acceptance with procedural frames/tones inside the approved task root.
 #[path = "../ui/tests/support/destination.rs"]
 #[allow(dead_code)]
 mod destination;
+use destination::task_fixtures;
 use imagine_server::{
     engine::{Backend, EngineFuture},
     scheduler::{self, Action},
@@ -18,8 +19,7 @@ use std::{
     time::Duration,
 };
 fn own() -> tempfile::TempDir {
-    let root = std::env::var("TMPDIR").unwrap();
-    assert!(root.starts_with("/run/media/veracrypt1/imagine/.codex-"));
+    let root = task_fixtures::env_root("TMPDIR");
     tempfile::tempdir_in(root).unwrap()
 }
 fn fixture(root: &Path, mode: BoundaryMode) -> (Service, Request, Vec<u8>) {
@@ -56,6 +56,7 @@ fn fixture(root: &Path, mode: BoundaryMode) -> (Service, Request, Vec<u8>) {
         profile_revision: "1".into(),
     };
     let mut project = VideoProject::create(CreateProject {
+        generation: None,
         schema_version: 1,
         default_model: model,
         delivery: DeliverySettings {
@@ -69,6 +70,8 @@ fn fixture(root: &Path, mode: BoundaryMode) -> (Service, Request, Vec<u8>) {
     project.assets.insert(
         asset.clone(),
         Asset {
+            library_source: None,
+            name: String::new(),
             id: asset.clone(),
             revision: 1,
             kind: MediaKind::Video,
@@ -104,6 +107,7 @@ fn fixture(root: &Path, mode: BoundaryMode) -> (Service, Request, Vec<u8>) {
         right: SceneId("scene_1".into()),
         mode,
         blend_frames: 3,
+        ..Boundary::new(SceneId("scene_0".into()), SceneId("scene_1".into()))
     });
     let mut source = tempfile::tempfile_in(root).unwrap();
     source.write_all(&bytes).unwrap();
@@ -151,6 +155,72 @@ fn probe(root: &Path, bytes: &[u8]) -> Value {
     let result=std::process::Command::new("/usr/bin/ffprobe").args(["-v","error","-count_frames","-show_entries","format=duration:stream=codec_name,nb_read_frames,pix_fmt,sample_rate,channels,color_space,duration","-of","json"]).arg(file.path()).output().unwrap();
     assert!(result.status.success());
     serde_json::from_slice(&result.stdout).unwrap()
+}
+#[test]
+fn accepted_external_takes_export_without_generation_recipes() {
+    let root = own();
+    let (mut service, mut request, original) = fixture(root.path(), BoundaryMode::HardCut);
+    let staging = SessionStaging::select(root.path()).unwrap();
+    let session = service.projects.session_mut(&request.project_id).unwrap();
+    let mut document = session.document().clone();
+    document.project.assembly.clips.clear();
+    let revision = document.project.project_revision;
+    session
+        .update(revision, document, BTreeMap::new(), &staging)
+        .unwrap();
+    for scene in ["scene_0", "scene_1"] {
+        session
+            .import_take(
+                imagine_server::video::captures::Import {
+                    schema_version: 1,
+                    expected_project_revision: session.document().project.project_revision,
+                    scene_id: SceneId(scene.into()),
+                    asset_id: AssetId("owned_source".into()),
+                    accept: true,
+                },
+                &staging,
+            )
+            .unwrap();
+    }
+    assert!(
+        session
+            .document()
+            .takes
+            .iter()
+            .all(|t| t.provenance.is_none())
+    );
+    assert!(
+        session.document().project.scenes.iter().all(|s| s
+            .accepted_take
+            .as_ref()
+            .unwrap()
+            .model
+            .is_none())
+    );
+    request.expected_project_revision = session.document().project.project_revision;
+    let frozen = freeze(&service, &request, &staging).unwrap();
+    assert_eq!(frozen.plan.frames, 48);
+    let encoded = render(frozen, Arc::default(), Progress::default()).unwrap();
+    let metadata = probe(root.path(), &encoded);
+    assert_eq!(metadata["streams"][0]["nb_read_frames"], "48");
+    assert_eq!(metadata["streams"][0]["codec_name"], "h264");
+    assert_eq!(metadata["streams"][1]["codec_name"], "aac");
+    assert!(
+        (metadata["format"]["duration"]
+            .as_str()
+            .unwrap()
+            .parse::<f64>()
+            .unwrap()
+            - 2.)
+            .abs()
+            < 0.001
+    );
+    // The input resource remains readable and byte-identical after exporting.
+    let session = service.projects.session(&request.project_id).unwrap();
+    let mut source = session.resource_file("source").unwrap();
+    let mut bytes = vec![];
+    std::io::Read::read_to_end(&mut source, &mut bytes).unwrap();
+    assert_eq!(bytes, original);
 }
 #[test]
 fn imported_trim_blend_has_exact_frame_clock_stereo_audio_and_no_timeline_gap() {
@@ -203,13 +273,33 @@ fn imported_trim_blend_has_exact_frame_clock_stereo_audio_and_no_timeline_gap() 
     assert!((0.03..0.11).contains(&rms), "{rms}");
 }
 #[test]
-fn transition_is_explicit_and_cancelled_render_has_no_container() {
+fn ungenerated_transition_warns_and_concatenates_and_cancel_has_no_container() {
     let root = own();
     let (mut service, request, _) = fixture(root.path(), BoundaryMode::Transition);
     let staging = SessionStaging::select(root.path()).unwrap();
+    let frozen = freeze(&service, &request, &staging).unwrap();
     assert_eq!(
-        freeze(&service, &request, &staging).err().unwrap().code,
-        "assembly_transition_take_required"
+        frozen.plan.frames, 48,
+        "Transition adds no third clip or extra duration"
+    );
+    assert_eq!(frozen.plan.clips[1].boundary, BoundaryMode::Transition);
+    assert_eq!(frozen.plan.clips[1].overlap, 0);
+    assert_eq!(
+        frozen.plan.warnings,
+        ["Transition was not generated; joining the existing Takes."]
+    );
+    let bytes = render(frozen, Arc::default(), Progress::default()).unwrap();
+    let metadata = probe(root.path(), &bytes);
+    assert_eq!(metadata["streams"][0]["nb_read_frames"], "48");
+    assert!(
+        (metadata["format"]["duration"]
+            .as_str()
+            .unwrap()
+            .parse::<f64>()
+            .unwrap()
+            - 2.)
+            .abs()
+            < 0.001
     );
     let p = service.projects.read(&request.project_id).unwrap();
     service
@@ -225,6 +315,7 @@ fn transition_is_explicit_and_cancelled_render_has_no_container() {
                         right: SceneId("scene_1".into()),
                         mode: BoundaryMode::HardCut,
                         blend_frames: 0,
+                        ..Boundary::new(SceneId("scene_0".into()), SceneId("scene_1".into()))
                     },
                 }],
             },

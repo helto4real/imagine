@@ -116,3 +116,30 @@ pub fn audio(
     }
     Ok(result)
 }
+
+/// Count decoded frames when the container has no declared frame count. A
+/// one-pixel output keeps this pass bounded without buffering full RGB frames.
+pub fn decoded_video_frame_count(file: &File, cancel: &AtomicBool) -> Result<usize, &'static str> {
+    let bytes = decode(
+        file,
+        &[
+            "-map",
+            "0:v:0",
+            "-an",
+            "-fps_mode",
+            "passthrough",
+            "-vf",
+            "scale=1:1",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "gray",
+        ],
+        crate::video::media::MAX_UPLOAD,
+        cancel,
+    )?;
+    if bytes.is_empty() {
+        return Err("invalid_video_frames");
+    }
+    Ok(bytes.len())
+}

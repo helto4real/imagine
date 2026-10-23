@@ -2,7 +2,74 @@
 use super::*;
 use imagine_video_contract::review::{ReviewAction, ReviewRequest};
 
+pub(super) fn attached(document: &Snapshot, take: &Value) -> bool {
+    let id = take["id"].as_str().unwrap_or("");
+    document.raw["captures"][id]["detached"] != true
+        && document.raw["captures"][id]["removed"] != true
+}
+
+pub(super) fn comparison_entries(
+    document: &Snapshot,
+    scene: &SceneId,
+) -> Vec<player::ComparisonEntry> {
+    document.raw["takes"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|take| take["scene_id"] == json!(scene))
+        .filter(|take| attached(document, take))
+        .filter_map(|take| take["id"].as_str().map(|id| (id, take)))
+        .enumerate()
+        .map(|(index, (id, take))| player::ComparisonEntry {
+            id: id.into(),
+            label: format!(
+                "Take {:03} · {}",
+                index + 1,
+                take["status"].as_str().unwrap_or("candidate")
+            ),
+            accepted: document.raw["take_states"][id]["accepted"] == true,
+            rejected: take["status"] == "rejected",
+        })
+        .collect()
+}
+
+impl Timeline {
+    fn sync_take_pair(&mut self, scene: Option<SceneId>, ids: &[String], accepted: Option<&str>) {
+        if self.comparison_scene != scene {
+            self.comparison_scene = scene;
+            self.comparison_explicit = false;
+            self.comparison_selection = [None, None];
+        }
+        let previous = if self.comparison_explicit || self.comparison.is_some() {
+            self.comparison_selection.clone()
+        } else {
+            [None, None]
+        };
+        self.comparison_selection = take_selection::normalize(ids, accepted, &previous);
+    }
+}
+
 impl ImagineApp {
+    pub(super) fn timeline_apply_review(
+        &mut self,
+        ctx: &egui::Context,
+        scene: SceneId,
+        take: TakeId,
+        action: ReviewAction,
+    ) {
+        let next = PostAction::Review {
+            scene,
+            take,
+            action,
+        };
+        let commands = self.timeline.draft_edits();
+        if commands.is_empty() {
+            self.timeline_action(ctx, next);
+        } else {
+            self.timeline.after_edit = Some(next);
+            self.timeline_edit(ctx, commands, 0);
+        }
+    }
     pub(super) fn timeline_review(
         &mut self,
         ctx: &egui::Context,
@@ -32,22 +99,32 @@ impl ImagineApp {
 
     pub(super) fn timeline_take_strip(&mut self, ui: &mut egui::Ui, document: &Snapshot) {
         let selected = self.timeline.scene().map(|scene| scene.id.clone());
-        for slot in &mut self.timeline.comparison_selection {
-            if slot.as_ref().is_some_and(|id| {
-                !document.raw["takes"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .any(|t| {
-                        t["id"].as_str() == Some(id)
-                            && t["scene_id"].as_str() == selected.as_ref().map(|s| s.0.as_str())
-                    })
-            }) {
-                *slot = None;
-            }
-        }
+        let entries = selected
+            .as_ref()
+            .map(|scene| comparison_entries(document, scene))
+            .unwrap_or_default();
+        let ids = entries
+            .iter()
+            .map(|entry| entry.id.clone())
+            .collect::<Vec<_>>();
+        let accepted = selected
+            .as_ref()
+            .and_then(|id| document.project.scene(id).ok())
+            .and_then(|scene| scene.accepted_take.as_ref())
+            .map(|take| take.id.0.as_str());
+        self.timeline
+            .sync_take_pair(selected.clone(), &ids, accepted);
+        let mut compare = false;
         ui.horizontal_wrapped(|ui| {
             ui.weak("Takes");
+            let captures =
+                helto::icon_button(ui, crate::icons::Icon::Folder, "Open Captures", false);
+            #[cfg(feature = "ui-preview")]
+            super::qa::control(ui, "take-captures".into(), &captures);
+            if captures.clicked() {
+                self.timeline.clear_preview();
+                self.timeline.captures.open = true;
+            }
             for (index, take) in document.raw["takes"]
                 .as_array()
                 .into_iter()
@@ -55,6 +132,7 @@ impl ImagineApp {
                 .filter(|take| {
                     take["scene_id"].as_str() == selected.as_ref().map(|id| id.0.as_str())
                 })
+                .filter(|take| attached(document, take))
                 .enumerate()
             {
                 let Some(id) = take["id"].as_str() else {
@@ -89,8 +167,33 @@ impl ImagineApp {
                     }
                 }
             }
+            let slots = &self.timeline.comparison_selection;
+            let button = ui
+                .allocate_ui(egui::vec2(32., 32.), |ui| {
+                    ui.add_enabled_ui(
+                        !self.timeline.busy
+                            && !self.timeline.admitting
+                            && slots.iter().all(Option::is_some),
+                        |ui| {
+                            helto::icon_button(
+                                ui,
+                                crate::icons::Icon::Compare,
+                                "Compare A/B",
+                                false,
+                            )
+                        },
+                    )
+                    .inner
+                })
+                .inner;
+            #[cfg(feature = "ui-preview")]
+            super::qa::control(ui, "take-compare".into(), &button);
+            compare = button.clicked();
         });
         let Some(scene) = selected else { return };
+        if compare {
+            self.timeline_compare(ui.ctx(), document);
+        }
         let Some(id) = self.timeline.selected_take.clone().filter(|id| {
             document.raw["takes"]
                 .as_array()
@@ -99,6 +202,7 @@ impl ImagineApp {
                 .any(|take| {
                     take["id"].as_str() == Some(id.as_str())
                         && take["scene_id"].as_str() == Some(scene.0.as_str())
+                        && attached(document, take)
                 })
         }) else {
             return;
@@ -107,12 +211,12 @@ impl ImagineApp {
             .as_bool()
             .unwrap_or(false);
         let mut action = None;
-        let mut compare = false;
         ui.add_enabled_ui(!self.timeline.busy && !self.timeline.admitting, |ui| {
             ui.horizontal_wrapped(|ui| {
-                for (name, label, value) in [
+                for (name, icon, label, value) in [
                     (
                         "take-accept",
+                        crate::icons::Icon::Check,
                         if outdated {
                             "Accept older Take"
                         } else {
@@ -120,10 +224,20 @@ impl ImagineApp {
                         },
                         ReviewAction::Accept,
                     ),
-                    ("take-reject", "Reject", ReviewAction::Reject),
-                    ("take-candidate", "Candidate", ReviewAction::Candidate),
+                    (
+                        "take-reject",
+                        crate::icons::Icon::Close,
+                        "Reject Take",
+                        ReviewAction::Reject,
+                    ),
+                    (
+                        "take-candidate",
+                        crate::icons::Icon::Retry,
+                        "Return to Candidate",
+                        ReviewAction::Candidate,
+                    ),
                 ] {
-                    let response = ui.small_button(label);
+                    let response = helto::icon_button(ui, icon, label, false);
                     #[cfg(feature = "ui-preview")]
                     super::qa::control(ui, name.into(), &response);
                     #[cfg(not(feature = "ui-preview"))]
@@ -145,17 +259,16 @@ impl ImagineApp {
                     super::qa::control(ui, name.into(), &response);
                     let _ = name;
                     if response.clicked() {
-                        self.timeline.comparison_selection[side] = Some(id.clone());
+                        self.timeline.comparison_explicit = true;
+                        self.timeline.comparison_selection = take_selection::update(
+                            &ids,
+                            accepted,
+                            &self.timeline.comparison_selection,
+                            side,
+                            &id,
+                        );
                     }
                 }
-                let slots = &self.timeline.comparison_selection;
-                let response = ui.add_enabled(
-                    slots[0].is_some() && slots[1].is_some() && slots[0] != slots[1],
-                    egui::Button::new("Compare A/B"),
-                );
-                #[cfg(feature = "ui-preview")]
-                super::qa::control(ui, "take-compare".into(), &response);
-                compare = response.clicked();
                 let menu = ui.menu_button("Differences", |ui| {
                     let reveal = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
                     if !reveal {
@@ -214,22 +327,46 @@ impl ImagineApp {
                 let _ = menu;
             });
         });
-        if compare {
-            self.timeline_compare(ui.ctx(), document);
-        }
         if let Some(action) = action {
-            let next = PostAction::Review {
-                scene,
-                take: TakeId(id),
-                action,
-            };
-            let commands = self.timeline.draft_edits();
-            if commands.is_empty() {
-                self.timeline_action(ui.ctx(), next);
-            } else {
-                self.timeline.after_edit = Some(next);
-                self.timeline_edit(ui.ctx(), commands, 0);
-            }
+            self.timeline_apply_review(ui.ctx(), scene, TakeId(id), action);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn automatic_pair_follows_new_takes_until_an_explicit_choice_and_resets_for_another_scene() {
+        let mut state = Timeline::default();
+        let scene = Some(SceneId("own_scene".into()));
+        let mut ids = vec!["first".to_owned()];
+        state.sync_take_pair(scene.clone(), &ids, Some("first"));
+        ids.push("second".into());
+        state.sync_take_pair(scene.clone(), &ids, Some("first"));
+        ids.push("third".into());
+        state.sync_take_pair(scene.clone(), &ids, Some("first"));
+        assert_eq!(
+            state.comparison_selection,
+            [Some("first".into()), Some("third".into())]
+        );
+        state.comparison_explicit = true;
+        state.comparison_selection = [Some("second".into()), Some("first".into())];
+        ids.push("fourth".into());
+        state.sync_take_pair(scene, &ids, Some("third"));
+        assert_eq!(
+            state.comparison_selection,
+            [Some("second".into()), Some("first".into())]
+        );
+        state.sync_take_pair(
+            Some(SceneId("another_own_scene".into())),
+            &ids,
+            Some("fourth"),
+        );
+        assert_eq!(
+            state.comparison_selection,
+            [Some("third".into()), Some("fourth".into())]
+        );
+        assert!(!state.comparison_explicit);
     }
 }

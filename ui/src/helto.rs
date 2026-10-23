@@ -7,6 +7,40 @@ pub fn reveal_in_viewport(ui: &egui::Ui, privacy_mode: bool) -> bool {
     !privacy_mode || ui.input(|i| i.focused) && ui.rect_contains_pointer(ui.clip_rect())
 }
 
+/// Conceal a private window body while preserving its layout and scroll extent.
+pub(crate) fn private_scope<R>(
+    ui: &mut egui::Ui,
+    hidden: bool,
+    body: impl FnOnce(&mut egui::Ui) -> R,
+) -> R {
+    ui.scope(|ui| {
+        if hidden {
+            ui.set_invisible();
+        }
+        let result = body(ui);
+        if hidden {
+            redact_private_accessibility(ui.ctx(), ui.unique_id());
+        }
+        result
+    })
+    .inner
+}
+fn redact_private_accessibility(ctx: &egui::Context, id: egui::Id) {
+    let children = ctx
+        .accesskit_node_builder(id, |node| {
+            node.clear_label();
+            node.clear_description();
+            node.clear_value();
+            node.clear_text_selection();
+            node.children().to_vec()
+        })
+        .unwrap_or_default();
+    for child in children {
+        let id = unsafe { egui::Id::from_high_entropy_bits(child.0) };
+        redact_private_accessibility(ctx, id);
+    }
+}
+
 pub const BG: Color32 = Color32::from_rgb(0x18, 0x18, 0x25);
 pub const SURFACE: Color32 = Color32::from_rgb(0x1e, 0x1e, 0x2e);
 pub const FIELD: Color32 = Color32::from_rgb(0x31, 0x32, 0x44);
@@ -311,7 +345,7 @@ pub fn textarea(
                                 .is_some_and(|pos| rect.intersect(ui.clip_rect()).contains(pos))
                     }));
             ui.painter().rect_filled(rect, 5, FIELD);
-            let response = egui::ScrollArea::vertical()
+            let mut response = egui::ScrollArea::vertical()
                 .id_salt((id, "text-scroll"))
                 .auto_shrink([false, false])
                 .max_height(rect.height())
@@ -319,6 +353,10 @@ pub fn textarea(
                     textarea_content(ui, text, id, hidden, rect.height())
                 })
                 .inner;
+            // A field's geometry is its frame, not the potentially much taller
+            // text content inside its own scroll area. Keep the text widget ID
+            // and editing/focus state for completion, clipboard and accessibility.
+            response.rect = rect;
             ui.painter().rect_stroke(
                 rect,
                 5,
@@ -358,6 +396,19 @@ fn textarea_content(
             }
             data.get_temp::<bool>(reveal_id).unwrap_or(false)
         });
+        #[cfg(feature = "ui-preview")]
+        {
+            let focused = ui.input(|i| i.focused);
+            let frame = ui.ctx().cumulative_frame_nr();
+            ui.data_mut(|d| {
+                let key = egui::Id::new("qa-text-privacy");
+                let mut values = d
+                    .get_temp::<std::collections::BTreeMap<String, (u64, bool, bool, bool)>>(key)
+                    .unwrap_or_default();
+                values.insert(format!("{id:?}"), (frame, hidden, keyboard_reveal, focused));
+                d.insert_temp(key, values);
+            });
+        }
         let previous_selection =
             egui::TextEdit::load_state(ui.ctx(), id).and_then(|state| state.cursor.char_range());
         let mut output = ui
@@ -440,6 +491,87 @@ fn redact_text_accessibility(ctx: &egui::Context, id: egui::Id) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn multiline_field_geometry_tracks_the_frame_without_truncating_long_text() {
+        let ctx = egui::Context::default();
+        let mut heights = vec![];
+        for original in [
+            "Own short prompt".to_owned(),
+            "Own wrapped long prompt. ".repeat(200),
+        ] {
+            let mut text = original.clone();
+            let mut rect = egui::Rect::NOTHING;
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(500., 400.),
+                    )),
+                    ..Default::default()
+                },
+                |ui| {
+                    ui.set_width(240.);
+                    rect = textarea(ui, &mut text, 3, "Own field geometry", false, false).rect;
+                },
+            );
+            output.textures_delta.clear();
+            assert_eq!(text, original);
+            assert!(rect.height() < 100., "field response grew to {:?}", rect);
+            heights.push(rect.height());
+        }
+        assert!((heights[0] - heights[1]).abs() < 1.);
+    }
+    #[test]
+    fn concealed_window_body_preserves_extent_and_redacts_accessibility() {
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut text = "Own private field".to_owned();
+        let mut sizes = vec![];
+        for hidden in [false, false, true, false, true] {
+            let mut size = egui::Vec2::ZERO;
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(800., 700.),
+                    )),
+                    focused: !hidden,
+                    ..Default::default()
+                },
+                |ui| {
+                    ui.set_width(300.);
+                    size = private_scope(ui, hidden, |ui| {
+                        ui.group(|ui| {
+                            ui.label("Own private name");
+                            ui.text_edit_multiline(&mut text);
+                        })
+                    })
+                    .response
+                    .rect
+                    .size();
+                },
+            );
+            output.textures_delta.clear();
+            if hidden {
+                assert!(
+                    !output
+                        .platform_output
+                        .accesskit_update
+                        .unwrap()
+                        .nodes
+                        .iter()
+                        .any(|(_, n)| n
+                            .value()
+                            .into_iter()
+                            .chain(n.label())
+                            .any(|t| t.contains("Own private")))
+                );
+            }
+            sizes.push(size);
+        }
+        assert!(sizes[1..].windows(2).all(|v| v[0] == v[1]), "{sizes:?}");
+        assert_eq!(text, "Own private field");
+    }
     #[test]
     fn viewport_privacy_still_hides_on_leave_and_lost_focus() {
         for (privacy, focused, inside, expected) in [

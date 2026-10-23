@@ -14,10 +14,14 @@ pub(super) struct State {
     operation: Operation,
     brief: String,
     instruction: String,
+    scene_field: Option<SceneField>,
+    target_scene: Option<SceneId>,
+    target_section: Option<SectionId>,
     duration: f64,
     destination: Destination,
     profile: String,
     provider: String,
+    transport_override: bool,
     provider_id: String,
     profiles: Value,
     providers: Value,
@@ -30,7 +34,26 @@ pub(super) struct State {
     cast: BTreeSet<String>,
     images: std::collections::BTreeMap<AssetId, ImageUse>,
     add_dialogue: bool,
+    pairs: std::collections::BTreeMap<AssetId, AssetId>,
+    provider_settings: bool,
+    show_profiles: bool,
+    progress: Value,
     project: Option<ProjectId>,
+}
+fn provider_transport(state: &State) -> String {
+    if state.transport_override {
+        return state.provider.clone();
+    }
+    state
+        .providers
+        .as_array()
+        .and_then(|rows| {
+            rows.iter()
+                .find(|profile| profile["id"] == state.provider_id)
+        })
+        .and_then(|profile| profile["story_transport"].as_str())
+        .unwrap_or("koboldcpp")
+        .into()
 }
 impl Default for State {
     fn default() -> Self {
@@ -40,10 +63,14 @@ impl Default for State {
             operation: Operation::Outline,
             brief: String::new(),
             instruction: String::new(),
+            scene_field: None,
+            target_scene: None,
+            target_section: None,
             duration: 10.,
             destination: Destination::Append,
             profile: "normal".into(),
             provider: "koboldcpp".into(),
+            transport_override: false,
             provider_id: "proxy".into(),
             profiles: Value::Null,
             providers: Value::Null,
@@ -56,11 +83,32 @@ impl Default for State {
             cast: Default::default(),
             images: Default::default(),
             add_dialogue: false,
+            pairs: Default::default(),
+            provider_settings: false,
+            show_profiles: false,
+            progress: Value::Null,
             project: None,
         }
     }
 }
 impl State {
+    #[cfg(feature = "ui-preview")]
+    pub(super) fn source_image_count(&self) -> usize {
+        self.images.len()
+    }
+    #[cfg(feature = "ui-preview")]
+    pub(super) fn progress_ready(&self, completed: u64, eta: bool) -> bool {
+        self.progress["completed"]
+            .as_u64()
+            .is_some_and(|value| value >= completed)
+            && (!eta
+                || self.progress["eta_seconds"]
+                    .as_f64()
+                    .is_some_and(|value| value > 0.))
+    }
+    pub(super) fn add_image(&mut self, id: AssetId) {
+        self.images.entry(id).or_insert(ImageUse::SettingReference);
+    }
     pub(super) fn session(&mut self, id: &str) {
         if self.owner_session.as_deref().is_some_and(|old| old != id) {
             self.busy = false;
@@ -89,8 +137,48 @@ fn image_label(id: &str, images: &[StoryImage]) -> String {
         .map(|i| i.label.clone())
         .unwrap_or_else(|| "Unavailable source image".into())
 }
+fn source_image_label(project: &VideoProject, id: &AssetId) -> String {
+    project
+        .assets
+        .get(id)
+        .filter(|asset| !asset.name.is_empty())
+        .map(|asset| asset.name.clone())
+        .unwrap_or_else(|| {
+            format!(
+                "Source image {}",
+                project
+                    .assets
+                    .values()
+                    .filter(|asset| asset.kind == MediaKind::Image)
+                    .position(|asset| &asset.id == id)
+                    .map_or(0, |i| i + 1)
+            )
+        })
+}
 impl ImagineApp {
     pub(super) fn timeline_open_authoring(&mut self, ctx: &egui::Context, operation: Operation) {
+        self.timeline_open_authoring_target(ctx, operation, None);
+    }
+    pub(super) fn timeline_open_field_enhance(&mut self, ctx: &egui::Context, field: SceneField) {
+        self.timeline_open_authoring_target(ctx, Operation::EnhanceScene, Some(field));
+    }
+    fn timeline_open_authoring_target(
+        &mut self,
+        ctx: &egui::Context,
+        operation: Operation,
+        scene_field: Option<SceneField>,
+    ) {
+        if self
+            .timeline
+            .authoring
+            .draft
+            .as_ref()
+            .is_some_and(|d| d.phase.busy())
+        {
+            self.timeline.authoring.open = true;
+            return;
+        }
+
         let project = self
             .timeline
             .document
@@ -99,19 +187,35 @@ impl ImagineApp {
         if self.timeline.authoring.project != project {
             self.timeline.authoring.cast.clear();
             self.timeline.authoring.images.clear();
+            self.timeline.authoring.pairs.clear();
             self.timeline.authoring.add_dialogue = false;
-            self.timeline.authoring.project = project;
+            self.timeline.authoring.project = project.clone();
         }
-        if self
-            .timeline
-            .authoring
-            .draft
-            .as_ref()
-            .is_some_and(|d| d.request.operation != operation && !d.phase.busy())
-            && let Some(draft) = self.timeline.authoring.draft.take()
+        let target_scene = (operation != Operation::Outline)
+            .then(|| {
+                self.timeline
+                    .document
+                    .as_ref()
+                    .and_then(|d| self.timeline.primary_scene(&d.project))
+            })
+            .flatten();
+        let target_section = (operation == Operation::EnhanceSection)
+            .then(|| self.timeline.section.clone())
+            .flatten();
+        if self.timeline.authoring.draft.as_ref().is_some_and(|d| {
+            !d.phase.busy()
+                && (Some(&d.project_id) != project.as_ref()
+                    || d.request.operation != operation
+                    || d.request.scene_id != target_scene
+                    || d.request.section_id != target_section
+                    || d.request.scene_field != scene_field)
+        }) && let Some(draft) = self.timeline.authoring.draft.take()
         {
             self.timeline.authoring.history.push(draft);
         }
+        self.timeline.authoring.scene_field = scene_field;
+        self.timeline.authoring.target_scene = target_scene;
+        self.timeline.authoring.target_section = target_section;
         self.timeline.authoring.open = true;
         self.timeline.authoring.operation = operation;
         if self.timeline.authoring.profiles.is_null() {
@@ -173,6 +277,9 @@ impl ImagineApp {
                 self.timeline.authoring.failure = Some(
                     if e.code == "authoring_revision_conflict" {
                         "The project changed. This draft is retained; Apply is blocked. Start a new proposal against the current project.".into()
+                    } else if matches!(e.code.as_str(), "storage_io_failed" | "storage_error") {
+                        "Could not save the proposal. Your edits are retained; retry the action."
+                            .into()
                     } else {
                         e.message
                     },
@@ -183,6 +290,13 @@ impl ImagineApp {
         self.timeline.authoring.failure = None;
         match kind {
             Reply::Catalog => {
+                if self.timeline.authoring.profiles.is_null() {
+                    self.timeline.authoring.profile = self
+                        .prefs
+                        .preferred_prompt_profile
+                        .clone()
+                        .unwrap_or_else(|| value["default_id"].as_str().unwrap_or("normal").into());
+                }
                 self.timeline.authoring.profiles = value;
                 self.authoring_call(
                     ctx,
@@ -194,6 +308,7 @@ impl ImagineApp {
             }
             Reply::Providers => self.timeline.authoring.providers = value,
             Reply::Draft => {
+                self.timeline.authoring.progress = value["progress"].clone();
                 if let Ok(draft) = serde_json::from_value::<Draft>(value) {
                     if draft.phase == Phase::Applied
                         && self
@@ -259,6 +374,7 @@ impl ImagineApp {
         let mut call = None;
         let mut new_proposal = false;
         let mut close_review = false;
+        let mut pick_images = false;
         let document = self.timeline.document.clone();
         if let Some(d) = &document {
             for value in d.raw["authoring"].as_array().into_iter().flatten() {
@@ -275,8 +391,22 @@ impl ImagineApp {
         }
         egui::Window::new("Story & Enhance").id(egui::Id::new("video-authoring")).open(&mut open).default_width(760.).default_height(580.).max_height((ctx.content_rect().height()-70.).max(200.)).vscroll(true).show(ctx,|ui|{
             let reveal=helto::reveal_in_viewport(ui,self.prefs.privacy_mode);
-            if !reveal {ui.label("Hidden proposal · hover to reveal");return;}
-            ui.label("Review and edit generated source before applying. Manual authoring remains available.");
+            helto::private_scope(ui,!reveal,|ui|{
+                #[cfg(feature="ui-preview")]{let r=ui.interact(ui.clip_rect(),ui.id().with("qa-story-scroll"),egui::Sense::hover());super::qa::control(ui,"story-scroll".into(),&r);}
+
+            ui.horizontal_wrapped(|ui|{ui.label("Review and edit generated source before applying. Manual authoring remains available.");let r=helto::icon_button(ui,crate::icons::Icon::Settings,"Provider settings",false);control(ui,"story-provider-settings",&r);if r.clicked(){state.provider_settings=true;}let r=helto::icon_button(ui,crate::icons::Icon::Edit,"View system prompt files and generation parameters",false);control(ui,"story-profile-settings",&r);if r.clicked(){state.show_profiles = !state.show_profiles;}});
+            if state.show_profiles && let Some(profile)=state.profiles["profiles"].as_array().and_then(|rows|rows.iter().find(|p|p["id"]==state.profile)) {
+                    ui.group(|ui| {
+                        ui.strong(format!("{} · prompt files",profile["label"].as_str().unwrap_or(&state.profile)));
+                        for file in profile["prompt_files"].as_array().into_iter().flatten() {
+                            ui.horizontal_wrapped(|ui| { ui.monospace(file["file"].as_str().unwrap_or("")); ui.weak(if file["inherited"]==true {format!("Inherited from {}",file["source_profile_id"].as_str().unwrap_or(""))}else{"Own".into()}); });
+                        }
+                        ui.collapsing("Generation parameters",|ui| {let mut text=serde_json::to_string_pretty(&profile["generation"]).unwrap_or_default();ui.add(egui::TextEdit::multiline(&mut text).code_editor().desired_width(f32::INFINITY).desired_rows(10).interactive(false));});
+                        ui.weak("System prompts use file-level inheritance. Reload prompts after editing the selected source profile files.");
+                    });
+            }
+            let (operation,field)=state.draft.as_ref().map_or((state.operation,state.scene_field),|d|(d.request.operation,d.request.scene_field));
+            if operation==Operation::EnhanceScene {ui.strong(format!("Enhance {}",field.unwrap_or_default().label()));}else if operation==Operation::EnhanceSection {ui.strong("Enhance Section prompt");}
             ui.horizontal(|ui|{ui.weak("Project cast · image inventory · editable source and bindings");let r=ui.button("Close review");control(ui,"story-close",&r);close_review=r.clicked();});
             if let Some(error)=&state.failure{ui.colored_label(helto::ERROR,error);if let Some(d)=&state.draft {let r=ui.button("Reconnect proposal");control(ui,"story-reconnect",&r);if r.clicked(){call=Some((Reply::Draft,false,format!("/v1/video/authoring/{}",d.id),None));}}}
             if !state.history.is_empty()&&!state.busy {
@@ -294,6 +424,11 @@ impl ImagineApp {
                     if busy {ui.spinner();let r=ui.button("Cancel");control(ui,"story-cancel",&r);if r.clicked(){call=Some((Reply::Draft,true,format!("/v1/video/authoring/{}/cancel",draft.id),Some(json!({}))));}}
                     let r=ui.add_enabled(!busy,egui::Button::new("New proposal"));control(ui,"story-new",&r);if r.clicked(){state.history.push(draft.clone());new_proposal=true;}
                 });
+                if state.progress["draft_id"]==draft.id {
+                    let completed=state.progress["completed"].as_u64().unwrap_or(0);let total=state.progress["total"].as_u64().unwrap_or(1).max(1);
+                    ui.add(egui::ProgressBar::new(completed as f32/total as f32).text(format!("{completed} / {total}")));
+                    let elapsed=state.progress["elapsed_seconds"].as_f64().unwrap_or(0.);ui.weak(if let Some(eta)=state.progress["eta_seconds"].as_f64(){format!("{elapsed:.1} s elapsed · about {eta:.1} s remaining")}else{format!("{elapsed:.1} s elapsed")});
+                }
                 if let Some(failure)=&draft.failure{ui.colored_label(helto::ERROR,format!("{failure} · previous completed scenes are retained"));}
                 if !busy&&draft.outline.is_none()&&matches!(draft.phase,Phase::Failed|Phase::Cancelled){let r=ui.button("Retry proposal");control(ui,"story-retry",&r);if r.clicked(){call=Some((Reply::Draft,true,format!("/v1/video/authoring/{}/retry",draft.id),Some(json!({}))));}}
                 if !draft.inventory.is_empty(){let header=ui.collapsing(format!("Image inventory · {}",draft.inventory.len()),|ui|{for note in &draft.inventory{ui.strong(image_label(&note.id,&draft.request.images));ui.label(&note.note);}});control(ui,"story-inventory-open",&header.header_response);}
@@ -307,10 +442,10 @@ impl ImagineApp {
                         if draft.outline.is_some(){let r=ui.add_enabled(editable,egui::Button::new(if draft.failed_index.is_some(){"Retry from failed scene"}else{"Expand scenes"}));control(ui,"story-expand",&r);if r.clicked(){expand=Some(draft.failed_index.unwrap_or(0));}}
                         let r=ui.add_enabled(!stale&&draft.phase==Phase::Review,egui::Button::new("Apply reviewed proposal"));control(ui,"story-apply",&r);apply=r.clicked();
                     });
-                    egui::ScrollArea::vertical().max_height(360.).id_salt("story-review").show(ui,|ui|{
+                    ui.vertical(|ui|{
                         if let Some(text)=&mut draft.text {
-                            if let Some(s)=document.as_ref().and_then(|d|d.project.scenes.iter().find(|s|Some(&s.id)==draft.request.scene_id.as_ref())) {
-                                ui.collapsing("Original",|ui|{ui.label(if draft.request.operation==Operation::EnhanceSection{s.sections.iter().find(|s|Some(&s.id)==draft.request.section_id.as_ref()).map(|s|s.prompt.as_str()).unwrap_or("")}else{&s.description});});
+                            if let Some(d)=&document && let Some(s)=d.project.scenes.iter().find(|s|Some(&s.id)==draft.request.scene_id.as_ref()) {
+                                ui.collapsing("Original",|ui|{ui.label(if draft.request.operation==Operation::EnhanceSection{s.sections.iter().find(|s|Some(&s.id)==draft.request.section_id.as_ref()).map(|s|s.prompt.clone()).unwrap_or_default()}else{draft.request.scene_field.unwrap_or_default().source(&d.project,s)});});
                             }
                             ui.label("Proposal");let r=ui.add(egui::TextEdit::multiline(text).desired_width(f32::INFINITY).desired_rows(8).interactive(editable));control(ui,"story-proposal-text",&r);
                         }
@@ -324,12 +459,12 @@ impl ImagineApp {
                             if !source.image_ids.is_empty(){ui.weak(format!("Setting images: {}",source.image_ids.iter().map(|id|image_label(id,&draft.request.images)).collect::<Vec<_>>().join(", ")));}
                             ui.add_enabled_ui(!expanded,|ui|{ui.horizontal(|ui|{ui.label("Relative weight");ui.add(egui::DragValue::new(&mut source.weight).range(0.001..=100000.));egui::ComboBox::from_id_salt("story-boundary").selected_text(&source.boundary_from_previous).show_ui(ui,|ui|{for (id,label) in [("hard_cut","Hard cut"),("continuous_shot","Continuous shot")]{ui.selectable_value(&mut source.boundary_from_previous,id.into(),label);}});});});
                             ui.add_enabled_ui(editable,|ui|{
-                            ui.label("Title");ui.text_edit_singleline(&mut source.title);
-                            ui.label("Summary");ui.text_edit_multiline(&mut source.summary);
+                            ui.label("Title");let r=ui.add(egui::TextEdit::singleline(&mut source.title).desired_width(f32::INFINITY));control(ui,"story-scene-title",&r);
+                            ui.label("Summary");let r=ui.add(egui::TextEdit::multiline(&mut source.summary).desired_rows(2).desired_width(f32::INFINITY));control(ui,"story-scene-summary",&r);
                             ui.label("Description");let r=ui.add(egui::TextEdit::multiline(&mut source.description).desired_rows(3).desired_width(f32::INFINITY));control(ui,"story-scene-description",&r);
-                            ui.horizontal(|ui|{ui.label("Ambient sound");ui.text_edit_singleline(&mut source.ambient_sound);});
-                            ui.horizontal(|ui|{ui.label("Music");ui.text_edit_singleline(&mut source.non_diegetic_music);});
-                            for (i,section) in source.sections.iter_mut().enumerate(){ui.label(format!("Section {}",i+1));let r=ui.add(egui::TextEdit::multiline(&mut section.prompt).desired_rows(3).desired_width(f32::INFINITY));control(ui,&format!("story-section-{i}"),&r);if !section.image_ids.is_empty()||!section.first_frame_id.is_empty()||!section.last_frame_id.is_empty(){ui.weak(format!("Images: {} · first: {} · last: {}",section.image_ids.iter().map(|id|image_label(id,&draft.request.images)).collect::<Vec<_>>().join(", "),image_label(&section.first_frame_id,&draft.request.images),image_label(&section.last_frame_id,&draft.request.images)));}
+                            ui.label("Ambient sound");let r=ui.add(egui::TextEdit::singleline(&mut source.ambient_sound).desired_width(f32::INFINITY));control(ui,"story-scene-ambient",&r);
+                            ui.label("Music");let r=ui.add(egui::TextEdit::singleline(&mut source.non_diegetic_music).desired_width(f32::INFINITY));control(ui,"story-scene-music",&r);
+                            for (i,section) in source.sections.iter_mut().enumerate(){ui.horizontal(|ui| { ui.label(format!("Section {}",i+1)); if !expanded { ui.label("Relative weight"); let r = ui.add(egui::DragValue::new(&mut section.weight).speed(0.1)); control(ui, &format!("story-section-weight-{i}"), &r); } });let r=ui.add(egui::TextEdit::multiline(&mut section.prompt).desired_rows(3).desired_width(f32::INFINITY));control(ui,&format!("story-section-{i}"),&r);if !section.image_ids.is_empty()||!section.first_frame_id.is_empty()||!section.last_frame_id.is_empty(){ui.weak(format!("Images: {} · first: {} · last: {}",section.image_ids.iter().map(|id|image_label(id,&draft.request.images)).collect::<Vec<_>>().join(", "),image_label(&section.first_frame_id,&draft.request.images),image_label(&section.last_frame_id,&draft.request.images)));}
                             if let Some(intent)=&mut section.dialogue_intent{ui.weak(format!("Dialogue: {} · at most {} turns",intent.participants.join(" / "),intent.max_turns));ui.text_edit_singleline(&mut intent.purpose);}}
                             });
                         }
@@ -339,33 +474,69 @@ impl ImagineApp {
                 if apply {call=Some((Reply::Applied,true,format!("/v1/video/authoring/{}/review",draft.id),Some(json!({"schema_version":1,"outline":draft.outline,"scenes":(draft.request.operation==Operation::Outline).then_some(&draft.scenes),"text":draft.text,"then_apply":draft.request.expected_project_revision}))));}
             } else {
                 ui.horizontal_wrapped(|ui|{
-                    egui::ComboBox::from_id_salt("authoring-profile").selected_text(&state.profile).show_ui(ui,|ui|{for p in state.profiles["profiles"].as_array().into_iter().flatten(){if let Some(id)=p["id"].as_str(){ui.selectable_value(&mut state.profile,id.into(),p["label"].as_str().unwrap_or(id));}}});
-                    egui::ComboBox::from_id_salt("authoring-provider").selected_text(&state.provider_id).show_ui(ui,|ui|{for p in state.providers.as_array().into_iter().flatten(){if let Some(id)=p["id"].as_str(){ui.selectable_value(&mut state.provider_id,id.into(),p["name"].as_str().unwrap_or(id));}}});
-                    egui::ComboBox::from_id_salt("authoring-transport").selected_text(&state.provider).show_ui(ui,|ui|{for id in ["koboldcpp","ollama"]{ui.selectable_value(&mut state.provider,id.into(),id);}});
-                    let r=ui.button("Reload prompts");control(ui,"story-reload",&r);if r.clicked(){call=Some((Reply::Catalog,false,"/v1/video/authoring/profiles".into(),None));}
+                    let menu=egui::ComboBox::from_id_salt("authoring-profile").selected_text(&state.profile).show_ui(ui,|ui|{for p in state.profiles["profiles"].as_array().into_iter().flatten(){if let Some(id)=p["id"].as_str(){let r=ui.selectable_value(&mut state.profile,id.into(),p["label"].as_str().unwrap_or(id));control(ui,&format!("story-profile-{id}"),&r);}}});control(ui,"story-profile-menu",&menu.response);
+                    let r=helto::icon_button(ui,crate::icons::Icon::Save,"Use this prompt profile by default",self.prefs.preferred_prompt_profile.as_deref()==Some(state.profile.as_str()));control(ui,"story-profile-default",&r);if r.clicked(){self.prefs.preferred_prompt_profile=Some(state.profile.clone());self.save_preferences();}
+                    let name=state.providers.as_array().and_then(|rows|rows.iter().find(|p|p["id"]==state.provider_id)).and_then(|p|p["name"].as_str()).unwrap_or(&state.provider_id).to_owned();
+                    let menu=egui::ComboBox::from_id_salt("authoring-provider").selected_text(name).show_ui(ui,|ui|{for p in state.providers.as_array().into_iter().flatten(){if let Some(id)=p["id"].as_str(){let r=ui.selectable_value(&mut state.provider_id,id.into(),p["name"].as_str().unwrap_or(id));control(ui,&format!("story-provider-{id}"),&r);}}});control(ui,"story-provider-menu",&menu.response);
+                    ui.weak(format!("API: {}",provider_transport(&state)));
+                    let r=helto::icon_button(ui,crate::icons::Icon::Retry,"Reload prompts",false);control(ui,"story-reload",&r);if r.clicked(){call=Some((Reply::Catalog,false,"/v1/video/authoring/profiles".into(),None));}
                 });
+                ui.collapsing("Advanced transport override",|ui| {ui.checkbox(&mut state.transport_override,"Override the connection profile's Story API");if state.transport_override {egui::ComboBox::from_id_salt("authoring-transport").selected_text(&state.provider).show_ui(ui,|ui|{for id in ["koboldcpp","ollama"]{ui.selectable_value(&mut state.provider,id.into(),id);}});}});
                 if state.operation==Operation::Outline {
                     if let Some(d)=&document {
                         let header=ui.collapsing("Cast & source images",|ui|{
+                            let r=ui.button("Add source images…");control(ui,"story-pick-images",&r);pick_images=r.clicked();
                             for (i,r)in d.project.creative.references.iter().enumerate(){let mut selected=state.cast.contains(&r.id);let response=ui.checkbox(&mut selected,format!("{} · @{}{}",r.name,r.alias,if r.enabled{""}else{" · disabled in project"}));control(ui,&format!("story-cast-{i}"),&response);if response.changed(){state.cast.remove(&r.id);if selected{state.cast.insert(r.id.clone());}}}
                             let r=ui.checkbox(&mut state.add_dialogue,"Plan dialogue");control(ui,"story-dialogue",&r);
                             for (i,asset)in d.project.assets.values().filter(|a|a.kind==MediaKind::Image).enumerate(){let mut selected=state.images.contains_key(&asset.id);let response=ui.checkbox(&mut selected,format!("Source image {}",i+1));control(ui,&format!("story-image-{i}"),&response);if response.changed(){state.images.remove(&asset.id);if selected{state.images.insert(asset.id.clone(),ImageUse::SettingReference);}}
-                            if let Some(usage)=state.images.get_mut(&asset.id){egui::ComboBox::from_id_salt(("story-image-use",i)).selected_text(format!("{usage:?}")).show_ui(ui,|ui|{for(value,label)in [(ImageUse::SettingReference,"Setting reference"),(ImageUse::RequiredMoment,"Required moment"),(ImageUse::StartFrame,"Directed start frame"),(ImageUse::EndFrame,"Directed end frame")]{ui.selectable_value(usage,value,label);}});}}
+                            if let Some(usage)=state.images.get_mut(&asset.id){let menu=egui::ComboBox::from_id_salt(("story-image-use",i)).selected_text(format!("{usage:?}")).show_ui(ui,|ui|{for(value,label)in [(ImageUse::SettingReference,"Setting reference"),(ImageUse::RequiredMoment,"Required moment"),(ImageUse::StartFrame,"Directed start frame"),(ImageUse::EndFrame,"Directed end frame")]{let r=ui.selectable_value(usage,value,label);control(ui,&format!("story-image-{i}-use-{value:?}"),&r);}});control(ui,&format!("story-image-{i}-usage"),&menu.response);}}
+                            for (start,usage) in &state.images { if *usage!=ImageUse::StartFrame {continue;} let selected=state.pairs.entry(start.clone()).or_insert_with(||AssetId(String::new()));let menu=egui::ComboBox::from_id_salt(("story-pair",&start.0)).selected_text(if selected.0.is_empty(){"Choose directed end frame".to_owned()}else{source_image_label(&d.project,selected)}).show_ui(ui,|ui|{for end in state.images.keys() {let r=ui.selectable_value(selected,end.clone(),source_image_label(&d.project,end));control(ui,&format!("story-pair-{}-{}",start.0,end.0),&r);}});control(ui,&format!("story-pair-{}",start.0),&menu.response);}
+
                         });control(ui,"story-sources-open",&header.header_response);
                     }
                     ui.label("Story brief");let r=ui.add(egui::TextEdit::multiline(&mut state.brief).desired_rows(5).desired_width(f32::INFINITY));control(ui,"story-brief",&r);
-                    ui.horizontal(|ui|{ui.label("Duration");ui.add(egui::DragValue::new(&mut state.duration).range(0.25..=3600.).suffix(" s"));for (d,label) in [(Destination::Append,"Append"),(Destination::Replace,"Replace scenes"),(Destination::Continue,"Continue")]{ui.selectable_value(&mut state.destination,d,label);}});
+                    ui.horizontal(|ui|{ui.label("Duration");ui.add(egui::DragValue::new(&mut state.duration).range(0.25..=3600.).suffix(" s"));for (d,label) in [(Destination::Append,"Append"),(Destination::Replace,"Replace scenes"),(Destination::Continue,"Continue")]{let name=serde_json::to_value(d).unwrap().as_str().unwrap().to_owned();let r=ui.selectable_value(&mut state.destination,d,label);control(ui,&format!("story-destination-{name}"),&r);}});
                 }
                 ui.label("Additional instruction");let r=ui.add(egui::TextEdit::multiline(&mut state.instruction).desired_rows(3).desired_width(f32::INFINITY));control(ui,"story-instruction",&r);
                 let r=ui.add_enabled(!state.busy&&document.is_some(),egui::Button::new(if state.operation==Operation::Outline{"Generate outline"}else{"Generate enhancement"}));control(ui,"story-generate",&r);
-                if r.clicked()&&let Some(d)=&document{call=Some((Reply::Draft,true,format!("/v1/video/projects/{}/authoring",d.project.id.0),Some(json!(Request{schema_version:1,expected_project_revision:d.project.project_revision,provider_profile_id:state.provider_id.clone(),provider:state.provider.clone(),prompt_profile_id:state.profile.clone(),operation:state.operation,scene_id:self.timeline.selected.iter().next().cloned(),section_id:self.timeline.section.clone(),brief:state.brief.clone(),instruction:state.instruction.clone(),duration_seconds:state.duration,destination:state.destination,cast:if state.operation==Operation::Outline{state.cast.iter().cloned().collect()}else{vec![]},images:if state.operation==Operation::Outline{state.images.iter().enumerate().map(|(i,(asset,usage))|StoryImage{id:asset.0.clone(),asset:asset.clone(),label:format!("Source image {}",i+1),usage:*usage}).collect()}else{vec![]},add_dialogue:state.operation==Operation::Outline&&state.add_dialogue}))));}
+                if r.clicked()&&let Some(d)=&document{call=Some((Reply::Draft,true,format!("/v1/video/projects/{}/authoring",d.project.id.0),Some(json!(Request{schema_version:1,expected_project_revision:d.project.project_revision,provider_profile_id:state.provider_id.clone(),provider:provider_transport(&state),prompt_profile_id:state.profile.clone(),operation:state.operation,scene_field:state.scene_field,scene_id:state.target_scene.clone(),section_id:state.target_section.clone(),brief:state.brief.clone(),instruction:state.instruction.clone(),duration_seconds:state.duration,destination:state.destination,cast:if state.operation==Operation::Outline{state.cast.iter().cloned().collect()}else{vec![]},images:if state.operation==Operation::Outline{state.images.iter().enumerate().map(|(i,(asset,usage))|StoryImage{pair_with:state.pairs.get(asset).filter(|id|!id.0.is_empty()).map(|id|id.0.clone()),id:asset.0.clone(),asset:asset.clone(),label:format!("Source image {}",i+1),usage:*usage}).collect()}else{vec![]},add_dialogue:state.operation==Operation::Outline&&state.add_dialogue}))));}
             }
+            });
         });
         if new_proposal {
             state.draft = None;
         }
         state.open = open && !close_review;
+        if state.provider_settings {
+            let mut settings_open = true;
+            egui::Window::new("Story provider settings")
+                .id(egui::Id::new("story-provider-settings-window"))
+                .open(&mut settings_open)
+                .default_width(600.)
+                .max_height((ctx.content_rect().height() - 70.).max(200.))
+                .vscroll(true)
+                .show(ctx, |ui| {
+                    let r = ui.button("Close settings");
+                    control(ui, "story-provider-close", &r);
+                    if r.clicked() {
+                        state.provider_settings = false;
+                    }
+                    self.enhancement_provider_settings(ui);
+                });
+            if !settings_open || !state.provider_settings {
+                state.provider_settings = false;
+                call = Some((
+                    Reply::Providers,
+                    false,
+                    "/v1/enhancement/profiles".into(),
+                    None,
+                ));
+            }
+        }
         self.timeline.authoring = state;
+        if pick_images {
+            self.timeline_pick_media(media_picker::Target::StoryImage);
+        }
         if let Some((kind, post, path, mut body)) = call {
             if path.ends_with("/review") {
                 let expand = body
@@ -436,5 +607,23 @@ impl ImagineApp {
                 }),
             );
         });
+    }
+}
+
+#[cfg(test)]
+mod provider_tests {
+    use super::*;
+    #[test]
+    fn selected_connection_owns_transport_unless_explicitly_overridden() {
+        let mut state = State {
+            providers: json!([{"id":"proxy","story_transport":"ollama"},{"id":"legacy"}]),
+            ..Default::default()
+        };
+        assert_eq!(provider_transport(&state), "ollama");
+        state.transport_override = true;
+        assert_eq!(provider_transport(&state), "koboldcpp");
+        state.transport_override = false;
+        state.provider_id = "legacy".into();
+        assert_eq!(provider_transport(&state), "koboldcpp");
     }
 }

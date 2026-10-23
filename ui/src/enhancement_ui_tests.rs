@@ -262,6 +262,11 @@ fn profile_editor_edits_required_system_prompt_and_new_copied_profiles_keep_inst
         h.frame(vec![], true);
     }
     h.click("Prompt enhancement", true);
+    assert!(
+        !h.nodes
+            .iter()
+            .any(|(_, node)| { matches!(node.label(), Some("API key" | "Clear saved key")) })
+    );
     let system = h.node("System prompt").bounds().unwrap();
     assert!(system.width() > 300. && system.x1 < 480., "{system:?}");
     h.click("System prompt", true);
@@ -395,7 +400,6 @@ async fn enhance_button_uses_saved_profile_through_the_real_http_client() {
                 system_prompt: "SYNTHETIC UI system instructions".into(),
                 ..Default::default()
             },
-            api_key: None,
         })
         .unwrap();
     let profiles =

@@ -3,6 +3,7 @@ use super::{contract::*, persistence::*};
 use crate::{h3_protocol as h3, short_av::Av};
 use std::{fs::File, io::Cursor};
 pub enum Produced {
+    BoundaryApplied(serde_json::Value),
     H3Endpoint { shape: h3::Shape, png: Vec<u8> },
     H3Motion(h3::continuation::Artifact),
 }
@@ -30,7 +31,9 @@ impl Produced {
         take: &StoredTake,
         staging: &SessionStaging,
     ) -> Result<(Resource, File), StorageError> {
+        let provenance = take.generated()?;
         match self {
+            Self::BoundaryApplied(_) => Err(StorageError::new("boundary_receipt_is_not_media")),
             Self::H3Motion(artifact) => {
                 if !artifact.valid() {
                     return Err(StorageError::new("invalid_continuation"));
@@ -40,7 +43,7 @@ impl Produced {
                     format!("motion_{}", uuid::Uuid::new_v4().simple()),
                     ResourceKind::H3Motion {
                         take_id: take.id.clone(),
-                        model: take.provenance.model.clone(),
+                        model: provenance.model.clone(),
                         descriptor: artifact.descriptor.clone(),
                     },
                     &mut file,
@@ -55,7 +58,7 @@ impl Produced {
                     ResourceKind::H3Endpoint {
                         take_id: take.id.clone(),
                         schema_version: 1,
-                        model: take.provenance.model.clone(),
+                        model: provenance.model.clone(),
                         shape: *shape,
                     },
                     &mut file,
@@ -90,6 +93,14 @@ pub fn freeze_endpoint(
     let Some(continuity) = &target.continuity else {
         return Ok(None);
     };
+    if matches!(
+        continuity.method,
+        ContinuityMethod::Combo | ContinuityMethod::Influence
+    ) {
+        // These consume the frozen source video and optional explicit end image,
+        // through reference_inputs rather than a precomputed untrimmed endpoint.
+        return Ok(None);
+    }
     if !matches!(
         continuity.method,
         ContinuityMethod::LastFrameFirstFrame
@@ -140,7 +151,7 @@ pub fn freeze_endpoint(
         model, descriptor, ..
     } = &resource.kind
     {
-        if model != &take.provenance.model {
+        if model != &take.generated()?.model {
             return Err(StorageError::new("continuity_endpoint_incompatible"));
         }
         let mut file = session.resource_file(&resource.id)?;
@@ -185,7 +196,7 @@ pub fn freeze_endpoint(
     else {
         unreachable!()
     };
-    if *schema_version != 1 || model != &take.provenance.model {
+    if *schema_version != 1 || model != &take.generated()?.model {
         return Err(StorageError::new("continuity_endpoint_incompatible"));
     }
     let mut file = session.resource_file(&resource.id)?;

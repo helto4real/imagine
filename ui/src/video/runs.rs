@@ -18,6 +18,9 @@ impl Timeline {
 }
 impl ImagineApp {
     pub(super) fn timeline_poll_runs(&mut self, ctx: &egui::Context) {
+        if self.timeline.needs_reopen {
+            return;
+        }
         ctx.request_repaint_after(Duration::from_millis(500));
         if self.timeline.runs_loading
             || self
@@ -61,7 +64,7 @@ impl ImagineApp {
         }
         if self.timeline.pending_run.is_none() {
             self.timeline.pending_run = Some((
-                json!({"schema_version":1,"project_id":document.project.id,"expected_project_revision":document.project.project_revision,"mode":mode,"selected_scene":self.timeline.selected.iter().next()}),
+                json!({"schema_version":1,"project_id":document.project.id,"expected_project_revision":document.project.project_revision,"mode":mode,"selected_scene":self.timeline.primary_scene(&document.project)}),
                 uuid::Uuid::new_v4().to_string(),
             ));
         }
@@ -116,32 +119,10 @@ impl ImagineApp {
             Ok(v) => v,
             Err(e) => {
                 if e.code == "session_changed" {
-                    for run in &mut self.timeline.runs {
-                        if !run.status.terminal() {
-                            run.status = Status::Interrupted;
-                            run.failure = Some("run_session_ended".into());
-                        }
-                    }
-                    self.timeline.clear_preview();
-                    self.timeline.session = None;
-                    self.timeline.session_checked = false;
-                    self.timeline.document = None;
-                    self.timeline.epoch += 1;
-                    self.timeline.pending_run = None;
-                    self.timeline.pending = None;
-                    for job in &mut self.timeline.jobs {
-                        if !job.terminal() {
-                            job.observation["status"] = json!("interrupted");
-                            job.monitoring = false;
-                            job.acting = false;
-                            job.error = Some("Server session ended. No run was resumed.".into());
-                        }
-                    }
-                    self.timeline.admitting = false;
-                    self.timeline.run_acting = false;
-                    self.timeline.runs_loading = false;
+                    self.timeline.session_ended();
                 }
                 if matches!(kind, Reply::Submitted) && !e.retryable {
+                    self.timeline_final_run_failure(&e.message);
                     self.timeline.pending_run = None;
                 }
                 if !matches!(kind, Reply::List) || !self.timeline.runs.is_empty() {
@@ -161,6 +142,9 @@ impl ImagineApp {
             return;
         };
         if matches!(kind, Reply::Submitted) {
+            for run in &runs {
+                self.timeline_final_run_reply(run);
+            }
             self.timeline.pending_run = None;
             self.timeline.error = None;
         }

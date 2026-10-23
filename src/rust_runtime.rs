@@ -11,6 +11,7 @@ pub struct Runtime {
     pub schema: u32,
     #[serde(default)]
     pub h3: Option<H3>,
+    /// Build provenance; executable compatibility is negotiated by the worker protocol.
     pub reference_revision: String,
     pub binary: PathBuf,
     pub environment: BTreeMap<String, String>,
@@ -22,7 +23,6 @@ impl Runtime {
             &std::fs::read(path).context("Rust runtime missing; run ./prepare-rust-backend.sh")?,
         )?;
         if runtime.schema != 1
-            || runtime.reference_revision != "446ef4e005fc7134d53ce6869ebd77d2134cd39c"
             || !runtime.binary.is_absolute()
             || !runtime.files.contains_key(&runtime.binary)
         {
@@ -137,6 +137,7 @@ pub fn prepare(root: &Path, site: &Path, output: &Path) -> Result<()> {
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct H3 {
+    /// Declared provenance, with digest syntax checked independently of historical values.
     pub profile_checkpoints: BTreeMap<String, String>,
     pub dependency_map: PathBuf,
     pub identity: crate::h3_protocol::Deployment,
@@ -159,7 +160,10 @@ impl H3 {
             // Opt-in observer worker used by the isolated Reference acceptance test.
             "IMAGINE_REFERENCE_PROBE_OUTPUT",
         ];
-        if self.profile_checkpoints != crate::h3_protocol::profile_checkpoints()
+        if self
+            .profile_checkpoints
+            .values()
+            .any(|s| !crate::h3_protocol::is_sha256(s))
             || !self.identity.valid()
             || !self.binary.is_absolute()
             || !self.model_root.is_absolute()

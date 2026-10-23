@@ -101,7 +101,6 @@ pub(super) fn message(code: &str) -> Option<&'static str> {
         "enhancement_invalid_models" => {
             "The server returned an invalid model list. Check its OpenAI-compatible endpoint."
         }
-        "invalid_enhancement_api_key" => "Enter a valid API key without line breaks.",
         "enhancement_profile_not_found" => {
             "This enhancement profile no longer exists. Choose another in Settings."
         }
@@ -118,7 +117,7 @@ pub(super) fn message(code: &str) -> Option<&'static str> {
             "Cannot reach the LLM. Check the profile's base URL and start the proxy."
         }
         "enhancement_auth_failed" => {
-            "The LLM rejected authentication. Check the profile's API key."
+            "The LLM requires authentication. Use a local provider endpoint that does not require an API key."
         }
         "enhancement_rate_limited" => "The LLM is rate limited. Wait and try again.",
         "enhancement_request_rejected" => {

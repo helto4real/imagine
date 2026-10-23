@@ -21,16 +21,89 @@ use tokio::{
 };
 #[path = "support/authoring_fixture.rs"]
 mod authoring_fixture;
+#[path = "../shared/task_fixtures.rs"]
+mod task_fixtures;
 struct Synthetic {
+    preview_state: Option<watch::Sender<EngineState>>,
+    cache: Option<imagine_server::video::reference_cache_owner::Owner>,
+    evidence: PathBuf,
     delay: std::time::Duration,
     fail_next: bool,
+    failure_code: &'static str,
 }
 impl Backend for Synthetic {
+    fn begin_job(&mut self, id: &str) {
+        if let Some(state) = &self.preview_state {
+            state.borrow().sampling_preview.begin(id);
+            state.send_modify(|s| {
+                s.job_id = Some(id.into());
+                s.phase = "sampling".into();
+            });
+        }
+    }
+    fn mark_idle(&mut self) {
+        if let Some(state) = &self.preview_state {
+            let id = state.borrow().job_id.clone();
+            if let Some(id) = id {
+                state.borrow().sampling_preview.end(&id);
+            }
+            state.send_modify(|s| s.job_id = None);
+        }
+    }
+    fn reference_cache(&self) -> Option<Arc<dyn imagine_server::video::reference_cache::Control>> {
+        self.cache
+            .as_ref()
+            .map(|c| c.clone() as Arc<dyn imagine_server::video::reference_cache::Control>)
+    }
     fn generate<'a>(
         &'a mut self,
-        _: &'a imagine_server::generation::ImagePass,
+        request: &'a imagine_server::generation::ImagePass,
     ) -> EngineFuture<'a, Vec<u8>> {
-        Box::pin(async {
+        let preview_state = self.preview_state.clone();
+        let total = request.sampling.steps;
+        Box::pin(async move {
+            if let Some(state) = preview_state {
+                let hub = state.borrow().sampling_preview.clone();
+                let job = state.borrow().job_id.clone().unwrap();
+                let settings = hub.settings();
+                let start = std::time::Instant::now();
+                let mut slot = 0;
+                for step in 1..=total {
+                    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                    let elapsed = start.elapsed().as_secs_f64();
+                    state.send_modify(|s| {
+                        s.phase = "inference".into();
+                        s.requested_steps = total;
+                        s.progress = Some(imagine_server::progress::SamplingProgress {
+                            completed: step,
+                            total,
+                            elapsed_seconds: elapsed,
+                            remaining_seconds: elapsed / f64::from(step) * f64::from(total - step),
+                            updated_at_ms: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_millis() as u64,
+                        });
+                    });
+                    let due = (elapsed / settings.interval_seconds).floor() as u64;
+                    if settings.enabled && due > slot {
+                        slot = due;
+                        hub.publish(
+                            &job,
+                            imagine_server::h3_protocol::preview::Metadata {
+                                sequence: u64::from(step),
+                                step,
+                                width: 64,
+                                height: 32,
+                                frames: 1,
+                                frame_duration_ms: 500,
+                                source_duration_seconds: 0.5,
+                            },
+                            vec![(step % 200 + 30) as u8; 64 * 32 * 3],
+                        );
+                    }
+                }
+            }
             let mut out = Cursor::new(vec![]);
             image::RgbImage::from_pixel(64, 64, image::Rgb([80, 110, 150]))
                 .write_to(&mut out, image::ImageFormat::Png)?;
@@ -42,14 +115,62 @@ impl Backend for Synthetic {
         input: &'a imagine_server::h3_protocol::Request,
     ) -> EngineFuture<'a, imagine_server::short_av::Av> {
         let fail = std::mem::take(&mut self.fail_next);
+        let failure_code = self.failure_code;
         let delay = self.delay;
+        let preview_state = self.preview_state.clone();
+        let capture = self
+            .evidence
+            .join(format!("generated-input-{}.json", input.id));
         Box::pin(async move {
+            std::fs::write(
+                capture,
+                serde_json::to_vec_pretty(
+                    &json!({"seed":input.seed,"prompt":input.prompt,"shape":input.shape,"sampling":input.sampling,"options":input.options,"reference_quality":input.references.quality,
+                        "boundary_receipt":input.references.boundary_receipt(),"reference_manifest":input.references.manifest,
+                        "start_image":input.image,"reference_shapes":{
+                            "images":input.references.images.iter().map(|i|[i.width,i.height]).collect::<Vec<_>>(),
+                            "videos":input.references.videos.iter().map(|v|json!({"width":v.width,"height":v.height,"frames":v.frames,"fps":v.source_fps,"audio_samples":v.audio.as_ref().map(|a|a.samples)})).collect::<Vec<_>>()}}),
+                )?,
+            )?;
             tokio::time::sleep(delay).await;
-            anyhow::ensure!(!fail, "synthetic_failure");
+            if let Some(state) = preview_state {
+                // Synthetic UI fixture only: real lifecycle/API but no model.
+                let hub = state.borrow().sampling_preview.clone();
+                let job = state.borrow().job_id.clone().unwrap();
+                let settings = hub.settings();
+                let start = std::time::Instant::now();
+                let mut slot = 0;
+                let mut sequence = 0;
+                for step in 1..=20 {
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    let elapsed = start.elapsed().as_secs_f64();
+                    let due = (elapsed / settings.interval_seconds).floor() as u64;
+                    if settings.enabled && due > slot {
+                        slot = due;
+                        sequence += 1;
+                        let metadata = imagine_server::h3_protocol::preview::Metadata {
+                            sequence,
+                            step,
+                            width: 64,
+                            height: 32,
+                            frames: 2,
+                            frame_duration_ms: 812,
+                            source_duration_seconds: 39. / 24.,
+                        };
+                        let mut rgb = vec![30; 64 * 32 * 3];
+                        rgb.extend(vec![130; 64 * 32 * 3]);
+                        hub.publish(&job, metadata, rgb);
+                    }
+                }
+            }
+            anyhow::ensure!(!fail, imagine_server::engine::EngineError(failure_code));
             Ok(pattern(input.shape))
         })
     }
     fn stop(&mut self) -> EngineFuture<'_, ()> {
+        if let Some(state) = &self.preview_state {
+            state.borrow().sampling_preview.clear();
+        }
         Box::pin(async { Ok(()) })
     }
 }
@@ -84,6 +205,7 @@ fn pattern(shape: imagine_server::h3_protocol::Shape) -> imagine_server::short_a
         .collect();
     let continuation = if shape.frames >= 22 {
         let descriptor = imagine_server::h3_protocol::continuation::Descriptor {
+            handoff_upscale: None,
             schema_version: 1,
             shape,
             sampled_frames: shape.frames,
@@ -116,6 +238,7 @@ fn seed(
     assembly: bool,
     long_assembly: bool,
     with_cast: bool,
+    review_takes: bool,
 ) -> anyhow::Result<()> {
     let model = ModelSelection {
         adapter: "h3".into(),
@@ -125,6 +248,7 @@ fn seed(
         profile_revision: "2".into(),
     };
     let mut project = VideoProject::create(CreateProject {
+        generation: None,
         schema_version: 1,
         default_model: model.clone(),
         delivery: DeliverySettings {
@@ -190,6 +314,8 @@ fn seed(
     document.project.assets.insert(
         asset.clone(),
         Asset {
+            library_source: None,
+            name: String::new(),
             id: asset.clone(),
             revision: 1,
             kind: MediaKind::Image,
@@ -231,6 +357,8 @@ fn seed(
         document.project.assets.insert(
             id.clone(),
             Asset {
+                library_source: None,
+                name: String::new(),
                 id: id.clone(),
                 kind: MediaKind::Audio,
                 revision: 1,
@@ -277,7 +405,9 @@ fn seed(
         id: take,
         scene_id: SceneId("scene_qa_1".into()),
         status: TakeStatus::Candidate,
-        provenance: TakeProvenance {
+        provenance: Some(TakeProvenance {
+            boundary: None,
+            resolved_loras: None,
             model,
             seed: 42,
             input_revision: imagine_server::video::planning::input_revision(
@@ -290,7 +420,7 @@ fn seed(
             references: vec![],
             source_take: None,
             continuity: None,
-        },
+        }),
     });
     if let Some(motion) = motion {
         let (resource, file) = motion.prepare(&document.takes[0], &staging)?;
@@ -300,6 +430,46 @@ fn seed(
     let (resource, file) = endpoint.prepare(&document.takes[0], &staging)?;
     files.insert(resource.key(), file);
     document.resources.push(resource);
+    if review_takes {
+        for index in 1..=2 {
+            let mut av = pattern(shape);
+            av.continuation = None;
+            av.pcm = (0..av.pcm.len() / 8)
+                .flat_map(|sample| {
+                    let v = (sample as f32 * (220. + index as f32 * 110.) * std::f32::consts::TAU
+                        / 32000.)
+                        .sin()
+                        * 0.04;
+                    let value = v.to_le_bytes();
+                    value.into_iter().chain(value)
+                })
+                .collect();
+            for frame in &mut av.frames {
+                for rgb in frame.chunks_exact_mut(3) {
+                    rgb[index] = rgb[index].saturating_add(45);
+                }
+            }
+            let mut take = document.takes[0].clone();
+            take.id = TakeId(format!("take_qa_review_{index}"));
+            take.provenance.as_mut().unwrap().seed += index as u64;
+            let video = imagine_server::short_av::encode(av).map_err(anyhow::Error::msg)?;
+            let mut file = source(root, &video)?;
+            let resource = Resource::inspect(
+                format!("video_qa_review_{index}"),
+                ResourceKind::TakeVideo {
+                    take_id: take.id.clone(),
+                },
+                &mut file,
+            )?;
+            files.insert(resource.key(), file);
+            document.resources.push(resource);
+            document.takes.push(take);
+        }
+        let first = &mut document.takes[0];
+        first.status = TakeStatus::Accepted;
+        document.project.scenes[0].accepted_take =
+            Some(first.accepted_summary(&document.resources)?);
+    }
     if assembly {
         for index in 0..document.project.scenes.len() {
             let scene_id = document.project.scenes[index].id.clone();
@@ -307,7 +477,7 @@ fn seed(
             if index > 0 {
                 take.id = TakeId(format!("take_qa_assembly_{index}"));
                 take.scene_id = scene_id.clone();
-                take.provenance.input_revision =
+                take.provenance.as_mut().unwrap().input_revision =
                     imagine_server::video::planning::input_revision(&document.project, &scene_id)
                         .map_err(StorageError::from)?;
                 let mut resource = document
@@ -326,11 +496,8 @@ fn seed(
             } else {
                 document.takes[0].status = TakeStatus::Accepted;
             }
-            document.project.scenes[index].accepted_take = Some(AcceptedTake {
-                id: take.id,
-                model: take.provenance.model,
-                source_fingerprint: take.provenance.input_revision,
-            });
+            document.project.scenes[index].accepted_take =
+                Some(take.accepted_summary(&document.resources)?);
         }
         document.project.assembly.boundaries = vec![
             imagine_server::video::assembly::Boundary {
@@ -338,12 +505,20 @@ fn seed(
                 right: document.project.scenes[1].id.clone(),
                 mode: imagine_server::video::assembly::BoundaryMode::ContinuousShot,
                 blend_frames: 0,
+                ..imagine_server::video::assembly::Boundary::new(
+                    document.project.scenes[0].id.clone(),
+                    document.project.scenes[1].id.clone(),
+                )
             },
             imagine_server::video::assembly::Boundary {
                 left: document.project.scenes[1].id.clone(),
                 right: document.project.scenes[2].id.clone(),
                 mode: imagine_server::video::assembly::BoundaryMode::BlendSeam,
                 blend_frames: 6,
+                ..imagine_server::video::assembly::Boundary::new(
+                    document.project.scenes[1].id.clone(),
+                    document.project.scenes[2].id.clone(),
+                )
             },
         ];
         if with_audio {
@@ -440,14 +615,25 @@ async fn main() -> anyhow::Result<()> {
     let arguments = std::env::args().skip(2).collect::<Vec<_>>();
     anyhow::ensure!(
         arguments.iter().all(|v| v == "--slow"
+            || v == "--sampling-preview"
+            || v == "--private-storage"
+            || v == "--reference-cache"
+            || v == "--h3-failure"
+            || v.strip_prefix("--port=")
+                .is_some_and(|p| p.parse::<u16>().is_ok())
             || v == "--authoring"
             || v == "--story-failure"
+            || v == "--story-slow"
             || v == "--fail-first-comparison"
             || v == "--fail-first"
             || v == "--drop-first-status"
             || v == "--drop-first-admission"
+            || v == "--drop-first-freeze"
             || v == "--publication-failure"
+            || v == "--editor-save-failures"
+            || v == "--lora-catalog"
             || v == "--with-audio"
+            || v == "--review-takes"
             || v == "--assembly"
             || v == "--assembly-long"
             || v == "--cast"
@@ -469,25 +655,25 @@ async fn main() -> anyhow::Result<()> {
     let drop_admission = Arc::new(std::sync::atomic::AtomicBool::new(
         arguments.iter().any(|v| v == "--drop-first-admission"),
     ));
+    let drop_freeze = Arc::new(std::sync::atomic::AtomicBool::new(
+        arguments.iter().any(|v| v == "--drop-first-freeze"),
+    ));
     let root = PathBuf::from(
         std::env::args_os()
             .nth(1)
             .ok_or_else(|| anyhow::anyhow!("owned case root required"))?,
     );
     anyhow::ensure!(
-        root.is_absolute()
-            && root
-                .to_string_lossy()
-                .starts_with("/run/media/veracrypt1/imagine/.codex-video-night-"),
-        "only owned encrypted night root is allowed"
+        task_fixtures::is_owned(&root),
+        "only the approved synthetic task root is allowed"
     );
     let fsid =
         d::fsid(&d::directory(&root).map_err(anyhow::Error::msg)?).map_err(anyhow::Error::msg)?;
     let base = Config {
         root: root.clone(),
-        mount: "/run/media/veracrypt1".into(),
-        source: "/dev/mapper/veracrypt1".into(),
-        filesystem: "ext3".into(),
+        mount: task_fixtures::MOUNT.into(),
+        source: task_fixtures::SOURCE.into(),
+        filesystem: task_fixtures::FILESYSTEM.into(),
         fsid,
     };
     let (_, fd) = d::inspect(&base, &System).map_err(anyhow::Error::msg)?;
@@ -510,6 +696,10 @@ async fn main() -> anyhow::Result<()> {
     if let Some(case) = arguments.iter().find_map(|a| a.strip_prefix("--reopen=")) {
         let source = root.parent().unwrap().join(case).join("saved-project");
         anyhow::ensure!(
+            task_fixtures::is_owned(&source),
+            "own synthetic reopen source required"
+        );
+        anyhow::ensure!(
             source != root.join("saved-project"),
             "use a new fixture root"
         );
@@ -522,6 +712,7 @@ async fn main() -> anyhow::Result<()> {
             arguments.iter().any(|v| v == "--assembly"),
             arguments.iter().any(|v| v == "--assembly-long"),
             arguments.iter().any(|v| v == "--cast"),
+            arguments.iter().any(|v| v == "--review-takes"),
         )?;
     }
     let config = Config {
@@ -534,8 +725,32 @@ async fn main() -> anyhow::Result<()> {
         root.join("state/video-output.json"),
         serde_json::to_vec_pretty(&config)?,
     )?;
-    let mut store = Store::open(&root.join("state")).await?;
-    store.videos.destination = Some(destination);
+    let private = if arguments.iter().any(|v| v == "--private-storage") {
+        let path = root.join("private");
+        let runtime = root.join("runtime");
+        std::fs::create_dir(&path)?;
+        std::fs::create_dir(&runtime)?;
+        Some(
+            imagine_server::private_storage::Root::with_environment(
+                Config {
+                    root: path,
+                    ..base.clone()
+                },
+                Arc::new(System),
+            )
+            .and_then(|private| private.with_runtime_directory(runtime))
+            .map_err(anyhow::Error::msg)?,
+        )
+    } else {
+        None
+    };
+    let store = if let Some(private) = &private {
+        Store::open_private(private.clone(), "own-image-workspace".into()).await?
+    } else {
+        let mut store = Store::open(&root.join("state")).await?;
+        store.videos.destination = Some(destination);
+        store
+    };
     let listener = UnixListener::bind(root.join("c.sock"))?;
     let semaphore = Arc::new(Semaphore::new(1));
     let broker = tokio::spawn(async move {
@@ -547,21 +762,48 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     });
-    let (control, scheduler) = scheduler::start_coordinated(
-        store.clone(),
-        Box::new(Synthetic { delay, fail_next }),
-        Some(root.join("c.sock")),
-    )
-    .await?;
-    let (_, engine) = watch::channel(EngineState {
+    let (state, engine) = watch::channel(EngineState {
         backend: "rust".into(),
         h3_available: true,
         ..Default::default()
     });
-    let enhancement =
-        imagine_server::enhancement::Service::open(root.join("state/enhancement.json"))?;
+    let (control, scheduler) = scheduler::start_coordinated(
+        store.clone(),
+        Box::new(Synthetic {
+            preview_state: arguments
+                .iter()
+                .any(|a| a == "--sampling-preview")
+                .then_some(state),
+            failure_code: if arguments.iter().any(|a| a == "--h3-failure") {
+                "h3_generation_failed"
+            } else {
+                "generation_failed"
+            },
+            cache: arguments
+                .iter()
+                .any(|a| a == "--reference-cache")
+                .then(imagine_server::video::reference_cache_owner::new),
+            delay,
+            fail_next,
+            evidence: root.join("evidence"),
+        }),
+        Some(root.join("c.sock")),
+    )
+    .await?;
+    let enhancement = match &private {
+        Some(private) => imagine_server::enhancement::Service::open_private(
+            private.clone(),
+            "library/enhancement-profiles.json".into(),
+        )?,
+        None => imagine_server::enhancement::Service::open(root.join("state/enhancement.json"))?,
+    };
     let authoring_worker = if std::env::args().any(|a| a == "--authoring") {
         let (url, worker, state) = authoring_fixture::spawn().await;
+        if arguments.iter().any(|argument| argument == "--story-slow") {
+            state
+                .delay_ms
+                .store(1000, std::sync::atomic::Ordering::SeqCst);
+        }
         if std::env::args().any(|a| a == "--story-failure") {
             state
                 .fail_second_once
@@ -575,7 +817,6 @@ async fn main() -> anyhow::Result<()> {
                     model: "own-story-fixture".into(),
                     ..Default::default()
                 },
-                api_key: None,
             })
             .map_err(|e| anyhow::anyhow!(e.code))?;
         Some(worker)
@@ -585,7 +826,16 @@ async fn main() -> anyhow::Result<()> {
     let app = App {
         video: control.video.clone(),
         enhancement,
-        library: Default::default(),
+        library: if arguments.iter().any(|a| a == "--lora-catalog") {
+            Arc::new(std::sync::Mutex::new(
+                imagine_server::model_library::Library::load(
+                    root.join("models"),
+                    root.join("state/model-library.json"),
+                )?,
+            ))
+        } else {
+            Default::default()
+        },
         profiles: Arc::new(imagine_server::profiles::Catalog::load(Path::new(
             concat!(env!("CARGO_MANIFEST_DIR"), "/profiles"),
         ))?),
@@ -594,7 +844,11 @@ async fn main() -> anyhow::Result<()> {
         engine,
         uploads: Arc::new(Semaphore::new(2)),
     };
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let port = arguments
+        .iter()
+        .find_map(|a| a.strip_prefix("--port="))
+        .unwrap_or("0");
+    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{port}")).await?;
     let url = format!("http://{}", listener.local_addr()?);
     std::fs::write(
         root.join("evidence/endpoint.json"),
@@ -607,12 +861,28 @@ async fn main() -> anyhow::Result<()> {
     let token = stop.clone();
     let fail_comparison = arguments.iter().any(|a| a == "--fail-first-comparison");
     let preview_reads = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let editor_faults = arguments.iter().any(|a| a == "--editor-save-failures");
+    let fault_root = root.clone();
+    let library_fault_seen = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let review_fault_seen = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let router=api::router(app).layer(axum::middleware::from_fn(move |request: axum::extract::Request,next: axum::middleware::Next| {
         let drop_status=drop_status.clone();
         let drop_admission=drop_admission.clone();
+        let drop_freeze=drop_freeze.clone();
         let preview_reads=preview_reads.clone();
+        let fault_root=fault_root.clone();
+        let library_fault_seen=library_fault_seen.clone();
+        let review_fault_seen=review_fault_seen.clone();
         async move {
             use axum::response::IntoResponse;
+            if editor_faults && request.method()==axum::http::Method::POST {
+                let path=request.uri().path();
+                let library=path.starts_with("/v1/video/libraries/")&&path.ends_with("/characters");
+                let review=path.starts_with("/v1/video/authoring/")&&path.ends_with("/review");
+                let fail=library&&fault_root.join("librarysavefault.signal").is_file()&&!library_fault_seen.swap(true,std::sync::atomic::Ordering::AcqRel)
+                    ||review&&fault_root.join("storyreviewfault.signal").is_file()&&!review_fault_seen.swap(true,std::sync::atomic::Ordering::AcqRel);
+                if fail {return (axum::http::StatusCode::INSUFFICIENT_STORAGE,axum::Json(json!({"error":{"code":"storage_io_failed"}}))).into_response();}
+            }
             let preview=request.method()==axum::http::Method::GET&&request.uri().path().strip_prefix("/v1/video/assets/").is_some_and(|tail|!tail.is_empty()&&!tail.contains('/'));
             if fail_comparison&&preview&&preview_reads.fetch_add(1,std::sync::atomic::Ordering::AcqRel)==2 {
                 return (axum::http::StatusCode::NOT_FOUND,axum::Json(json!({"error":{"code":"synthetic_media_unavailable"}}))).into_response();
@@ -622,7 +892,11 @@ async fn main() -> anyhow::Result<()> {
                 return (axum::http::StatusCode::SERVICE_UNAVAILABLE,axum::Json(json!({"error":{"code":"synthetic_status_lost","message":"Synthetic status response lost. Reconnect."}}))).into_response();
             }
             let admission=request.method()==axum::http::Method::POST && (request.uri().path()=="/v1/jobs" || request.uri().path().starts_with("/v1/video/assemblies/") && request.uri().path().ends_with("/jobs"));
+            let freeze=request.method()==axum::http::Method::POST && request.uri().path().starts_with("/v1/video/projects/") && request.uri().path().ends_with("/assembly");
             let response=next.run(request).await;
+            if freeze && response.status().is_success() && drop_freeze.swap(false,std::sync::atomic::Ordering::AcqRel) {
+                return (axum::http::StatusCode::SERVICE_UNAVAILABLE,axum::Json(json!({"error":{"code":"synthetic_freeze_lost"}}))).into_response();
+            }
             if admission && response.status().is_success() && drop_admission.swap(false,std::sync::atomic::Ordering::AcqRel) {
                 return (axum::http::StatusCode::SERVICE_UNAVAILABLE,axum::Json(json!({"error":{"code":"synthetic_admission_lost","message":"Synthetic admission response lost. Retrieve submission."}}))).into_response();
             }

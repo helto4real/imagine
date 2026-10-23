@@ -1,0 +1,799 @@
+{
+  "source": "AST-selected actual Director functions; no modules/config directories/runtime IO",
+  "cases": [
+    {
+      "global_stack": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "scene": {
+        "enabled": false,
+        "merge_mode": "Inherit Global",
+        "main": {
+          "version": 1,
+          "loras": [
+            {
+              "name": "/own/local.weights",
+              "strength_model": -1.25,
+              "strength_clip": 0.4,
+              "enabled": true
+            },
+            {
+              "name": "/own/global.weights",
+              "strength_model": 0.25,
+              "strength_clip": 0.25,
+              "enabled": true
+            }
+          ],
+          "ui": {
+            "show_strengths": "single",
+            "match": "scene"
+          }
+        }
+      },
+      "resolved": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "active": [
+        {
+          "enabled": true,
+          "name": "/own/global.weights",
+          "strength_model": 0.75,
+          "strength_clip": -2.0
+        }
+      ]
+    },
+    {
+      "global_stack": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "scene": {
+        "enabled": false,
+        "merge_mode": "Add To Global",
+        "main": {
+          "version": 1,
+          "loras": [
+            {
+              "name": "/own/local.weights",
+              "strength_model": -1.25,
+              "strength_clip": 0.4,
+              "enabled": true
+            },
+            {
+              "name": "/own/global.weights",
+              "strength_model": 0.25,
+              "strength_clip": 0.25,
+              "enabled": true
+            }
+          ],
+          "ui": {
+            "show_strengths": "single",
+            "match": "scene"
+          }
+        }
+      },
+      "resolved": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "active": [
+        {
+          "enabled": true,
+          "name": "/own/global.weights",
+          "strength_model": 0.75,
+          "strength_clip": -2.0
+        }
+      ]
+    },
+    {
+      "global_stack": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "scene": {
+        "enabled": false,
+        "merge_mode": "Replace Global",
+        "main": {
+          "version": 1,
+          "loras": [
+            {
+              "name": "/own/local.weights",
+              "strength_model": -1.25,
+              "strength_clip": 0.4,
+              "enabled": true
+            },
+            {
+              "name": "/own/global.weights",
+              "strength_model": 0.25,
+              "strength_clip": 0.25,
+              "enabled": true
+            }
+          ],
+          "ui": {
+            "show_strengths": "single",
+            "match": "scene"
+          }
+        }
+      },
+      "resolved": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "active": [
+        {
+          "enabled": true,
+          "name": "/own/global.weights",
+          "strength_model": 0.75,
+          "strength_clip": -2.0
+        }
+      ]
+    },
+    {
+      "global_stack": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "scene": {
+        "enabled": false,
+        "merge_mode": "Disable LoRAs",
+        "main": {
+          "version": 1,
+          "loras": [
+            {
+              "name": "/own/local.weights",
+              "strength_model": -1.25,
+              "strength_clip": 0.4,
+              "enabled": true
+            },
+            {
+              "name": "/own/global.weights",
+              "strength_model": 0.25,
+              "strength_clip": 0.25,
+              "enabled": true
+            }
+          ],
+          "ui": {
+            "show_strengths": "single",
+            "match": "scene"
+          }
+        }
+      },
+      "resolved": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "active": [
+        {
+          "enabled": true,
+          "name": "/own/global.weights",
+          "strength_model": 0.75,
+          "strength_clip": -2.0
+        }
+      ]
+    },
+    {
+      "global_stack": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "scene": {
+        "enabled": true,
+        "merge_mode": "Inherit Global",
+        "main": {
+          "version": 1,
+          "loras": [
+            {
+              "name": "/own/local.weights",
+              "strength_model": -1.25,
+              "strength_clip": 0.4,
+              "enabled": true
+            },
+            {
+              "name": "/own/global.weights",
+              "strength_model": 0.25,
+              "strength_clip": 0.25,
+              "enabled": true
+            }
+          ],
+          "ui": {
+            "show_strengths": "single",
+            "match": "scene"
+          }
+        }
+      },
+      "resolved": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "active": [
+        {
+          "enabled": true,
+          "name": "/own/global.weights",
+          "strength_model": 0.75,
+          "strength_clip": -2.0
+        }
+      ]
+    },
+    {
+      "global_stack": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "scene": {
+        "enabled": true,
+        "merge_mode": "Add To Global",
+        "main": {
+          "version": 1,
+          "loras": [
+            {
+              "name": "/own/local.weights",
+              "strength_model": -1.25,
+              "strength_clip": 0.4,
+              "enabled": true
+            },
+            {
+              "name": "/own/global.weights",
+              "strength_model": 0.25,
+              "strength_clip": 0.25,
+              "enabled": true
+            }
+          ],
+          "ui": {
+            "show_strengths": "single",
+            "match": "scene"
+          }
+        }
+      },
+      "resolved": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          },
+          {
+            "name": "/own/local.weights",
+            "strength_model": -1.25,
+            "strength_clip": 0.4,
+            "enabled": true
+          },
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.25,
+            "strength_clip": 0.25,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "scene"
+        }
+      },
+      "active": [
+        {
+          "enabled": true,
+          "name": "/own/global.weights",
+          "strength_model": 0.75,
+          "strength_clip": -2.0
+        },
+        {
+          "enabled": true,
+          "name": "/own/local.weights",
+          "strength_model": -1.25,
+          "strength_clip": 0.4
+        },
+        {
+          "enabled": true,
+          "name": "/own/global.weights",
+          "strength_model": 0.25,
+          "strength_clip": 0.25
+        }
+      ]
+    },
+    {
+      "global_stack": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "scene": {
+        "enabled": true,
+        "merge_mode": "Replace Global",
+        "main": {
+          "version": 1,
+          "loras": [
+            {
+              "name": "/own/local.weights",
+              "strength_model": -1.25,
+              "strength_clip": 0.4,
+              "enabled": true
+            },
+            {
+              "name": "/own/global.weights",
+              "strength_model": 0.25,
+              "strength_clip": 0.25,
+              "enabled": true
+            }
+          ],
+          "ui": {
+            "show_strengths": "single",
+            "match": "scene"
+          }
+        }
+      },
+      "resolved": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/local.weights",
+            "strength_model": -1.25,
+            "strength_clip": 0.4,
+            "enabled": true
+          },
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.25,
+            "strength_clip": 0.25,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "scene"
+        }
+      },
+      "active": [
+        {
+          "enabled": true,
+          "name": "/own/local.weights",
+          "strength_model": -1.25,
+          "strength_clip": 0.4
+        },
+        {
+          "enabled": true,
+          "name": "/own/global.weights",
+          "strength_model": 0.25,
+          "strength_clip": 0.25
+        }
+      ]
+    },
+    {
+      "global_stack": {
+        "version": 1,
+        "loras": [
+          {
+            "name": "/own/global.weights",
+            "strength_model": 0.75,
+            "strength_clip": -2,
+            "enabled": true
+          },
+          {
+            "name": "None",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": true
+          },
+          {
+            "name": "/own/off",
+            "strength_model": 1.0,
+            "strength_clip": 1.0,
+            "enabled": false
+          },
+          {
+            "name": "/own/zero",
+            "strength_model": 0,
+            "strength_clip": 0,
+            "enabled": true
+          }
+        ],
+        "ui": {
+          "show_strengths": "single",
+          "match": "global"
+        }
+      },
+      "scene": {
+        "enabled": true,
+        "merge_mode": "Disable LoRAs",
+        "main": {
+          "version": 1,
+          "loras": [
+            {
+              "name": "/own/local.weights",
+              "strength_model": -1.25,
+              "strength_clip": 0.4,
+              "enabled": true
+            },
+            {
+              "name": "/own/global.weights",
+              "strength_model": 0.25,
+              "strength_clip": 0.25,
+              "enabled": true
+            }
+          ],
+          "ui": {
+            "show_strengths": "single",
+            "match": "scene"
+          }
+        }
+      },
+      "resolved": {
+        "version": 1,
+        "loras": [],
+        "ui": {
+          "show_strengths": "single",
+          "match": ""
+        }
+      },
+      "active": []
+    }
+  ]
+}

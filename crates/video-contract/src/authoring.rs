@@ -1,5 +1,5 @@
 //! Editable source proposals. These types never contain credentials or model-family syntax.
-use crate::contract::{AssetId, ProjectId, SceneId, SectionId};
+use crate::contract::{AssetId, ProjectId, Scene, SceneId, SectionId, VideoProject};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -8,6 +8,39 @@ pub enum Operation {
     Outline,
     EnhanceScene,
     EnhanceSection,
+}
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SceneField {
+    #[default]
+    Description,
+    Summary,
+    AmbientSound,
+    NonDiegeticMusic,
+}
+impl SceneField {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Description => "Description",
+            Self::Summary => "Summary",
+            Self::AmbientSound => "Ambient sound",
+            Self::NonDiegeticMusic => "Audience-only music",
+        }
+    }
+    pub fn source(self, project: &VideoProject, scene: &Scene) -> String {
+        if self == Self::Description {
+            return scene.description.clone();
+        }
+        let Some(source) = project.creative.scene_prompts.get(&scene.id) else {
+            return String::new();
+        };
+        match self {
+            Self::Description => unreachable!(),
+            Self::Summary => source.summary.clone(),
+            Self::AmbientSound => source.ambient_sound.clone(),
+            Self::NonDiegeticMusic => source.non_diegetic_music.clone(),
+        }
+    }
 }
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -26,6 +59,8 @@ pub struct Request {
     pub provider: String,
     pub prompt_profile_id: String,
     pub operation: Operation,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scene_field: Option<SceneField>,
     #[serde(default)]
     pub scene_id: Option<SceneId>,
     #[serde(default)]
@@ -56,6 +91,8 @@ pub enum ImageUse {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StoryImage {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pair_with: Option<String>,
     pub id: String,
     pub asset: AssetId,
     pub label: String,

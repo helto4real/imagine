@@ -26,12 +26,31 @@ pub fn decode(input: &c::Input, bytes: &[u8]) -> Result<(Tensor, Tensor), Error>
         Tensor::f_from_slice(&values[split..])?.f_view([1, 32, 2, 37])?,
     ))
 }
+/// Director's ephemeral Stage 1 proxy. Keep the original high-resolution AV
+/// context separately: only spatial cells are area-pooled, never time or audio.
+pub fn area_context(context: &(Tensor, Tensor), base: p::Shape) -> Result<(Tensor, Tensor), Error> {
+    let size = context.0.size();
+    if size.len() != 5 || size[..3] != [1, 24, 7] || !base.valid() {
+        return Err(error());
+    }
+    let height = i64::from(base.height / 16);
+    let width = i64::from(base.width / 16);
+    let video = context
+        .0
+        .f_to_kind(Kind::Float)?
+        .f_reshape([-1, 1, size[3], size[4]])?
+        .f_adaptive_avg_pool2d([height, width])?
+        .f_reshape([size[0], size[1], size[2], height, width])?
+        .f_to_kind(context.0.kind())?;
+    Ok((video, context.1.shallow_clone()))
+}
 pub fn capture(
     video: &Tensor,
     audio: &Tensor,
     shape: p::Shape,
     sampled: p::Shape,
     head: u32,
+    handoff_upscale: Option<c::HandoffUpscale>,
 ) -> Result<c::Artifact, Error> {
     let end = head + shape.frames;
     let (step, frame) = c::endpoint(sampled.video_latent_t() as u32, end);
@@ -41,6 +60,7 @@ pub fn capture(
         sampled_frames: sampled.frames,
         visible_end_frame: end,
         selected_end_frame: frame,
+        handoff_upscale,
     };
     if !descriptor.valid()
         || video.size()
@@ -118,6 +138,9 @@ pub struct Window {
     weights: Vec<f32>,
 }
 impl Window {
+    pub(super) fn matches_layout(&self, q: &Tensor, k: &Tensor, v: &Tensor) -> bool {
+        q.size()[2] == self.minimum && k.size()[2] == self.minimum && v.size()[2] == self.minimum
+    }
     pub(super) fn from_layout(
         minimum: i64,
         video_rows: i64,
@@ -243,5 +266,154 @@ impl Window {
             )?);
         }
         Ok(Tensor::f_cat(&out, 1)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn values(tensor: &Tensor) -> Vec<f32> {
+        Vec::<f32>::try_from(
+            &tensor
+                .f_to_kind(Kind::Float)
+                .unwrap()
+                .f_contiguous()
+                .unwrap()
+                .f_view([-1])
+                .unwrap(),
+        )
+        .unwrap()
+    }
+    fn source() -> (Tensor, Tensor) {
+        let data = (0..24 * 7 * 4 * 6)
+            .map(|v| (v % 31) as f32 / 16.)
+            .collect::<Vec<_>>();
+        (
+            Tensor::f_from_slice(&data)
+                .unwrap()
+                .f_view([1, 24, 7, 4, 6])
+                .unwrap(),
+            Tensor::f_from_slice(
+                &(0..32 * 2 * 37)
+                    .map(|v| (v % 17) as f32 / 8.)
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap()
+            .f_view([1, 32, 2, 37])
+            .unwrap(),
+        )
+    }
+    #[test]
+    fn area_proxy_preserves_planes_audio_and_original_high_resolution_tail() {
+        let original = source();
+        let before = values(&original.0);
+        let base = p::Shape {
+            width: 64,
+            height: 32,
+            ..p::Shape::default()
+        };
+        let proxy = area_context(&original, base).unwrap();
+        assert_eq!(proxy.0.size(), [1, 24, 7, 2, 4]);
+        // Independent adaptive-area bins for the noninteger spatial scale 6 -> 4.
+        let mut expected = vec![];
+        for plane in before.chunks_exact(24) {
+            for row in [0, 2] {
+                for col in [0, 1, 3, 4] {
+                    expected.push(
+                        (plane[row * 6 + col]
+                            + plane[row * 6 + col + 1]
+                            + plane[(row + 1) * 6 + col]
+                            + plane[(row + 1) * 6 + col + 1])
+                            / 4.,
+                    );
+                }
+            }
+        }
+        assert_eq!(values(&proxy.0), expected);
+        assert_eq!(values(&proxy.1), values(&original.1));
+        assert_eq!(values(&original.0), before);
+        let half = (
+            original.0.f_to_kind(Kind::Half).unwrap(),
+            original.1.shallow_clone(),
+        );
+        let half_proxy = area_context(&half, base).unwrap();
+        assert_eq!(half_proxy.0.kind(), Kind::Half);
+        assert_eq!(values(&half_proxy.0), expected);
+    }
+    #[test]
+    fn stage_two_restores_original_prefix_after_renoise_without_resizing_audio() {
+        let original = source();
+        let proxy = area_context(
+            &original,
+            p::Shape {
+                width: 64,
+                height: 32,
+                ..p::Shape::default()
+            },
+        )
+        .unwrap();
+        let first_video = Tensor::zeros([1, 24, 12, 2, 4], (Kind::Float, Device::Cpu));
+        let first_audio = Tensor::ones([1, 32, 2, 80], (Kind::Float, Device::Cpu));
+        let _ = prefix(&first_video, &first_audio, &proxy, true).unwrap();
+        assert_eq!(values(&first_video.narrow(2, 0, 7)), values(&proxy.0));
+        assert_eq!(values(&first_audio.narrow(3, 0, 37)), values(&original.1));
+        for include_audio in [false, true] {
+            let prediction = Tensor::ones([1, 24, 12, 4, 6], (Kind::Float, Device::Cpu));
+            let noise = Tensor::full([1, 24, 12, 4, 6], 3., (Kind::Float, Device::Cpu));
+            let video = super::super::sampling::renoise_video(&prediction, &noise, 0.5).unwrap();
+            let audio = Tensor::full([1, 32, 2, 80], 9., (Kind::Float, Device::Cpu));
+            let mask = prefix(&video, &audio, &original, include_audio).unwrap();
+            assert_eq!(values(&video.narrow(2, 0, 7)), values(&original.0));
+            assert!(values(&video.narrow(2, 7, 5)).iter().all(|v| *v == 4.));
+            if include_audio {
+                assert_eq!(values(&audio.narrow(3, 0, 37)), values(&original.1));
+            } else {
+                assert!(values(&audio).iter().all(|v| *v == 9.));
+            }
+            assert!(values(&audio.narrow(3, 37, 43)).iter().all(|v| *v == 9.));
+            let mask = values(&mask);
+            assert!(mask.iter().all(|v| *v == 0. || *v == 1.));
+            assert_eq!(
+                mask.iter().filter(|v| **v == 0.).count(),
+                24 * 7 * 4 * 6 + if include_audio { 32 * 2 * 37 } else { 0 }
+            );
+        }
+    }
+    #[test]
+    fn capture_retains_final_geometry_and_roundtrips_original_tail() {
+        let shape = p::Shape {
+            width: 96,
+            height: 64,
+            ..p::Shape::default()
+        };
+        let (sampled, head, _) = c::runtime(shape, c::Method::MotionContextExp).unwrap();
+        let video = Tensor::ones(
+            [1, 24, sampled.video_latent_t(), 4, 6],
+            (Kind::Float, Device::Cpu),
+        );
+        let audio = Tensor::full(
+            [1, 32, 2, sampled.audio_latent_t()],
+            0.25,
+            (Kind::Float, Device::Cpu),
+        );
+        let handoff = c::HandoffUpscale {
+            base_width: 64,
+            base_height: 32,
+            factor: 1.5,
+        };
+        let artifact =
+            capture(&video, &audio, shape, sampled, head, Some(handoff.clone())).unwrap();
+        assert!(artifact.valid());
+        assert_eq!(artifact.descriptor.handoff_upscale, Some(handoff));
+        let input = c::Input {
+            method: c::Method::MotionContextExp,
+            include_audio: true,
+            descriptor: artifact.descriptor,
+            sha256: "a".repeat(64),
+        };
+        let decoded = decode(&input, &artifact.bytes).unwrap();
+        assert_eq!(decoded.0.size(), [1, 24, 7, 4, 6]);
+        assert!(values(&decoded.0).iter().all(|v| *v == 1.));
+        assert!(values(&decoded.1).iter().all(|v| *v == 0.25));
     }
 }

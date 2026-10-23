@@ -12,6 +12,7 @@ required-features = ["ui-preview"]
 
 [dependencies]
 anyhow = "1"
+fancy-regex = "0.16"
 # Enable egui-winit's native Wayland clipboard fallback as well as X11.
 arboard = { version = "3.6.1", default-features = false, features = ["wayland-data-control"] }
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "wayland", "x11", "accesskit"] }
@@ -22,7 +23,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["rt", "sync", "time", "net", "macros", "fs", "io-util"] }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "net", "macros", "fs", "io-util"] }
 tokio-util = { version = "0.7", features = ["io"] }
 uuid = { version = "1", features = ["v4"] }
 

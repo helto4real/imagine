@@ -1,7 +1,22 @@
 //! Shared reference preprocessing: AIO's shrink-only geometry and /32 center crop.
 use anyhow::{Result, bail};
-use image::{DynamicImage, ImageFormat, imageops::FilterType};
+use image::{DynamicImage, ImageDecoder, ImageFormat, imageops::FilterType};
 use std::io::Cursor;
+/// Preserve the MCP's existing display-image decode contract in memory. The
+/// original file and its integrity identity remain raw and are never rewritten.
+pub fn normalize_reference(bytes: &[u8]) -> Result<Vec<u8>> {
+    let reader = image::ImageReader::new(Cursor::new(bytes)).with_guessed_format()?;
+    let mut decoder = reader.into_decoder()?;
+    let orientation = decoder.orientation()?;
+    let mut image = DynamicImage::from_decoder(decoder)?;
+    image.apply_orientation(orientation);
+    let image = if image.color().has_alpha() {
+        DynamicImage::ImageRgba8(image.to_rgba8())
+    } else {
+        DynamicImage::ImageRgb8(image.to_rgb8())
+    };
+    encode(&image)
+}
 pub fn dimensions(width: u32, height: u32, pixels: u32) -> (u32, u32, u32, u32) {
     let scale = if pixels > 0 && u64::from(width) * u64::from(height) > u64::from(pixels) {
         (f64::from(pixels) / (f64::from(width) * f64::from(height))).sqrt()

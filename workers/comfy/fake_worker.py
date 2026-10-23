@@ -45,6 +45,11 @@ class FakeRuntime:
             runtime, _, _ = RuntimeTests.generation_runtime()
             runtime.Image.fromarray.return_value.save.side_effect = lambda output, **kw: output.write(png(header["width"], header["height"]))
             return runtime.generate(header, references, emit)
+        if mode == "preview" and header.get("sampling_preview", {}).get("enabled"):
+            emit("preview", metadata={"bad":"synthetic invalid frame"}, payload=b"invalid")
+            emit("preview_warning")
+            emit("preview", metadata={"sequence":1,"step":1,"width":1,"height":1,"frames":1,
+                 "frame_duration_ms":1000,"source_duration_seconds":1.}, payload=b"\x01\x02\x03")
         emit("progress", completed=header["sampling"]["steps"], total=header["sampling"]["steps"], elapsed_seconds=1.0)
         return png(header["width"], header["height"])
 

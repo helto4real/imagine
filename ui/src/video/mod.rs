@@ -6,24 +6,50 @@ use imagine_video_contract::{
 };
 use serde_json::json;
 use std::collections::BTreeSet;
+mod animate;
 mod assembly;
 mod audio;
 mod authoring;
+mod captures;
 mod cast;
+mod catalog;
+mod compatibility;
 mod compiled;
 mod continuity;
 mod editing;
+mod generation_ui;
+mod group_commands;
+mod image_anchors;
 mod inspector;
 mod jobs;
 mod library;
+mod library_character;
+mod loras;
 mod media_binding;
+mod media_health;
+mod media_picker;
+mod navigation;
 mod player;
+mod project_prompt;
+mod project_timing;
+mod prompt_tools;
 #[cfg(feature = "ui-preview")]
 pub(in crate::app) mod qa;
+mod recovery;
+mod reference_cache;
 mod review;
 mod runs;
+mod scene_commands;
+mod section_commands;
+mod seed;
+mod selection;
+#[cfg(test)]
+mod selection_oracle;
+mod take_selection;
+mod thumbnails;
 #[path = "timeline.rs"]
 mod tracks;
+mod waveform;
 mod workspace;
 #[derive(Clone)]
 struct Snapshot {
@@ -42,19 +68,36 @@ impl Snapshot {
 }
 #[derive(Default)]
 pub(super) struct Timeline {
+    captures: captures::State,
+    reference_cache: reference_cache::State,
+    media_health: media_health::State,
+    compatibility_open: bool,
+    compatibility_report: Option<Value>,
+    generation_editor: generation_ui::State,
     assembly: assembly::State,
     authoring: authoring::State,
     cast: cast::State,
+    catalog: catalog::State,
+    media_picker: media_picker::State,
+    thumbnails: thumbnails::State,
+    image_anchors: image_anchors::State,
     compiled: compiled::State,
     library: library::State,
+    loras: loras::State,
     session: Option<String>,
+    private_storage: bool,
     session_checked: bool,
+    needs_reopen: bool,
     document: Option<Snapshot>,
     epoch: u64,
     busy: bool,
     admitting: bool,
     selected: BTreeSet<SceneId>,
+    selection_order: Vec<selection::Item>,
+    playhead: f64,
     section: Option<SectionId>,
+    section_selection: Vec<SectionId>,
+    audio_selection_order: Vec<AudioClipId>,
     boundary: bool,
     audio_selected: BTreeSet<AudioClipId>,
     audio_primary: Option<AudioClipId>,
@@ -65,6 +108,8 @@ pub(super) struct Timeline {
     snap: editing::Snap,
     mode: editing::Mode,
     zoom: f32,
+    navigation: navigation::State,
+    waveform: waveform::State,
     error: Option<String>,
     folder: Option<PathBuf>,
     draft_scene: Option<SceneId>,
@@ -72,6 +117,9 @@ pub(super) struct Timeline {
     draft_scene_prompt: imagine_video_contract::creative::ScenePrompt,
     draft_section: String,
     draft_global: String,
+    global_prompt_options: Option<imagine_video_contract::creative::GlobalPromptOptions>,
+    project_prompt_open: bool,
+    project_timing: project_timing::State,
     jobs: Vec<jobs::Job>,
     runs: Vec<imagine_video_contract::runs::Run>,
     runs_loading: bool,
@@ -79,19 +127,66 @@ pub(super) struct Timeline {
     run_poll_at: Option<std::time::Instant>,
     pending_run: Option<(Value, String)>,
     pending: Option<(Value, String)>,
+    pending_seed_advance: Option<seed::Advance>,
     after_edit: Option<PostAction>,
     pub(super) quick_clip: bool,
     player: Option<player::Player>,
     comparison: Option<player::Comparison>,
+    comparison_state: Option<player::ComparisonState>,
     comparison_selection: [Option<String>; 2],
+    comparison_scene: Option<SceneId>,
+    comparison_explicit: bool,
     loading: Option<(u64, std::sync::Arc<std::sync::atomic::AtomicBool>)>,
     load_nonce: u64,
     preview_asset: Option<String>,
     selected_take: Option<String>,
     refresh_after_busy: bool,
+    shelf_collapsed: bool,
+    inspector_collapsed: bool,
+    keyboard_focus: Option<egui::Id>,
     drag: Option<tracks::Drag>,
 }
 pub(super) enum Event {
+    Animated {
+        epoch: u64,
+        result: Result<(client::TimelineSession, Value), client::TimelineFailure>,
+    },
+    ReferenceCache {
+        epoch: u64,
+        nonce: u64,
+        result: Result<Value, client::TimelineFailure>,
+    },
+    MediaHealth {
+        epoch: u64,
+        nonce: u64,
+        kind: media_health::Reply,
+        result: Result<Value, client::TimelineFailure>,
+    },
+    Waveform {
+        epoch: u64,
+        project: ProjectId,
+        asset: AssetId,
+        revision: u64,
+        peaks: usize,
+        result: Result<Value, String>,
+    },
+    CatalogIo {
+        nonce: u64,
+        result: Result<catalog::Loaded, String>,
+    },
+    PickerLibrary {
+        epoch: u64,
+        nonce: u64,
+        id: String,
+        result: Result<Value, client::TimelineFailure>,
+    },
+    Thumbnail {
+        epoch: u64,
+        project: ProjectId,
+        asset: AssetId,
+        revision: u64,
+        result: Result<client::Preview, String>,
+    },
     Compiled {
         session: String,
         epoch: u64,
@@ -117,6 +212,7 @@ pub(super) enum Event {
         session: String,
         epoch: u64,
         progress: bool,
+        elapsed_ms: u64,
         result: Result<Value, client::TimelineFailure>,
     },
     Comparison {
@@ -140,7 +236,7 @@ pub(super) enum Event {
         asset: String,
         result: Result<player::Preview, String>,
     },
-    Session(Result<String, client::TimelineFailure>),
+    Session(Result<client::TimelineSession, client::TimelineFailure>),
     Document {
         epoch: u64,
         replace: bool,
@@ -156,6 +252,19 @@ pub(super) enum Event {
     Files {
         epoch: u64,
         paths: Vec<PathBuf>,
+        target: media_picker::Target,
+    },
+    Imported {
+        epoch: u64,
+        target: media_picker::Target,
+        assets: Vec<AssetId>,
+        result: Result<Value, client::TimelineFailure>,
+    },
+    LibraryImported {
+        epoch: u64,
+        editor: String,
+        voice: bool,
+        result: Result<Vec<AssetId>, client::TimelineFailure>,
     },
     Submitted {
         epoch: u64,
@@ -178,19 +287,41 @@ pub(super) enum Event {
 }
 #[derive(Clone, Copy)]
 pub(super) enum FolderMode {
+    ExportCompatible,
     Open,
     Save,
     SaveAs,
 }
 #[derive(Clone)]
 pub(super) enum PostAction {
+    ImportTake {
+        scene: SceneId,
+        asset: AssetId,
+    },
+    Capture {
+        scene: SceneId,
+        take: TakeId,
+        action: imagine_video_contract::captures::Action,
+    },
+    ClearSelection,
+    SelectGroup(Vec<SectionId>, Vec<AudioClipId>),
+    SelectSection(SceneId, SectionId),
+    ExportCompatible,
+    GenerationSaved,
+    EnhanceField(imagine_video_contract::authoring::SceneField),
     Compiled,
+    ApproveCompiled,
     Library,
+    LibrarySave {
+        character: bool,
+        replace: bool,
+    },
     UseClip {
         scene: SceneId,
         asset: AssetId,
     },
     Assembly,
+    RenderAssembly,
     Authoring(imagine_video_contract::authoring::Operation),
     Run(imagine_video_contract::runs::Mode),
     Generate,
@@ -205,7 +336,7 @@ pub(super) enum PostAction {
     },
 }
 impl ImagineApp {
-    fn timeline_session(&mut self, ctx: &egui::Context) {
+    pub(in crate::app) fn timeline_session(&mut self, ctx: &egui::Context) {
         let Some(client) = self.client.clone() else {
             return;
         };
@@ -222,7 +353,99 @@ impl ImagineApp {
         });
     }
     pub(super) fn timeline_message(&mut self, ctx: &egui::Context, event: Event) {
+        if let Event::Animated { epoch, result } = event {
+            if epoch != self.timeline.epoch {
+                return;
+            }
+            self.timeline.busy = false;
+            match result {
+                Ok((connection, raw)) => {
+                    self.timeline.folder = None;
+                    self.timeline_message(ctx, Event::Session(Ok(connection)));
+                    self.timeline_message(
+                        ctx,
+                        Event::Document {
+                            epoch,
+                            replace: true,
+                            before: None,
+                            history: 0,
+                            result: Ok(raw),
+                        },
+                    );
+                }
+                Err(error) => self.timeline.error = Some(error.message),
+            }
+            return;
+        }
         match event {
+            Event::Animated { .. } => unreachable!(),
+            Event::ReferenceCache {
+                epoch,
+                nonce,
+                result,
+            } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline
+                        .reference_cache
+                        .receive(nonce, result.map_err(|e| e.message));
+                }
+            }
+            Event::MediaHealth {
+                epoch,
+                nonce,
+                kind,
+                result,
+            } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline_media_health_reply(ctx, nonce, kind, result);
+                }
+            }
+            Event::CatalogIo { nonce, result } => self.timeline_catalog_reply(nonce, result),
+            Event::PickerLibrary {
+                epoch,
+                nonce,
+                id,
+                result,
+            } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline_picker_library_reply(nonce, id, result);
+                }
+            }
+            Event::Thumbnail {
+                epoch,
+                project,
+                asset,
+                revision,
+                result,
+            } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline_thumbnail_reply(ctx, project, asset, revision, result);
+                }
+            }
+            Event::Waveform {
+                epoch,
+                project,
+                asset,
+                revision,
+                peaks,
+                result,
+            } => {
+                if epoch == self.timeline.epoch
+                    && self.timeline.waveform.project.as_ref() == Some(&project)
+                {
+                    self.timeline
+                        .waveform
+                        .loading
+                        .remove(&(asset.clone(), revision, peaks));
+                    self.timeline.waveform.values.insert(
+                        (asset, revision, peaks),
+                        result.and_then(|v| {
+                            serde_json::from_value(v)
+                                .map_err(|_| "Invalid waveform response.".into())
+                        }),
+                    );
+                }
+            }
             Event::Compiled {
                 session,
                 epoch,
@@ -233,7 +456,7 @@ impl ImagineApp {
                 {
                     self.timeline.busy = false;
                     match result {
-                        Ok(value) => self.timeline.compiled.value = Some(value),
+                        Ok(value) => self.timeline.compiled.receive(value),
                         Err(error) => self.timeline.compiled.error = Some(error.message),
                     }
                 }
@@ -291,8 +514,9 @@ impl ImagineApp {
                 session,
                 epoch,
                 progress,
+                elapsed_ms,
                 result,
-            } => self.timeline_assembly_reply(session, epoch, progress, result),
+            } => self.timeline_assembly_reply(ctx, session, epoch, progress, elapsed_ms, result),
             Event::Runs {
                 session,
                 kind,
@@ -326,7 +550,9 @@ impl ImagineApp {
             Event::Session(result) => {
                 self.timeline.busy = false;
                 match result {
-                    Ok(session) => {
+                    Ok(connection) => {
+                        self.timeline.private_storage = connection.private_storage;
+                        let session = connection.id;
                         self.timeline.authoring.session(&session);
                         self.timeline.library.session(&session);
                         self.timeline.session = Some(session);
@@ -349,11 +575,37 @@ impl ImagineApp {
                 match result {
                     Ok(raw) => match Snapshot::parse(raw) {
                         Ok(snapshot) => {
-                            let sync_draft =
-                                replace || before.is_some() || self.timeline.draft_scene.is_none();
+                            let reattaching = self.timeline.needs_reopen;
+                            let replace =
+                                replace
+                                    || (reattaching
+                                        && self.timeline.document.as_ref().is_some_and(|old| {
+                                            old.project.id != snapshot.project.id
+                                        }));
+                            self.timeline.needs_reopen = false;
+                            if reattaching {
+                                self.timeline.history = Default::default();
+                            }
+                            if let Some(report) = snapshot.raw.get("compatibility_export") {
+                                self.timeline.compatibility_report = Some(report.clone());
+                                self.timeline.compatibility_open = true;
+                            }
+                            let sync_draft = replace
+                                || (!reattaching
+                                    && (before.is_some() || self.timeline.draft_scene.is_none()));
                             if replace {
+                                if self
+                                    .timeline
+                                    .document
+                                    .as_ref()
+                                    .is_none_or(|d| d.project.id != snapshot.project.id)
+                                {
+                                    self.timeline.navigation = Default::default();
+                                }
+                                self.timeline.assembly.project_changed();
                                 self.timeline.clear_audio_selection();
                                 self.timeline.clear_preview();
+                                self.timeline.thumbnails = Default::default();
                                 self.timeline.epoch += 1;
                                 self.timeline.history = Default::default();
                                 self.timeline.selected.clear();
@@ -426,10 +678,7 @@ impl ImagineApp {
                             self.timeline.document = Some(snapshot);
                         }
                         if error.code == "session_changed" {
-                            self.timeline.clear_preview();
-                            self.timeline.session = None;
-                            self.timeline.document = None;
-                            self.timeline.epoch += 1;
+                            self.timeline.session_ended();
                         }
                         self.timeline.error = Some(error.message);
                     }
@@ -444,13 +693,60 @@ impl ImagineApp {
                     self.timeline_folder(ctx, path, mode);
                 }
             }
-            Event::Files { epoch, paths } => {
+            Event::Files {
+                epoch,
+                paths,
+                target,
+            } => {
                 if epoch != self.timeline.epoch {
                     return;
                 }
                 self.timeline.busy = false;
                 if !paths.is_empty() {
-                    self.timeline_import(ctx, paths);
+                    self.timeline_import_into(ctx, paths, target);
+                }
+            }
+            Event::Imported {
+                epoch,
+                target,
+                assets,
+                result,
+            } => {
+                if epoch != self.timeline.epoch {
+                    return;
+                }
+                let success = result.is_ok();
+                self.timeline.media_picker.finish_import(
+                    &target,
+                    result.as_ref().err().map(|error| error.message.clone()),
+                );
+                self.timeline_message(
+                    ctx,
+                    Event::Document {
+                        epoch,
+                        replace: false,
+                        before: None,
+                        history: 0,
+                        result,
+                    },
+                );
+                if success {
+                    self.timeline_use_media(ctx, target, assets);
+                }
+            }
+            Event::LibraryImported {
+                epoch,
+                editor,
+                voice,
+                result,
+            } => {
+                if epoch != self.timeline.epoch {
+                    return;
+                }
+                self.timeline.busy = false;
+                match result {
+                    Ok(assets) => self.library_character_media(&editor, voice, assets),
+                    Err(error) => self.timeline.library.error = Some(error.message),
                 }
             }
             Event::Submitted { epoch, result } => {
@@ -469,7 +765,20 @@ impl ImagineApp {
                             let id = job.id.clone();
                             if !self.timeline.jobs.iter().any(|old| old.id == id) {
                                 self.timeline.jobs.push(job);
+                                if let Some(advance) = self.timeline.pending_seed_advance.take()
+                                    && let Some(document) = &self.timeline.document
+                                    && let Some(generation) = advance.apply(&document.project)
+                                {
+                                    self.timeline_edit(
+                                        ctx,
+                                        vec![Edit::SetGenerationDefaults {
+                                            generation: Some(generation),
+                                        }],
+                                        0,
+                                    );
+                                }
                             }
+                            self.timeline.pending_seed_advance = None;
                             self.timeline_poll(ctx, id);
                         } else {
                             self.timeline.error=Some("Could not read admission. Retry submission to retrieve the same job.".into());
@@ -478,6 +787,7 @@ impl ImagineApp {
                     Err(error) => {
                         if !error.retryable {
                             self.timeline.pending = None;
+                            self.timeline.pending_seed_advance = None;
                         }
                         self.timeline.error = Some(if error.retryable {
                             "Submission unconfirmed. Use Retrieve submission to check the existing job.".into()
@@ -557,11 +867,91 @@ impl ImagineApp {
         }
     }
     fn timeline_action(&mut self, ctx: &egui::Context, action: PostAction) {
+        let current_scene = self
+            .timeline
+            .document
+            .as_ref()
+            .and_then(|d| self.timeline.primary_scene(&d.project));
+        if matches!(
+            &action,
+            PostAction::Generate
+                | PostAction::Compiled
+                | PostAction::ApproveCompiled
+                | PostAction::Save
+                | PostAction::SaveAs
+                | PostAction::ExportCompatible
+                | PostAction::Run(_)
+        ) && let Some(project) = self.timeline.document.as_ref().map(|d| &d.project)
+            && let Some(error) = self.timeline.generation_editor.input_error(
+                project,
+                if matches!(
+                    &action,
+                    PostAction::Generate | PostAction::Compiled | PostAction::ApproveCompiled
+                ) {
+                    current_scene.as_ref()
+                } else {
+                    None
+                },
+            )
+        {
+            self.timeline.error = Some(error);
+            return;
+        }
         match action {
+            PostAction::ClearSelection => {
+                if let Some(p) = self.timeline.document.as_ref().map(|d| d.project.clone()) {
+                    self.timeline.set_selection(&p, vec![]);
+                }
+            }
+            PostAction::ExportCompatible => {
+                self.timeline.compatibility_report = None;
+                self.timeline.compatibility_open = true;
+            }
+            PostAction::GenerationSaved => self.timeline.generation_editor.project_saved(),
             PostAction::Compiled => self.timeline_compiled(ctx),
+            PostAction::ApproveCompiled => self.timeline_approve_compiled(ctx),
             PostAction::Library => self.timeline.library.open = true,
+            PostAction::LibrarySave { character, replace } => {
+                self.library_save(ctx, character, replace)
+            }
             PostAction::UseClip { scene, asset } => self.timeline_clip_source(ctx, scene, asset),
             PostAction::Assembly => self.timeline.assembly.open = true,
+            PostAction::RenderAssembly => self.timeline_assembly_render_current(ctx),
+            PostAction::SelectSection(scene, section) => {
+                self.timeline.clear_audio_selection();
+                self.timeline.selected = BTreeSet::from([scene]);
+                self.timeline.section_selection = vec![section.clone()];
+                self.timeline.section = Some(section);
+                self.timeline.sync_draft();
+            }
+            PostAction::SelectGroup(sections, audio) => {
+                self.timeline.clear_audio_selection();
+                self.timeline.section_selection = sections;
+                self.timeline.section = if audio.is_empty() {
+                    self.timeline.section_selection.last().cloned()
+                } else {
+                    None
+                };
+                self.timeline.audio_selection_order = audio;
+                self.timeline.audio_selected = self
+                    .timeline
+                    .audio_selection_order
+                    .iter()
+                    .cloned()
+                    .collect();
+                self.timeline.audio_primary = self.timeline.audio_selection_order.last().cloned();
+                if let Some(scene) = self.timeline.document.as_ref().and_then(|d| {
+                    d.project.scenes.iter().find(|s| {
+                        s.sections
+                            .iter()
+                            .any(|s| self.timeline.section_selection.last() == Some(&s.id))
+                    })
+                }) {
+                    self.timeline.selected = BTreeSet::from([scene.id.clone()]);
+                }
+                self.timeline.sync_draft();
+            }
+            PostAction::EnhanceField(field) => self.timeline_open_field_enhance(ctx, field),
             PostAction::Authoring(operation) => self.timeline_open_authoring(ctx, operation),
             PostAction::Run(mode) => self.timeline_start_run(ctx, mode),
             PostAction::Generate => self.timeline_generate(ctx),
@@ -574,6 +964,12 @@ impl ImagineApp {
                 take,
                 action,
             } => self.timeline_review(ctx, scene, take, action),
+            PostAction::Capture {
+                scene,
+                take,
+                action,
+            } => self.timeline_capture(ctx, scene, take, action),
+            PostAction::ImportTake { scene, asset } => self.timeline_import_take(ctx, scene, asset),
         }
     }
     fn timeline_request(
@@ -585,7 +981,7 @@ impl ImagineApp {
         replace: bool,
         edit: Option<(VideoProject, i8)>,
     ) {
-        if self.timeline.busy {
+        if self.timeline.busy || (self.timeline.needs_reopen && path != "/v1/video/projects/open") {
             return;
         }
         let (Some(client), Some(session)) = (self.client.clone(), self.timeline.session.clone())
@@ -617,6 +1013,9 @@ impl ImagineApp {
         });
     }
     fn timeline_refresh(&mut self, ctx: &egui::Context) {
+        if self.timeline.needs_reopen {
+            return;
+        }
         if let Some(document) = &self.timeline.document {
             self.timeline_request(
                 ctx,
@@ -653,24 +1052,20 @@ impl ImagineApp {
     fn timeline_new(&mut self, ctx: &egui::Context) {
         let shape = crate::h3_protocol::Selection {
             ratio: "16:9".into(),
+            quality: "Standard".into(),
             seconds: 5.,
             ..Default::default()
         }
         .resolve()
         .expect("default video geometry");
-        let model = ModelSelection {
-            adapter: "h3".into(),
-            model: "minimax-h3".into(),
-            variant: "reference".into(),
-            profile: "h3-av-noref-v2".into(),
-            profile_revision: "2".into(),
-        };
+        let model = imagine_video_contract::generation::h3_model("reference");
         self.timeline.folder = None;
         self.timeline_request(
             ctx,
             true,
             "/v1/video/projects".into(),
             Some(json!(CreateProject {
+                generation: Some(Default::default()),
                 schema_version: 1,
                 default_model: model,
                 delivery: DeliverySettings {
@@ -688,13 +1083,17 @@ impl ImagineApp {
             return;
         };
         let project = &document.project;
-        let start = project
-            .scenes
-            .iter()
-            .map(|s| editing::seconds(s.start) + editing::seconds(s.duration))
-            .fold(0., f64::max);
+        let current = self.timeline.primary_scene(project);
+        let Some((start, duration)) = scene_commands::insertion(
+            project,
+            current.as_ref(),
+            self.timeline.playhead,
+            self.timeline.snap,
+        ) else {
+            self.timeline.error = Some("No free space for a Scene on this timeline.".into());
+            return;
+        };
         let id = SceneId(format!("scene_{}", uuid::Uuid::new_v4().simple()));
-        let duration = Time { num: 5, den: 1 };
         let settings = SettingsSlot {
             model: project.default_model.clone(),
             schema_version: 1,
@@ -702,17 +1101,16 @@ impl ImagineApp {
         };
         let scene = Scene {
             id: id.clone(),
-            start: editing::time(start),
+            start,
             duration,
             description: String::new(),
             model: ModelChoice::ProjectDefault,
-            settings: vec![settings],
-            sections: vec![Section {
-                id: SectionId(format!("section_{}", uuid::Uuid::new_v4().simple())),
-                start: Time { num: 0, den: 1 },
-                duration,
-                prompt: String::new(),
-            }],
+            settings: if project.generation.is_some() {
+                vec![]
+            } else {
+                vec![settings]
+            },
+            sections: vec![],
             bindings: vec![],
             continuity: None,
             accepted_take: None,
@@ -720,6 +1118,10 @@ impl ImagineApp {
         self.timeline.clear_preview();
         self.timeline.selected_take = None;
         self.timeline.selected = BTreeSet::from([id]);
+        self.timeline.section = None;
+        self.timeline.section_selection.clear();
+        self.timeline.clear_audio_selection();
+        self.timeline.selection_order.clear();
         self.timeline_edit(
             ctx,
             vec![Edit::AddScene {
@@ -729,6 +1131,19 @@ impl ImagineApp {
         );
     }
     fn timeline_choose_folder(&mut self, ctx: &egui::Context, mode: FolderMode) {
+        if self.timeline.private_storage && !matches!(mode, FolderMode::Open) {
+            if let Some(document) = &self.timeline.document {
+                let action = match mode {
+                    FolderMode::SaveAs => "save-as",
+                    FolderMode::ExportCompatible => "export-compatible",
+                    _ => "save",
+                };
+                self.timeline_request(ctx, true, format!("/v1/video/projects/{}/{action}", document.project.id.0),
+                    Some(json!({"schema_version":1,"expected_project_revision":document.project.project_revision})),
+                    matches!(mode, FolderMode::SaveAs), None);
+            }
+            return;
+        }
         if self.timeline.busy {
             return;
         }
@@ -739,6 +1154,9 @@ impl ImagineApp {
         std::thread::spawn(move || {
             let path = rfd::FileDialog::new()
                 .set_title(match mode {
+                    FolderMode::ExportCompatible => {
+                        "Export older-compatible copy to an empty folder"
+                    }
                     FolderMode::SaveAs => "Choose an empty folder for the project copy",
                     FolderMode::Save => "Choose an empty project folder",
                     FolderMode::Open => "Open project folder",
@@ -762,14 +1180,19 @@ impl ImagineApp {
         self.timeline.busy = true;
         let document = self.timeline.document.as_ref().map(|d| d.project.clone());
         let epoch = self.timeline.epoch;
-        self.timeline.folder = Some(path.clone());
+        let recovering = self.timeline.needs_reopen
+            && matches!(mode, FolderMode::Open)
+            && self.timeline.folder.as_ref() == Some(&path);
+        if !matches!(mode, FolderMode::ExportCompatible) {
+            self.timeline.folder = Some(path.clone());
+        }
         let tx = self.tx.clone();
         let ctx = ctx.clone();
-        let replace = matches!(mode, FolderMode::Open | FolderMode::SaveAs);
+        let replace = matches!(mode, FolderMode::Open | FolderMode::SaveAs) && !recovering;
         std::thread::spawn(move || {
             let result=runtime().block_on(async {
             let location=client.timeline_request(&session,true,"/v1/video/locations",Some(&json!({"schema_version":1,"path":path}))).await?;
-            let (route,body)=if let Some(document)=document.filter(|_|!matches!(mode,FolderMode::Open)) {(format!("/v1/video/projects/{}/{}",document.id.0,if matches!(mode,FolderMode::SaveAs){"save-as"}else{"save"}),json!({"schema_version":1,"expected_project_revision":document.project_revision,"location_id":location["location_id"]}))}else{("/v1/video/projects/open".into(),json!({"schema_version":1,"location_id":location["location_id"]}))};
+            let (route,body)=if let Some(document)=document.filter(|_|!matches!(mode,FolderMode::Open)) {(format!("/v1/video/projects/{}/{}",document.id.0,match mode{FolderMode::SaveAs=>"save-as",FolderMode::ExportCompatible=>"export-compatible",_=>"save"}),json!({"schema_version":1,"expected_project_revision":document.project_revision,"location_id":location["location_id"]}))}else{("/v1/video/projects/open".into(),json!({"schema_version":1,"location_id":location["location_id"]}))};
             client.timeline_request(&session,true,&route,Some(&body)).await
         });
             send(
@@ -796,29 +1219,33 @@ impl ImagineApp {
         self.timeline_request(ctx,true,format!("/v1/video/projects/{}/save",document.project.id.0),Some(json!({"schema_version":1,"expected_project_revision":document.project.project_revision})),false,None);
     }
     fn timeline_choose_media(&mut self, ctx: &egui::Context) {
-        if self.timeline.busy {
+        self.timeline_choose_context_media(ctx, media_picker::Target::Project);
+    }
+    fn timeline_import_into(
+        &mut self,
+        ctx: &egui::Context,
+        paths: Vec<PathBuf>,
+        target: media_picker::Target,
+    ) {
+        self.timeline_import_sources(
+            ctx,
+            paths
+                .into_iter()
+                .map(media_picker::ImportSource::File)
+                .collect(),
+            target,
+        );
+    }
+    fn timeline_import_sources(
+        &mut self,
+        ctx: &egui::Context,
+        sources: Vec<media_picker::ImportSource>,
+        target: media_picker::Target,
+    ) {
+        if let media_picker::Target::LibraryCharacter { editor, voice } = target {
+            self.library_character_import(ctx, sources, editor, voice);
             return;
         }
-        self.timeline.busy = true;
-        let tx = self.tx.clone();
-        let ctx = ctx.clone();
-        let epoch = self.timeline.epoch;
-        std::thread::spawn(move || {
-            let paths = rfd::FileDialog::new()
-                .set_title("Import project media")
-                .add_filter(
-                    "Image, video or audio",
-                    &[
-                        "png", "jpg", "jpeg", "webp", "mp4", "mkv", "webm", "wav", "flac", "mp3",
-                        "ogg",
-                    ],
-                )
-                .pick_files()
-                .unwrap_or_default();
-            send(&tx, &ctx, Message::Timeline(Event::Files { epoch, paths }));
-        });
-    }
-    fn timeline_import(&mut self, ctx: &egui::Context, paths: Vec<PathBuf>) {
         let (Some(client), Some(session), Some(document)) = (
             self.client.clone(),
             self.timeline.session.clone(),
@@ -834,19 +1261,29 @@ impl ImagineApp {
         let tx = self.tx.clone();
         let ctx = ctx.clone();
         std::thread::spawn(move || {
+            let mut assets = vec![];
+            let mut value = document.raw;
             let result=runtime().block_on(async {
-            let mut value=document.raw;
-            for path in paths {let media=client.upload_media(&session,&path).await?;value=client.timeline_request(&session,true,&format!("/v1/video/projects/{}/assets",document.project.id.0),Some(&json!({"schema_version":1,"expected_project_revision":value["project"]["project_revision"],"asset_id":media["id"]}))).await?;}
-            Ok(value)
-        });
+                for source in sources {
+                    let (media,name)=match source {
+                        media_picker::ImportSource::File(path)=>{let name=path.file_name().and_then(|n|n.to_str()).unwrap_or("").to_owned();(client.upload_media(&session,&path).await?,name)},
+                        media_picker::ImportSource::Library{library,entry}=>{
+                            let origin=LibraryMediaSource{library_id:library.clone(),entry_id:entry["entry_id"].as_str().unwrap_or("").into(),resource_id:entry["resource_id"].as_str().unwrap_or("").into()};
+                            if let Some(asset)=serde_json::from_value::<VideoProject>(value["project"].clone()).ok().and_then(|p|p.assets.into_values().find(|a|a.library_source.as_ref()==Some(&origin))){assets.push(asset.id);continue;}
+                            let media=client.timeline_request(&session,true,&format!("/v1/video/libraries/{library}/media-copy"),Some(&json!({"schema_version":1,"entry_id":entry["entry_id"],"expected_entry_revision":entry["entry_revision"],"resource_id":entry["resource_id"]}))).await?;(media,entry["name"].as_str().unwrap_or("").to_owned())},
+                    };
+                    value=client.timeline_request(&session,true,&format!("/v1/video/projects/{}/assets",document.project.id.0),Some(&json!({"schema_version":1,"expected_project_revision":value["project"]["project_revision"],"asset_id":media["id"],"name":name,"library_source":media["library_source"]}))).await?;
+                    if let Some(id)=value["runtime_assets"].as_object().and_then(|m|m.iter().find(|(_,v)|*v==&media["id"])).map(|(k,_)|AssetId(k.clone())) {assets.push(id);}
+                }
+                Ok(value.clone())
+            }).map_err(|mut error:client::TimelineFailure| {error.snapshot=Some(value);error});
             send(
                 &tx,
                 &ctx,
-                Message::Timeline(Event::Document {
+                Message::Timeline(Event::Imported {
                     epoch,
-                    replace: false,
-                    before: None,
-                    history: 0,
+                    target,
+                    assets,
                     result,
                 }),
             );
@@ -854,8 +1291,7 @@ impl ImagineApp {
     }
     fn timeline_generate(&mut self, ctx: &egui::Context) {
         if self.timeline.admitting
-            || !self.timeline.audio_selected.is_empty()
-            || self.timeline.selected.len() != 1
+            || self.timeline.scene().is_none()
             || self.timeline.scene_active()
         {
             return;
@@ -863,7 +1299,7 @@ impl ImagineApp {
         let Some(document) = self.timeline.document.as_ref() else {
             return;
         };
-        let Some(scene) = self.timeline.selected.iter().next() else {
+        let Some(scene) = self.timeline.primary_scene(&document.project) else {
             return;
         };
         if self.timeline.pending.as_ref().is_some_and(|(request, _)| {
@@ -876,7 +1312,15 @@ impl ImagineApp {
             );
             return;
         }
-        self.timeline.pending.get_or_insert_with(||(json!({"kind":"video_scene","schema_version":1,"project_id":document.project.id,"expected_project_revision":document.project.project_revision,"scene_id":scene,"seed":42}),uuid::Uuid::new_v4().to_string()));
+        if self.timeline.pending.is_none() {
+            let random = uuid::Uuid::new_v4().as_u128() as u64;
+            let (seed, advance) = seed::prepare(&document.project, random);
+            self.timeline.pending_seed_advance = advance;
+            self.timeline.pending = Some((
+                json!({"kind":"video_scene","schema_version":1,"project_id":document.project.id,"expected_project_revision":document.project.project_revision,"scene_id":scene,"seed":seed}),
+                uuid::Uuid::new_v4().to_string(),
+            ));
+        }
         self.timeline_submit_pending(ctx);
     }
     fn timeline_submit_pending(&mut self, ctx: &egui::Context) {
@@ -977,13 +1421,39 @@ impl ImagineApp {
     }
 }
 impl Timeline {
+    pub(in crate::app) fn sampling_preview_session(&self) -> Option<(u64, String)> {
+        Some((self.epoch, self.session.clone()?))
+    }
+    pub(in crate::app) fn sampling_preview_selection(&self) -> Option<(ProjectId, SceneId)> {
+        if self.needs_reopen {
+            return None;
+        }
+        let project = &self.document.as_ref()?.project;
+        Some((project.id.clone(), self.primary_scene(project)?))
+    }
+    pub(in crate::app) fn sampling_preview_job_matches(
+        &self,
+        id: &str,
+        project: &ProjectId,
+        scene: &SceneId,
+    ) -> bool {
+        self.jobs.iter().any(|job| {
+            job.id == id
+                && !job.acting
+                && job.matches(project, scene)
+                && job.observation["status"] == "running"
+        })
+    }
     fn scene_active(&self) -> bool {
-        let (Some(document), Some(scene)) = (&self.document, self.selected.iter().next()) else {
+        let Some(document) = &self.document else {
+            return false;
+        };
+        let Some(scene) = self.primary_scene(&document.project) else {
             return false;
         };
         self.jobs
             .iter()
-            .any(|j| j.matches(&document.project.id, scene) && !j.terminal())
+            .any(|j| j.matches(&document.project.id, &scene) && !j.terminal())
     }
 
     fn clear_preview(&mut self) {
@@ -998,16 +1468,50 @@ impl Timeline {
             comparison.pause();
         }
         self.comparison = None;
+        self.comparison_state = None;
         self.preview_asset = None;
     }
     fn scene(&self) -> Option<&Scene> {
-        self.document
-            .as_ref()?
-            .project
-            .scene(self.selected.iter().next()?)
-            .ok()
+        let project = &self.document.as_ref()?.project;
+        project.scene(&self.primary_scene(project)?).ok()
     }
     fn sync_draft(&mut self) {
+        self.reconcile_selection();
+        if let Some(project) = self.document.as_ref().map(|d| &d.project) {
+            self.section_selection.retain(|id| {
+                project
+                    .scenes
+                    .iter()
+                    .any(|s| s.sections.iter().any(|section| &section.id == id))
+            });
+            if self.section.is_some() {
+                self.section = self
+                    .section
+                    .as_ref()
+                    .filter(|id| {
+                        project
+                            .scenes
+                            .iter()
+                            .any(|s| s.sections.iter().any(|section| &section.id == *id))
+                    })
+                    .cloned()
+                    .or_else(|| self.section_selection.last().cloned());
+            }
+            if let Some(id) = &self.section {
+                if !self.section_selection.contains(id) {
+                    self.section_selection = vec![id.clone()];
+                }
+            } else if self.audio_selected.is_empty()
+                && !self
+                    .selection_order
+                    .iter()
+                    .any(|item| matches!(item, selection::Item::Section(_)))
+            {
+                self.section_selection.clear();
+            }
+            self.audio_selection_order
+                .retain(|id| self.audio_selected.contains(id));
+        }
         self.audio_draft = self
             .document
             .as_ref()
@@ -1027,6 +1531,10 @@ impl Timeline {
             .as_ref()
             .map(|d| d.project.global_prompt.clone())
             .unwrap_or_default();
+        self.global_prompt_options = self
+            .document
+            .as_ref()
+            .and_then(|d| d.project.creative.global_prompt.clone());
         if let Some(scene) = self.scene().cloned() {
             self.draft_scene_prompt = self
                 .document
@@ -1045,6 +1553,7 @@ impl Timeline {
         }
     }
 }
+
 impl Drop for Timeline {
     fn drop(&mut self) {
         self.clear_preview();
@@ -1103,7 +1612,14 @@ impl Timeline {
         let Some(document) = &self.document else {
             return vec![];
         };
-        let mut edits = vec![];
+        let mut edits = self.generation_editor.scene_edits(&document.project);
+        let mut creative = document.project.creative.clone();
+        self.cast.merge_pending(&document.project, &mut creative);
+        self.image_anchors
+            .merge_pending(&document.project, &mut creative);
+        if let Some(options) = &self.global_prompt_options {
+            creative.global_prompt = Some(options.clone());
+        }
         if let Some(draft) = &self.audio_draft
             && document
                 .project
@@ -1138,11 +1654,9 @@ impl Timeline {
                     .cloned()
                     .unwrap_or_default()
             {
-                let mut creative = document.project.creative.clone();
                 creative
                     .scene_prompts
                     .insert(scene.id.clone(), self.draft_scene_prompt.clone());
-                edits.push(Edit::SetCreative { creative });
             }
             if self.draft_description != scene.description {
                 edits.push(Edit::SetSceneDescription {
@@ -1164,6 +1678,44 @@ impl Timeline {
                 });
             }
         }
+        if creative != document.project.creative {
+            edits.push(Edit::SetCreative { creative });
+        }
         edits
+    }
+}
+
+#[cfg(test)]
+mod mixed_selection_regression {
+    use super::*;
+    #[test]
+    fn audio_primary_keeps_secondary_sections_through_draft_refresh() {
+        let mut p = super::media_picker::tests::project();
+        let section = p.scenes[0].sections[0].id.clone();
+        let audio = AudioClipId("own_mixed_audio".into());
+        p.audio_tracks = vec![AudioTrack {
+            id: AudioTrackId("own_track".into()),
+            clips: vec![AudioClip::new(
+                audio.clone(),
+                Time { num: 0, den: 1 },
+                Time { num: 1, den: 1 },
+                &p.audio,
+            )],
+        }];
+        let mut state = Timeline::default();
+        state.document = Some(Snapshot {
+            project: p,
+            raw: json!({}),
+        });
+        state.section_selection = vec![section.clone()];
+        state.audio_primary = Some(audio.clone());
+        state.audio_selected = BTreeSet::from([audio.clone()]);
+        state.audio_selection_order = vec![audio];
+        state.sync_draft();
+        assert_eq!(state.section_selection, vec![section]);
+        assert!(state.section.is_none() && state.audio_draft.is_some());
+        state.clear_audio_selection();
+        state.sync_draft();
+        assert!(state.section_selection.is_empty());
     }
 }

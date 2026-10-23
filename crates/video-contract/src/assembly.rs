@@ -16,6 +16,21 @@ pub struct ClipInstance {
 fn yes() -> bool {
     true
 }
+fn is_yes(value: &bool) -> bool {
+    *value
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AudioContinuity {
+    #[default]
+    NewSceneAudio,
+    ReferencePreviousAudio,
+}
+impl AudioContinuity {
+    fn is_default(&self) -> bool {
+        *self == Self::NewSceneAudio
+    }
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum BoundaryMode {
@@ -32,6 +47,43 @@ pub struct Boundary {
     pub right: SceneId,
     pub mode: BoundaryMode,
     pub blend_frames: u32,
+    /// None is the Director default: three seconds at the project's current fps.
+    /// Some(0) is an authored zero, not a missing value.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tail_frames: Option<u64>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub transition_prompt: String,
+    #[serde(default = "yes", skip_serializing_if = "is_yes")]
+    pub reuse_visual_references: bool,
+    #[serde(default = "yes", skip_serializing_if = "is_yes")]
+    pub reuse_style: bool,
+    #[serde(default, skip_serializing_if = "AudioContinuity::is_default")]
+    pub audio_continuity: AudioContinuity,
+}
+impl Boundary {
+    pub fn new(left: SceneId, right: SceneId) -> Self {
+        Self {
+            left,
+            right,
+            mode: BoundaryMode::HardCut,
+            blend_frames: 3,
+            tail_frames: None,
+            transition_prompt: String::new(),
+            reuse_visual_references: true,
+            reuse_style: true,
+            audio_continuity: AudioContinuity::NewSceneAudio,
+        }
+    }
+    pub fn requested_tail_frames(&self, fps: Time) -> Result<u64, Issue> {
+        match self.tail_frames {
+            Some(frames) => Ok(frames),
+            None => {
+                check(fps.positive(), "invalid_delivery", "delivery.fps")?;
+                // Director Math.round uses positive half-up, not ties-to-even.
+                Ok((seconds(fps) * 3.).round() as u64)
+            }
+        }
+    }
 }
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -57,6 +109,8 @@ pub enum MixMode {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Options {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_filename: Option<String>,
     pub audio_mode: MixMode,
     pub generated_gain: f64,
     pub timeline_gain: f64,
@@ -69,6 +123,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            output_filename: None,
             audio_mode: MixMode::Combined,
             generated_gain: 1.,
             timeline_gain: 1.,
@@ -79,6 +134,28 @@ impl Default for Options {
             bit_depth: 8,
         }
     }
+}
+/// A basename within the selected output destination, never a different path.
+pub fn output_filename(value: Option<&str>) -> Result<Option<String>, Issue> {
+    let Some(value) = value.filter(|v| !v.trim().is_empty()) else {
+        return Ok(None);
+    };
+    let mut components = std::path::Path::new(value).components();
+    if value.contains('\0')
+        || value.contains('/')
+        || !matches!(components.next(), Some(std::path::Component::Normal(_)))
+        || components.next().is_some()
+    {
+        return Err(Issue::new(
+            "invalid_output_filename",
+            "options.output_filename",
+        ));
+    }
+    Ok(Some(if value.to_ascii_lowercase().ends_with(".mp4") {
+        value.to_owned()
+    } else {
+        format!("{value}.mp4")
+    }))
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

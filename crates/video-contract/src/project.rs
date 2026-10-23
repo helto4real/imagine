@@ -25,6 +25,7 @@ fn model(value: &ModelSelection) -> bool {
 impl VideoProject {
     pub fn create(request: CreateProject) -> Result<Self, Issue> {
         let project = Self {
+            generation: request.generation,
             schema_version: request.schema_version,
             id: ProjectId(format!("project_{}", uuid::Uuid::new_v4().simple())),
             project_revision: 0,
@@ -53,7 +54,33 @@ impl VideoProject {
             .find(|s| &s.id == id)
             .ok_or_else(|| Issue::new("scene_not_found", "scene_id"))
     }
+    pub fn effective_settings<'a>(&'a self, scene: &'a Scene) -> Option<&'a SettingsSlot> {
+        let model = self.effective_model(scene);
+        self.settings_for(scene, model)
+    }
+    pub fn settings_for<'a>(
+        &'a self,
+        scene: &'a Scene,
+        model: &ModelSelection,
+    ) -> Option<&'a SettingsSlot> {
+        scene
+            .settings
+            .iter()
+            .find(|s| &s.model == model)
+            .or_else(|| {
+                self.generation
+                    .as_ref()?
+                    .settings
+                    .iter()
+                    .find(|s| &s.model == model)
+            })
+    }
     pub fn validate(&self) -> Result<(), Issue> {
+        check(
+            self.creative.timeline_duration.is_none_or(Time::positive),
+            "invalid_time",
+            "creative.timeline_duration",
+        )?;
         crate::creative::validate(self)?;
         crate::assembly::validate(self)?;
         check(
@@ -68,6 +95,19 @@ impl VideoProject {
             "project_revision",
         )?;
         check(model(&self.default_model), "invalid_model", "default_model")?;
+        if let Some(g) = &self.generation {
+            let mut slots = BTreeSet::new();
+            for slot in &g.settings {
+                check(
+                    model(&slot.model)
+                        && slot.schema_version > 0
+                        && slot.values.is_object()
+                        && slots.insert(&slot.model),
+                    "invalid_settings_slot",
+                    "generation.settings",
+                )?;
+            }
+        }
         check(
             self.delivery.fps.positive() && self.delivery.width > 0 && self.delivery.height > 0,
             "invalid_delivery",
@@ -143,7 +183,9 @@ impl VideoProject {
             }
             if let Some(take) = &scene.accepted_take {
                 check(
-                    name(&take.id.0) && model(&take.model) && name(&take.source_fingerprint),
+                    name(&take.id.0)
+                        && take.model.as_ref().is_none_or(model)
+                        && name(&take.source_fingerprint),
                     "invalid_take",
                     "accepted_take",
                 )?;

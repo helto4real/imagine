@@ -4,6 +4,60 @@ use super::*;
 use crate::app::workspace as chrome;
 use egui::Rect;
 impl ImagineApp {
+    fn timeline_enhance_action(
+        &mut self,
+        ctx: &egui::Context,
+        action: PostAction,
+        commands: &mut Vec<Edit>,
+    ) {
+        commands.extend(self.timeline.draft_edits());
+        if commands.is_empty() {
+            self.timeline_action(ctx, action);
+        } else {
+            self.timeline.after_edit = Some(action);
+        }
+    }
+    fn timeline_enhance_label(
+        &mut self,
+        ui: &mut egui::Ui,
+        label: &str,
+        field: Option<imagine_video_contract::authoring::SceneField>,
+        commands: &mut Vec<Edit>,
+    ) {
+        let r = ui
+            .horizontal(|ui| {
+                ui.label(label);
+                helto::icon_button(
+                    ui,
+                    crate::icons::Icon::Enhance,
+                    &format!("Enhance {label}"),
+                    false,
+                )
+            })
+            .inner;
+        #[cfg(feature = "ui-preview")]
+        super::qa::control(
+            ui,
+            format!(
+                "enhance-field-{}",
+                if field.is_some() {
+                    "description"
+                } else {
+                    "section"
+                }
+            ),
+            &r,
+        );
+        if r.clicked() {
+            let action = field
+                .map(PostAction::EnhanceField)
+                .unwrap_or(PostAction::Authoring(
+                    imagine_video_contract::authoring::Operation::EnhanceSection,
+                ));
+            self.timeline_enhance_action(ui.ctx(), action, commands);
+        }
+    }
+
     pub(super) fn timeline_references(
         &mut self,
         ui: &mut egui::Ui,
@@ -114,6 +168,15 @@ impl ImagineApp {
     ) {
         chrome::panel(ui, rect, false);
         chrome::region(ui, "timeline-inspector", rect.shrink(10.), |ui| {
+            #[cfg(feature = "ui-preview")]
+            {
+                let response = ui.interact(
+                    ui.clip_rect(),
+                    ui.id().with("qa-inspector-scroll"),
+                    egui::Sense::hover(),
+                );
+                super::qa::control(ui, "inspector-scroll".into(), &response);
+            }
             egui::ScrollArea::vertical()
                 .id_salt("video-inspector-scroll")
                 .show(ui, |ui| {
@@ -142,6 +205,37 @@ impl ImagineApp {
                     });
                     ui.separator();
                     ui.add_enabled_ui(enabled, |ui| {
+                        ui.label("Scene type");
+                        let mut kind=d.project.scene_kind(&scene.id);
+                        let before=kind;
+                        let response=egui::ComboBox::from_id_salt(("scene-kind",&scene.id.0)).selected_text(kind.label()).show_ui(ui,|ui|{
+                            for value in imagine_video_contract::creative::SceneKind::ALL {
+                                let r=ui.selectable_value(&mut kind,value,value.label());
+                                #[cfg(feature="ui-preview")]super::qa::control(ui,format!("scene-kind-{}",value.label().to_lowercase()),&r);
+                                let _=r;
+                            }
+                        }).response;
+                        #[cfg(feature="ui-preview")]super::qa::control(ui,"scene-kind".into(),&response);
+                        let _=response;
+                        if before!=kind {commands.push(Edit::SetSceneKind{scene_id:scene.id.clone(),kind});}
+                        ui.horizontal_wrapped(|ui| {
+                            for (kind, label, key) in [
+                                (MediaKind::Image, "Attach images…", "attach-images"),
+                                (MediaKind::Video, "Attach videos…", "attach-videos"),
+                            ] {
+                                let r = ui.button(label);
+                                #[cfg(feature = "ui-preview")]
+                                super::qa::control(ui, key.into(), &r);
+                                let _ = key;
+                                if r.clicked() {
+                                    self.timeline_pick_media(media_picker::Target::Generation {
+                                        scene: scene.id.clone(),
+                                        section: self.timeline.section.clone(),
+                                        kind,
+                                    });
+                                }
+                            }
+                        });
                         ui.label("Duration");
                         let mut duration = seconds(scene.duration);
                         if ui
@@ -160,15 +254,16 @@ impl ImagineApp {
                                 self.timeline.mode,
                             ));
                         }
-                        ui.label("Description");
+                        self.timeline_enhance_label(ui,"Description",Some(imagine_video_contract::authoring::SceneField::Description),commands);
                         self.timeline_assembly_clip(ui, d, &scene, commands);
-                        let r = helto::textarea(
+                        let r = prompt_tools::textarea(
                             ui,
                             &mut self.timeline.draft_description,
                             3,
                             "Scene description",
                             self.prefs.privacy_mode,
                             true,
+                            prompt_tools::Source::scene(&d.project.creative,&d.project.id,&scene.id),
                         );
                         #[cfg(feature = "ui-preview")]
                         super::qa::control(ui, "scene-description".into(), &r);
@@ -178,29 +273,37 @@ impl ImagineApp {
                         let source_header = ui.collapsing("Scene prompt fields", |ui| {
                             let p = &mut self.timeline.draft_scene_prompt;
                             let mut save = false;
+                            let mut enhance_field=None;
                             for (name, label, value) in [
                                 ("title", "Title", &mut p.title),
                                 ("summary", "Summary", &mut p.summary),
                                 ("ambient", "Ambient sound", &mut p.ambient_sound),
                                 ("music", "Audience-only music", &mut p.non_diegetic_music),
                             ] {
-                                ui.label(label);
-                                let r = helto::textarea(
+                                if name=="title" {ui.label(label);}else{
+                                    let field=match name{"summary"=>imagine_video_contract::authoring::SceneField::Summary,"ambient"=>imagine_video_contract::authoring::SceneField::AmbientSound,_=>imagine_video_contract::authoring::SceneField::NonDiegeticMusic};
+                                    // This loop borrows the source draft; defer opening until it is released.
+                                    let r=ui.horizontal(|ui|{ui.label(label);helto::icon_button(ui,crate::icons::Icon::Enhance,&format!("Enhance {label}"),false)}).inner;
+                                    #[cfg(feature="ui-preview")]super::qa::control(ui,format!("enhance-field-{name}"),&r);
+                                    if r.clicked(){enhance_field=Some(field);}
+                                }
+                                let r = prompt_tools::textarea(
                                     ui,
                                     value,
                                     2,
                                     label,
                                     self.prefs.privacy_mode,
                                     true,
+                                    prompt_tools::Source::scene(&d.project.creative,&d.project.id,&scene.id),
                                 );
                                 #[cfg(feature = "ui-preview")]
                                 super::qa::control(ui, format!("scene-source-{name}"), &r);
                                 let _ = name;
                                 save |= r.lost_focus();
                             }
-                            if save {
-                                commands.extend(self.timeline.draft_edits());
-                            }
+                            if save {commands.extend(self.timeline.draft_edits());}
+                            if let Some(field)=enhance_field{self.timeline_enhance_action(ui.ctx(),PostAction::EnhanceField(field),commands);}
+
                         });
                         #[cfg(feature = "ui-preview")]
                         super::qa::control(
@@ -215,14 +318,16 @@ impl ImagineApp {
                             .as_ref()
                             .and_then(|id| scene.sections.iter().find(|s| &s.id == id))
                         {
-                            ui.label("Section prompt");
-                            let r = helto::textarea(
+                            self.timeline_image_anchors(ui, d, &section.id, commands);
+                            self.timeline_enhance_label(ui,"Section prompt",None,commands);
+                            let r = prompt_tools::textarea(
                                 ui,
                                 &mut self.timeline.draft_section,
                                 3,
                                 "Section prompt",
                                 self.prefs.privacy_mode,
                                 true,
+                                prompt_tools::Source::section(&d.project.creative,&d.project.id,&section.id),
                             );
                             #[cfg(feature = "ui-preview")]
                             super::qa::control(ui, "section-prompt".into(), &r);
@@ -235,20 +340,9 @@ impl ImagineApp {
                                 seconds(section.start) + seconds(section.duration)
                             ));
                         }
-                        ui.label("Global prompt");
-                        let r = helto::textarea(
-                            ui,
-                            &mut self.timeline.draft_global,
-                            2,
-                            "Project prompt",
-                            self.prefs.privacy_mode,
-                            true,
-                        );
-                        if r.lost_focus() {
-                            commands.extend(self.timeline.draft_edits());
-                        }
                         ui.separator();
                         ui.label("Model");
+                        self.timeline_scene_generation(ui,d,&scene,commands);
                         ui.weak(format!(
                             "{} · {}",
                             d.project.effective_model(&scene).model,
@@ -258,7 +352,7 @@ impl ImagineApp {
                         if model.adapter == "h3"
                             && model.variant == "reference"
                             && let Some(slot) =
-                                scene.settings.iter().find(|slot| &slot.model == model)
+                                d.project.effective_settings(&scene)
                         {
                             let mut use_audio =
                                 slot.values["audio_reference_mode"].as_str() != Some("Disabled");

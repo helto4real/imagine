@@ -4,6 +4,10 @@ mod authoring_tests;
 #[path = "../ui/tests/support/destination.rs"]
 #[allow(dead_code)]
 mod destination;
+#[path = "support/video_media_health.rs"]
+mod media_health_tests;
+#[path = "support/storage_links.rs"]
+mod storage_links;
 use axum::{
     Router,
     body::{Body, to_bytes},
@@ -128,6 +132,289 @@ fn png() -> Vec<u8> {
         .write_to(&mut out, image::ImageFormat::Png)
         .unwrap();
     out.into_inner()
+}
+#[tokio::test]
+async fn library_character_edit_and_copy_preserve_image_voice_and_relationship_properties() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "library-rich-character").await;
+    let (_, project) = call(&h, "POST", "/v1/video/projects", Some(create())).await;
+    let project = project["project"]["id"].as_str().unwrap();
+    let (_, image) = raw(
+        &h,
+        "POST",
+        "/v1/video/assets",
+        Body::from(png()),
+        "image/png",
+        true,
+    )
+    .await;
+    let mut wav = Cursor::new(vec![]);
+    wav.write_all(b"RIFF").unwrap();
+    wav.write_all(&(36u32 + 6400).to_le_bytes()).unwrap();
+    wav.write_all(b"WAVEfmt ").unwrap();
+    for value in [16u32, 0x00020001, 32000, 128000, 0x00100004] {
+        wav.write_all(&value.to_le_bytes()).unwrap();
+    }
+    wav.write_all(b"data").unwrap();
+    wav.write_all(&6400u32.to_le_bytes()).unwrap();
+    wav.write_all(&vec![0; 6400]).unwrap();
+    let (_, audio) = raw(
+        &h,
+        "POST",
+        "/v1/video/assets",
+        Body::from(wav.into_inner()),
+        "audio/wav",
+        true,
+    )
+    .await;
+    let location = select(&h, &root.path().join("own-library")).await;
+    let (_, library) = call(
+        &h,
+        "POST",
+        "/v1/video/libraries",
+        Some(json!({"schema_version":1,"location_id":location,"mode":"create"})),
+    )
+    .await;
+    let library = library["id"].as_str().unwrap();
+    let image_id = image["id"].as_str().unwrap();
+    let audio_id = audio["id"].as_str().unwrap();
+    let reference = json!({"id":"own_original","name":"Own character","alias":"own_character","kind":"custom subject","description":"Own description","tags":["fixture"],"enabled":false,"strength":0.37,"retention":"strong","relationship":{"marker":"attribute_transfer","note":"Own relation note","target_reference_id":"own_original"},"images":[{"id":"own_image","asset":image_id,"enabled":false,"preview":true,"contribution":"Own image contribution åäö"},{"id":"own_second_image","asset":image_id,"enabled":true,"preview":false,"contribution":"Same source, separate image properties"}],"voice":{"language":"Swedish","description":"Own voice profile","assets":[audio_id],"reference_settings":{(audio_id):{"enabled":false,"voice_description":"Own timbre","contribution":"Own audio contribution","strength":0.23,"relationship":"weak_reference"}}},"origin":null});
+    let character = json!({"name":"Own character","alias":"own_character","description":"Own description","tags":["fixture"],"visual_asset_ids":[image_id,image_id],"voice":{"language":"Swedish","description":"Own voice profile","reference_asset_ids":[audio_id]},"reference":reference});
+    let (status,saved)=call(&h,"POST",&format!("/v1/video/libraries/{library}/characters"),Some(json!({"schema_version":1,"expected_library_revision":0,"title":"Own character","character":character}))).await;
+    assert_eq!(status, 200, "{saved}");
+    let entry = saved["entry_id"].as_str().unwrap();
+    let stored = &saved["library"]["entries"][0]["content"]["document"];
+    let mut edited = character;
+    edited["description"] = json!("Edited inside library");
+    edited["reference"] = stored["reference"].clone();
+    edited["visual_asset_ids"] = stored["visual_ids"].clone();
+    edited["voice"]["reference_asset_ids"] = stored["voice"]["reference_ids"].clone();
+    let (status,updated)=call(&h,"POST",&format!("/v1/video/libraries/{library}/characters"),Some(json!({"schema_version":1,"expected_library_revision":1,"title":"Own character","replace":{"entry_id":entry,"expected_entry_revision":1},"character":edited}))).await;
+    assert_eq!(status, 200, "{updated}");
+    let (status,copied)=call(&h,"POST",&format!("/v1/video/projects/{project}/cast/from-library"),Some(json!({"schema_version":1,"expected_project_revision":0,"library_id":library,"entry_id":entry,"expected_entry_revision":2}))).await;
+    assert_eq!(status, 200, "{copied}");
+    let actual = &copied["project"]["creative"]["references"][0];
+    for key in [
+        "name",
+        "alias",
+        "kind",
+        "tags",
+        "enabled",
+        "strength",
+        "retention",
+    ] {
+        assert_eq!(actual[key], reference[key], "{key}");
+    }
+    assert_eq!(actual["description"], "Edited inside library");
+    assert_eq!(actual["relationship"]["marker"], "attribute_transfer");
+    assert_eq!(actual["relationship"]["note"], "Own relation note");
+    assert_eq!(actual["relationship"]["target_reference_id"], actual["id"]);
+    for key in ["enabled", "preview", "contribution"] {
+        assert_eq!(actual["images"][0][key], reference["images"][0][key]);
+        assert_eq!(actual["images"][1][key], reference["images"][1][key]);
+    }
+    assert_eq!(actual["images"][0]["asset"], actual["images"][1]["asset"]);
+    assert_eq!(copied["project"]["assets"].as_object().unwrap().len(), 2);
+    let voice_asset = actual["voice"]["assets"][0].as_str().unwrap();
+    assert_eq!(
+        actual["voice"]["reference_settings"][voice_asset],
+        reference["voice"]["reference_settings"][audio_id]
+    );
+    assert_eq!(actual["origin"]["revision"], 2);
+    let image_asset = actual["images"][0]["asset"].as_str().unwrap();
+    assert_eq!(
+        download(
+            &h,
+            copied["runtime_assets"][image_asset].as_str().unwrap(),
+            None
+        )
+        .await
+        .1,
+        png()
+    );
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn standalone_library_asset_metadata_and_removal_preserve_project_and_source() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "library-asset-edit").await;
+    let (_, p) = call(&h, "POST", "/v1/video/projects", Some(create())).await;
+    let project = p["project"]["id"].as_str().unwrap();
+    let bytes = png();
+    let (_, media) = raw(
+        &h,
+        "POST",
+        "/v1/video/assets",
+        Body::from(bytes.clone()),
+        "image/png",
+        true,
+    )
+    .await;
+    let (status, p) = call(&h, "POST", &format!("/v1/video/projects/{project}/assets"), Some(json!({"schema_version":1,"expected_project_revision":0,"asset_id":media["id"],"name":"Own blue source.png"}))).await;
+    assert_eq!(status, 200, "{p}");
+    let asset = p["project"]["assets"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .next()
+        .unwrap();
+    let location = select(&h, &root.path().join("own-library")).await;
+    let (_, library) = call(
+        &h,
+        "POST",
+        "/v1/video/libraries",
+        Some(json!({"schema_version":1,"location_id":location,"mode":"create"})),
+    )
+    .await;
+    let id = library["id"].as_str().unwrap();
+    let save = json!({"schema_version":1,"expected_library_revision":0,"project_id":project,"expected_project_revision":1,"asset_id":asset,"title":"Own standalone"});
+    let (status, saved) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/libraries/{id}/assets"),
+        Some(save),
+    )
+    .await;
+    assert_eq!(status, 200, "{saved}");
+    assert_eq!(saved["library"]["entries"][0]["content"]["kind"], "asset");
+    let entry = saved["entry_id"].as_str().unwrap();
+    let edit_route = format!("/v1/video/libraries/{id}/entries/{entry}/edit");
+    let edit = json!({"schema_version":1,"expected_library_revision":1,"expected_entry_revision":1,"title":"Renamed own asset","remove":false});
+    let (status, edited) = call(&h, "POST", &edit_route, Some(edit.clone())).await;
+    assert_eq!(status, 200, "{edited}");
+    assert_eq!(edited["entries"][0]["title"], "Renamed own asset");
+    assert_eq!(edited["entries"][0]["revision"], 2);
+    assert_eq!(call(&h, "POST", &edit_route, Some(edit)).await.0, 409);
+    assert_eq!(
+        call(&h, "GET", &format!("/v1/video/libraries/{id}"), None)
+            .await
+            .1,
+        edited
+    );
+    let (status, index) = call(&h, "GET", &format!("/v1/video/libraries/{id}/media"), None).await;
+    assert_eq!(status, 200);
+    assert_eq!(index["assets"][0]["name"], "Renamed own asset");
+    let row = &index["assets"][0];
+    let (status, copied) = call(&h, "POST", &format!("/v1/video/libraries/{id}/media-copy"), Some(json!({"schema_version":1,"entry_id":entry,"expected_entry_revision":2,"resource_id":row["resource_id"]}))).await;
+    assert_eq!(status, 200, "{copied}");
+    assert_eq!(
+        download(&h, copied["id"].as_str().unwrap(), None).await.1,
+        bytes
+    );
+    let (status, removed) = call(&h, "POST", &edit_route, Some(json!({"schema_version":1,"expected_library_revision":2,"expected_entry_revision":2,"remove":true}))).await;
+    assert_eq!(status, 200, "{removed}");
+    assert!(removed["entries"].as_array().unwrap().is_empty());
+    assert_eq!(
+        download(&h, media["id"].as_str().unwrap(), None).await.1,
+        bytes
+    );
+    assert_eq!(
+        download(&h, copied["id"].as_str().unwrap(), None).await.1,
+        bytes
+    );
+    assert_eq!(
+        call(&h, "GET", &format!("/v1/video/projects/{project}"), None)
+            .await
+            .1["project"],
+        p["project"]
+    );
+    let reopened =
+        imagine_server::video::library::LibrarySession::open(&root.path().join("own-library"))
+            .unwrap();
+    assert_eq!(serde_json::to_value(reopened.document()).unwrap(), removed);
+}
+
+#[tokio::test]
+async fn library_picker_media_streams_and_copies_owned_sources_with_revision_bound_selection() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "library-media-picker").await;
+    let (_, p) = call(&h, "POST", "/v1/video/projects", Some(create())).await;
+    let project = p["project"]["id"].as_str().unwrap();
+    let bytes = png();
+    let (_, media) = raw(
+        &h,
+        "POST",
+        "/v1/video/assets",
+        Body::from(bytes.clone()),
+        "image/png",
+        true,
+    )
+    .await;
+    let (status,p)=call(&h,"POST",&format!("/v1/video/projects/{project}/assets"),Some(json!({"schema_version":1,"expected_project_revision":0,"asset_id":media["id"],"name":"Own blue library source.png"}))).await;
+    assert_eq!(status, 200, "{p}");
+    let location = select(&h, &root.path().join("own-library")).await;
+    let (_, library) = call(
+        &h,
+        "POST",
+        "/v1/video/libraries",
+        Some(json!({"schema_version":1,"location_id":location,"mode":"create"})),
+    )
+    .await;
+    let id = library["id"].as_str().unwrap();
+    let (_,saved)=call(&h,"POST",&format!("/v1/video/libraries/{id}/projects"),Some(json!({"schema_version":1,"expected_library_revision":0,"project_id":project,"expected_project_revision":p["project"]["project_revision"],"title":"Own media project","replace":null}))).await;
+    let (status, index) = call(&h, "GET", &format!("/v1/video/libraries/{id}/media"), None).await;
+    assert_eq!(status, 200);
+    assert_eq!(index["assets"].as_array().unwrap().len(), 1);
+    let row = &index["assets"][0];
+    assert_eq!(row["name"], "Own blue library source.png");
+    assert_eq!(row["kind"], "image");
+    let route = format!(
+        "/v1/video/libraries/{id}/entries/{}/revisions/1/media/{}",
+        row["entry_id"].as_str().unwrap(),
+        row["resource_id"].as_str().unwrap()
+    );
+    let read = || async {
+        let response = h
+            .router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(&route)
+                    .header("X-Imagine-Session", &h.store.session.id)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 200);
+        to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap()
+            .to_vec()
+    };
+    let (a, b) = tokio::join!(read(), read());
+    assert_eq!(a, bytes);
+    assert_eq!(b, bytes);
+    let body = json!({"schema_version":1,"entry_id":row["entry_id"],"expected_entry_revision":1,"resource_id":row["resource_id"]});
+    let (status, copied) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/libraries/{id}/media-copy"),
+        Some(body.clone()),
+    )
+    .await;
+    assert_eq!(status, 200, "{copied}");
+    assert_eq!(
+        download(&h, copied["id"].as_str().unwrap(), None).await.1,
+        bytes
+    );
+    let (status,updated)=call(&h,"POST",&format!("/v1/video/libraries/{id}/projects"),Some(json!({"schema_version":1,"expected_library_revision":1,"project_id":project,"expected_project_revision":p["project"]["project_revision"],"title":"Own updated project","replace":{"entry_id":saved["entry_id"],"expected_entry_revision":1}}))).await;
+    assert_eq!(status, 200, "{updated}");
+    let (status, error) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/libraries/{id}/media-copy"),
+        Some(body),
+    )
+    .await;
+    assert_eq!(status, 409);
+    assert_eq!(error["error"]["code"], "revision_conflict");
+    assert_eq!(
+        download(&h, copied["id"].as_str().unwrap(), None).await.1,
+        bytes
+    );
+    stop(h).await;
 }
 async fn select(h: &Harness, path: &Path) -> String {
     std::fs::create_dir_all(path).unwrap();
@@ -596,10 +883,13 @@ async fn reopen_is_atomic_when_a_later_resource_has_invalid_media_and_ranges_are
         )
         .body(Body::empty())
         .unwrap();
-    assert_eq!(
-        h.router.clone().oneshot(request).await.unwrap().status(),
-        413
-    );
+    // A declared AV length above the former buffer ceiling is admissible.
+    // This empty body still fails validation, rather than a size gate.
+    let response = h.router.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), 422);
+    let error: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await.unwrap()).unwrap();
+    assert_eq!(error["error"]["code"], "invalid_media_size");
     let mut project = ProjectSession::new(
         VideoProject::create(serde_json::from_value(create()).unwrap()).unwrap(),
     )
@@ -615,6 +905,8 @@ async fn reopen_is_atomic_when_a_later_resource_has_invalid_media_and_ranges_are
         document.project.assets.insert(
             asset_id.clone(),
             Asset {
+                library_source: None,
+                name: String::new(),
                 id: asset_id.clone(),
                 revision: 1,
                 kind: MediaKind::Image,

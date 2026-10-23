@@ -6,65 +6,78 @@ use axum::{
 use tokio::sync::{Notify, mpsc};
 
 #[test]
-fn profiles_require_system_prompts_and_keep_keys_out_of_public_data() {
+fn legacy_credentials_are_discarded_and_never_persisted_or_returned() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("enhancement.json");
+    let mut legacy = serde_json::to_value(Profile::default()).unwrap();
+    legacy["has_api_key"] = json!(true);
+    legacy["api_key"] = json!("synthetic-profile-key");
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&json!({
+            "profiles":[legacy], "secrets":{"proxy":"synthetic-saved-key"}
+        }))
+        .unwrap(),
+    )
+    .unwrap();
     let service = Service::open(path.clone()).unwrap();
-    let mut profile = Profile::default();
-    assert_eq!(profile.base_url, "http://127.0.0.1:5002/v1");
+    let public = serde_json::to_value(service.profiles()).unwrap();
+    assert!(public[0].get("has_api_key").is_none());
+    assert!(public[0].get("api_key").is_none());
+    let mut profile = service.profiles()[0].clone();
     profile.system_prompt = "  \n ".into();
     assert_eq!(
         service
             .save(ProfileUpdate {
-                profile: profile.clone(),
-                api_key: None
+                profile: profile.clone()
             })
             .unwrap_err()
             .code,
         "invalid_enhancement_profile"
     );
     profile.system_prompt = "SYNTHETIC editable system instructions\nKeep åäö.".into();
-    let saved = service
-        .save(ProfileUpdate {
-            profile: profile.clone(),
-            api_key: Some("synthetic-secret".into()),
-        })
-        .unwrap();
-    assert!(saved[0].has_api_key);
-    assert!(
-        !serde_json::to_string(&saved)
+    profile.story_transport = crate::enhancement_types::StoryTransport::Ollama;
+    let update: ProfileUpdate = serde_json::from_value(json!({"profile":profile,
+        "api_key":"synthetic-update-key"}))
+    .unwrap();
+    assert_eq!(
+        serde_json::to_value(&update)
             .unwrap()
-            .contains("synthetic-secret")
+            .as_object()
+            .unwrap()
+            .len(),
+        1
     );
+    let saved = service.save(update).unwrap();
+    let disk: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    assert!(disk.get("secrets").is_none());
+    assert!(!disk.to_string().contains("synthetic-"));
+    assert!(disk["profiles"][0].get("has_api_key").is_none());
+    assert!(disk["profiles"][0].get("api_key").is_none());
     assert_eq!(
         std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
         0o600
     );
     assert_eq!(Service::open(path.clone()).unwrap().profiles(), saved);
-    profile.system_prompt = "SYNTHETIC revised system instructions".into();
-    service
-        .save(ProfileUpdate {
-            profile: profile.clone(),
-            api_key: None,
-        })
-        .unwrap();
-    assert_eq!(
-        service.state.lock().unwrap().saved.secrets[&profile.id],
-        "synthetic-secret"
+    // Compatibility is narrow: unrelated misspellings still use the same wire validation.
+    let mut invalid = serde_json::to_value(&profile).unwrap();
+    invalid["model_typo"] = json!("unexpected");
+    assert!(serde_json::from_value::<Profile>(invalid).is_err());
+    let lookup: ModelsRequest = serde_json::from_value(json!({"profile_id":"proxy",
+        "base_url":"http://127.0.0.1:5002/v1","api_key":{"ignored":"any old value"}}))
+    .unwrap();
+    assert!(
+        serde_json::to_value(lookup)
+            .unwrap()
+            .get("api_key")
+            .is_none()
     );
-    service
-        .save(ProfileUpdate {
-            profile: profile.clone(),
-            api_key: Some(String::new()),
-        })
-        .unwrap();
-    assert!(!service.profiles()[0].has_api_key);
     service.delete(&profile.id).unwrap();
     assert!(Service::open(path).unwrap().profiles().is_empty());
 }
 
 #[test]
-fn failed_saves_preserve_the_last_profile_and_key() {
+fn failed_saves_preserve_the_last_profile() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("blocked");
     let service = Service::open(path.clone()).unwrap();
@@ -75,17 +88,10 @@ fn failed_saves_preserve_the_last_profile_and_key() {
         ..Default::default()
     };
     assert_eq!(
-        service
-            .save(ProfileUpdate {
-                profile,
-                api_key: Some("synthetic-key".into())
-            })
-            .unwrap_err()
-            .code,
+        service.save(ProfileUpdate { profile }).unwrap_err().code,
         "enhancement_save_failed"
     );
     assert_eq!(service.profiles(), before);
-    assert!(service.state.lock().unwrap().saved.secrets.is_empty());
 }
 
 #[test]
@@ -189,6 +195,57 @@ async fn result(service: &Service, id: &str) -> Status {
 }
 
 #[tokio::test]
+async fn legacy_keys_cannot_reach_enhancement_or_story_provider_requests() {
+    let mut provider = provider().await;
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("profiles.json");
+    let profile = Profile {
+        base_url: provider.base.clone(),
+        model: "normal".into(),
+        ..Default::default()
+    };
+    let mut legacy = serde_json::to_value(&profile).unwrap();
+    legacy["has_api_key"] = json!(true);
+    std::fs::write(
+        &path,
+        serde_json::to_vec(&json!({
+            "profiles":[legacy],"secrets":{"proxy":"own-synthetic-never-transmitted-key"}
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let service = Service::open(path).unwrap();
+    let snapshot = service.snapshot("proxy").unwrap();
+    let parameters = json!({"temperature":0.5,"top_p":0.9,"top_k":40,
+        "min_p":0.05,"repeat_penalty":1.1,"max_tokens":128,"reasoning":{}})
+    .as_object()
+    .unwrap()
+    .clone();
+    assert_eq!(
+        service
+            .authoring_complete(
+                &snapshot,
+                "koboldcpp",
+                "SYNTHETIC own system template",
+                "SYNTHETIC own user template",
+                &parameters,
+                &[]
+            )
+            .await
+            .unwrap(),
+        "SYNTHETIC enhanced prompt åäö"
+    );
+    let (headers, _) = provider.requests.recv().await.unwrap();
+    assert!(headers.get("authorization").is_none());
+    service
+        .complete(snapshot.profile, "SYNTHETIC own direct template".into())
+        .await
+        .unwrap();
+    let (headers, _) = provider.requests.recv().await.unwrap();
+    assert!(headers.get("authorization").is_none());
+}
+
+#[tokio::test]
 async fn chat_completion_freezes_profile_and_separates_system_prompt_from_user_text() {
     let mut provider = provider().await;
     let root = tempfile::tempdir().unwrap();
@@ -204,7 +261,6 @@ async fn chat_completion_freezes_profile_and_separates_system_prompt_from_user_t
     service
         .save(ProfileUpdate {
             profile: profile.clone(),
-            api_key: Some("synthetic-key".into()),
         })
         .unwrap();
     let prompt = "SYNTHETIC original prompt\nReference 1: åäö";
@@ -214,10 +270,9 @@ async fn chat_completion_freezes_profile_and_separates_system_prompt_from_user_t
     service
         .save(ProfileUpdate {
             profile: profile.clone(),
-            api_key: None,
         })
         .unwrap();
-    assert_eq!(headers["authorization"], "Bearer synthetic-key");
+    assert!(headers.get("authorization").is_none());
     assert_eq!(
         body["messages"],
         json!([{"role":"system","content":"SYNTHETIC system before edit"},{"role":"user","content":prompt}])
@@ -238,12 +293,7 @@ async fn chat_completion_freezes_profile_and_separates_system_prompt_from_user_t
     profile.model = "normal".into();
     profile.temperature = None;
     profile.token_parameter = TokenParameter::MaxTokens;
-    service
-        .save(ProfileUpdate {
-            profile,
-            api_key: Some(String::new()),
-        })
-        .unwrap();
+    service.save(ProfileUpdate { profile }).unwrap();
     let id = submit(&service, prompt);
     let (headers, body) = provider.requests.recv().await.unwrap();
     assert!(headers.get("authorization").is_none());
@@ -278,7 +328,6 @@ async fn provider_errors_and_partial_or_reasoning_only_responses_never_become_pr
                     model: model.into(),
                     ..Default::default()
                 },
-                api_key: None,
             })
             .unwrap();
         let id = submit(&service, "SYNTHETIC user prompt");
@@ -305,7 +354,6 @@ async fn cancelled_requests_release_slots_and_ignore_late_results() {
                 model: "slow".into(),
                 ..Default::default()
             },
-            api_key: None,
         })
         .unwrap();
     let id = submit(&service, "SYNTHETIC prompt");
@@ -323,4 +371,142 @@ async fn cancelled_requests_release_slots_and_ignore_late_results() {
         service.status(&id).unwrap_err().code,
         "enhancement_not_found"
     );
+}
+
+mod private_store {
+    use super::*;
+    use crate::{private_storage::Root, video_destination as d};
+    use std::path::Path;
+
+    struct Volume(Mutex<String>);
+    impl d::Environment for Volume {
+        fn mounts(&self) -> d::Result<String> {
+            Ok(self.0.lock().unwrap().clone())
+        }
+        fn host(&self) -> d::Result<String> {
+            Ok("own-provider-store-fixture".into())
+        }
+    }
+    fn fixture() -> (tempfile::TempDir, Root, Arc<Volume>, String) {
+        let own = crate::task_fixtures::env_root("TMPDIR");
+        let temp = tempfile::Builder::new()
+            .prefix("cp42provider-")
+            .tempdir_in(own)
+            .unwrap();
+        let mount = temp.path().join("volume");
+        let root = mount.join("imagine");
+        std::fs::create_dir_all(&root).unwrap();
+        let mounts = format!(
+            "1 0 0:1 / {} rw - fixturefs own-provider-store rw\n",
+            mount.display()
+        );
+        let env = Arc::new(Volume(Mutex::new(mounts.clone())));
+        let config = d::Config {
+            root,
+            mount: mount.clone(),
+            source: "own-provider-store".into(),
+            filesystem: "fixturefs".into(),
+            fsid: d::fsid(&d::directory(&mount).unwrap()).unwrap(),
+        };
+        (
+            temp,
+            Root::with_environment(config, env.clone()).unwrap(),
+            env,
+            mounts,
+        )
+    }
+    const RELATIVE: &str = "library/enhancement-profiles.json";
+    #[test]
+    fn private_profiles_roundtrip_and_strip_legacy_credentials_without_fixture_fallback() {
+        let (_temp, root, _env, _mounts) = fixture();
+        let mut profile = serde_json::to_value(Profile::default()).unwrap();
+        profile["has_api_key"] = json!(true);
+        profile["api_key"] = json!("own-old-profile-key");
+        root.write(
+            Path::new(RELATIVE),
+            &serde_json::to_vec(&json!({"profiles":[profile],
+            "secrets":{"proxy":"own-old-saved-key"}}))
+            .unwrap(),
+        )
+        .unwrap();
+        let service = Service::open_private(root.clone(), RELATIVE.into()).unwrap();
+        let mut selected = service.profiles()[0].clone();
+        selected.system_prompt = "OWN PRIVATE PROVIDER INSTRUCTIONS".into();
+        let profiles = service.save(ProfileUpdate { profile: selected }).unwrap();
+        let bytes = root.read(Path::new(RELATIVE)).unwrap().unwrap();
+        let value: Value = serde_json::from_slice(&bytes).unwrap();
+        assert!(value.get("secrets").is_none());
+        assert!(!String::from_utf8(bytes).unwrap().contains("own-old-"));
+        assert_eq!(
+            Service::open_private(root.clone(), RELATIVE.into())
+                .unwrap()
+                .profiles(),
+            profiles
+        );
+        service.delete("proxy").unwrap();
+        assert!(
+            Service::open_private(root.clone(), RELATIVE.into())
+                .unwrap()
+                .profiles()
+                .is_empty()
+        );
+        assert!(Service::open_private(root, "../outside.json".into()).is_err());
+    }
+    #[test]
+    fn private_profile_save_and_delete_revalidate_volume_preserve_state_and_recover() {
+        let (temp, root, env, mounts) = fixture();
+        let service = Service::open_private(root.clone(), RELATIVE.into()).unwrap();
+        let initial = Profile {
+            name: "Own original profile".into(),
+            ..Default::default()
+        };
+        service
+            .save(ProfileUpdate {
+                profile: initial.clone(),
+            })
+            .unwrap();
+        let path = root.layout().root().join(RELATIVE);
+        let disk = std::fs::read(&path).unwrap();
+        let previous = service.profiles();
+        let changed = Profile {
+            name: "Own changed profile".into(),
+            ..initial
+        };
+        for inaccessible in [String::new(), mounts.replace(" rw", " ro")] {
+            *env.0.lock().unwrap() = inaccessible;
+            assert_eq!(
+                service
+                    .save(ProfileUpdate {
+                        profile: changed.clone()
+                    })
+                    .unwrap_err()
+                    .code,
+                "enhancement_save_failed"
+            );
+            assert_eq!(
+                service.delete("proxy").unwrap_err().code,
+                "enhancement_save_failed"
+            );
+            assert_eq!(service.profiles(), previous);
+            // This known synthetic file is inspected directly only to establish
+            // that the failed guarded save did not touch its previous bytes.
+            assert_eq!(std::fs::read(&path).unwrap(), disk);
+            assert!(Service::open_private(root.clone(), RELATIVE.into()).is_err());
+            assert!(
+                !temp
+                    .path()
+                    .join("library/enhancement-profiles.json")
+                    .exists()
+            );
+        }
+        *env.0.lock().unwrap() = mounts;
+        let saved = service.save(ProfileUpdate { profile: changed }).unwrap();
+        assert_eq!(
+            Service::open_private(root, RELATIVE.into())
+                .unwrap()
+                .profiles(),
+            saved
+        );
+        assert_ne!(std::fs::read(path).unwrap(), disk);
+    }
 }

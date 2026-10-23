@@ -59,6 +59,7 @@ impl Grounding {
                 for image in r.images.iter().filter(|i| i.enabled) {
                     if !selections.iter().any(|i| i.asset == image.asset) {
                         selections.push(StoryImage {
+                            pair_with: None,
                             id: image.id.clone(),
                             asset: image.asset.clone(),
                             label: r.name.clone(),
@@ -83,6 +84,7 @@ impl Grounding {
                     && !selections.iter().any(|i| i.asset == binding.asset)
                 {
                     selections.push(StoryImage {
+                        pair_with: None,
                         id: binding.asset.0.clone(),
                         asset: binding.asset.clone(),
                         label: format!("{:?}", binding.role),
@@ -103,6 +105,7 @@ impl Grounding {
                 {
                     if !selections.iter().any(|i| i.asset == binding.asset) {
                         selections.push(StoryImage {
+                            pair_with: None,
                             id: binding.image_id.clone(),
                             asset: binding.asset.clone(),
                             label: "Section source image".into(),

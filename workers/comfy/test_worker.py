@@ -12,8 +12,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock
 
 from worker import (ATTENTION, MAX_HEADER, MAX_PAYLOAD, WorkerError, read_frame,
-                    component_load, references, serve, write_frame)
+                    component_load, references, serve, write_frame,
+                    private_temporary_directory)
 from runtime import Runtime, require_kitchen
+from sampling_preview import State as PreviewState
 
 
 def request(**values):
@@ -21,6 +23,59 @@ def request(**values):
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_private_temporary_directory_never_probes_an_unencrypted_fallback(self):
+        import os
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as directory:
+            missing = str(Path(directory) / "own-missing-volume")
+            with patch.dict(os.environ, {"IMAGINE_PRIVATE_TMP": missing}), \
+                 patch.object(tempfile, "tempdir", None), \
+                 patch.object(tempfile, "_get_default_tempdir", side_effect=AssertionError("fallback")):
+                private_temporary_directory()
+                with self.assertRaises(FileNotFoundError):
+                    tempfile.TemporaryFile()
+            self.assertFalse(Path(missing).exists())
+
+    def test_preview_payload_is_separate_and_does_not_replace_final_result(self):
+        class PreviewRuntime:
+            def generate(self, request, references, emit):
+                emit("preview", metadata={"frames": 1}, payload=b"\x01\x02\x03")
+                emit("preview_warning")
+                return b"unchanged final PNG"
+        incoming, outgoing = io.BytesIO(), io.BytesIO()
+        write_frame(incoming, request())
+        incoming.seek(0)
+        serve(incoming, outgoing, PreviewRuntime())
+        outgoing.seek(0)
+        read_frame(outgoing)
+        self.assertEqual(read_frame(outgoing), ({"type":"preview", "id":"synthetic", "metadata":{"frames":1}}, b"\x01\x02\x03"))
+        self.assertEqual(read_frame(outgoing), ({"type":"preview_warning", "id":"synthetic"}, b""))
+        self.assertEqual(read_frame(outgoing), ({"type":"result", "id":"synthetic"}, b"unchanged final PNG"))
+
+    def test_preview_cadence_precedes_render_and_failure_is_nonfatal(self):
+        now = [0.]
+        events = []
+        emit = lambda event, **data: events.append((event, data))
+        renderer = Mock(return_value=(1, 1, b"rgb"))
+        disabled = PreviewState(None, clock=lambda: now[0])
+        now[0] = 100.
+        disabled.update(1, object(), emit, renderer)
+        renderer.assert_not_called()
+        state = PreviewState({"enabled":True, "interval_seconds":2., "max_resolution":1}, clock=lambda: now[0])
+        now[0] = 101.
+        state.update(1, object(), emit, renderer)
+        renderer.assert_not_called()
+        now[0] = 102.
+        renderer.side_effect = ValueError("private preview detail")
+        state.update(2, object(), emit, renderer)
+        self.assertEqual(events, [("preview_warning", {})])
+        renderer.side_effect = None
+        now[0] = 104.
+        state.update(4, object(), emit, renderer)
+        self.assertEqual(events[1][0], "preview")
+        self.assertEqual(events[1][1]["metadata"]["sequence"], 1)
+        self.assertEqual(events[1][1]["payload"], b"rgb")
+
     def test_component_failures_keep_role_and_safe_cause_without_exception_text(self):
         for component in ("text_encoder", "vae", "diffusion_model"):
             for error, reason, tensor in (

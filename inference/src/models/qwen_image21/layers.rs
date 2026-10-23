@@ -27,6 +27,7 @@ fn offload_cast(rt: &Runtime, value: &Value, x: &Tensor) -> Result<Option<Value>
 }
 
 pub struct Linear {
+    dynamic: Option<std::sync::Arc<crate::checkpoint::dynamic::Module>>,
     pub weight_patches: Vec<crate::patching::Patch>,
     pub bias_patches: Vec<crate::patching::Patch>,
     pub weight: Value,
@@ -53,6 +54,7 @@ impl Linear {
         };
         let policy = state.linear_policies.get(name).cloned().unwrap_or_default();
         Ok(Self {
+            dynamic: state.dynamic_modules.get(name).cloned(),
             weight: get("weight")?,
             weight_patches: state
                 .lowvram_patches
@@ -74,6 +76,12 @@ impl Linear {
     /// # Safety
     /// Prepared parameters and inputs must satisfy their original backend contracts.
     pub unsafe fn forward(&self, rt: &Runtime, x: &Tensor) -> Result<Tensor, Error> {
+        let lease = self.dynamic.as_ref().map(|m| m.acquire(rt)).transpose()?;
+        let weight = lease.as_ref().map_or(&self.weight, |v| &v.values[0]);
+        let module_bias = lease
+            .as_ref()
+            .and_then(|v| v.values.get(1))
+            .or(self.bias.as_ref());
         let smoothed = match &self.pre_quant_scale {
             Some(scale) => Some(x.f_mul(&scale.as_tensor()?.f_to_device_(
                 x.device(),
@@ -85,7 +93,7 @@ impl Linear {
         };
         let x = smoothed.as_ref().unwrap_or(x);
         let input_shape = x.size();
-        let layout = self.weight.as_quantized().ok().map(|q| q.layout);
+        let layout = weight.as_quantized().ok().map(|q| q.layout);
         let quantize_input = layout.as_deref().is_some_and(|l| {
             !matches!(
                 l,
@@ -154,11 +162,10 @@ impl Linear {
         }
         let cast_dequantize = self.full_precision
             || (!weight_only
-                && self
-                    .weight
+                && weight
                     .as_quantized()
                     .is_ok_and(|q| q.params.original_kind != x.kind()));
-        let mut w = if let Some(w) = offload_cast(rt, &self.weight, x)? {
+        let mut w = if let Some(w) = offload_cast(rt, weight, x)? {
             w
         } else {
             let mut options = vec![
@@ -172,7 +179,7 @@ impl Linear {
             unsafe {
                 rt.op(
                     "aten::to.dtype_layout",
-                    std::slice::from_ref(&self.weight),
+                    std::slice::from_ref(weight),
                     &options,
                 )?
             }
@@ -180,7 +187,7 @@ impl Linear {
         if cast_dequantize || !self.weight_patches.is_empty() {
             w = unsafe { rt.dequantize_args(&w)? };
         }
-        let mut bias = match &self.bias {
+        let mut bias = match module_bias {
             Some(b) => {
                 if let Some(b) = offload_cast(rt, b, x)? {
                     b

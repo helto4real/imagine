@@ -136,6 +136,15 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             let start = Instant::now();
             let mut observer = |event| {
                 let event = match event {
+                    Event::Preview { metadata, pixels } => {
+                        return write(
+                            &mut output,
+                            json!({"type":"preview","id":id,"metadata":metadata}),
+                            &pixels,
+                        )
+                        .map_err(|e| Error::Native(e.to_string()));
+                    }
+                    Event::PreviewWarning => json!({"type":"preview_warning","id":id}),
                     Event::LoadFailure(diagnostic) => {
                         load_failure = Some(diagnostic);
                         return Ok(());

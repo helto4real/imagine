@@ -81,96 +81,13 @@ pub fn move_scenes(
         })
         .collect()
 }
-pub fn section_gesture(
-    scene: &Scene,
-    id: &SectionId,
-    edge: Option<bool>,
-    value: f64,
-    snap: Snap,
-    fps: Time,
-    mode: Mode,
-) -> Vec<Edit> {
-    let mut list = scene.sections.clone();
-    list.sort_by(|a, b| seconds(a.start).total_cmp(&seconds(b.start)));
-    let Some(index) = list.iter().position(|s| &s.id == id) else {
-        return vec![];
-    };
-    let minimum = 0.25;
-    let position = seconds(snapped(value, snap, fps));
-    let limit = seconds(scene.duration);
-    let start = seconds(list[index].start);
-    let end = start + seconds(list[index].duration);
-    let previous = index.checked_sub(1);
-    let next = (index + 1 < list.len()).then_some(index + 1);
-    let prev_end = previous
-        .map(|i| seconds(list[i].start) + seconds(list[i].duration))
-        .unwrap_or(0.);
-    let next_start = next.map(|i| seconds(list[i].start)).unwrap_or(limit);
-    match edge {
-        None => {
-            let last = (next_start - (end - start)).max(prev_end);
-            list[index].start = time(position.clamp(prev_end, last));
-        }
-        Some(false) => {
-            let touches = (start - prev_end).abs() < 1e-6;
-            let lower = if mode == Mode::TrimNeighbor && (touches || position < prev_end) {
-                previous
-                    .map(|i| seconds(list[i].start) + minimum)
-                    .unwrap_or(0.)
-            } else {
-                prev_end
-            };
-            let value = position.clamp(lower.min(end - minimum), end - minimum);
-            list[index].start = time(value);
-            list[index].duration = time(end - value);
-            if mode == Mode::TrimNeighbor
-                && let Some(i) = previous
-                && (touches || position < prev_end)
-            {
-                list[i].duration = time(value - seconds(list[i].start));
-            }
-        }
-        Some(true) if mode == Mode::Ripple => {
-            let last = list
-                .last()
-                .map(|s| seconds(s.start) + seconds(s.duration))
-                .unwrap_or(end);
-            let delta =
-                (position - end).clamp(-(end - start - minimum).max(0.), (limit - last).max(0.));
-            list[index].duration = time(end + delta - start);
-            for section in list.iter_mut().skip(index + 1) {
-                section.start = time(seconds(section.start) + delta);
-            }
-        }
-        Some(true) => {
-            let touches = (end - next_start).abs() < 1e-6;
-            let upper = if touches || position > next_start {
-                next.map(|i| seconds(list[i].start) + seconds(list[i].duration) - minimum)
-                    .unwrap_or(limit)
-            } else {
-                next_start
-            };
-            let value = position.clamp((start + minimum).min(upper), upper);
-            list[index].duration = time(value - start);
-            if let Some(i) = next
-                && (touches || position > next_start)
-            {
-                let last = seconds(list[i].start) + seconds(list[i].duration);
-                list[i].start = time(value);
-                list[i].duration = time(last - value);
-            }
-        }
-    }
-    list.into_iter()
-        .filter(|s| scene.sections.iter().find(|v| v.id == s.id) != Some(s))
-        .map(|section| Edit::UpdateSection {
-            scene_id: scene.id.clone(),
-            section,
-        })
-        .collect()
-}
 pub fn difference(current: &VideoProject, desired: &VideoProject) -> Vec<Edit> {
     let mut commands = vec![];
+    if current.generation != desired.generation {
+        commands.push(Edit::SetGenerationDefaults {
+            generation: desired.generation.clone(),
+        });
+    }
     if current.default_model != desired.default_model {
         commands.push(Edit::SetDefaultModel {
             model: desired.default_model.clone(),
@@ -236,6 +153,14 @@ pub fn difference(current: &VideoProject, desired: &VideoProject) -> Vec<Edit> {
                 scene_id: id.clone(),
                 model: desired.model.clone(),
             });
+        }
+        for settings in &current.settings {
+            if !desired.settings.iter().any(|s| s.model == settings.model) {
+                commands.push(Edit::InheritModelSettings {
+                    scene_id: id.clone(),
+                    model: settings.model.clone(),
+                });
+            }
         }
         for settings in &desired.settings {
             if !current.settings.contains(settings) {
@@ -383,6 +308,7 @@ mod tests {
             profile_revision: "1".into(),
         };
         VideoProject::create(CreateProject {
+            generation: None,
             schema_version: 1,
             default_model: model,
             delivery: DeliverySettings {
@@ -438,54 +364,41 @@ mod tests {
     }
     #[test]
     fn neighbor_trim_and_ripple_preserve_director_section_semantics() {
-        let mut p = project();
-        let mut s = scene("a", 0., 4.);
-        s.sections = vec![
-            Section {
-                id: SectionId("first".into()),
-                start: time(0.),
-                duration: time(1.),
-                prompt: String::new(),
-            },
-            Section {
-                id: SectionId("next".into()),
-                start: time(1.),
-                duration: time(1.),
-                prompt: String::new(),
-            },
-        ];
-        p.scenes.push(s.clone());
-        apply(
-            &mut p,
-            section_gesture(
-                &s,
+        for mode in [Mode::TrimNeighbor, Mode::Ripple] {
+            let mut p = project();
+            let mut s = scene("a", 0., 4.);
+            s.sections = vec![
+                Section {
+                    id: SectionId("first".into()),
+                    start: time(0.),
+                    duration: time(1.),
+                    prompt: String::new(),
+                },
+                Section {
+                    id: SectionId("next".into()),
+                    start: time(1.),
+                    duration: time(1.),
+                    prompt: String::new(),
+                },
+            ];
+            p.scenes.push(s);
+            p.creative.timeline_duration = Some(time(4.));
+            let commands = super::super::group_commands::resize(
+                &p,
                 &SectionId("first".into()),
-                Some(true),
+                true,
                 1.5,
                 Snap::None,
-                Time { num: 24, den: 1 },
-                Mode::TrimNeighbor,
-            ),
-        );
-        assert_eq!(p.scenes[0].sections[0].duration, time(1.5));
-        assert_eq!(p.scenes[0].sections[1].start, time(1.5));
-        assert_eq!(p.scenes[0].sections[1].duration, time(0.5));
-        let mut p = project();
-        p.scenes.push(s.clone());
-        apply(
-            &mut p,
-            section_gesture(
-                &s,
-                &SectionId("first".into()),
-                Some(true),
-                1.5,
-                Snap::None,
-                Time { num: 24, den: 1 },
-                Mode::Ripple,
-            ),
-        );
-        assert_eq!(p.scenes[0].sections[1].start, time(1.5));
-        assert_eq!(p.scenes[0].sections[1].duration, time(1.));
+                mode,
+            );
+            apply(&mut p, commands);
+            assert_eq!(p.scenes[0].sections[0].duration, time(1.5));
+            assert_eq!(p.scenes[0].sections[1].start, time(1.5));
+            assert_eq!(
+                p.scenes[0].sections[1].duration,
+                time(if mode == Mode::Ripple { 1. } else { 0.5 })
+            );
+        }
     }
     #[test]
     fn undo_restores_middle_scene_order_with_new_revision_without_rolling_back_take() {
@@ -502,7 +415,7 @@ mod tests {
         history.record(before.clone(), p.clone());
         let take = AcceptedTake {
             id: TakeId("new-result".into()),
-            model: p.default_model.clone(),
+            model: Some(p.default_model.clone()),
             source_fingerprint: "new".into(),
         };
         p.scenes[0].accepted_take = Some(take.clone());

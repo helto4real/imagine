@@ -283,10 +283,7 @@ async fn enhancement_routes_share_session_guard_and_never_start_image_inference(
         system_prompt: " \n".into(),
         ..Default::default()
     };
-    let update = imagine_server::enhancement_types::ProfileUpdate {
-        profile,
-        api_key: None,
-    };
+    let update = imagine_server::enhancement_types::ProfileUpdate { profile };
     let response = h
         .router
         .clone()

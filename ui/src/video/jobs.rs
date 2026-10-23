@@ -10,6 +10,24 @@ pub(super) struct Job {
     pub error: Option<String>,
 }
 impl Job {
+    pub(super) fn failure_message(&self) -> Option<String> {
+        self.error
+            .clone()
+            .or_else(|| {
+                self.observation["error"]["message"]
+                    .as_str()
+                    .map(str::to_owned)
+            })
+            .or_else(|| {
+                self.observation["error"]["code"].as_str().map(|code| {
+                    if code == "generation_failed" {
+                        "Video generation failed. Retry the scene.".into()
+                    } else {
+                        client::error_message(code)
+                    }
+                })
+            })
+    }
     pub fn new(id: String, request: Value) -> Option<Self> {
         if id.is_empty()
             || id.len() > 128
@@ -166,7 +184,7 @@ impl ImagineApp {
                 if let Progress::Status{sampling:Some(p),..}=client::job_progress(&job.observation) {
                     ui.add(egui::ProgressBar::new(p.completed as f32/p.total.max(1) as f32).text(format!("{} / {} steps",p.completed,p.total)).fill(helto::ACCENT));
                 }
-                let error=job.error.clone().or_else(||job.observation["error"]["message"].as_str().map(str::to_owned)).or_else(||job.observation["error"]["code"].as_str().map(|code|if code=="generation_failed" {"Video generation failed. Retry the scene.".into()}else{client::error_message(code)}));
+                let error=job.failure_message();
                 if let Some(error)=error {
                     ui.colored_label(helto::ERROR,if revealed {error.as_str()} else {"Hidden error"});
                 }

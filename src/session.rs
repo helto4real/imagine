@@ -8,6 +8,7 @@ use std::{
 pub struct Session {
     pub id: String,
     pub media: PathBuf,
+    private_root: Option<crate::private_storage::Root>,
 }
 impl Session {
     pub fn new(data: &Path) -> Result<Arc<Self>> {
@@ -18,9 +19,31 @@ impl Session {
             .recursive(true)
             .mode(0o700)
             .create(&media)?;
-        Ok(Arc::new(Self { id, media }))
+        Ok(Arc::new(Self {
+            id,
+            media,
+            private_root: None,
+        }))
+    }
+    pub fn new_private(root: &crate::private_storage::Root, project: &str) -> Result<Arc<Self>> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let media = root
+            .project(project)
+            .map_err(anyhow::Error::msg)?
+            .tmp
+            .join(&id);
+        root.directory(media.strip_prefix(root.layout().root())?)
+            .map_err(anyhow::Error::msg)?;
+        Ok(Arc::new(Self {
+            id,
+            media,
+            private_root: Some(root.clone()),
+        }))
     }
     pub fn clear(&self) -> Result<()> {
+        if let Some(root) = &self.private_root {
+            root.proof().map_err(anyhow::Error::msg)?;
+        }
         remove_tree(&self.media)
     }
 }

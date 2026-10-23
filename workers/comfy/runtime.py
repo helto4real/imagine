@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from worker import ATTENTION, WorkerError, component_load
+from sampling_preview import State as PreviewState, render as render_preview
 
 
 def require_kitchen(device, kitchen, attention):
@@ -110,9 +111,12 @@ class Runtime:
                       if custom_sigmas else None)
             emit("phase", phase="inference")
             started = time.monotonic()
+            preview = PreviewState(request.get("sampling_preview"))
 
             def callback(step, _x0, _x, total):
                 emit("progress", completed=step + 1, total=total, elapsed_seconds=time.monotonic() - started)
+                preview.update(step + 1, _x0, emit,
+                               lambda denoised, edge: render_preview(self.torch, denoised, edge))
 
             samples = self.sample.sample(
                 model, noise, settings["steps"], settings["cfg_scale"], settings["sampler"],

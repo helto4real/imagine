@@ -1,16 +1,18 @@
-//! Synthetic fixture roots must be placed on the explicitly authorized encrypted volume.
+//! Synthetic fixtures use only the explicitly approved task root on encrypted /home.
+#[path = "../../../shared/task_fixtures.rs"]
+pub mod task_fixtures;
 pub fn destination(root: &std::path::Path) -> imagine_server::video::output::Destination {
     use imagine_server::video_destination as d;
     assert!(
-        root.to_string_lossy()
-            .starts_with("/run/media/veracrypt1/imagine/.codex-")
+        task_fixtures::is_owned(root),
+        "own synthetic task destination required"
     );
     std::fs::create_dir_all(root).unwrap();
     let config = d::Config {
         root: root.into(),
-        mount: "/run/media/veracrypt1".into(),
-        source: "/dev/mapper/veracrypt1".into(),
-        filesystem: "ext3".into(),
+        mount: task_fixtures::MOUNT.into(),
+        source: task_fixtures::SOURCE.into(),
+        filesystem: task_fixtures::FILESYSTEM.into(),
         fsid: d::fsid(&d::directory(root).unwrap()).unwrap(),
     };
     let dest = imagine_server::video::output::Destination::new(config);

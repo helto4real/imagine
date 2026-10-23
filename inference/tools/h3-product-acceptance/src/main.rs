@@ -197,6 +197,9 @@ async fn main() -> Result<()> {
                     bail!("closed_worker_error")
                 }
                 p::Event::Ready { .. } => bail!("duplicate_ready"),
+                p::Event::ReferenceCache { .. } => {
+                    bail!("unexpected_reference_cache_in_no_reference_probe")
+                }
             }
         }
         Ok::<_, anyhow::Error>(())

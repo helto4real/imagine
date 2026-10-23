@@ -13,8 +13,19 @@ pub struct EditRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Edit {
+    SetGenerationDefaults {
+        generation: Option<crate::generation::Defaults>,
+    },
+    InheritModelSettings {
+        scene_id: SceneId,
+        model: ModelSelection,
+    },
     SetCreative {
         creative: crate::creative::Creative,
+    },
+    SetSceneKind {
+        scene_id: SceneId,
+        kind: crate::creative::SceneKind,
     },
     SetAssembly {
         intent: crate::assembly::Intent,
@@ -133,13 +144,25 @@ pub fn apply(project: &mut VideoProject, request: EditRequest) -> Result<(), Iss
     for command in request.commands {
         match command {
             Edit::SetCreative { creative } => candidate.creative = creative,
+            Edit::SetSceneKind { scene_id, kind } => {
+                scene(&mut candidate, &scene_id)?;
+                candidate.creative.scene_kinds.insert(scene_id, kind);
+            }
             Edit::SetAssembly { intent } => candidate.assembly = intent,
             Edit::SetClipInstance { scene_id, clip } => {
                 scene(&mut candidate, &scene_id)?;
                 if let Some(clip) = clip {
+                    candidate
+                        .creative
+                        .scene_kinds
+                        .insert(scene_id.clone(), crate::creative::SceneKind::Imported);
                     candidate.assembly.clips.insert(scene_id, clip);
                 } else {
                     candidate.assembly.clips.remove(&scene_id);
+                    candidate
+                        .creative
+                        .scene_kinds
+                        .insert(scene_id, crate::creative::SceneKind::Generated);
                 }
             }
             Edit::SetAssemblyBoundary { boundary } => {
@@ -149,6 +172,14 @@ pub fn apply(project: &mut VideoProject, request: EditRequest) -> Result<(), Iss
                     .retain(|b| b.left != boundary.left || b.right != boundary.right);
                 candidate.assembly.boundaries.push(boundary);
             }
+            Edit::SetGenerationDefaults { generation } => candidate.generation = generation,
+            Edit::InheritModelSettings { scene_id, model } => candidate
+                .scenes
+                .iter_mut()
+                .find(|s| s.id == scene_id)
+                .ok_or_else(|| Issue::new("scene_not_found", "scene_id"))?
+                .settings
+                .retain(|s| s.model != model),
             Edit::SetDefaultModel { model } => candidate.default_model = model,
             Edit::SetDelivery { delivery } => candidate.delivery = delivery,
             Edit::SetGlobalPrompt { prompt } => candidate.global_prompt = prompt,
@@ -209,6 +240,8 @@ pub fn apply(project: &mut VideoProject, request: EditRequest) -> Result<(), Iss
                 candidate.scenes.push(*scene);
             }
             Edit::RemoveScene { scene_id } => {
+                candidate.creative.scene_loras.remove(&scene_id);
+                candidate.creative.scene_kinds.remove(&scene_id);
                 candidate.creative.scene_prompts.remove(&scene_id);
                 let removed = scene(&mut candidate, &scene_id)?
                     .sections
@@ -295,6 +328,21 @@ pub fn apply(project: &mut VideoProject, request: EditRequest) -> Result<(), Iss
                 start,
             } => {
                 let mut copy = scene(&mut candidate, &scene_id)?.clone();
+                if let Some(stack) = candidate.creative.scene_loras.get(&scene_id).cloned() {
+                    candidate
+                        .creative
+                        .scene_loras
+                        .insert(new_scene_id.clone(), stack);
+                }
+                if let Some(kind) = candidate.creative.scene_kinds.get(&scene_id).copied() {
+                    candidate
+                        .creative
+                        .scene_kinds
+                        .insert(new_scene_id.clone(), kind);
+                }
+                if let Some(clip) = candidate.assembly.clips.get(&scene_id).cloned() {
+                    candidate.assembly.clips.insert(new_scene_id.clone(), clip);
+                }
                 if let Some(source) = candidate.creative.scene_prompts.get(&scene_id).cloned() {
                     candidate
                         .creative

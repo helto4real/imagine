@@ -14,6 +14,18 @@ pub struct Planned {
 fn error(code: &str) -> StorageError {
     StorageError::new(code)
 }
+fn dependency(project: &VideoProject, scene: &Scene) -> Option<SceneId> {
+    scene
+        .continuity
+        .as_ref()
+        .map(|c| c.source_scene.clone())
+        .or_else(|| {
+            imagine_video_contract::boundary::resolve(project, &scene.id)
+                .ok()
+                .flatten()
+                .map(|b| b.source_scene)
+        })
+}
 fn authoring(project: &VideoProject) -> VideoProject {
     let mut project = project.clone();
     for scene in &mut project.scenes {
@@ -67,11 +79,7 @@ pub fn plan(
         project.scene(selected)?;
         included.insert(selected.clone());
         for scene in &project.scenes {
-            if scene
-                .continuity
-                .as_ref()
-                .is_some_and(|c| included.contains(&c.source_scene))
-            {
+            if dependency(project, scene).is_some_and(|source| included.contains(&source)) {
                 included.insert(scene.id.clone());
             }
         }
@@ -79,11 +87,11 @@ pub fn plan(
     let mut reserved: BTreeSet<u64> = project
         .scenes
         .iter()
-        .filter_map(|s| locked(s).map(|t| t.provenance.seed))
+        .filter_map(|s| locked(s).and_then(|t| t.provenance.as_ref().map(|p| p.seed)))
         .collect();
     let mut targets = vec![];
     for scene in &project.scenes {
-        if project.assembly.clips.contains_key(&scene.id) {
+        if project.scene_kind(&scene.id) == imagine_video_contract::creative::SceneKind::Imported {
             continue;
         }
         if (request.mode == Mode::MissingOnly && accepted(scene).is_some())
@@ -92,10 +100,11 @@ pub fn plan(
             continue;
         }
         let previous = locked(scene);
-        if request.mode == Mode::AllSameSeeds && previous.is_none() {
+        let locked_seed = previous.and_then(|t| t.provenance.as_ref().map(|p| p.seed));
+        if request.mode == Mode::AllSameSeeds && locked_seed.is_none() {
             return Err(error("all_scenes_require_locked_seeds"));
         }
-        let use_fresh = request.mode == Mode::AllFreshSeeds || previous.is_none();
+        let use_fresh = request.mode == Mode::AllFreshSeeds || locked_seed.is_none();
         let seed = if use_fresh {
             let mut value = uuid::Uuid::new_v4().as_u128() as u64 & MAX_INTEGER;
             while reserved.contains(&value) {
@@ -104,14 +113,14 @@ pub fn plan(
             reserved.insert(value);
             value
         } else {
-            previous.unwrap().provenance.seed
+            locked_seed.unwrap()
         };
         targets.push(Target {
             scene_id: scene.id.clone(),
             seed,
             seed_source: if use_fresh { "fresh" } else { "locked_take" }.into(),
             seed_take_id: (!use_fresh).then(|| previous.unwrap().id.clone()),
-            dependency: scene.continuity.as_ref().map(|c| c.source_scene.clone()),
+            dependency: dependency(project, scene),
             job_id: None,
             completed_take_id: None,
         });
@@ -161,13 +170,13 @@ impl Planned {
         if self.intents.get(scene) != Some(&planning::input_revision(&authoring(project), scene)?) {
             return Err(error("run_inputs_changed"));
         }
-        let mut current = Some(scene);
+        let mut current = Some(scene.clone());
         while let Some(id) = current {
-            let s = project.scene(id)?;
-            if self.selections.get(id) != Some(&s.accepted_take) {
+            let s = project.scene(&id)?;
+            if self.selections.get(&id) != Some(&s.accepted_take) {
                 return Err(error("run_take_selection_changed"));
             }
-            current = s.continuity.as_ref().map(|c| &c.source_scene);
+            current = dependency(project, s);
         }
         Ok(())
     }
@@ -187,7 +196,7 @@ impl Planned {
             .ok_or_else(|| error("run_result_missing"))?;
         if take.status != TakeStatus::Candidate
             || planning::input_revision(&session.document().project, &scene)?
-                != take.provenance.input_revision
+                != take.generated()?.input_revision
         {
             return Err(error("run_result_outdated"));
         }

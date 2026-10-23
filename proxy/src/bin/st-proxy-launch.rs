@@ -103,7 +103,13 @@ fn plan(args: Vec<String>, mut env: HashMap<String, String>) -> Result<Plan> {
         direct,
     })
 }
-fn main() -> Result<()> {
+fn main() {
+    if run().is_err() {
+        eprintln!("st-proxy: launch failed");
+        std::process::exit(1);
+    }
+}
+fn run() -> Result<()> {
     let plan = plan(
         std::env::args().skip(1).collect(),
         std::env::vars().collect(),
@@ -121,10 +127,19 @@ fn main() -> Result<()> {
         command.args(plan.proxy_args);
         command
     } else {
+        let executable = std::env::current_exe()?;
+        let packaged = executable.with_file_name("st-stack.zsh");
+        let script = if packaged.is_file() {
+            packaged
+        } else {
+            root.join("proxy/st-stack.zsh")
+        };
         let mut command = Command::new("zsh");
-        command
-            .arg(root.join("proxy/st-stack.zsh"))
-            .args(plan.stack_args);
+        command.env(
+            "ST_STACK_PROXY_BINARY",
+            executable.with_file_name("st-proxy"),
+        );
+        command.arg(script).args(plan.stack_args);
         command
     };
     Err(command.envs(plan.env).exec().into())

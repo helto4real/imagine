@@ -12,6 +12,13 @@ pub const QUALITIES: [&str; 5] = [
 /// Bounded in-memory product transport, not a GPU-fit promise. Supports native
 /// 1 MP / 15 s; reject larger decoded results before any model is constructed.
 pub const MAX_RAW_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+pub fn upscale_canvas(width: u32, height: u32, factor: f64) -> Option<(u32, u32)> {
+    if !factor.is_finite() || !(1. ..=4.).contains(&factor) {
+        return None;
+    }
+    let align = |v: u32| ((f64::from(v) * factor / 32.).round_ties_even() * 32.).max(16.) as u32;
+    Some((align(width), align(height)))
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Shape {

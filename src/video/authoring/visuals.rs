@@ -32,7 +32,15 @@ pub struct Beat {
 }
 pub fn beats(images: &[StoryImage]) -> Result<Vec<Beat>, &'static str> {
     let mut out = vec![];
-    let mut start = None;
+    let starts = images
+        .iter()
+        .filter(|i| i.usage == ImageUse::StartFrame)
+        .collect::<Vec<_>>();
+    let ends = images
+        .iter()
+        .filter(|i| i.usage == ImageUse::EndFrame)
+        .collect::<Vec<_>>();
+    let mut used = std::collections::BTreeSet::new();
     for image in images {
         match image.usage {
             ImageUse::SettingReference => {}
@@ -42,22 +50,26 @@ pub fn beats(images: &[StoryImage]) -> Result<Vec<Beat>, &'static str> {
                 role: "depicted_moment",
             }),
             ImageUse::StartFrame => {
-                if start.is_some() {
-                    return Err("story_image_pair_incomplete");
-                }
-                start = Some(image.id.clone());
-            }
-            ImageUse::EndFrame => {
-                let first = start.take().ok_or("story_image_pair_incomplete")?;
+                let target = image
+                    .pair_with
+                    .as_deref()
+                    .or_else(|| (starts.len() == 1 && ends.len() == 1).then(|| ends[0].id.as_str()))
+                    .ok_or("story_image_pair_incomplete")?;
+                let end = images
+                    .iter()
+                    .find(|end| end.id == target)
+                    .ok_or("story_image_pair_incomplete")?;
+                used.insert(end.id.as_str());
                 out.push(Beat {
-                    key: format!("pair_{first}"),
-                    ids: vec![first, image.id.clone()],
+                    key: format!("pair_{}", image.id),
+                    ids: vec![image.id.clone(), end.id.clone()],
                     role: "state_transition",
                 });
             }
+            ImageUse::EndFrame => {}
         }
     }
-    if start.is_some() {
+    if ends.iter().any(|end| !used.contains(end.id.as_str())) {
         return Err("story_image_pair_incomplete");
     }
     Ok(out)
@@ -170,4 +182,30 @@ pub fn project(
     let board: Storyboard = serde_json::from_value(value).map_err(|_| "invalid_storyboard")?;
     validate(&board)?;
     Ok(board)
+}
+
+#[cfg(test)]
+mod pair_tests {
+    use super::*;
+    #[test]
+    fn directed_pair_is_independent_of_id_sorting_and_explicit_pairs_do_not_cross() {
+        let mut images: Vec<StoryImage> = serde_json::from_value(json!([
+            {"id":"a_end","asset":"own_end","label":"End","usage":"end_frame"},
+            {"id":"z_start","asset":"own_start","label":"Start","usage":"start_frame"}
+        ]))
+        .unwrap();
+        assert_eq!(beats(&images).unwrap()[0].ids, vec!["z_start", "a_end"]);
+        images.reverse();
+        assert_eq!(beats(&images).unwrap()[0].ids, vec!["z_start", "a_end"]);
+        images[0].pair_with = Some("a_end".into());
+        images.push(serde_json::from_value(json!({"id":"second_start","asset":"own_two","label":"Second","usage":"start_frame","pair_with":"a_end"})).unwrap());
+        let paired = beats(&images).unwrap();
+        assert_eq!(paired[0].ids, vec!["z_start", "a_end"]);
+        assert_eq!(paired[1].ids, vec!["second_start", "a_end"]);
+        images[2].pair_with = Some("second_start".into());
+        assert_eq!(
+            beats(&images).unwrap()[1].ids,
+            vec!["second_start", "second_start"]
+        );
+    }
 }

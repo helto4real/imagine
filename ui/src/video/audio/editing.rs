@@ -21,6 +21,7 @@ fn project_end(project: &VideoProject) -> f64 {
         )
         .fold(10., f64::max)
 }
+#[cfg(test)]
 pub(super) fn move_clips(
     project: &VideoProject,
     selected: &BTreeSet<AudioClipId>,
@@ -40,16 +41,7 @@ pub(super) fn move_clips(
     if !anchor.is_finite() {
         return vec![];
     }
-    let delta =
-        (seconds(snapped(anchor + delta, snap, project.delivery.fps)) - anchor).max(-anchor);
-    clips
-        .into_iter()
-        .map(|c| {
-            let mut c = c.clone();
-            c.start = time(seconds(c.start) + delta);
-            Edit::UpdateAudioClip { clip: Box::new(c) }
-        })
-        .collect()
+    super::super::group_commands::move_items(project, &[], selected, anchor, delta, snap)
 }
 pub(super) fn resize_clip(
     project: &VideoProject,
@@ -90,6 +82,7 @@ mod tests {
     use super::*;
     fn project() -> VideoProject {
         VideoProject::create(CreateProject {
+            generation: None,
             schema_version: 1,
             default_model: ModelSelection {
                 adapter: "synthetic".into(),

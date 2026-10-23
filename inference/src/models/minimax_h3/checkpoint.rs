@@ -268,6 +268,10 @@ pub fn static_component(
         }
         parameters.values.insert(name, value);
     }
+    let inventory = component_inventory(component)?;
+    static_component_from_inventory(rt, parameters, inventory)
+}
+pub fn component_inventory(component: Component) -> Result<ComponentInventory, Error> {
     #[derive(Deserialize)]
     struct Inventories {
         models: BTreeMap<String, ComponentInventory>,
@@ -275,9 +279,8 @@ pub fn static_component(
     let mut inventories: Inventories =
         serde_json::from_str(include_str!("../../../resources/h3-component-modules.json"))
             .map_err(|e| Error::Native(e.to_string()))?;
-    let inventory = inventories
+    inventories
         .models
         .remove(component.name())
-        .ok_or_else(|| gap("Unbound H3 component inventory"))?;
-    static_component_from_inventory(rt, parameters, inventory)
+        .ok_or_else(|| gap("Unbound H3 component inventory"))
 }

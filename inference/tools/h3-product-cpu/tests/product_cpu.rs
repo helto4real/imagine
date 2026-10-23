@@ -32,6 +32,8 @@ impl Drop for Own {
 }
 fn request(prompt: &str) -> Request {
     Request {
+        preview: None,
+        options: Default::default(),
         capture_continuation: false,
         continuation: None,
         continuation_bytes: vec![],
@@ -139,7 +141,12 @@ fn ready(own: &Own) -> p::Deployment {
 }
 struct Never;
 impl Generator for Never {
-    fn generate(&mut self, _: &Request, _: &mut wire::Emit<'_>) -> Result<(), ErrorCode> {
+    fn generate(
+        &mut self,
+        _: &Request,
+        _: &mut wire::Emit<'_>,
+        _: &mut dyn Read,
+    ) -> Result<(), ErrorCode> {
         panic!("not admitted")
     }
 }
@@ -225,6 +232,7 @@ fn latent_tail_transport_validates_version_geometry_length_hash_and_finiteness_b
         sampled_frames: r.shape.frames,
         visible_end_frame: r.shape.frames,
         selected_end_frame: r.shape.frames,
+        handoff_upscale: None,
     };
     let body = vec![0; descriptor.bytes()];
     r.continuation = Some(p::continuation::Input {
@@ -264,6 +272,98 @@ fn latent_tail_transport_validates_version_geometry_length_hash_and_finiteness_b
             "{mutation}"
         );
         assert!(!called, "{mutation}");
+    }
+}
+
+#[test]
+fn exp_upscale_tail_transport_keeps_final_source_and_stage_one_geometry_separate() {
+    use sha2::Digest;
+    let mut r = request("own Exp upscale fixture");
+    r.profile = p::Profile::AvNoReferenceV2;
+    r.shape = p::Shape {
+        width: 96,
+        height: 64,
+        ..r.shape
+    };
+    let sampling = p::sampling::Sampling {
+        first: p::sampling::Stage {
+            sigmas: vec![1., 0.5],
+            ..Default::default()
+        },
+        base_steps_to_run: 1,
+        second: Some(p::sampling::SecondStage {
+            upscale: Some(p::sampling::Upscale {
+                factor: 1.5,
+                base_width: 64,
+                base_height: 32,
+                model: None,
+            }),
+            model_file: None,
+            sampling: p::sampling::Stage {
+                sigmas: vec![0.5, 0.],
+                ..Default::default()
+            },
+            profile: p::Profile::AvNoReferenceV2,
+            handoff: p::sampling::Handoff::ReNoiseVideoPrediction,
+        }),
+    };
+    let descriptor = p::continuation::Descriptor {
+        schema_version: 1,
+        shape: r.shape,
+        sampled_frames: r.shape.frames,
+        visible_end_frame: r.shape.frames,
+        selected_end_frame: r.shape.frames,
+        handoff_upscale: p::continuation::HandoffUpscale::from_sampling(&sampling),
+    };
+    let body = vec![0; descriptor.bytes()];
+    r.continuation = Some(p::continuation::Input {
+        method: p::continuation::Method::MotionContextExp,
+        include_audio: true,
+        descriptor,
+        sha256: format!("{:x}", sha2::Sha256::digest(&body)),
+    });
+    r.sampling = Some(sampling);
+    let header = serde_json::to_vec(&r).unwrap();
+    let parsed = wire::request(&mut frame(&header, &body).as_slice()).unwrap();
+    assert_eq!(parsed.continuation_bytes, body);
+    assert_eq!(
+        parsed
+            .sampling
+            .as_ref()
+            .unwrap()
+            .input_shape(parsed.shape)
+            .width,
+        64
+    );
+    assert_eq!(parsed.continuation.unwrap().descriptor.shape.width, 96);
+    for mutation in [
+        "source_factor",
+        "source_base",
+        "missing_source",
+        "missing_target",
+    ] {
+        let mut header = serde_json::to_value(&r).unwrap();
+        match mutation {
+            "source_factor" => {
+                header["continuation"]["descriptor"]["handoff_upscale"]["factor"] = 1.6.into()
+            }
+            "source_base" => {
+                header["continuation"]["descriptor"]["handoff_upscale"]["base_width"] = 96.into()
+            }
+            "missing_source" => {
+                header["continuation"]["descriptor"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("handoff_upscale");
+            }
+            "missing_target" => header["sampling"] = serde_json::Value::Null,
+            _ => unreachable!(),
+        }
+        assert!(
+            wire::request(&mut frame(&serde_json::to_vec(&header).unwrap(), &body).as_slice())
+                .is_err(),
+            "{mutation}"
+        );
     }
 }
 #[test]

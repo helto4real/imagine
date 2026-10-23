@@ -79,6 +79,7 @@ while True:
         data: dir.path().join("data"),
         bind: "127.0.0.1:0".parse().unwrap(),
         model_root: dir.path().join("models"),
+        private_storage: None,
     };
     let engine = Comfy::new_rust(config, tx, &manifest).unwrap();
     (dir, engine, rx)

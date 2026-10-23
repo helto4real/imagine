@@ -22,6 +22,7 @@ use tokio::{
 };
 
 mod h3;
+mod image_preview;
 
 const MAX_HEADER: usize = 1024 * 1024;
 const MAX_PAYLOAD: usize = 256 * 1024 * 1024;
@@ -54,6 +55,7 @@ impl EngineKind {
 }
 
 pub struct PipeBackend {
+    reference_cache: crate::video::reference_cache_owner::Owner,
     config: Config,
     python: PathBuf,
     root: PathBuf,
@@ -80,11 +82,19 @@ impl PipeBackend {
         if !python.is_file() || !root.join("comfy/sd.py").is_file() {
             bail!("Invalid Comfy Python executable or source root");
         }
-        let script = config.project.join("workers/comfy/worker.py");
+        // A selected immutable package carries its matching Python worker too;
+        // never mix a private-storage server with an older checkout bootstrap.
+        let packaged = std::env::current_exe()?.with_file_name("comfy-worker/worker.py");
+        let script = if packaged.is_file() {
+            packaged
+        } else {
+            config.project.join("workers/comfy/worker.py")
+        };
         if !script.is_file() {
             bail!("Comfy worker source missing");
         }
         Ok(Self {
+            reference_cache: crate::video::reference_cache_owner::new(),
             config,
             python,
             root,
@@ -105,6 +115,7 @@ impl PipeBackend {
         let runtime = crate::rust_runtime::Runtime::load(manifest)?;
         state.send_modify(|s| s.h3_available = runtime.h3.is_some());
         Ok(Self {
+            reference_cache: crate::video::reference_cache_owner::new(),
             config,
             python: runtime.binary.clone(),
             root: PathBuf::new(),
@@ -136,7 +147,9 @@ impl PipeBackend {
             s.pid = self.child.as_ref().and_then(Child::id);
         });
     }
-    async fn launch(&mut self, mut command: Command) -> Result<()> {
+    async fn launch(&mut self, mut command: Command, cache_family: &str) -> Result<()> {
+        self.config
+            .private_worker_environment(command.as_std_mut(), cache_family)?;
         command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -194,7 +207,7 @@ impl PipeBackend {
                 .arg(&self.root)
                 .current_dir(&self.root);
         }
-        self.launch(command).await?;
+        self.launch(command, "rust").await?;
         self.phase("loading_model");
         let (event, body) = tokio::time::timeout(
             Duration::from_secs(300),
@@ -262,15 +275,32 @@ impl PipeBackend {
             s.progress = None;
         });
         self.ready().await?;
+        let mut preview = image_preview::Context::new(&self.state.borrow());
+        if let Some(preview) = &preview {
+            header["sampling_preview"] = json!(preview.settings);
+        }
         let id = header["id"].as_str().unwrap();
         write_frame(self.input.as_mut().unwrap(), &header, &payload).await?;
         let mut completed = 0;
         loop {
             let (event, body) = read_frame(self.output.as_mut().unwrap()).await?;
-            if !matches!(event, Event::Result { .. }) && !body.is_empty() {
+            if !matches!(event, Event::Result { .. } | Event::Preview { .. }) && !body.is_empty() {
                 bail!(EngineError("comfy_protocol_error"));
             }
             match event {
+                Event::Preview {
+                    id: event_id,
+                    metadata,
+                } if event_id == id => {
+                    if let Some(preview) = &mut preview {
+                        preview.receive(metadata, body, request.sampling.steps);
+                    }
+                }
+                Event::PreviewWarning { id: event_id } if event_id == id => {
+                    if let Some(preview) = &preview {
+                        preview.failed();
+                    }
+                }
                 Event::Phase {
                     id: event_id,
                     phase,
@@ -406,6 +436,17 @@ impl PipeBackend {
     }
 }
 impl Backend for PipeBackend {
+    fn reference_cache(
+        &self,
+    ) -> Option<std::sync::Arc<dyn crate::video::reference_cache::Control>> {
+        self.rust_runtime
+            .as_ref()
+            .and_then(|r| r.h3.as_ref())
+            .map(|_| {
+                self.reference_cache.clone()
+                    as std::sync::Arc<dyn crate::video::reference_cache::Control>
+            })
+    }
     fn generate_video<'a>(
         &'a mut self,
         request: &'a crate::h3_protocol::Request,
@@ -443,6 +484,7 @@ impl Backend for PipeBackend {
         }
     }
     fn begin_job(&mut self, id: &str) {
+        self.state.borrow().sampling_preview.begin(id);
         self.state.send_modify(|s| {
             s.job_id = Some(id.into());
             s.stage = None;
@@ -452,6 +494,9 @@ impl Backend for PipeBackend {
         self.phase("preparing");
     }
     fn mark_idle(&mut self) {
+        if let Some(id) = &self.state.borrow().job_id {
+            self.state.borrow().sampling_preview.end(id);
+        }
         self.state.send_modify(|s| {
             s.job_id = None;
             s.stage = None;
@@ -464,6 +509,7 @@ impl Backend for PipeBackend {
     }
     fn stop(&mut self) -> EngineFuture<'_, ()> {
         Box::pin(async move {
+            self.state.borrow().sampling_preview.clear();
             self.phase("unloading");
             if let Some(child) = &mut self.child {
                 if child.try_wait()?.is_none() {
@@ -567,6 +613,14 @@ enum Event {
         completed: u32,
         total: u32,
         elapsed_seconds: f64,
+    },
+    Preview {
+        id: String,
+        #[serde(default)]
+        metadata: Value,
+    },
+    PreviewWarning {
+        id: String,
     },
     Result {
         id: String,

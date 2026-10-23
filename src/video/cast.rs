@@ -62,6 +62,8 @@ pub(crate) fn from_library(
         document.project.assets.insert(
             asset.clone(),
             Asset {
+                library_source: None,
+                name: String::new(),
                 id: asset.clone(),
                 revision: 1,
                 kind: info.kind.clone(),
@@ -115,25 +117,63 @@ pub(crate) fn from_library(
             })
         })
         .transpose()?;
-    document.project.creative.references.push(VisualReference {
-        id: id.clone(),
-        name: copy.character.name,
-        alias: copy.character.alias,
-        kind: "Character".into(),
-        description: copy.character.description,
-        tags: copy.character.tags,
-        enabled: true,
-        strength: 1.,
-        retention: String::new(),
-        relationship: None,
-        images,
-        voice,
-        origin: Some(Origin {
-            library_id: copy.origin.library_id,
-            entry_id: copy.origin.entry_id,
-            revision: copy.origin.entry_revision,
-        }),
+    let mut reference = if let Some(mut reference) = copy.character.reference {
+        let previous_id = reference.id.clone();
+        for image in &mut reference.images {
+            image.id = crate::storage::id("reference_image");
+            image.asset = ids
+                .get(&image.asset.0)
+                .cloned()
+                .ok_or_else(|| StorageError::new("character_resource_missing"))?;
+        }
+        if let Some(voice) = &mut reference.voice {
+            let mut settings = BTreeMap::new();
+            for asset in &mut voice.assets {
+                let mapped = ids
+                    .get(&asset.0)
+                    .cloned()
+                    .ok_or_else(|| StorageError::new("character_resource_missing"))?;
+                if let Some(value) = voice.reference_settings.get(asset) {
+                    settings.insert(mapped.clone(), value.clone());
+                }
+                *asset = mapped;
+            }
+            voice.reference_settings = settings;
+        }
+        if let Some(relationship) = &mut reference.relationship
+            && relationship.target_reference_id.as_deref() == Some(previous_id.as_str())
+        {
+            relationship.target_reference_id = Some(id.clone());
+        }
+        reference
+    } else {
+        VisualReference {
+            id: id.clone(),
+            name: String::new(),
+            alias: String::new(),
+            kind: "Character".into(),
+            description: String::new(),
+            tags: vec![],
+            enabled: true,
+            strength: 1.,
+            retention: String::new(),
+            relationship: None,
+            images,
+            voice,
+            origin: None,
+        }
+    };
+    reference.id = id;
+    reference.name = copy.character.name;
+    reference.alias = copy.character.alias;
+    reference.description = copy.character.description;
+    reference.tags = copy.character.tags;
+    reference.origin = Some(Origin {
+        library_id: copy.origin.library_id,
+        entry_id: copy.origin.entry_id,
+        revision: copy.origin.entry_revision,
     });
+    document.project.creative.references.push(reference);
     super::review::invalidate_changed(&session.document().project, &mut document)?;
     let update = session.prepare_update(project_revision, document, copy.sources, staging)?;
     Ok(Prepared {

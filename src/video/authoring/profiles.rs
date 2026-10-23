@@ -55,6 +55,54 @@ struct Manifest {
     order: i64,
     generation: Value,
 }
+fn legacy_generation() -> Result<Generation> {
+    normalize(
+        json!({"defaults":{"temperature":0.05,"top_p":0.9,"top_k":40,"repeat_penalty":1.05,"max_tokens":4500},"operations":{"text_enhancement":{},"image_analysis":{},"story_generation":{}},"providers":{"ollama":{"defaults":{"repeat_penalty":1.1,"max_tokens":1024,"context_tokens":0},"operations":{}},"koboldcpp":{"defaults":{"min_p":0.05,"reasoning":{"include":true,"effort":"medium","enable_thinking":true}},"operations":{"image_analysis":{"max_tokens":4500},"story_generation":{"max_tokens":8000}}}}}),
+        true,
+    )
+}
+fn manifest(bytes: &[u8]) -> Result<Manifest> {
+    let mut raw: Value = serde_json::from_slice(bytes).map_err(|_| "invalid_profile")?;
+    if raw
+        .get("schema_version")
+        .is_some_and(|v| !matches!(v.as_u64(), Some(2 | 3)))
+    {
+        return Err("invalid_profile");
+    }
+    if raw.get("schema_version").is_none() {
+        let map = raw.as_object_mut().ok_or("invalid_profile")?;
+        if map.len() != 5
+            || !["id", "label", "temperature", "default", "order"]
+                .iter()
+                .all(|key| map.contains_key(*key))
+        {
+            return Err("invalid_profile");
+        }
+        let temperature = map
+            .remove("temperature")
+            .filter(|value| {
+                value
+                    .as_f64()
+                    .is_some_and(|t| t.is_finite() && (0. ..=2.).contains(&t))
+            })
+            .ok_or("invalid_profile_parameters")?;
+        map.insert("schema_version".into(), json!(1));
+        map.insert("generation".into(),json!({"defaults":{"temperature":temperature},"operations":{"text_enhancement":{"temperature":temperature},"image_analysis":{"temperature":temperature},"story_generation":{"temperature":temperature}},"providers":{}}));
+    }
+    serde_json::from_value(raw).map_err(|_| "invalid_profile")
+}
+fn legacy_animation(mut generation: Generation) -> Result<Generation> {
+    for provider in PROVIDERS {
+        let settings = resolve(&generation, provider, "story_scene_expansion")?;
+        generation
+            .providers
+            .entry(provider.into())
+            .or_default()
+            .operations
+            .insert("animate_image".into(), settings);
+    }
+    Ok(generation)
+}
 #[derive(Clone, Serialize)]
 pub struct PromptFile {
     pub key: String,
@@ -363,11 +411,10 @@ impl Catalog {
                     return Err("invalid_profile");
                 }
                 let bytes = std::fs::read(file).map_err(|_| "invalid_profile")?;
-                let mut manifest: Manifest =
-                    serde_json::from_slice(&bytes).map_err(|_| "invalid_profile")?;
+                let mut manifest = manifest(&bytes)?;
                 manifest.id = manifest.id.trim().into();
                 manifest.label = manifest.label.trim().into();
-                if manifest.schema_version != 3
+                if !matches!(manifest.schema_version, 1..=3)
                     || manifest.id != id
                     || !valid_id(&id)
                     || manifest.label.is_empty()
@@ -375,7 +422,13 @@ impl Catalog {
                 {
                     return Err("invalid_profile");
                 }
-                let overlay = normalize(manifest.generation.clone(), manifest.default)?;
+                let mut overlay = normalize(
+                    manifest.generation.clone(),
+                    manifest.default && manifest.schema_version != 1,
+                )?;
+                if manifest.default && manifest.schema_version == 1 {
+                    overlay = inherited(&legacy_generation()?, overlay);
+                }
                 Ok((manifest, overlay))
             })();
             match parsed {
@@ -391,15 +444,23 @@ impl Catalog {
             return Err("prompt_profile_default_ambiguous_or_missing");
         }
         let (default, base) = defaults[0];
-        validate_effective(base)?;
+        let base = if default.schema_version < 3 {
+            legacy_animation(base.clone())?
+        } else {
+            base.clone()
+        };
+        validate_effective(&base)?;
         let mut profiles = vec![];
         let mut prompts = BTreeMap::new();
         for (manifest, overlay) in &manifests {
-            let generation = if manifest.default {
+            let mut generation = if manifest.default {
                 base.clone()
             } else {
-                inherited(base, overlay.clone())
+                inherited(&base, overlay.clone())
             };
+            if manifest.schema_version < 3 {
+                generation = legacy_animation(generation)?;
+            }
             let loaded = (|| {
                 validate_effective(&generation)?;
                 let mut texts = BTreeMap::new();
@@ -453,7 +514,8 @@ impl Catalog {
                 }
             };
             let mut digest = Sha256::new();
-            let metadata = json!({"schema_version":3,"id":manifest.id,"label":manifest.label,"default":manifest.default,"order":manifest.order,"generation":generation});
+            let version = if manifest.schema_version == 1 { 1 } else { 3 };
+            let metadata = json!({"schema_version":version,"id":manifest.id,"label":manifest.label,"default":manifest.default,"order":manifest.order,"generation":generation});
             // Python's revision JSON uses sorted keys, compact separators and ensure_ascii.
             let serialized = canonical_json(&metadata);
             let mut ascii = String::new();
@@ -474,7 +536,7 @@ impl Catalog {
                 digest.update(&texts[key]);
             }
             profiles.push(Profile {
-                schema_version: 3,
+                schema_version: version,
                 id: manifest.id.clone(),
                 label: manifest.label.clone(),
                 default: manifest.default,

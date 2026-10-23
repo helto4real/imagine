@@ -34,6 +34,7 @@ fn fake() -> (tempfile::TempDir, Comfy, watch::Receiver<EngineState>) {
         data: directory.path().join("data"),
         bind: "127.0.0.1:0".parse().unwrap(),
         model_root: directory.path().join("models"),
+        private_storage: None,
     };
     let (sender, receiver) = watch::channel(EngineState {
         backend: "comfy".into(),
@@ -54,6 +55,33 @@ fn fake() -> (tempfile::TempDir, Comfy, watch::Receiver<EngineState>) {
     (directory, engine, receiver)
 }
 
+#[tokio::test]
+async fn actual_child_preview_errors_are_nonfatal_and_final_png_matches_disabled() {
+    let (_directory, mut engine, state) = fake();
+    let hub = state.borrow().sampling_preview.clone();
+    engine.begin_job("own-preview-public-job");
+    hub.configure(imagine_server::h3_protocol::preview::Settings {
+        enabled: false,
+        ..Default::default()
+    })
+    .unwrap();
+    let without = engine.generate(&pass("preview")).await.unwrap();
+    assert!(hub.snapshot("own-preview-public-job", 0).is_none());
+    hub.configure(Default::default()).unwrap();
+    let with = engine.generate(&pass("preview")).await.unwrap();
+    assert_eq!(without, with);
+    let first = hub.snapshot("own-preview-public-job", 0).unwrap();
+    assert_eq!(first.bytes, vec![1, 2, 3]);
+    assert!(hub.status().warning.is_none());
+    engine.generate(&pass("preview")).await.unwrap();
+    assert!(
+        hub.snapshot("own-preview-public-job", first.metadata.sequence)
+            .is_some()
+    );
+    engine.stop().await.unwrap();
+    engine.mark_idle();
+    assert!(hub.status().active_job.is_none());
+}
 #[tokio::test]
 async fn load_errors_identify_the_component_and_the_submitted_relative_path() {
     use imagine_server::component_error::{Component, ComponentLoadError, Reason};
@@ -208,6 +236,7 @@ async fn live_lora_through_rust_backend() {
         data: directory.path().into(),
         bind: "127.0.0.1:0".parse().unwrap(),
         model_root: path("IMAGINE_TEST_MODEL_ROOT"),
+        private_storage: None,
     };
     let (sender, _) = watch::channel(EngineState::default());
     let mut engine = Comfy::new(

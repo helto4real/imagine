@@ -57,11 +57,14 @@ async fn saved_profiles_round_trip_through_client_and_enhance_with_edited_system
     let profiles = client
         .save_enhancement_profile(ProfileUpdate {
             profile: profile.clone(),
-            api_key: Some("synthetic-key".into()),
         })
         .await
         .unwrap();
-    assert!(profiles[0].has_api_key);
+    assert!(
+        serde_json::to_value(&profiles).unwrap()[0]
+            .get("has_api_key")
+            .is_none()
+    );
     assert_eq!(client.enhancement_profiles().await.unwrap(), profiles);
     let id = uuid::Uuid::new_v4().to_string();
     let prompt = "SYNTHETIC user text\nReference 1";
@@ -108,7 +111,7 @@ async fn saved_profiles_round_trip_through_client_and_enhance_with_edited_system
 }
 
 #[tokio::test]
-async fn model_lookup_uses_draft_connection_and_never_leaks_saved_keys_to_another_server() {
+async fn model_lookup_uses_draft_connection_without_provider_authorization() {
     use axum::http::HeaderMap;
     let root = tempfile::tempdir().unwrap();
     let keys = Arc::new(Mutex::new(Vec::new()));
@@ -136,7 +139,6 @@ async fn model_lookup_uses_draft_connection_and_never_leaks_saved_keys_to_anothe
                 base_url: format!("{base}/v1"),
                 ..Default::default()
             },
-            api_key: Some("synthetic-saved-key".into()),
         })
         .unwrap();
     let before = std::fs::read(root.path().join("profiles.json")).unwrap();
@@ -152,29 +154,19 @@ async fn model_lookup_uses_draft_connection_and_never_leaks_saved_keys_to_anothe
     let mut lookup = ModelsRequest {
         profile_id: "proxy".into(),
         base_url: format!("{base}/v1/"),
-        api_key: None,
     };
     assert_eq!(
         client.enhancement_models(&lookup).await.unwrap(),
         vec!["synthetic-a", "synthetic-z"]
     );
-    lookup.api_key = Some("synthetic-draft-key".into());
-    client.enhancement_models(&lookup).await.unwrap();
-    lookup.api_key = Some(String::new());
-    client.enhancement_models(&lookup).await.unwrap();
-    // Same mock listener under a different hostname is a different server address.
+    // Old wire clients may still send credentials; the new wire discards them.
+    let legacy: ModelsRequest = serde_json::from_value(json!({"profile_id":"proxy",
+        "base_url":lookup.base_url,"api_key":"synthetic-draft-key"}))
+    .unwrap();
+    client.enhancement_models(&legacy).await.unwrap();
     lookup.base_url = lookup.base_url.replace("127.0.0.1", "localhost");
-    lookup.api_key = None;
     client.enhancement_models(&lookup).await.unwrap();
-    assert_eq!(
-        *keys.lock().unwrap(),
-        vec![
-            Some("Bearer synthetic-saved-key".into()),
-            Some("Bearer synthetic-draft-key".into()),
-            None,
-            None
-        ]
-    );
+    assert_eq!(*keys.lock().unwrap(), vec![None, None, None]);
     lookup.base_url = format!("{base}/empty");
     assert!(client.enhancement_models(&lookup).await.unwrap().is_empty());
     lookup.base_url = format!("{base}/missing");
@@ -251,17 +243,13 @@ async fn client_reports_invalid_system_prompt_and_cancels_an_owned_operation() {
     let error = client
         .save_enhancement_profile(ProfileUpdate {
             profile: profile.clone(),
-            api_key: None,
         })
         .await
         .unwrap_err();
     assert!(error.message.contains("system prompt"));
     profile.system_prompt = "SYNTHETIC system instructions".into();
     client
-        .save_enhancement_profile(ProfileUpdate {
-            profile,
-            api_key: None,
-        })
+        .save_enhancement_profile(ProfileUpdate { profile })
         .await
         .unwrap();
     let id = uuid::Uuid::new_v4().to_string();

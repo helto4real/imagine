@@ -138,7 +138,7 @@ async fn accepted_endpoint_drives_target_pixels_survives_reopen_and_source_repla
     assert_eq!(rgb.dimensions(), (32, 32));
     assert!(rgb.as_raw().iter().all(|pixel| *pixel == 70));
     drop(service);
-    for mutation in ["version", "ambiguous", "missing", "unbound"] {
+    for mutation in ["version", "ambiguous", "missing", "no_start_image"] {
         let revision = {
             let mut service = h.control.video.lock().await;
             let session = service
@@ -167,7 +167,9 @@ async fn accepted_endpoint_drives_target_pixels_survives_reopen_and_source_repla
                     document.resources.push(duplicate);
                 }
                 "missing" => document.resources.retain(|resource| !matches!(&resource.kind, ResourceKind::H3Endpoint { take_id, .. } if take_id == &selected)),
-                "unbound" => document.project.scenes[1].continuity.as_mut().unwrap().method = imagine_server::video::contract::ContinuityMethod::Combo,
+                // Combo is now wired for active boundaries. Hard Cut does not
+                // request its guide, leaving this I2V request without an image.
+                "no_start_image" => document.project.scenes[1].continuity.as_mut().unwrap().method = imagine_server::video::contract::ContinuityMethod::Combo,
                 _ => unreachable!(),
             }
             let revision = document.project.project_revision;
@@ -184,7 +186,7 @@ async fn accepted_endpoint_drives_target_pixels_survives_reopen_and_source_repla
             rejected["error"]["code"],
             match mutation {
                 "version" => "continuity_endpoint_incompatible",
-                "unbound" => "continuity_method_unbound",
+                "no_start_image" => "scene_runtime_unsupported",
                 _ => "continuity_endpoint_missing_or_ambiguous",
             }
         );

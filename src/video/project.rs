@@ -28,6 +28,17 @@ impl ProjectService {
         );
         Ok(project)
     }
+    pub fn create_private(
+        &mut self,
+        request: CreateProject,
+        root: &crate::private_storage::Root,
+    ) -> Result<VideoProject, super::persistence::StorageError> {
+        let project = VideoProject::create(request)?;
+        let mut session = super::persistence::ProjectSession::new(project.clone())?;
+        session.save_private(root)?;
+        self.insert(session)?;
+        Ok(project)
+    }
     pub fn read(&self, id: &ProjectId) -> Result<VideoProject, Issue> {
         self.projects
             .get(id)

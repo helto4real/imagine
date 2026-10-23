@@ -1,6 +1,33 @@
 use imagine_server::h3_protocol::*;
+#[test]
+fn boundary_receipt_is_post_sampling_exactly_once_and_has_no_media_payload() {
+    let id = "own-boundary".to_owned();
+    let mut stream = Stream::with_steps(id.clone(), Shape::default(), 1).unwrap();
+    let event = Event::BoundaryApplied {
+        id: id.clone(),
+        receipt: serde_json::json!({"dependency":{"source":"own"},"applied":true}),
+    };
+    assert!(stream.accept(&event, &[]).is_err());
+    stream
+        .accept(
+            &Event::Progress {
+                id,
+                completed: 1,
+                total: 1,
+                elapsed_seconds: 1.,
+            },
+            &[],
+        )
+        .unwrap();
+    assert!(stream.accept(&event, &[1]).is_err());
+    stream.accept(&event, &[]).unwrap();
+    assert!(stream.boundary_applied());
+    assert!(stream.accept(&event, &[]).is_err());
+}
 fn request() -> Request {
     Request {
+        preview: None,
+        options: Default::default(),
         capture_continuation: false,
         continuation: None,
         continuation_bytes: vec![],
@@ -40,7 +67,7 @@ fn request_has_no_model_paths_overrides_or_silent_versions() {
     assert!(!r.valid());
 }
 #[test]
-fn deployment_pins_core_models_and_binary_identity() {
+fn deployment_uses_protocol_and_digest_format_not_historical_provenance() {
     let mut d = Deployment {
         protocol: VERSION,
         profile: Profile::ShortAvNoReferenceV1,
@@ -50,7 +77,13 @@ fn deployment_pins_core_models_and_binary_identity() {
         dependencies_sha256: "b".repeat(64),
     };
     assert!(d.valid());
-    d.core_revision = "unreviewed".into();
+    d.core_revision = "own-compatible-rebuild".into();
+    d.model_lock_sha256 = "c".repeat(64);
+    assert!(d.valid());
+    d.protocol += 1;
+    assert!(!d.valid());
+    d.protocol = VERSION;
+    d.worker_sha256 = "invalid digest".into();
     assert!(!d.valid());
     const { assert!(MAX_HEADER < MAX_PAYLOAD) };
     assert_eq!(FPS, 24);
@@ -169,4 +202,88 @@ fn viewing_export_preserves_h3_clamp_and_ties_to_even() {
     );
     assert!(export_rgb8(&[f32::NAN]).is_err());
     assert!(export_rgb8(&[f32::INFINITY]).is_err());
+}
+
+#[test]
+fn sampling_preview_is_complete_bounded_and_never_counts_as_exported_av() {
+    let id = "own-preview".to_owned();
+    let mut stream = Stream::with_steps(id.clone(), Shape::default(), 1).unwrap();
+    let mut meta = preview::Metadata {
+        sequence: 1,
+        step: 1,
+        width: 2,
+        height: 1,
+        frames: 2,
+        frame_duration_ms: 812,
+        source_duration_seconds: 39. / 24.,
+    };
+    let event = |meta| Event::SamplingPreview {
+        id: id.clone(),
+        metadata: meta,
+    };
+    assert!(stream.accept(&event(meta.clone()), &[7; 12]).is_err());
+    stream
+        .accept(
+            &Event::Progress {
+                id: id.clone(),
+                completed: 1,
+                total: 1,
+                elapsed_seconds: 10.,
+            },
+            &[],
+        )
+        .unwrap();
+    assert!(stream.accept(&event(meta.clone()), &[7; 11]).is_err());
+    stream.accept(&event(meta.clone()), &[7; 12]).unwrap();
+    assert!(stream.accept(&event(meta.clone()), &[7; 12]).is_err());
+    meta.sequence = 2;
+    stream.accept(&event(meta), &[8; 12]).unwrap();
+    stream
+        .accept(
+            &Event::PreviewWarning {
+                id: id.clone(),
+                code: "fast_preview_failed".into(),
+            },
+            &[],
+        )
+        .unwrap();
+    let complete = Event::Complete {
+        id: id.clone(),
+        frames: FRAMES,
+        audio_samples: AUDIO_SAMPLES,
+    };
+    assert!(stream.accept(&complete, &[]).is_err());
+    for index in 0..FRAMES {
+        stream
+            .accept(
+                &Event::VideoFrame {
+                    id: id.clone(),
+                    index,
+                },
+                &vec![19; FRAME_BYTES],
+            )
+            .unwrap();
+    }
+    stream
+        .accept(
+            &Event::AudioChunk {
+                id: id.clone(),
+                start: 0,
+                samples: AUDIO_SAMPLES,
+            },
+            &vec![0; AUDIO_SAMPLES as usize * 8],
+        )
+        .unwrap();
+    stream.accept(&complete, &[]).unwrap();
+    assert!(
+        stream
+            .accept(
+                &Event::PreviewWarning {
+                    id,
+                    code: "late".into()
+                },
+                &[]
+            )
+            .is_err()
+    );
 }

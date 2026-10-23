@@ -10,8 +10,8 @@ fn main() -> anyhow::Result<()> {
     anyhow::ensure!(
         root.is_absolute()
             && root
-                .starts_with("/run/media/veracrypt1/imagine/.codex-video-night-20261020-a6428d9e"),
-        "own encrypted probe root required"
+                .starts_with("/home/thhel/tmp/.codex-video-night-20261020-a6428d9e/ui-groups-01"),
+        "own moved synthetic probe root required"
     );
     let session = ProjectSession::open(&root.join("project"))?;
     let project = session.document().project.clone();

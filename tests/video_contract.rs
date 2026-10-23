@@ -18,6 +18,7 @@ fn model(adapter: &str) -> ModelSelection {
 }
 fn request() -> CreateProject {
     CreateProject {
+        generation: None,
         schema_version: 1,
         default_model: model("h3-test"),
         delivery: DeliverySettings {
@@ -166,6 +167,8 @@ fn voice(p: &mut VideoProject) {
         vec![
             Edit::AddAsset {
                 asset: Asset {
+                    library_source: None,
+                    name: String::new(),
                     id: AssetId("voice".into()),
                     revision: 1,
                     kind: MediaKind::Audio,
@@ -245,7 +248,7 @@ fn model_switch_preserves_authoring_settings_and_accepted_take() {
     voice(&mut p);
     p.scenes[0].accepted_take = Some(AcceptedTake {
         id: TakeId("take".into()),
-        model: model("h3-test"),
+        model: Some(model("h3-test")),
         source_fingerprint: "synthetic-source".into(),
     });
     let before = p.clone();
@@ -393,7 +396,7 @@ fn fingerprint_tracks_only_effective_scene_inputs() {
     assert_eq!(before, input_revision(&p, &id).unwrap());
     p.scenes[0].accepted_take = Some(AcceptedTake {
         id: TakeId("take".into()),
-        model: model("h3-test"),
+        model: Some(model("h3-test")),
         source_fingerprint: "source".into(),
     });
     assert_eq!(before, input_revision(&p, &id).unwrap());
@@ -422,6 +425,8 @@ fn section_video_asset_revision_invalidates_generation_without_unrelated_assets(
         p.assets.insert(
             asset.clone(),
             Asset {
+                library_source: None,
+                name: String::new(),
                 id: asset,
                 kind: MediaKind::Video,
                 revision: 1,
@@ -498,6 +503,8 @@ fn role_type_and_combination_constraints_block_without_deleting_inputs() {
         &mut p,
         vec![Edit::AddAsset {
             asset: Asset {
+                library_source: None,
+                name: String::new(),
                 id: AssetId("image".into()),
                 revision: 1,
                 kind: MediaKind::Image,
@@ -539,7 +546,7 @@ fn continuity_is_source_bound_and_latent_compatibility_fails_closed() {
     );
     p.scenes[0].accepted_take = Some(AcceptedTake {
         id: TakeId("take".into()),
-        model: model("h3-test"),
+        model: Some(model("h3-test")),
         source_fingerprint: "source".into(),
     });
     assert_ne!(before, input_revision(&p, &SceneId("b".into())).unwrap());
@@ -581,7 +588,7 @@ fn duplicate_allocates_child_ids_and_cannot_forge_take() {
     let mut forged = scene("forged");
     forged.accepted_take = Some(AcceptedTake {
         id: TakeId("fake".into()),
-        model: model("h3-test"),
+        model: Some(model("h3-test")),
         source_fingerprint: "fake".into(),
     });
     assert_eq!(

@@ -1,5 +1,42 @@
 use super::*;
 #[tokio::test]
+async fn more_than_sixty_four_completed_proposals_and_applied_records_remain_usable() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "authoring-many").await;
+    let (url, worker, _) = fixture::spawn().await;
+    let id = configured(&h, &url).await;
+    let base = expanded(&h, &id, "append").await;
+    let scene = base["project"]["scenes"][0]["id"].clone();
+    for _ in 0..65 {
+        let mut body = request(&h, &id, "enhance_scene", "koboldcpp").await;
+        body["scene_id"] = scene.clone();
+        let revision = body["expected_project_revision"].clone();
+        let (code, draft) = call(
+            &h,
+            "POST",
+            &format!("/v1/video/projects/{id}/authoring"),
+            Some(body),
+        )
+        .await;
+        assert_eq!(code, 202, "{draft}");
+        let draft_id = draft["id"].as_str().unwrap();
+        let ready = wait(&h, draft_id, "review").await;
+        assert!(ready["text"].is_string());
+        let (code, saved) = call(
+            &h,
+            "POST",
+            &format!("/v1/video/authoring/{draft_id}/apply"),
+            Some(json!({"schema_version":1,"expected_project_revision":revision})),
+        )
+        .await;
+        assert_eq!(code, 200, "{saved}");
+    }
+    let (_, current) = call(&h, "GET", &format!("/v1/video/projects/{id}"), None).await;
+    assert_eq!(current["authoring"].as_array().unwrap().len(), 66);
+    worker.abort();
+    stop(h).await;
+}
+#[tokio::test]
 async fn compiled_scene_source_dialogue_and_pending_media_are_explicit_without_inference() {
     let root = tempfile::tempdir().unwrap();
     let h = setup(root.path(), "compile-source").await;
@@ -401,13 +438,14 @@ async fn cast_inventory_dialogue_retry_apply_and_reopen_keep_owned_bindings_and_
     )
     .await;
     assert_eq!(code, 200, "{saved}");
+    // Verify reopening after the owning service releases its autosave writer.
+    stop(h).await;
     let reopened = imagine_server::video::persistence::ProjectSession::open(&folder).unwrap();
     assert_eq!(
         serde_json::to_value(&reopened.document().project).unwrap(),
         applied["project"]
     );
     assert_eq!(reopened.document().authoring[0].inventory.len(), 1);
-    stop(h).await;
     worker.abort();
     let _ = worker.await;
 }
@@ -588,6 +626,8 @@ async fn story_snapshot_retry_review_atomic_apply_and_reload_preserve_provenance
     .await
     .unwrap();
     assert_eq!(failed["failed_index"], 1);
+    assert_eq!(failed["progress"]["completed"], 1);
+    assert_eq!(failed["progress"]["total"], 2);
     assert!(!failed["scenes"][0].is_null());
     assert!(failed["scenes"][1].is_null());
     let first = failed["scenes"][0].clone();
@@ -802,6 +842,80 @@ async fn enhancements_review_section_and_scene_without_mutating_unselected_field
                 before["project"]["scenes"][0]["description"]
             );
         }
+    }
+    stop(h).await;
+    worker.abort();
+    let _ = worker.await;
+}
+
+#[tokio::test]
+async fn inline_enhancement_uses_and_applies_only_the_reviewed_scene_field() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "inline-fields").await;
+    let (url, worker, state) = fixture::spawn().await;
+    let project = configured(&h, &url).await;
+    expanded(&h, &project, "append").await;
+    for field in [
+        "summary",
+        "ambient_sound",
+        "non_diegetic_music",
+        "description",
+    ] {
+        let (_, before) = call(&h, "GET", &format!("/v1/video/projects/{project}"), None).await;
+        let scene = before["project"]["scenes"][0]["id"].as_str().unwrap();
+        let source = if field == "description" {
+            before["project"]["scenes"][0]["description"]
+                .as_str()
+                .unwrap_or("")
+        } else {
+            before["project"]["creative"]["scene_prompts"][scene][field]
+                .as_str()
+                .unwrap_or("")
+        };
+        let mut payload = request(&h, &project, "enhance_scene", "koboldcpp").await;
+        payload["scene_id"] = json!(scene);
+        payload["scene_field"] = json!(field);
+        let (code, draft) = call(
+            &h,
+            "POST",
+            &format!("/v1/video/projects/{project}/authoring"),
+            Some(payload),
+        )
+        .await;
+        assert_eq!(code, 202, "{draft}");
+        let id = draft["id"].as_str().unwrap();
+        let draft = wait(&h, id, "review").await;
+        assert_eq!(draft["request"]["scene_field"], field);
+        let sent = state.requests.lock().unwrap().last().unwrap().clone();
+        assert!(
+            sent["messages"][1]["content"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("Source text:\n{source}"))
+        );
+        let text = format!("Own reviewed {field}");
+        assert_eq!(
+            call(
+                &h,
+                "POST",
+                &format!("/v1/video/authoring/{id}/review"),
+                Some(json!({"schema_version":1,"outline":null,"scenes":null,"text":text}))
+            )
+            .await
+            .0,
+            200
+        );
+        let(code,result)=call(&h,"POST",&format!("/v1/video/authoring/{id}/apply"),Some(json!({"schema_version":1,"expected_project_revision":draft["request"]["expected_project_revision"]}))).await;
+        assert_eq!(code, 200, "{result}");
+        let mut expected = before["project"].clone();
+        if field == "description" {
+            expected["scenes"][0]["description"] = json!(text);
+        } else {
+            expected["creative"]["scene_prompts"][scene][field] = json!(text);
+        }
+        expected["project_revision"] =
+            json!(before["project"]["project_revision"].as_u64().unwrap() + 1);
+        assert_eq!(result["project"], expected, "{field}");
     }
     stop(h).await;
     worker.abort();

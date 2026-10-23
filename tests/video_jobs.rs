@@ -87,6 +87,9 @@ impl Backend for Fake {
                     sampled_frames: p.shape.frames,
                     visible_end_frame: p.shape.frames,
                     selected_end_frame: p.shape.frames,
+                    handoff_upscale: p.sampling.as_ref().and_then(
+                        imagine_server::h3_protocol::continuation::HandoffUpscale::from_sampling,
+                    ),
                 };
                 let bytes = vec![0.125f32; descriptor.bytes() / 4]
                     .into_iter()
@@ -96,7 +99,8 @@ impl Backend for Fake {
             });
             if let Some(context) = &p.continuation {
                 anyhow::ensure!(
-                    context.valid(p.shape) && context.descriptor.valid_bytes(&p.continuation_bytes)
+                    context.valid_sampling(p.shape, p.sampling.as_ref())
+                        && context.descriptor.valid_bytes(&p.continuation_bytes)
                 );
                 anyhow::ensure!(
                     p.continuation_bytes
@@ -119,6 +123,8 @@ impl Backend for Fake {
         })
     }
 }
+#[path = "support/video_boundary.rs"]
+mod boundary_tests;
 #[path = "support/video_endpoint.rs"]
 mod endpoint_tests;
 #[path = "support/video_motion.rs"]
@@ -267,8 +273,8 @@ async fn exercise_frozen_reference_media(timeline_audio: bool) {
         );
         revision += 1;
     }
-    let creative = json!({"references":[{"id":"keeper_id","name":"Own keeper","alias":"keeper","kind":"character","description":"own adult keeper","enabled":true,"strength":1.,"retention":"","images":[{"id":"own-image","asset":assets[0],"enabled":true,"preview":false}],"voice":{"language":"English","description":"own voice","assets":[assets[1]]},"origin":null}],"sections":{}});
-    let mut commands = json!([{"operation":"add_section","scene_id":"s1","section":{"id":"own-dialogue","start":{"num":0,"den":1},"duration":{"num":1,"den":1},"prompt":"@keeper says [English] \"Hello!\""}},{"operation":"set_creative","creative":creative}]);
+    let creative = json!({"references":[{"id":"keeper_id","name":"Own keeper","alias":"Keeper A!","kind":"character","description":"own adult keeper","enabled":true,"strength":1.,"retention":"","images":[{"id":"own-image","asset":assets[0],"enabled":true,"preview":false}],"voice":{"language":"English","description":"own voice","assets":[assets[1]]},"origin":null}],"sections":{}});
+    let mut commands = json!([{"operation":"add_section","scene_id":"s1","section":{"id":"own-dialogue","start":{"num":0,"den":1},"duration":{"num":1,"den":1},"prompt":"@keeper_a says [English] \"Hello!\""}},{"operation":"set_creative","creative":creative}]);
     if timeline_audio {
         let mut clip = imagine_server::video::contract::AudioClip::new(
             imagine_server::video::contract::AudioClipId("own-timeline-reference".into()),
@@ -845,37 +851,33 @@ async fn shutdown_and_coordinator_loss_release_owned_work_without_publishing_can
     stop(h).await;
 }
 #[tokio::test]
-async fn unsupported_seed_and_unbound_trained_upscaler_are_blocked_before_queue_admission() {
+async fn full_u64_seed_and_inactive_trained_upscaler_metadata_reach_normal_admission() {
     let root = tempfile::tempdir().unwrap();
     let h = setup(root.path(), "state").await;
     let (project, mut request) = scene(&h).await;
-    request["seed"] = json!(9_007_199_254_740_992u64);
-    let (s, error) = call(
-        &h,
-        "POST",
-        "/v1/jobs",
-        request.clone(),
-        Some("unsupported-seed"),
-    )
-    .await;
-    assert_eq!(s, 422);
-    assert_eq!(error["error"]["code"], "scene_runtime_unsupported");
+    request["seed"] = json!(u64::MAX);
+    let first = submit(&h, request.clone(), "full-u64").await;
+    wait_calls(&h, 1).await;
+    h.probe.release.notify_one();
+    assert_eq!(terminal(&h, &first).await["status"], "succeeded");
+    let before = snapshot(&h, &project).await;
+    assert_eq!(before["takes"][0]["provenance"]["seed"], json!(u64::MAX));
     request["seed"] = json!(42);
-    let model = snapshot(&h, &project).await["project"]["default_model"].clone();
+    let model = before["project"]["default_model"].clone();
     let sampling = json!({"steps":20,"sampler":"res_multistep","scheduler":"simple"});
-    let(s,v)=call(&h,"POST",&format!("/v1/video/projects/{project}/edits"),json!({"schema_version":1,"expected_project_revision":1,"commands":[{"operation":"set_model_settings","scene_id":"s1","settings":{"model":model,"schema_version":1,"values":{"stage_one":sampling,"stage_two":{"sampling":sampling,"model":model,"handoff":"continue_latent","trained_latent_upscale_model":"explicit-unavailable-test-upscaler"}}}}]}),None).await;
+    let(s,v)=call(&h,"POST",&format!("/v1/video/projects/{project}/edits"),json!({"schema_version":1,"expected_project_revision":before["project"]["project_revision"],"commands":[{"operation":"set_model_settings","scene_id":"s1","settings":{"model":model,"schema_version":1,"values":{"stage_one":sampling,"stage_two":{"sampling":sampling,"model":model,"handoff":"continue_latent","trained_latent_upscale_model":"explicit-unused-test-upscaler"}}}}]}),None).await;
     assert_eq!(s, 200, "{v}");
-    request["expected_project_revision"] = json!(2);
-    let (s, error) = call(&h, "POST", "/v1/jobs", request, Some("unsupported-stage2")).await;
-    assert_eq!(s, 422);
-    assert_eq!(error["error"]["code"], "h3_trained_upscaler_unavailable");
-    assert!(h.probe.calls.lock().unwrap().is_empty());
+    request["expected_project_revision"] = v["project"]["project_revision"].clone();
+    let second = submit(&h, request, "inactive-upscaler").await;
+    wait_calls(&h, 2).await;
+    h.probe.release.notify_one();
+    assert_eq!(terminal(&h, &second).await["status"], "succeeded");
     assert_eq!(
         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM jobs")
             .fetch_one(&h.store.db)
             .await
             .unwrap(),
-        0
+        2
     );
     stop(h).await;
 }

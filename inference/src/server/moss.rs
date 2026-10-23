@@ -131,6 +131,7 @@ pub(super) fn generate(
         let negative = condition(contexts.pop().unwrap());
         let positive = condition(contexts.pop().unwrap());
         observer(Event::Phase("inference"))?;
+        let mut preview = super::preview_callback::State::new(r.sampling_preview);
         let mut denoiser = unsafe {
             m::MossDenoiser::bind(m::MossDenoiserConfig {
                 runtime: rt,
@@ -143,7 +144,10 @@ pub(super) fn generate(
                 multiplier: 1.,
                 execution: m::MossStaticExecution::bind(rt, &params, attention())?,
                 generator: rt.native.generator(dev, r.seed)?,
-                observer: Some(Box::new(|step| observer(Event::Step(step.i + 1)))),
+                observer: Some(Box::new(|step| {
+                    observer(Event::Step(step.i + 1))?;
+                    preview.update(&r.model, step.i + 1, step.denoised, observer)
+                })),
             })
         };
         let out = q::sample_euler(input, &sigmas, Default::default(), &mut denoiser)?;

@@ -102,6 +102,14 @@ impl Audio {
     }
 }
 impl Input {
+    pub fn boundary_receipt(&self) -> Option<serde_json::Value> {
+        self.manifest["boundary_dependency"].is_object().then(|| {
+            serde_json::json!({
+                "dependency":self.manifest["boundary_dependency"],
+                "selection":self.manifest["boundary_selection"],"applied":true
+            })
+        })
+    }
     pub fn is_empty(&self) -> bool {
         self.images.is_empty()
             && self.videos.is_empty()

@@ -1,0 +1,37 @@
+--- a/inference/src/checkpoint.rs
++++ b/inference/src/checkpoint.rs
+@@ -16,6 +16,8 @@
+ mod detector_program;
+ mod detector_values;
+ mod diffusers_program;
++pub mod dynamic;
++pub(crate) mod dynamic_vbar;
+ mod embedding;
+ mod metadata_json;
+ pub mod model_registry;
+@@ -39,6 +41,7 @@
+ type FileHandle = unsafe extern "C" fn(*mut c_void) -> u64;
+ type Free = unsafe extern "C" fn(*mut c_void);
+ struct AimdoLibrary {
++    path: PathBuf,
+     handle: NonNull<c_void>,
+     allocate: Allocate,
+     get: Get,
+@@ -86,6 +89,7 @@
+         }
+         let result = (|| unsafe {
+             Ok(AimdoLibrary {
++                path: PathBuf::from(std::ffi::OsStr::from_bytes(path.as_bytes())),
+                 handle,
+                 allocate: symbol(handle, c"model_mmap_allocate")?,
+                 get: symbol(handle, c"model_mmap_get")?,
+@@ -102,6 +106,9 @@
+                 Err(e)
+             }
+         }
++    }
++    pub fn path(&self) -> &Path {
++        &self.0.path
+     }
+     fn map(&self, path: &Path, size: usize) -> Result<Arc<Mapping>, Error> {
+         let filename = CString::new(path.as_os_str().as_bytes())

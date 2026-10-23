@@ -4,6 +4,37 @@ use super::{
 };
 use std::{collections::VecDeque, fs::File, io, sync::atomic::AtomicBool};
 const RAW_LIMIT: u64 = crate::video::media::MAX_UPLOAD;
+/// Linked originals remain on the user's filesystem. Check their authored
+/// content once per decode and reject in-place mutation during that decode.
+/// Owned/generated sources retain the existing path without extra hashing.
+fn decode_source<T>(
+    frozen: &Frozen,
+    source: &Source,
+    decode: impl FnOnce(&File) -> Result<T, &'static str>,
+) -> Result<T, &'static str> {
+    use crate::video::{bundle, persistence::source_witness};
+    let file = frozen
+        .files
+        .get(&source.resource_id)
+        .ok_or("assembly_source_missing")?;
+    if !frozen.external_sources.contains(&source.resource_id) {
+        return decode(file);
+    }
+    let before = source_witness(file).map_err(|_| "source_unavailable")?;
+    let mut descriptor = file.try_clone().map_err(|_| "source_unavailable")?;
+    let (sha256, bytes) = bundle::digest(&mut descriptor).map_err(|_| "source_unavailable")?;
+    if before != source_witness(file).map_err(|_| "source_unavailable")?
+        || sha256 != source.sha256
+        || bytes != source.bytes
+    {
+        return Err("source_changed");
+    }
+    let result = decode(file);
+    if before != source_witness(file).map_err(|_| "source_unavailable")? {
+        return Err("source_changed");
+    }
+    result
+}
 fn selected_range(clip: &ClipPlan, count: usize) -> (usize, usize, f64, f64) {
     let fps = clip.source.fps.map(seconds).unwrap_or(24.);
     let duration = count as f64 / fps;
@@ -109,13 +140,14 @@ impl Frames {
         let Some(clip) = self.frozen.plan.clips.get(self.clip_index).cloned() else {
             return Ok(false);
         };
-        let file = &self.frozen.files[&clip.source.resource_id];
         self.progress.set(
             "decoding_clip",
             self.clip_index as u64,
             self.frozen.plan.clips.len() as u64,
         );
-        let bytes = decode_video(file, &clip, &self.cancel)?;
+        let bytes = decode_source(&self.frozen, &clip.source, |file| {
+            decode_video(file, &clip, &self.cancel)
+        })?;
         let count = bytes.len() / (clip.source.width as usize * clip.source.height as usize * 3);
         let (start, end, _, _) = selected_range(&clip, count);
         if end <= start {
@@ -248,12 +280,18 @@ fn mix(frozen: &Frozen, cancel: &AtomicBool, progress: &Progress) -> Result<Vec<
                 index as u64,
                 plan.clips.len() as u64,
             );
-            let source = media::audio(&frozen.files[&clip.source.resource_id], None, cancel)?;
-            let source_end = clip
-                .source_out
-                .map(seconds)
-                .unwrap_or(seconds(clip.source.duration));
-            let samples = audio_slice(&source, seconds(clip.source_in), source_end);
+            // Director fits the soundtrack from the same decoded-frame range as
+            // the picture. VFR container duration can differ from count / fps.
+            let (source, count) = decode_source(frozen, &clip.source, |file| {
+                let source = media::audio(file, None, cancel)?;
+                let count = match clip.source.frames {
+                    Some(count) => count.try_into().map_err(|_| "invalid_video_frames")?,
+                    None => media::decoded_video_frame_count(file, cancel)?,
+                };
+                Ok((source, count))
+            })?;
+            let (_, _, source_start, source_end) = selected_range(clip, count);
+            let samples = audio_slice(&source, source_start, source_end);
             let start = round_samples(clip.output_start as f64 / fps, 44100.) as usize;
             let end =
                 round_samples((clip.output_start + clip.frames) as f64 / fps, 44100.) as usize;
@@ -278,7 +316,9 @@ fn mix(frozen: &Frozen, cancel: &AtomicBool, progress: &Progress) -> Result<Vec<
                 index as u64,
                 plan.audio.len() as u64,
             );
-            let source = media::audio(&frozen.files[&clip.source.resource_id], None, cancel)?;
+            let source = decode_source(frozen, &clip.source, |file| {
+                media::audio(file, None, cancel)
+            })?;
             let a = (clip
                 .source_start_sample
                 .unwrap_or_else(|| round_samples(seconds(clip.source_in), 44100.))
@@ -400,3 +440,7 @@ pub fn render(
     );
     result
 }
+
+#[cfg(test)]
+#[path = "external_decode_tests.rs"]
+mod external_decode_tests;

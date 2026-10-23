@@ -70,6 +70,7 @@ fn native_tail_descriptor_and_runtime_match_director_grid_and_trim() {
             sampled_frames: sampled.frames,
             visible_end_frame: head + 124,
             selected_end_frame: head + 124,
+            handoff_upscale: None,
         };
         assert!(d.valid());
         let mut bytes = vec![0; d.bytes()];
@@ -104,6 +105,7 @@ fn continuation_event_is_bounded_finite_single_and_at_end_of_sampling() {
         sampled_frames: 39,
         visible_end_frame: 39,
         selected_end_frame: 39,
+        handoff_upscale: None,
     };
     let bytes = vec![0; descriptor.bytes()];
     let event = p::Event::Continuation {
@@ -129,4 +131,115 @@ fn continuation_event_is_bounded_finite_single_and_at_end_of_sampling() {
     stream.accept(&event, &bytes).unwrap();
     assert!(stream.captured_continuation());
     assert!(stream.accept(&event, &bytes).is_err());
+}
+
+#[test]
+fn exp_upscale_preserves_final_tail_and_requires_director_handoff_geometry() {
+    let base = p::Shape {
+        width: 64,
+        height: 32,
+        ..p::Shape::default()
+    };
+    let sampling = p::sampling::Sampling {
+        second: Some(p::sampling::SecondStage {
+            upscale: Some(p::sampling::Upscale {
+                factor: 1.5,
+                base_width: base.width,
+                base_height: base.height,
+                model: Some("own-compatible-upscaler".into()),
+            }),
+            model_file: None,
+            sampling: p::sampling::Stage::default(),
+            profile: p::Profile::AvNoReferenceV2,
+            handoff: p::sampling::Handoff::ReNoiseVideoPrediction,
+        }),
+        ..Default::default()
+    };
+    let output = sampling
+        .second
+        .as_ref()
+        .unwrap()
+        .upscale
+        .as_ref()
+        .unwrap()
+        .shape(base)
+        .unwrap();
+    assert_eq!((output.width, output.height), (96, 64));
+    let descriptor = c::Descriptor {
+        schema_version: 1,
+        shape: output,
+        sampled_frames: output.frames,
+        visible_end_frame: output.frames,
+        selected_end_frame: output.frames,
+        handoff_upscale: c::HandoffUpscale::from_sampling(&sampling),
+    };
+    let mut input = c::Input {
+        method: c::Method::MotionContextExp,
+        include_audio: true,
+        descriptor,
+        sha256: "a".repeat(64),
+    };
+    assert!(input.valid_sampling(output, Some(&sampling)));
+    assert!(
+        !input.valid(output),
+        "upscaled source requires its Stage 2 settings"
+    );
+    let roundtrip: c::Descriptor =
+        serde_json::from_value(serde_json::to_value(&input.descriptor).unwrap()).unwrap();
+    assert_eq!(roundtrip, input.descriptor);
+    assert_eq!(input.descriptor.video_values(), 24 * 7 * 4 * 6);
+    let mut changed = sampling.clone();
+    changed
+        .second
+        .as_mut()
+        .unwrap()
+        .upscale
+        .as_mut()
+        .unwrap()
+        .factor = 1.6;
+    assert!(
+        changed.valid_shape(output),
+        "different factor may round to the same output"
+    );
+    assert!(
+        !input.valid_sampling(output, Some(&changed)),
+        "Director still requires the same factor"
+    );
+    changed
+        .second
+        .as_mut()
+        .unwrap()
+        .upscale
+        .as_mut()
+        .unwrap()
+        .factor = 1.5;
+    changed
+        .second
+        .as_mut()
+        .unwrap()
+        .upscale
+        .as_mut()
+        .unwrap()
+        .base_width = 96;
+    assert!(!input.valid_sampling(output, Some(&changed)));
+    input.descriptor.handoff_upscale = None;
+    assert!(
+        !input.valid_sampling(output, Some(&sampling)),
+        "legacy tails cannot invent upscale provenance"
+    );
+    input.descriptor.shape = base;
+    assert!(input.valid(base));
+    assert!(
+        serde_json::to_value(&input.descriptor)
+            .unwrap()
+            .get("handoff_upscale")
+            .is_none()
+    );
+    let mut legacy = serde_json::to_value(&input.descriptor).unwrap();
+    legacy.as_object_mut().unwrap().remove("handoff_upscale");
+    assert!(
+        serde_json::from_value::<c::Descriptor>(legacy)
+            .unwrap()
+            .valid()
+    );
 }

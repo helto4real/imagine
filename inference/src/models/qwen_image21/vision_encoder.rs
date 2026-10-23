@@ -36,22 +36,38 @@ impl Default for VisionEncoderConfig {
     }
 }
 struct Norm {
+    dynamic: Option<std::sync::Arc<crate::checkpoint::dynamic::Module>>,
     weight: Tensor,
     bias: Tensor,
 }
 impl Norm {
     fn from_parameters(state: &PreparedParameters, name: &str) -> Result<Self, Error> {
         Ok(Self {
+            dynamic: state.dynamic_modules.get(name).cloned(),
             weight: get(state, &format!("{name}.weight"))?.as_tensor()?,
             bias: get(state, &format!("{name}.bias"))?.as_tensor()?,
         })
     }
-    fn forward<E: TextEncoderExecution>(&self, x: &Tensor, exec: &mut E) -> Result<Tensor, Error> {
+    fn forward<E: TextEncoderExecution>(
+        &self,
+        rt: &Runtime,
+        x: &Tensor,
+        exec: &mut E,
+    ) -> Result<Tensor, Error> {
         exec.check_interrupt()?;
-        let weight = self
-            .weight
+        let lease = self.dynamic.as_ref().map(|m| m.acquire(rt)).transpose()?;
+        let weight = lease
+            .as_ref()
+            .map(|v| v.values[0].as_tensor())
+            .transpose()?
+            .unwrap_or_else(|| self.weight.shallow_clone())
             .f_to_device_(x.device(), x.kind(), false, false)?;
-        let bias = self.bias.f_to_device_(x.device(), x.kind(), false, false)?;
+        let bias = lease
+            .as_ref()
+            .map(|v| v.values[1].as_tensor())
+            .transpose()?
+            .unwrap_or_else(|| self.bias.shallow_clone())
+            .f_to_device_(x.device(), x.kind(), false, false)?;
         Ok(x.f_layer_norm(
             weight.size().as_slice(),
             Some(&weight),
@@ -96,9 +112,9 @@ impl Merger {
         exec: &mut E,
     ) -> Result<Tensor, Error> {
         let x = if self.postshuffle {
-            self.norm.forward(&x.f_view([-1, merge_dim])?, exec)?
+            self.norm.forward(rt, &x.f_view([-1, merge_dim])?, exec)?
         } else {
-            self.norm.forward(x, exec)?.f_view([-1, merge_dim])?
+            self.norm.forward(rt, x, exec)?.f_view([-1, merge_dim])?
         };
         exec.check_interrupt()?;
         // The two merger classes use exact GELU, unlike the vision block MLP.
@@ -114,6 +130,8 @@ fn get(state: &PreparedParameters, name: &str) -> Result<Value, Error> {
     })
 }
 pub struct QwenVisionEncoder {
+    dynamic_patch: Option<std::sync::Arc<crate::checkpoint::dynamic::Module>>,
+    dynamic_position: Option<std::sync::Arc<crate::checkpoint::dynamic::Module>>,
     pub config: VisionEncoderConfig,
     patch_weight: Tensor,
     patch_bias: Tensor,
@@ -147,6 +165,11 @@ impl QwenVisionEncoder {
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self {
+            dynamic_patch: state
+                .dynamic_modules
+                .get("visual.patch_embed.proj")
+                .cloned(),
+            dynamic_position: state.dynamic_modules.get("visual.pos_embed").cloned(),
             patch_weight: get(state, "visual.patch_embed.proj.weight")?.as_tensor()?,
             patch_bias: get(state, "visual.patch_embed.proj.bias")?.as_tensor()?,
             pos_weight: get(state, "visual.pos_embed.weight")?,
@@ -202,7 +225,7 @@ impl QwenVisionEncoder {
         exec: &mut E,
     ) -> Result<Tensor, Error> {
         let c = &self.config;
-        let (dev, kind) = match &self.pos_weight {
+        let (mut dev, kind) = match &self.pos_weight {
             Value::Quantized(_) => {
                 let q = self.pos_weight.as_quantized()?;
                 (q.payload.device(), q.params.original_kind)
@@ -212,6 +235,9 @@ impl QwenVisionEncoder {
                 (t.device(), t.kind())
             }
         };
+        if self.dynamic_position.is_some() {
+            dev = tch::Device::Cuda(0);
+        }
         let side = (c.position_embeddings as f64).sqrt() as i64;
         let mut indices: [Vec<i64>; 4] = std::array::from_fn(|_| vec![]);
         let mut weights: [Vec<f32>; 4] = std::array::from_fn(|_| vec![]);
@@ -264,8 +290,15 @@ impl QwenVisionEncoder {
             .f_view([4, n])?
             .f_to_device_(dev, kind, false, false)?;
         exec.check_interrupt()?;
-        let pos = unsafe { super::layers::embedding_rows(rt, &self.pos_weight, &ids, None)? }
-            .f_mul(&weights.f_unsqueeze(2)?)?;
+        let lease = self
+            .dynamic_position
+            .as_ref()
+            .map(|m| m.acquire(rt))
+            .transpose()?;
+        let position_weight = lease.as_ref().map_or(&self.pos_weight, |v| &v.values[0]);
+        let pos = unsafe { super::layers::embedding_rows(rt, position_weight, &ids, None)? };
+        drop(lease);
+        let pos = pos.f_mul(&weights.f_unsqueeze(2)?)?;
         let pos = pos
             .f_get(0)?
             .f_add(&pos.f_get(1)?)?
@@ -309,11 +342,22 @@ impl QwenVisionEncoder {
             c.patch_size,
             c.patch_size,
         ])?;
-        let weight = self
-            .patch_weight
+        let lease = self
+            .dynamic_patch
+            .as_ref()
+            .map(|m| m.acquire(rt))
+            .transpose()?;
+        let weight = lease
+            .as_ref()
+            .map(|v| v.values[0].as_tensor())
+            .transpose()?
+            .unwrap_or_else(|| self.patch_weight.shallow_clone())
             .f_to_device_(x.device(), x.kind(), false, false)?;
-        let bias = self
-            .patch_bias
+        let bias = lease
+            .as_ref()
+            .map(|v| v.values[1].as_tensor())
+            .transpose()?
+            .unwrap_or_else(|| self.patch_bias.shallow_clone())
             .f_to_device_(x.device(), x.kind(), false, false)?;
         let mut x = x
             .f_conv3d(
@@ -325,6 +369,9 @@ impl QwenVisionEncoder {
                 1,
             )?
             .f_view([-1, c.hidden_size])?;
+        drop(weight);
+        drop(bias);
+        drop(lease);
         exec.observe("vision_patch", &x)?;
         let pos = unsafe { self.learned_positions(rt, grid, exec)? }.f_to_device(x.device())?;
         exec.observe("vision_learned_positions", &pos)?;
@@ -354,7 +401,7 @@ impl QwenVisionEncoder {
             .collect::<Vec<_>>();
         let mut ds = vec![];
         for (i, b) in self.blocks.iter().enumerate() {
-            let n = b.norm1.forward(&x, exec)?;
+            let n = b.norm1.forward(rt, &x, exec)?;
             exec.check_interrupt()?;
             let qkv = unsafe { b.qkv.forward(rt, &n)? }
                 .f_reshape([x.size()[0], 3, c.heads, -1])?
@@ -397,7 +444,7 @@ impl QwenVisionEncoder {
             let attn = Tensor::f_cat(&outputs, 1)?.f_reshape([x.size()[0], -1])?;
             exec.check_interrupt()?;
             x = x.f_add(&unsafe { b.proj.forward(rt, &attn)? })?;
-            let n = b.norm2.forward(&x, exec)?;
+            let n = b.norm2.forward(rt, &x, exec)?;
             exec.check_interrupt()?;
             let n = unsafe { b.fc1.forward(rt, &n)? }.f_gelu("tanh")?;
             exec.check_interrupt()?;

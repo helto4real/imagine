@@ -154,6 +154,41 @@ pub fn strata_line(line: &str) -> String {
         color("_RESET")
     )
 }
+/// The terminal stream may be redirected by an operator. Keep free-form
+/// backend errors, decoded request paths and model labels in RAM responses;
+/// the diagnostic sink receives only technical event/status/timing fields.
+fn technical_record(text: &str) -> String {
+    let event = [
+        ("request started:", "request_started"),
+        ("request completed:", "request_completed"),
+        ("request rejected:", "request_rejected"),
+        ("request failed:", "request_failed"),
+        ("state transition:", "state_transition"),
+        ("MCP image job failed:", "image_job_failed"),
+        ("MCP image batch failed:", "image_batch_failed"),
+        ("broker ready:", "broker_ready"),
+        ("broker stopped", "broker_stopped"),
+    ]
+    .into_iter()
+    .find_map(|(prefix, event)| text.starts_with(prefix).then_some(event))
+    .unwrap_or("status");
+    let mut record = format!("event={event}");
+    for token in text.split_whitespace() {
+        if let Some(value) = token.strip_prefix("status=") {
+            if value.len() == 3 && value.bytes().all(|b| b.is_ascii_digit()) {
+                record.push_str(&format!(" status={value}"));
+            }
+        } else if let Some(value) = token.strip_prefix("duration=") {
+            let number = value.strip_suffix("ms").or_else(|| value.strip_suffix('s'));
+            if number.is_some_and(|v| {
+                !v.is_empty() && v.parse::<f64>().is_ok_and(|n| n.is_finite() && n >= 0.0)
+            }) {
+                record.push_str(&format!(" duration={value}"));
+            }
+        }
+    }
+    record
+}
 pub fn log(level: i32, name: &str, text: impl AsRef<str>) {
     if level < LEVEL.load(Ordering::Relaxed) {
         return;
@@ -186,6 +221,39 @@ pub fn log(level: i32, name: &str, text: impl AsRef<str>) {
     let _ = writeln!(
         io::stderr().lock(),
         "{}",
-        format(&stamp, level, name, text.as_ref(), colored)
+        format(
+            &stamp,
+            level,
+            name,
+            &technical_record(text.as_ref()),
+            colored
+        )
     );
+}
+
+#[cfg(test)]
+mod privacy_tests {
+    use super::technical_record;
+    #[test]
+    fn diagnostic_sink_omits_paths_raw_errors_and_private_text() {
+        assert_eq!(
+            technical_record(
+                "request failed: target=own-private-model path=/own-private-image error=own-private-prompt status=502 duration=0.125s"
+            ),
+            "event=request_failed status=502 duration=0.125s"
+        );
+        assert_eq!(
+            technical_record("own-private-model: own-private-prompt\n/own-private-image"),
+            "event=status"
+        );
+    }
+    #[test]
+    fn malformed_diagnostic_fields_never_become_text_fields() {
+        assert_eq!(
+            technical_record(
+                "status=own-private-text duration=own-private-path duration=NaNs duration=-2s duration=3ms"
+            ),
+            "event=status duration=3ms"
+        );
+    }
 }

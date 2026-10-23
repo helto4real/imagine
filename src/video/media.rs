@@ -37,6 +37,14 @@ pub struct Info {
     pub channels: Option<u32>,
 }
 pub fn detect(file: &File) -> Result<Info, &'static str> {
+    detect_with_policy(file, false)
+}
+/// Descriptor-only AV callers may inspect a large compressed source without buffering it.
+/// Image callers retain the existing encoded-buffer bound.
+pub fn detect_streamed(file: &File) -> Result<Info, &'static str> {
+    detect_with_policy(file, true)
+}
+fn detect_with_policy(file: &File, streamed: bool) -> Result<Info, &'static str> {
     use std::os::unix::fs::FileExt;
     let mut header = [0u8; 64];
     let n = file
@@ -66,11 +74,17 @@ pub fn detect(file: &File) -> Result<Info, &'static str> {
     } else {
         return Err("unsupported_media_type");
     };
-    inspect(file, mime)
+    inspect_with_policy(file, mime, streamed)
 }
 pub fn inspect(file: &File, mime: &str) -> Result<Info, &'static str> {
+    inspect_with_policy(file, mime, false)
+}
+pub fn inspect_streamed(file: &File, mime: &str) -> Result<Info, &'static str> {
+    inspect_with_policy(file, mime, true)
+}
+fn inspect_with_policy(file: &File, mime: &str, streamed: bool) -> Result<Info, &'static str> {
     let length = file.metadata().map_err(|_| "media_io_failed")?.len();
-    if length == 0 || length > MAX_UPLOAD {
+    if length == 0 || ((!streamed || mime.starts_with("image/")) && length > MAX_UPLOAD) {
         return Err("invalid_media_size");
     }
     if mime.starts_with("image/") {
@@ -205,7 +219,7 @@ fn decimal(value: &str) -> Option<Time> {
     let t = Time { num, den };
     t.valid().then(|| t.normalized())
 }
-fn probe_command(file: &File, format: &str, entries: &str, output: &str) -> Command {
+pub(super) fn probe_command(file: &File, format: &str, entries: &str, output: &str) -> Command {
     let mut command = Command::new("/usr/bin/ffprobe");
     command
         .args([
@@ -323,11 +337,11 @@ fn packet_duration(file: &File, format: &str) -> Result<Option<Time>, &'static s
     }
     Ok(span(first, end))
 }
-fn probe(file: &File, format: &str) -> Result<serde_json::Value, &'static str> {
+pub(super) fn probe(file: &File, format: &str) -> Result<serde_json::Value, &'static str> {
     let mut child = probe_command(
         file,
         format,
-        "stream=codec_type,width,height,avg_frame_rate,r_frame_rate,nb_frames,sample_rate,channels,start_time,duration",
+        "stream=codec_type,codec_name,width,height,avg_frame_rate,r_frame_rate,nb_frames,sample_rate,channels,sample_fmt,start_time,duration:format=duration",
         "json",
     )
     .spawn()

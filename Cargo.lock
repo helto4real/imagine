@@ -2040,6 +2040,7 @@ dependencies = [
  "arboard",
  "axum",
  "eframe",
+ "fancy-regex",
  "image",
  "imagine-server",
  "imagine-video-contract",
@@ -2062,6 +2063,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sha2",
  "uuid",
 ]

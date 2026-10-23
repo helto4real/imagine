@@ -172,22 +172,6 @@ impl VideoDesk {
     }
 }
 impl ImagineApp {
-    pub(super) fn can_animate_image(&self) -> bool {
-        self.can_edit_image() && !self.video.working && self.video.pending.is_none()
-    }
-    pub(super) fn start_animating(&mut self) {
-        if !self.can_animate_image() {
-            return;
-        }
-        self.video.start_image = self.image.selected_result().cloned();
-        self.timeline.quick_clip = true;
-        self.video.i2v = true;
-        self.video.selection.ratio = "Source".into();
-        self.video.selection.portrait = false;
-        self.video.error = None;
-        self.workspace = Workspace::Video;
-    }
-
     pub(super) fn refresh_video(&mut self, ctx: &egui::Context) {
         let Some(client) = self.client.clone() else {
             return;
@@ -455,30 +439,15 @@ mod tests {
         (root, app, ctx)
     }
     #[test]
-    fn animate_keeps_source_alive_and_never_submits_until_requested() {
+    fn animate_requires_a_selected_image_and_no_pending_clip() {
         let (_root, mut app, _ctx) = app();
         app.workspace = Workspace::Image;
         assert!(app.can_animate_image());
-        let original = app.image.selected_result().unwrap().asset_id.clone();
-        app.start_animating();
-        assert_eq!(app.workspace, Workspace::Video);
-        assert_eq!(app.video.selection.ratio, "Source");
-        assert!(app.video.i2v);
+        app.video.working = true;
+        assert!(!app.can_animate_image());
+        app.video.working = false;
         app.image.result = None;
-        assert_eq!(app.video.start_image.as_ref().unwrap().asset_id, original);
-        assert!(app.video.pending.is_none());
-        assert!(!app.video.working);
-        assert!(app.video.shape().is_ok());
-        let request = app.video.request().unwrap();
-        assert_eq!(request["inputs"]["start_image"], original);
-        app.video.start_image = None;
-        assert!(app.video.request().is_err());
-        app.video.i2v = false;
-        app.video.selection = Default::default();
-        assert_eq!(
-            app.video.request().unwrap()["video"]["profile"],
-            "h3-av-noref-v2"
-        );
+        assert!(!app.can_animate_image());
     }
     #[test]
     fn audio_helper_uses_valid_stereo_flags_and_reaps_with_dummy_devices() {

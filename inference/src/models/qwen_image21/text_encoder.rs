@@ -132,6 +132,7 @@ struct LanguageBlock {
 pub struct QwenTextEncoder {
     pub config: TextEncoderConfig,
     pub embedding: Value,
+    dynamic_embedding: Option<std::sync::Arc<crate::checkpoint::dynamic::Module>>,
     blocks: Vec<LanguageBlock>,
     norm: Option<Tensor>,
 }
@@ -529,6 +530,7 @@ impl QwenTextEncoder {
         }
         Ok(Self {
             embedding: parameter(state, "model.embed_tokens.weight")?,
+            dynamic_embedding: state.dynamic_modules.get("model.embed_tokens").cloned(),
             norm: if final_norm {
                 Some(parameter(state, "model.norm.weight")?.as_tensor()?)
             } else {
@@ -548,7 +550,13 @@ impl QwenTextEncoder {
         exec: &mut E,
     ) -> Result<Tensor, Error> {
         exec.check_interrupt()?;
-        unsafe { super::layers::embedding_rows(rt, &self.embedding, ids, Some(Kind::Float)) }
+        let lease = self
+            .dynamic_embedding
+            .as_ref()
+            .map(|m| m.acquire(rt))
+            .transpose()?;
+        let weight = lease.as_ref().map_or(&self.embedding, |v| &v.values[0]);
+        unsafe { super::layers::embedding_rows(rt, weight, ids, Some(Kind::Float)) }
     }
 
     /// # Safety

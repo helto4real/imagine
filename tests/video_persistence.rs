@@ -25,6 +25,8 @@ fn with_reference(staging: &SessionStaging) -> ProjectSession {
     doc.project.assets.insert(
         AssetId("image".into()),
         Asset {
+            library_source: None,
+            name: String::new(),
             id: AssetId("image".into()),
             revision: 1,
             kind: MediaKind::Image,
@@ -222,6 +224,8 @@ fn invalid_documents_and_missing_inputs_do_not_mutate_session() {
     invalid.project.assets.insert(
         AssetId("missing".into()),
         Asset {
+            library_source: None,
+            name: String::new(),
             id: AssetId("missing".into()),
             revision: 0,
             kind: MediaKind::Video,
@@ -293,6 +297,7 @@ fn character_library_has_independent_media_and_voice_copy() {
     );
     let key = r.key();
     let character = CharacterDocument {
+        reference: None,
         schema_version: 1,
         id: "character".into(),
         name: "Synthetic".into(),
@@ -364,6 +369,8 @@ fn all_completed_take_statuses_and_historical_references_survive_open() {
     {
         let id = TakeId(format!("take-{i}"));
         let provenance = TakeProvenance {
+            boundary: None,
+            resolved_loras: None,
             model: model.clone(),
             seed: 42,
             input_revision: "synthetic-input".into(),
@@ -383,7 +390,7 @@ fn all_completed_take_statuses_and_historical_references_survive_open() {
         if status == TakeStatus::Accepted {
             doc.project.scenes[0].accepted_take = Some(AcceptedTake {
                 id: id.clone(),
-                model: model.clone(),
+                model: Some(model.clone()),
                 source_fingerprint: "synthetic-input".into(),
             });
         }
@@ -391,7 +398,7 @@ fn all_completed_take_statuses_and_historical_references_survive_open() {
             id: id.clone(),
             scene_id: doc.project.scenes[0].id.clone(),
             status,
-            provenance,
+            provenance: Some(provenance),
         });
         let (r, f) = input(
             &format!("video-{i}"),
@@ -423,11 +430,35 @@ fn all_completed_take_statuses_and_historical_references_survive_open() {
     drop(p);
     drop(staging);
     drop(stage);
-    let reopened = ProjectSession::open(output.path()).unwrap();
+    let mut reopened = ProjectSession::open(output.path()).unwrap();
     assert_eq!(reopened.document(), &expected);
     assert_eq!(reopened.document().takes.len(), 4);
     assert_eq!(bytes(&reopened, "old-reference"), b"OLD REFERENCE");
     assert_eq!(bytes(&reopened, "latent-3"), b"OPAQUE SYNTHETIC LATENT");
+    let commands = reopened
+        .document()
+        .project
+        .scenes
+        .iter()
+        .map(|scene| Edit::RemoveScene {
+            scene_id: scene.id.clone(),
+        })
+        .collect();
+    reopened
+        .edit(EditRequest {
+            schema_version: 1,
+            expected_project_revision: reopened.document().project.project_revision,
+            commands,
+        })
+        .unwrap();
+    assert!(reopened.document().project.scenes.is_empty());
+    assert_eq!(reopened.document().takes, expected.takes);
+    assert_eq!(reopened.document().resources, expected.resources);
+    drop(reopened);
+    let retained = ProjectSession::open(output.path()).unwrap();
+    assert_eq!(retained.document().takes, expected.takes);
+    assert_eq!(bytes(&retained, "video-0"), b"SYNTHETIC VIDEO 0");
+    assert_eq!(bytes(&retained, "latent-3"), b"OPAQUE SYNTHETIC LATENT");
 }
 
 #[test]

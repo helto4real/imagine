@@ -1,3 +1,4 @@
+use crate::async_runtime::runtime;
 use crate::{
     client::{
         self, Client, Completed, Failure, OutputRole, Preview, Progress, Reference, Submission,
@@ -21,6 +22,10 @@ struct ReferenceView {
     texture: egui::TextureHandle,
 }
 enum Message {
+    SamplingPreview {
+        nonce: u64,
+        reply: sampling_preview::Reply,
+    },
     Timeline(timeline::Event),
     Video(video_ui::Event),
     Queue(queue::Event),
@@ -41,13 +46,6 @@ fn send(tx: &Sender<Message>, ctx: &egui::Context, msg: Message) {
     let _ = tx.send(msg);
     ctx.request_repaint();
 }
-fn runtime() -> tokio::runtime::Runtime {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("client runtime")
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Workspace {
     Image,
@@ -134,16 +132,19 @@ impl GenerationDesk {
 pub struct ImagineApp {
     #[cfg(feature = "ui-preview")]
     qa: Option<timeline::qa::Runner>,
+    #[cfg(feature = "ui-preview")]
+    qa_manual_picker_root: Option<PathBuf>,
     clipboard: Option<crate::clipboard::Clipboard>,
-    project: PathBuf,
     connection: Connection,
     prefs: Preferences,
+    preferences_store: crate::settings::PreferencesStore,
     client: Option<Client>,
     metadata: Option<Value>,
     models: models::ModelUi,
     enhancement: enhancement::EnhancementUi,
     video: video_ui::VideoDesk,
     timeline: timeline::Timeline,
+    sampling_preview: sampling_preview::State,
     image: GenerationDesk,
     edit: editing::EditSession,
     sheet: GenerationDesk,
@@ -178,8 +179,10 @@ impl ImagineApp {
         Self {
             #[cfg(feature = "ui-preview")]
             qa: None,
+            #[cfg(feature = "ui-preview")]
+            qa_manual_picker_root: None,
             clipboard: None,
-            project,
+            preferences_store: crate::settings::PreferencesStore::Fixture(project),
             connection,
             prefs,
             client: None,
@@ -188,6 +191,7 @@ impl ImagineApp {
             enhancement: Default::default(),
             video: Default::default(),
             timeline: Default::default(),
+            sampling_preview: Default::default(),
             image: GenerationDesk::default(),
             edit: editing::EditSession::default(),
             sheet: GenerationDesk {
@@ -204,6 +208,18 @@ impl ImagineApp {
             tx,
             rx,
         }
+    }
+    pub fn with_preferences_store(
+        mut self,
+        store: crate::settings::PreferencesStore,
+        warning: Option<String>,
+    ) -> Self {
+        if store.server_owned_output() {
+            self.prefs.output_folder.clear();
+        }
+        self.preferences_store = store;
+        self.settings_error = warning;
+        self
     }
     fn desk_for(&self, workspace: Workspace) -> &GenerationDesk {
         match workspace {
@@ -277,6 +293,9 @@ impl ImagineApp {
     fn receive(&mut self, ctx: &egui::Context) {
         while let Ok(message) = self.rx.try_recv() {
             match message {
+                Message::SamplingPreview { nonce, reply } => {
+                    self.sampling_preview_reply(ctx, nonce, reply)
+                }
                 Message::Video(event) => self.video_message(ctx, event),
                 Message::Timeline(event) => self.timeline_message(ctx, event),
                 Message::Queue(event) => self.queue_message(ctx, event),
@@ -391,10 +410,11 @@ impl ImagineApp {
                         output_folder: folder,
                         ..self.prefs.clone()
                     };
-                    match prefs.save(&self.project) {
-                        Ok(()) => { self.prefs = prefs; self.settings_error = None; }
-                        Err(_) => self.settings_error = Some("Could not save the folder choice. Check write permissions for .imagine.".into()),
-                    }
+                    self.prefs = prefs;
+                    self.settings_error =
+                        self.preferences_store.save(&self.prefs).err().map(|error| {
+                            format!("Folder choice is kept in memory but was not saved: {error}")
+                        });
                 }
                 Message::Folder(None) => self.picking_folder = false,
                 Message::Progress(workspace, Progress::Submitted(job)) => {
@@ -679,15 +699,18 @@ impl ImagineApp {
             return;
         }
         self.settings_error = self
-            .prefs
-            .save(&self.project)
+            .preferences_store
+            .save(&self.prefs)
             .err()
-            .map(|_| "Could not save settings. Check write permissions for .imagine.".into());
+            .map(|error| format!("Settings are kept in memory but were not saved: {error}"));
     }
 }
 
 #[path = "workspace.rs"]
 mod workspace;
+
+#[path = "video/sampling_preview.rs"]
+mod sampling_preview;
 
 #[path = "editing.rs"]
 mod editing;
@@ -887,6 +910,7 @@ impl eframe::App for ImagineApp {
     }
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.receive(ctx);
+        self.timeline_final_tick(ctx);
         #[cfg(feature = "ui-preview")]
         self.qa_tick(ctx);
     }

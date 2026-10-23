@@ -2,12 +2,23 @@
 //! Only serde/serde_json/std: no tensor, CUDA, filesystem or async dependencies.
 use serde::{Deserialize, Serialize};
 
-// Version 8 adds frame batches and index-paired video soundtracks.
-pub const VERSION: u32 = 8;
+// Version 13 adds disposable sampling previews, separate from final AV output.
+// v15 carries trained-upscale continuation geometry. v14 readers reject that
+// descriptor field; negotiate a matching worker before sending physical tails.
+// v16 reports actual adaptive-solver callback progress, including total corrections.
+pub const VERSION: u32 = 16;
+#[path = "h3_reference_cache.rs"]
+pub mod cache;
 #[path = "h3_continuation.rs"]
 pub mod continuation;
 #[path = "h3_geometry.rs"]
 pub mod geometry;
+#[path = "h3_options.rs"]
+pub mod options;
+#[path = "h3_preview.rs"]
+pub mod preview;
+#[path = "h3_progress.rs"]
+pub mod progress;
 #[path = "h3_references.rs"]
 pub mod references;
 #[path = "h3_sampling.rs"]
@@ -69,8 +80,8 @@ pub struct Deployment {
 impl Deployment {
     pub fn valid(&self) -> bool {
         self.protocol == VERSION
-            && self.core_revision == CORE_REVISION
-            && self.model_lock_sha256 == MODEL_LOCK_SHA256
+            // Revisions and model-lock digests describe build provenance, not ABI.
+            && is_sha256(&self.model_lock_sha256)
             && is_sha256(&self.worker_sha256)
             && is_sha256(&self.dependencies_sha256)
     }
@@ -90,6 +101,10 @@ pub enum RequestKind {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview: Option<preview::Settings>,
+    #[serde(default)]
+    pub options: options::Options,
     pub protocol: u32,
     pub kind: RequestKind,
     pub id: String,
@@ -127,6 +142,8 @@ impl Request {
     }
     pub fn valid_settings(&self) -> bool {
         self.protocol == VERSION
+            && self.preview.as_ref().is_none_or(preview::Settings::valid)
+            && self.options.valid()
             && valid_id(&self.id)
             && !self.prompt.trim().is_empty()
             && self.prompt.len() <= MAX_PROMPT_BYTES
@@ -134,16 +151,18 @@ impl Request {
             && (self.profile != Profile::ShortAvNoReferenceV1 || self.shape == Shape::default())
             && (self.profile != Profile::ShortAvNoReferenceV1
                 || (self.seed == 42 && self.sampling.is_none()))
-            && self.seed <= 9_007_199_254_740_991
-            && self.sampling.as_ref().is_none_or(sampling::Sampling::valid)
+            && self
+                .sampling
+                .as_ref()
+                .is_none_or(|s| s.valid() && s.valid_shape(self.shape))
             && self.references.valid()
             && (!self.capture_continuation || self.shape.frames >= 22)
             && (self.profile != Profile::ShortAvNoReferenceV1
                 || (!self.capture_continuation && self.continuation.is_none()))
-            && self
-                .continuation
-                .as_ref()
-                .is_none_or(|v| self.profile == Profile::AvNoReferenceV2 && v.valid(self.shape))
+            && self.continuation.as_ref().is_none_or(|v| {
+                self.profile == Profile::AvNoReferenceV2
+                    && v.valid_sampling(self.shape, self.sampling.as_ref())
+            })
             && serde_json::to_vec(self).is_ok_and(|header| header.len() <= MAX_HEADER)
     }
 }
@@ -161,6 +180,8 @@ pub enum Phase {
     EncodingText,
     LoadingDit,
     Sampling,
+    LoadingUpscaler,
+    UpscalingLatents,
     LoadingVideoVae,
     DecodingVideo,
     LoadingAudioVae,
@@ -175,10 +196,25 @@ pub enum ErrorCode {
     ComponentLoadFailed,
     OutOfMemory,
     GenerationFailed,
+    LatentUpscaleFailed,
+    LoraLoadFailed,
+    UpscaleContextUnavailable,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Event {
+    SamplingPreview {
+        id: String,
+        metadata: preview::Metadata,
+    },
+    PreviewWarning {
+        id: String,
+        code: String,
+    },
+    ReferenceCache {
+        id: String,
+        command: cache::Command,
+    },
     Ready {
         deployment: Deployment,
     },
@@ -207,6 +243,10 @@ pub enum Event {
         id: String,
         descriptor: continuation::Descriptor,
     },
+    BoundaryApplied {
+        id: String,
+        receipt: serde_json::Value,
+    },
     Complete {
         id: String,
         frames: u32,
@@ -216,6 +256,15 @@ pub enum Event {
         id: Option<String>,
         code: ErrorCode,
     },
+}
+impl Event {
+    pub fn payload_limit(&self) -> usize {
+        if matches!(self, Self::SamplingPreview { .. }) {
+            preview::MAX_BYTES
+        } else {
+            MAX_PAYLOAD
+        }
+    }
 }
 /// Product uses this before accepting any bytes. No partial result is publishable.
 /// Ready is checked against the verified deployment before constructing a stream.
@@ -228,10 +277,15 @@ pub struct Stream {
     expected_steps: u32,
     terminal: bool,
     continuation: bool,
+    preview_sequence: u64,
+    boundary_applied: bool,
 }
 impl Stream {
     pub fn captured_continuation(&self) -> bool {
         self.continuation
+    }
+    pub fn boundary_applied(&self) -> bool {
+        self.boundary_applied
     }
     pub fn new(id: String) -> Option<Self> {
         Self::with_shape(id, Shape::default())
@@ -240,26 +294,45 @@ impl Stream {
         Self::with_steps(id, shape, STEPS)
     }
     pub fn with_steps(id: String, shape: Shape, expected_steps: u32) -> Option<Self> {
-        (valid_id(&id)
-            && shape.valid()
-            && expected_steps > 0
-            && expected_steps <= 2 * sampling::MAX_STEPS)
-            .then_some(Self {
-                shape,
-                id,
-                frames: 0,
-                audio_samples: 0,
-                steps: 0,
-                expected_steps,
-                terminal: false,
-                continuation: false,
-            })
+        (valid_id(&id) && shape.valid() && expected_steps > 0).then_some(Self {
+            shape,
+            id,
+            frames: 0,
+            audio_samples: 0,
+            steps: 0,
+            expected_steps,
+            terminal: false,
+            continuation: false,
+            preview_sequence: 0,
+            boundary_applied: false,
+        })
     }
     pub fn accept(&mut self, event: &Event, payload: &[u8]) -> Result<(), &'static str> {
-        if self.terminal || payload.len() > MAX_PAYLOAD {
+        if self.terminal || payload.len() > event.payload_limit() {
             return Err("h3_protocol_error");
         }
         match event {
+            Event::BoundaryApplied { id, receipt }
+                if id == &self.id
+                    && !self.boundary_applied
+                    && payload.is_empty()
+                    && self.steps == self.expected_steps
+                    && receipt["applied"] == true
+                    && receipt["dependency"].is_object() =>
+            {
+                self.boundary_applied = true;
+            }
+            Event::SamplingPreview { id, metadata }
+                if id == &self.id
+                    && metadata.sequence > self.preview_sequence
+                    && metadata.step > 0
+                    && metadata.step <= self.steps
+                    && metadata.valid_payload(payload.len()) =>
+            {
+                self.preview_sequence = metadata.sequence;
+            }
+            Event::PreviewWarning { id, code }
+                if id == &self.id && payload.is_empty() && !code.is_empty() => {}
             Event::Continuation { id, descriptor }
                 if id == &self.id
                     && !self.continuation
@@ -269,6 +342,8 @@ impl Stream {
             {
                 self.continuation = true;
             }
+            Event::ReferenceCache { id, command }
+                if id == &self.id && command.valid_payload(payload.len()) => {}
             Event::Phase { id, .. } if id == &self.id && payload.is_empty() => {}
             Event::Progress {
                 id,
@@ -277,13 +352,15 @@ impl Stream {
                 elapsed_seconds,
             } if id == &self.id
                 && payload.is_empty()
-                && *total == self.expected_steps
-                && *completed > self.steps
-                && *completed <= self.expected_steps
+                && *completed > 0
+                && *completed >= self.steps
+                && (*completed > self.steps || *total != self.expected_steps)
+                && *completed <= *total
                 && elapsed_seconds.is_finite()
                 && *elapsed_seconds >= 0. =>
             {
                 self.steps = *completed;
+                self.expected_steps = *total;
             }
             Event::VideoFrame { id, index }
                 if id == &self.id

@@ -73,6 +73,7 @@ fn scene_fault(error: crate::video::persistence::StorageError) -> Fault {
         "reference_resource_missing" => Fault::new(422, "reference_resource_missing"),
         "resource_integrity_failed" => Fault::new(422, "resource_integrity_failed"),
         "unsupported_h3_geometry" => Fault::new(422, "unsupported_h3_geometry"),
+        "imported_scene_not_generatable" => Fault::new(422, "imported_scene_not_generatable"),
         _ => Fault::new(422, "invalid_scene_request"),
     }
 }
@@ -211,7 +212,7 @@ pub async fn start_coordinated(
     let (state, receiver) = watch::channel(json!({"paused":paused,"active_job":false,"queued":0}));
     let coordinated = coordinator.is_some();
     let video = std::sync::Arc::new(tokio::sync::Mutex::new(
-        crate::video::service::Service::default(),
+        crate::video::service::Service::with_reference_cache(engine.reference_cache()),
     ));
     let scheduler = Scheduler {
         assemblies: Default::default(),
@@ -337,21 +338,16 @@ impl Scheduler {
                 let frozen =
                     crate::video::execution::freeze(&*self.video.lock().await, &request, &staging)
                         .map_err(scene_fault)?;
-                let proof = self
+                let destination = self
                     .store
-                    .videos
-                    .destination()
-                    .and_then(|d| d.proof())
+                    .output_destination(Some(&frozen.target.project_id.0), true)
                     .map_err(|c| Fault::new(422, c))?;
-                self.store
-                    .videos
-                    .destination()
-                    .and_then(|d| {
-                        d.preflight(
-                            &json!(proof),
-                            frozen.request.shape.raw_bytes() + 64 * 1024 * 1024,
-                        )
-                    })
+                let proof = destination.proof().map_err(|c| Fault::new(422, c))?;
+                destination
+                    .preflight(
+                        &json!(proof),
+                        frozen.request.shape.raw_bytes() + 64 * 1024 * 1024,
+                    )
                     .map_err(|c| Fault::new(422, c))?;
                 let summary = frozen.summary().to_string();
                 let job = id("job");
@@ -574,13 +570,13 @@ impl Scheduler {
         }
         // API clients without a local-folder selection use the configured server destination.
         // UI clients send a proof, which must match; no client path becomes authoritative.
-        if request.model != "minimax-h3"
-            && !request.client_metadata.contains_key("video_destination")
+        if self.store.private_root().is_some()
+            || (request.model != "minimax-h3"
+                && !request.client_metadata.contains_key("video_destination"))
         {
             let proof = self
                 .store
-                .videos
-                .destination()
+                .output_destination(None, request.model == "minimax-h3")
                 .and_then(|d| d.proof())
                 .map_err(|e| Fault::new(422, e))?;
             request
@@ -599,8 +595,7 @@ impl Scheduler {
             32 * 1024 * 1024
         };
         self.store
-            .videos
-            .destination()
+            .destination_for_proof(&request.client_metadata["video_destination"])
             .and_then(|d| d.preflight(&request.client_metadata["video_destination"], required))
             .map_err(|e| Fault::new(422, e))?;
         let fingerprint = hash(&serde_json::to_vec(&request).expect("serializable request"));
@@ -712,9 +707,15 @@ impl Scheduler {
             let token = cancel.clone();
             let mut ticket = self.granted.take();
             let (target, scene_input) = if let Some(scene) = scene {
+                let project = scene.target.project_id.clone();
                 (
                     Some(scene.target),
-                    Some((scene.request, scene.first_frame, scene.reference_inputs)),
+                    Some((
+                        scene.request,
+                        scene.first_frame,
+                        scene.reference_inputs,
+                        project,
+                    )),
                 )
             } else {
                 (None, None)
@@ -730,8 +731,8 @@ impl Scheduler {
                         _=token.cancelled()=>Err(anyhow::anyhow!("cancelled")),
                         _=async {ticket.as_mut().unwrap().lost().await}, if ticket.is_some()=>Err(anyhow::anyhow!(EngineError("coordinator_unavailable"))),
                         result=async {
-                            if let Some((input,image,references))=scene_input {
-                                let proof=store.videos.destination().and_then(|d|d.proof()).map_err(EngineError)?;
+                            if let Some((input,image,references,project))=scene_input {
+                                let proof=store.output_destination(Some(&project.0), true).and_then(|d|d.proof()).map_err(EngineError)?;
                                 crate::video::execution::generate(engine.as_mut(),input,image,references,json!(proof),&store).await
                             } else {
                                 crate::generation::generate(engine.as_mut(),request.as_ref().expect("image or legacy video"),&worker_owner,&store).await

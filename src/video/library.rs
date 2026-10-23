@@ -30,6 +30,9 @@ pub struct CharacterDocument {
     pub visual_ids: Vec<String>,
     pub voice: Option<VoiceProfile>,
     pub resources: Vec<Resource>,
+    /// Portable reference metadata: image/voice asset keys refer to resource ids.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference: Option<imagine_video_contract::creative::VisualReference>,
 }
 impl CharacterDocument {
     fn validate(&self) -> Result<(), StorageError> {
@@ -53,6 +56,23 @@ impl CharacterDocument {
         {
             return Err(StorageError::new("invalid_character_resource"));
         }
+        if let Some(reference) = &self.reference
+            && (reference
+                .images
+                .iter()
+                .any(|image| !self.visual_ids.contains(&image.asset.0))
+                || reference
+                    .voice
+                    .iter()
+                    .flat_map(|voice| &voice.assets)
+                    .any(|asset| {
+                        self.voice
+                            .as_ref()
+                            .is_none_or(|voice| !voice.reference_ids.contains(&asset.0))
+                    }))
+        {
+            return Err(StorageError::new("character_resource_missing"));
+        }
         Ok(())
     }
 }
@@ -66,6 +86,13 @@ impl CharacterDocument {
 pub enum LibraryContent {
     Project(Box<ProjectDocument>),
     Character(Box<CharacterDocument>),
+    Asset(Box<AssetDocument>),
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AssetDocument {
+    pub asset: Asset,
+    pub resource: Resource,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -80,6 +107,7 @@ impl LibraryEntry {
         match &self.content {
             LibraryContent::Project(p) => p.resources.iter().collect(),
             LibraryContent::Character(c) => c.resources.iter().collect(),
+            LibraryContent::Asset(a) => vec![&a.resource],
         }
     }
 }
@@ -121,6 +149,13 @@ impl Bundle for LibraryDocument {
             match &entry.content {
                 LibraryContent::Project(p) => p.validate()?,
                 LibraryContent::Character(c) => c.validate()?,
+                LibraryContent::Asset(a) => {
+                    validate_resources(std::slice::from_ref(&a.resource))?;
+                    if !matches!(&a.resource.kind,ResourceKind::Reference{asset_id,..}if asset_id==&a.asset.id)
+                    {
+                        return Err(StorageError::new("asset_resource_missing"));
+                    }
+                }
             }
         }
         Ok(())
@@ -131,26 +166,56 @@ pub struct CharacterCopy {
     pub origin: LibraryOrigin,
     pub sources: BTreeMap<BlobKey, File>,
 }
+#[derive(Debug, Clone, Serialize)]
+pub struct MediaEntry {
+    pub entry_id: String,
+    pub entry_revision: u64,
+    pub resource_id: String,
+    pub name: String,
+    pub kind: MediaKind,
+}
 pub struct LibrarySession {
     document: LibraryDocument,
     store: Store<LibraryDocument>,
     sources: BTreeMap<BlobKey, File>,
+    location: std::path::PathBuf,
 }
 impl LibrarySession {
     pub fn create(path: &Path) -> Result<Self, StorageError> {
+        let store = Store::select(path, "library.json")?;
+        Self::create_at(path, store)
+    }
+    fn create_at(path: &Path, mut store: Store<LibraryDocument>) -> Result<Self, StorageError> {
         let document = LibraryDocument {
             schema_version: 1,
             id: format!("library_{}", uuid::Uuid::new_v4().simple()),
             revision: 0,
             entries: vec![],
         };
-        let mut store = Store::select(path, "library.json")?;
         let mut sources = BTreeMap::new();
         store.save(&document, &mut sources)?;
         Ok(Self {
             document,
             store,
             sources,
+            location: path.into(),
+        })
+    }
+    pub fn create_private(root: &crate::private_storage::Root) -> Result<Self, StorageError> {
+        let path = root.library().map_err(StorageError::new)?;
+        let store = Store::select_private(&path, "library.json", root)?;
+        Self::create_at(&path, store)
+    }
+    pub fn open_private(root: &crate::private_storage::Root) -> Result<Self, StorageError> {
+        let path = root.library().map_err(StorageError::new)?;
+        let (store, document) =
+            Store::<LibraryDocument>::open_private(&path, "library.json", root)?;
+        let sources = store.files(&document)?;
+        Ok(Self {
+            document,
+            store,
+            sources,
+            location: path,
         })
     }
     pub fn open(path: &Path) -> Result<Self, StorageError> {
@@ -160,12 +225,177 @@ impl LibrarySession {
             document,
             store,
             sources,
+            location: path.into(),
         })
+    }
+    pub fn location(&self) -> &Path {
+        &self.location
     }
     pub fn document(&self) -> &LibraryDocument {
         &self.document
     }
+    pub fn media_entries(&self) -> Vec<MediaEntry> {
+        self.document
+            .entries
+            .iter()
+            .flat_map(|entry| {
+                entry.resources().into_iter().filter_map(move |resource| {
+                    let ResourceKind::Reference { asset_id, .. } = &resource.kind else {
+                        return None;
+                    };
+                    let (kind, name) = match &entry.content {
+                        LibraryContent::Project(p) => {
+                            let asset = p.project.assets.get(asset_id)?;
+                            (
+                                asset.kind.clone(),
+                                if asset.name.is_empty() {
+                                    format!("{} · {}", entry.title, asset.id.0)
+                                } else {
+                                    asset.name.clone()
+                                },
+                            )
+                        }
+                        LibraryContent::Character(c) => {
+                            let kind = if c.visual_ids.contains(&resource.id) {
+                                MediaKind::Image
+                            } else if c
+                                .voice
+                                .as_ref()
+                                .is_some_and(|v| v.reference_ids.contains(&resource.id))
+                            {
+                                MediaKind::Audio
+                            } else {
+                                return None;
+                            };
+                            (kind, format!("{} · {}", entry.title, resource.id))
+                        }
+                        LibraryContent::Asset(a) => (a.asset.kind.clone(), entry.title.clone()),
+                    };
+                    Some(MediaEntry {
+                        entry_id: entry.id.clone(),
+                        entry_revision: entry.revision,
+                        resource_id: resource.id.clone(),
+                        name,
+                        kind,
+                    })
+                })
+            })
+            .collect()
+    }
+    pub fn media_file(
+        &self,
+        entry: &str,
+        revision: u64,
+        resource: &str,
+    ) -> Result<(Resource, File), StorageError> {
+        use std::os::fd::AsRawFd;
+        let entry = self.entry(entry, revision)?;
+        let resource = entry
+            .resources()
+            .into_iter()
+            .find(|r| r.id == resource && matches!(r.kind, ResourceKind::Reference { .. }))
+            .ok_or_else(|| StorageError::new("resource_missing"))?;
+        if let Some(file) = resource.open_source()? {
+            return Ok((resource.clone(), file));
+        }
+        let file = self
+            .sources
+            .get(&resource.key())
+            .ok_or_else(|| StorageError::new("resource_missing"))?;
+        // Reopen this owned descriptor for an independent stream position.
+        let file = File::open(format!("/proc/self/fd/{}", file.as_raw_fd()))
+            .map_err(|_| StorageError::new("storage_io_failed"))?;
+        Ok((resource.clone(), file))
+    }
     /// Explicit save only. replace=(entry id, expected revision) updates a selected entry.
+    pub fn save_asset(
+        &mut self,
+        title: String,
+        replace: Option<(&str, u64)>,
+        project: &ProjectSession,
+        id: &AssetId,
+    ) -> Result<String, StorageError> {
+        let asset = project
+            .document()
+            .project
+            .assets
+            .get(id)
+            .cloned()
+            .ok_or_else(|| StorageError::new("asset_not_found"))?;
+        let resource = project
+            .document()
+            .resources
+            .iter()
+            .find(|r| matches!(&r.kind,ResourceKind::Reference{asset_id,..}if asset_id==id))
+            .cloned()
+            .ok_or_else(|| StorageError::new("resource_missing"))?;
+        self.save_content(
+            title,
+            replace,
+            LibraryContent::Asset(Box::new(AssetDocument { asset, resource })),
+            project.files()?,
+        )
+    }
+    /// Manifest-only editing/removal. External originals and content blobs are never deleted.
+    pub fn edit_entry(
+        &mut self,
+        id: &str,
+        expected: u64,
+        title: Option<String>,
+        description: Option<String>,
+        remove: bool,
+    ) -> Result<(), StorageError> {
+        self.entry(id, expected)?;
+        let mut candidate = self.document.clone();
+        candidate.revision = candidate
+            .revision
+            .checked_add(1)
+            .ok_or_else(|| StorageError::new("revision_exhausted"))?;
+        if remove {
+            candidate.entries.retain(|entry| entry.id != id);
+        } else {
+            let entry = candidate
+                .entries
+                .iter_mut()
+                .find(|entry| entry.id == id)
+                .unwrap();
+            entry.revision = entry
+                .revision
+                .checked_add(1)
+                .ok_or_else(|| StorageError::new("revision_exhausted"))?;
+            if let Some(title) = title {
+                entry.title = title;
+            }
+            if let (Some(description), LibraryContent::Character(c)) =
+                (description, &mut entry.content)
+            {
+                c.description = description;
+            }
+        }
+        if !remove {
+            let index = candidate
+                .entries
+                .iter()
+                .position(|entry| entry.id == id)
+                .unwrap();
+            let entry = candidate.entries.remove(index);
+            candidate.entries.push(entry);
+        }
+        candidate.validate()?;
+        let mut sources = bundle::clone_files(&self.sources)?;
+        let result = self.store.save(&candidate, &mut sources);
+        if result.is_ok()
+            || result
+                .as_ref()
+                .is_err_and(|e| e.code == "storage_durability_uncertain")
+        {
+            self.document = candidate;
+            self.sources = sources;
+        }
+        result?;
+        self.sources = self.store.files(&self.document)?;
+        Ok(())
+    }
     pub fn save_project(
         &mut self,
         title: String,
@@ -296,10 +526,24 @@ impl LibrarySession {
             return Err(StorageError::new("entry_kind_mismatch"));
         };
         let mut sources = BTreeMap::new();
+        let owned: BTreeSet<_> = character
+            .resources
+            .iter()
+            .filter(|r| r.source.is_none())
+            .map(Resource::key)
+            .collect();
         for (key, mut source) in self.select_sources(entry)? {
-            sources.insert(key, staging.copy(&mut source)?);
+            let file = if owned.contains(&key) {
+                staging.copy(&mut source)?
+            } else {
+                source
+            };
+            sources.insert(key, file);
         }
         for resource in &character.resources {
+            if resource.source.is_some() {
+                continue;
+            }
             let file = sources
                 .get_mut(&resource.key())
                 .ok_or_else(|| StorageError::new("resource_missing"))?;
@@ -319,6 +563,10 @@ impl LibrarySession {
     ) -> Result<BTreeMap<BlobKey, File>, StorageError> {
         let mut files = BTreeMap::new();
         for resource in entry.resources() {
+            if let Some(file) = resource.open_source()? {
+                files.insert(resource.key(), file);
+                continue;
+            }
             let file = self
                 .sources
                 .get(&resource.key())

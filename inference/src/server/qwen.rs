@@ -212,6 +212,7 @@ pub(super) fn generate(
             1.,
         )?;
         observer(Event::Phase("inference"))?;
+        let mut preview = super::preview_callback::State::new(r.sampling_preview);
         let mut denoiser = unsafe {
             q::QwenDenoiser::bind(q::QwenDenoiserConfig {
                 runtime: rt,
@@ -233,7 +234,10 @@ pub(super) fn generate(
                 )?,
                 compute_dtype: Kind::BFloat16,
                 generator: rt.native.generator(dev, r.seed)?,
-                observer: Some(Box::new(|step| observer(Event::Step(step.i + 1)))),
+                observer: Some(Box::new(|step| {
+                    observer(Event::Step(step.i + 1))?;
+                    preview.update(&r.model, step.i + 1, step.denoised, observer)
+                })),
             })
         };
         let out = match r.sampling.sampler.as_str() {

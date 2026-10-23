@@ -44,6 +44,10 @@ pub struct Preferences {
     #[serde(default)]
     pub negative_prompt: String,
     #[serde(default)]
+    pub prompt_catalog_folder: Option<PathBuf>,
+    #[serde(default)]
+    pub preferred_prompt_profile: Option<String>,
+    #[serde(default)]
     pub generation: GenerationSettings,
     #[serde(default = "sheet_width")]
     pub sheet_width: u32,
@@ -146,11 +150,8 @@ impl GenerationSettings {
         if !(262_144..=4_000_000).contains(&self.reference_max_pixels_per_image) {
             bail!("Reference size must be 0.262144–4 MP per image.");
         }
-        if !(1..=100).contains(&self.steps)
-            || !self.cfg_scale.is_finite()
-            || !(0.0..=20.0).contains(&self.cfg_scale)
-        {
-            bail!("Steps must be 1–100 and CFG 0–20.");
+        if self.steps == 0 || !self.cfg_scale.is_finite() {
+            bail!("Steps must be positive and CFG finite.");
         }
         Ok(())
     }
@@ -161,7 +162,267 @@ fn sheet_width() -> u32 {
 fn privacy_default() -> bool {
     true
 }
+
+/// Explicit fixture storage is kept separate from normal HOME-based storage.
+#[derive(Clone)]
+pub enum PreferencesStore {
+    Fixture(PathBuf),
+    Home {
+        paths: crate::storage_layout::PublicPaths,
+        runtime: PathBuf,
+        private: Option<std::sync::Arc<crate::private_storage::Root>>,
+        private_error: Option<String>,
+        system_private: bool,
+    },
+}
+#[derive(Serialize, Deserialize)]
+#[serde(default)]
+struct PublicUi {
+    privacy_mode: bool,
+    generation: GenerationSettings,
+    sheet_width: u32,
+    upscale_target: UpscaleTarget,
+}
+impl Default for PublicUi {
+    fn default() -> Self {
+        Self {
+            privacy_mode: true,
+            generation: Default::default(),
+            sheet_width: sheet_width(),
+            upscale_target: Default::default(),
+        }
+    }
+}
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
+struct PublicGroup {
+    variant: String,
+    loras: Vec<LoraSetting>,
+}
+#[derive(Serialize, Deserialize)]
+struct Selection {
+    model_group: String,
+    model_groups: std::collections::BTreeMap<String, PublicGroup>,
+}
+#[derive(Default, Serialize, Deserialize)]
+#[serde(default)]
+struct PrivateUi {
+    output_folder: PathBuf,
+    negative_prompt: String,
+    prompt_catalog_folder: Option<PathBuf>,
+    preferred_prompt_profile: Option<String>,
+    enhancement_profiles: std::collections::BTreeMap<String, String>,
+}
+const PRIVATE_UI: &str = "library/ui-preferences.json";
+impl PreferencesStore {
+    pub fn server_owned_output(&self) -> bool {
+        matches!(self, Self::Home { .. })
+    }
+    pub fn system() -> Result<Self> {
+        let home = PathBuf::from(std::env::var_os("HOME").context("HOME is unavailable")?);
+        if !home.is_absolute() {
+            bail!("HOME must be absolute")
+        }
+        let runtime = crate::storage_layout::runtime_directory(
+            std::env::var_os("XDG_RUNTIME_DIR")
+                .as_deref()
+                .map(Path::new),
+        )
+        .map_err(anyhow::Error::msg)?;
+        Ok(Self::Home {
+            paths: crate::storage_layout::PublicPaths::for_home(&home),
+            runtime,
+            private: None,
+            private_error: None,
+            system_private: true,
+        })
+    }
+    /// Explicit homes/volume providers make CPU/QA independent of actual HOME.
+    pub fn for_home(
+        home: &Path,
+        runtime: PathBuf,
+        private: Result<crate::private_storage::Root, &'static str>,
+    ) -> Self {
+        let (private, private_error) = match private {
+            Ok(root) => (Some(std::sync::Arc::new(root)), None),
+            Err(error) => (None, Some(error.into())),
+        };
+        Self::Home {
+            paths: crate::storage_layout::PublicPaths::for_home(home),
+            runtime,
+            private,
+            private_error,
+            system_private: false,
+        }
+    }
+    pub(crate) fn private_root(
+        &self,
+    ) -> std::result::Result<std::sync::Arc<crate::private_storage::Root>, String> {
+        let Self::Home {
+            private,
+            private_error,
+            system_private,
+            ..
+        } = self
+        else {
+            return Err("Explicit private store required".into());
+        };
+        if *system_private {
+            // Reopening a normally mounted volume may recover a previous outage;
+            // explicit CPU fixtures never inspect the system mount namespace.
+            crate::private_storage::Root::system()
+                .map(std::sync::Arc::new)
+                .map_err(str::to_owned)
+        } else {
+            private.clone().ok_or_else(|| {
+                private_error
+                    .clone()
+                    .unwrap_or_else(|| "private_storage_unavailable".into())
+            })
+        }
+    }
+    pub fn load(&self) -> Result<(Preferences, Option<String>)> {
+        let Self::Home { paths, .. } = self else {
+            let Self::Fixture(project) = self else {
+                unreachable!()
+            };
+            return Preferences::load(project).map(|p| (p, None));
+        };
+        let public: PublicUi = crate::settings_store::read_value(&paths.ui)?
+            .map(serde_json::from_value)
+            .transpose()?
+            .unwrap_or_default();
+        let selection: Option<Selection> =
+            crate::settings_store::read_namespace(&paths.models, "selection")?
+                .map(serde_json::from_value)
+                .transpose()?;
+        let (private_prefs, warning) = match self.private_root() {
+            Ok(root) => match root.read(Path::new(PRIVATE_UI)) {
+                Ok(bytes) => (
+                    bytes
+                        .map(|b| serde_json::from_slice::<PrivateUi>(&b))
+                        .transpose()?,
+                    None,
+                ),
+                Err(error) => (
+                    None,
+                    Some(format!("Private preferences unavailable: {error}")),
+                ),
+            },
+            Err(error) => (
+                None,
+                Some(format!("Private preferences unavailable: {error}")),
+            ),
+        };
+        let private_prefs = private_prefs.unwrap_or_default();
+        let mut model_groups: std::collections::BTreeMap<String, ModelGroupSettings> = selection
+            .as_ref()
+            .map(|s| {
+                s.model_groups
+                    .iter()
+                    .map(|(name, g)| {
+                        (
+                            name.clone(),
+                            ModelGroupSettings {
+                                variant: g.variant.clone(),
+                                loras: g.loras.clone(),
+                                enhancement_profile_id: private_prefs
+                                    .enhancement_profiles
+                                    .get(name)
+                                    .cloned(),
+                            },
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        for (name, profile) in &private_prefs.enhancement_profiles {
+            model_groups
+                .entry(name.clone())
+                .or_default()
+                .enhancement_profile_id = Some(profile.clone());
+        }
+        Ok((
+            Preferences {
+                model_group: selection.map_or_else(default_model_group, |s| s.model_group),
+                model_groups,
+                output_folder: private_prefs.output_folder,
+                privacy_mode: public.privacy_mode,
+                negative_prompt: private_prefs.negative_prompt,
+                prompt_catalog_folder: private_prefs.prompt_catalog_folder,
+                preferred_prompt_profile: private_prefs.preferred_prompt_profile,
+                generation: public.generation,
+                sheet_width: public.sheet_width,
+                upscale_target: public.upscale_target,
+            },
+            warning,
+        ))
+    }
+    pub fn save(&self, prefs: &Preferences) -> Result<()> {
+        let Self::Home { paths, runtime, .. } = self else {
+            let Self::Fixture(project) = self else {
+                unreachable!()
+            };
+            return prefs.save(project);
+        };
+        let root = self
+            .private_root()
+            .map_err(|error| anyhow::anyhow!("Private preferences unavailable: {error}"))?;
+        let private = PrivateUi {
+            output_folder: prefs.output_folder.clone(),
+            negative_prompt: prefs.negative_prompt.clone(),
+            prompt_catalog_folder: prefs.prompt_catalog_folder.clone(),
+            preferred_prompt_profile: prefs.preferred_prompt_profile.clone(),
+            enhancement_profiles: prefs
+                .model_groups
+                .iter()
+                .filter_map(|(name, g)| {
+                    g.enhancement_profile_id
+                        .as_ref()
+                        .map(|id| (name.clone(), id.clone()))
+                })
+                .collect(),
+        };
+        // The private write must succeed before any public file reports this save.
+        root.write(Path::new(PRIVATE_UI), &serde_json::to_vec_pretty(&private)?)
+            .map_err(anyhow::Error::msg)?;
+        let selection = Selection {
+            model_group: prefs.model_group.clone(),
+            model_groups: prefs
+                .model_groups
+                .iter()
+                .map(|(name, g)| {
+                    (
+                        name.clone(),
+                        PublicGroup {
+                            variant: g.variant.clone(),
+                            loras: g.loras.clone(),
+                        },
+                    )
+                })
+                .collect(),
+        };
+        crate::settings_store::write_namespace(
+            &paths.models,
+            "selection",
+            serde_json::to_value(selection)?,
+            runtime,
+        )?;
+        crate::settings_store::write_value(
+            &paths.ui,
+            serde_json::to_value(PublicUi {
+                privacy_mode: prefs.privacy_mode,
+                generation: prefs.generation.clone(),
+                sheet_width: prefs.sheet_width,
+                upscale_target: prefs.upscale_target,
+            })?,
+            runtime,
+        )?;
+        Ok(())
+    }
+}
 impl Preferences {
+    /// Explicit source-owned fixture API. Normal entry uses PreferencesStore::system.
     pub fn load(project: &Path) -> Result<Self> {
         let path = project.join(".imagine/ui-settings.json");
         if !path.exists() {
@@ -171,6 +432,8 @@ impl Preferences {
                 output_folder: project.join(".imagine/images"),
                 privacy_mode: true,
                 negative_prompt: String::new(),
+                prompt_catalog_folder: None,
+                preferred_prompt_profile: None,
                 generation: GenerationSettings::default(),
                 sheet_width: sheet_width(),
                 upscale_target: UpscaleTarget::default(),
@@ -381,6 +644,26 @@ fn save_outputs(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn image_sampling_has_no_quality_policy_ceiling() {
+        let mut settings = super::GenerationSettings {
+            steps: 130,
+            cfg_scale: 20.1,
+            ..Default::default()
+        };
+        settings.validate().unwrap();
+        settings.cfg_scale = -1.;
+        settings.validate().unwrap();
+        settings.steps = 0;
+        assert!(settings.validate().is_err());
+        settings.steps = u32::MAX;
+        settings.validate().unwrap();
+        for cfg in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            settings.cfg_scale = cfg;
+            assert!(settings.validate().is_err());
+        }
+    }
+
     use super::*;
     #[test]
     fn dated_numbering_groups_sheets_and_keeps_upscale_variants_beside_source() {
@@ -590,6 +873,8 @@ mod tests {
             output_folder: root.path().join("pictures"),
             privacy_mode: false,
             negative_prompt: "  artifacts, suddig\nextra fingrar  ".into(),
+            prompt_catalog_folder: Some(root.path().join("own-catalog")),
+            preferred_prompt_profile: Some("own custom profile".into()),
             sheet_width: 1536,
             upscale_target: UpscaleTarget::K3,
             generation: GenerationSettings {
@@ -658,4 +943,144 @@ pub struct LoraSetting {
     pub name: String,
     pub strength: f32,
     pub enabled: bool,
+}
+
+#[cfg(test)]
+mod storage_tests {
+    use super::*;
+    use crate::{private_storage::Root, video_destination as d};
+    use serde_json::json;
+    use std::sync::{Arc, Mutex};
+
+    struct Volume(Mutex<String>);
+    impl d::Environment for Volume {
+        fn mounts(&self) -> d::Result<String> {
+            Ok(self.0.lock().unwrap().clone())
+        }
+        fn host(&self) -> d::Result<String> {
+            Ok("own-ui-settings-fixture".into())
+        }
+    }
+    fn own() -> tempfile::TempDir {
+        let root = crate::test_destination::task_fixtures::env_root("TMPDIR");
+        tempfile::Builder::new()
+            .prefix("cp42settings-")
+            .tempdir_in(root)
+            .unwrap()
+    }
+    fn volume(path: &Path) -> (Root, Arc<Volume>) {
+        let mount = path.join("volume");
+        let root = mount.join("imagine");
+        std::fs::create_dir_all(&root).unwrap();
+        let env = Arc::new(Volume(Mutex::new(format!(
+            "1 0 0:1 / {} rw - fixturefs own-ui-settings rw\n",
+            mount.display()
+        ))));
+        let config = d::Config {
+            root,
+            mount: mount.clone(),
+            source: "own-ui-settings".into(),
+            filesystem: "fixturefs".into(),
+            fsid: d::fsid(&d::directory(&mount).unwrap()).unwrap(),
+        };
+        (Root::with_environment(config, env.clone()).unwrap(), env)
+    }
+    #[test]
+    fn split_preferences_never_leak_private_fields_or_read_legacy_and_preserve_catalog() {
+        let own = own();
+        let home = own.path().join("home");
+        std::fs::create_dir_all(home.join(".imagine")).unwrap();
+        let legacy = home.join(".imagine/ui-settings.json");
+        std::fs::write(
+            &legacy,
+            b"Own deliberately invalid legacy fixture; must not be read",
+        )
+        .unwrap();
+        let (private, env) = volume(own.path());
+        let runtime = own.path().join("runtime/imagine");
+        let store = PreferencesStore::for_home(&home, runtime.clone(), Ok(private.clone()));
+        let (initial, warning) = store.load().unwrap();
+        assert!(warning.is_none());
+        assert!(initial.output_folder.as_os_str().is_empty());
+        let paths = crate::storage_layout::PublicPaths::for_home(&home);
+        crate::settings_store::write_namespace(
+            &paths.models,
+            "catalog",
+            json!({"root":"own-models"}),
+            &runtime,
+        )
+        .unwrap();
+        let mut prefs = initial;
+        prefs.negative_prompt = "OWN PRIVATE NEGATIVE".into();
+        prefs.output_folder = private.layout().root().join("projects/own/outputs/images");
+        prefs.prompt_catalog_folder = Some(private.layout().library().join("OWN PRIVATE CATALOG"));
+        prefs.preferred_prompt_profile = Some("OWN PRIVATE PROMPT PROFILE".into());
+        prefs.model_groups.insert(
+            prefs.model_group.clone(),
+            ModelGroupSettings {
+                variant: "own-model-id".into(),
+                loras: vec![LoraSetting {
+                    id: "own-lora-id".into(),
+                    name: "own-lora".into(),
+                    strength: 0.8,
+                    enabled: true,
+                }],
+                enhancement_profile_id: Some("OWN PRIVATE PROVIDER PROFILE".into()),
+            },
+        );
+        store.save(&prefs).unwrap();
+        assert_eq!(store.load().unwrap(), (prefs.clone(), None));
+        assert_eq!(
+            crate::settings_store::read_namespace(&paths.models, "catalog").unwrap(),
+            Some(json!({"root":"own-models"}))
+        );
+        for path in [&paths.ui, &paths.models] {
+            let bytes = std::fs::read(path).unwrap();
+            let text = String::from_utf8(bytes).unwrap();
+            for private in [
+                "OWN PRIVATE",
+                "negative_prompt",
+                "output_folder",
+                "prompt_catalog_folder",
+                "preferred_prompt_profile",
+                "enhancement_profile_id",
+            ] {
+                assert!(!text.contains(private), "private field leaked: {private}");
+            }
+        }
+        let private_bytes = private.read(Path::new(PRIVATE_UI)).unwrap().unwrap();
+        assert!(
+            String::from_utf8(private_bytes)
+                .unwrap()
+                .contains("OWN PRIVATE NEGATIVE")
+        );
+        assert_eq!(
+            std::fs::read(&legacy).unwrap(),
+            b"Own deliberately invalid legacy fixture; must not be read"
+        );
+        let public_before = std::fs::read(&paths.ui).unwrap();
+        let models_before = std::fs::read(&paths.models).unwrap();
+        env.0.lock().unwrap().clear();
+        prefs.negative_prompt = "OWN UNSAVED RAM VALUE".into();
+        assert!(store.save(&prefs).is_err());
+        assert_eq!(prefs.negative_prompt, "OWN UNSAVED RAM VALUE");
+        assert_eq!(std::fs::read(&paths.ui).unwrap(), public_before);
+        assert_eq!(std::fs::read(&paths.models).unwrap(), models_before);
+        let (_, warning) = store.load().unwrap();
+        assert!(warning.unwrap().contains("Private preferences unavailable"));
+    }
+    #[test]
+    fn unavailable_private_root_keeps_public_loadable_but_never_claims_save_success() {
+        let own = own();
+        let home = own.path().join("home");
+        let runtime = own.path().join("runtime/imagine");
+        let store = PreferencesStore::for_home(&home, runtime, Err("video_volume_not_mounted"));
+        let (mut prefs, warning) = store.load().unwrap();
+        assert!(warning.unwrap().contains("video_volume_not_mounted"));
+        assert!(prefs.output_folder.as_os_str().is_empty());
+        prefs.negative_prompt = "OWN RAM ONLY".into();
+        assert!(store.save(&prefs).is_err());
+        assert_eq!(prefs.negative_prompt, "OWN RAM ONLY");
+        assert!(!home.join(".config").exists());
+    }
 }

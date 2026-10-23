@@ -13,6 +13,8 @@ impl ImagineApp {
             project.clone(),
             connection,
             Preferences {
+                prompt_catalog_folder: None,
+                preferred_prompt_profile: None,
                 model_group: crate::model_catalog::QWEN_GROUP.into(),
                 model_groups: Default::default(),
                 output_folder: project.join("Pictures/Imagine"),

@@ -36,6 +36,7 @@ async fn own_prompt_uses_product_queue_and_persists_av() -> Result<()> {
         data: dir.path().join("own-data"),
         bind: "127.0.0.1:0".parse()?,
         model_root: dir.path().join("unused-image-models"),
+        private_storage: None,
     };
     let observed_state = state_rx.clone();
     let engine = Comfy::new_rust(config, state_tx, &manifest)?;

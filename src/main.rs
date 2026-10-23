@@ -14,7 +14,13 @@ use std::{
 use tokio::sync::{Semaphore, watch};
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() {
+    if run().await.is_err() {
+        eprintln!("Imagine server startup or shutdown failed.");
+        std::process::exit(1);
+    }
+}
+async fn run() -> Result<()> {
     // Prompts must not be captured by an OS core dump.
     let limit = libc::rlimit {
         rlim_cur: 0,
@@ -117,15 +123,36 @@ async fn main() -> Result<()> {
     } else {
         None
     };
-    let data = data.unwrap_or_else(|| project.join(".imagine"));
-    let (config, _lock) = Config::load(project, data, bind.parse()?)?;
-    // Remove legacy/crash remnants before serving requests.
-    imagine_server::session::purge(&config.data)?;
+    let home = std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .context("home_unavailable")?;
+    let runtime = imagine_server::storage_layout::runtime_directory(
+        std::env::var_os("XDG_RUNTIME_DIR")
+            .as_deref()
+            .map(Path::new),
+    )
+    .map_err(anyhow::Error::msg)?;
+    let private = imagine_server::private_storage::Root::system()
+        .and_then(|root| root.with_runtime_directory(runtime.clone()))
+        .map_err(anyhow::Error::msg)?;
+    let workspace = image_workspace(&private)?;
+    let layout = private.project(&workspace).map_err(anyhow::Error::msg)?;
+    if data.as_ref().is_some_and(|path| *path != layout.work) {
+        anyhow::bail!("private_storage_location_required");
+    }
+    let (config, _lock) = Config::load_private(
+        project,
+        private.clone(),
+        workspace.clone(),
+        bind.parse()?,
+        &home,
+        runtime.clone(),
+    )?;
     let profiles = Arc::new(imagine_server::profiles::Catalog::load(
         &profiles.unwrap_or_else(|| config.project.join("profiles")),
     )?);
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
-    let store = Store::open(&config.data).await?;
+    let store = Store::open_private(private.clone(), workspace).await?;
     let (engine_tx, engine_rx) = watch::channel(EngineState {
         backend: backend.name().into(),
         phase: "unloaded".into(),
@@ -133,9 +160,10 @@ async fn main() -> Result<()> {
         ..Default::default()
     });
     let library = Arc::new(std::sync::Mutex::new(
-        imagine_server::model_library::Library::load(
+        imagine_server::model_library::Library::load_namespaced(
             config.model_root.clone(),
-            config.data.join("model-library.json"),
+            imagine_server::storage_layout::PublicPaths::for_home(&home).models,
+            runtime.clone(),
         )?,
     ));
     let engine: Box<dyn Backend> = if backend == EngineKind::Rust {
@@ -150,16 +178,13 @@ async fn main() -> Result<()> {
             None => Box::new(Native::new(config.clone(), engine_tx)?),
         }
     };
-    let (control, mut scheduler) = scheduler::start_coordinated(
-        store.clone(),
-        engine,
-        std::env::var_os("IMAGINE_COORDINATOR_SOCKET").map(PathBuf::from),
-    )
-    .await?;
+    let (control, mut scheduler) =
+        scheduler::start_coordinated(store.clone(), engine, Some(runtime.join("gpu.sock"))).await?;
     let app = App {
         video: control.video.clone(),
-        enhancement: imagine_server::enhancement::Service::open(
-            config.data.join("enhancement-profiles.json"),
+        enhancement: imagine_server::enhancement::Service::open_private(
+            private,
+            "library/enhancement-profiles.json".into(),
         )?,
         library,
         profiles,
@@ -199,6 +224,36 @@ async fn main() -> Result<()> {
     // All writers are stopped before removing assets and closing the RAM database.
     let cleaned = store.close().await;
     outcome.and(cleaned)
+}
+
+/// The image workspace has stable private output ownership without persisting
+/// request history. Existing project/user data is never scanned or migrated.
+fn image_workspace(root: &imagine_server::private_storage::Root) -> Result<String> {
+    let index = Path::new("library/image-workspace.json");
+    if let Some(bytes) = root.read(index).map_err(anyhow::Error::msg)? {
+        let value: serde_json::Value =
+            serde_json::from_slice(&bytes).context("private_workspace_invalid")?;
+        let id = value["project_id"]
+            .as_str()
+            .context("private_workspace_invalid")?;
+        root.layout().project(id).map_err(anyhow::Error::msg)?;
+        return Ok(id.to_owned());
+    }
+    let id = format!("project_image_{}", uuid::Uuid::new_v4().simple());
+    let layout = root.project(&id).map_err(anyhow::Error::msg)?;
+    root.write(
+        layout.document.strip_prefix(root.layout().root())?,
+        &serde_json::to_vec(&serde_json::json!({
+            "schema_version":1,"kind":"image_workspace","project_id":id
+        }))?,
+    )
+    .map_err(anyhow::Error::msg)?;
+    root.write(
+        index,
+        &serde_json::to_vec(&serde_json::json!({"project_id":id}))?,
+    )
+    .map_err(anyhow::Error::msg)?;
+    Ok(id)
 }
 
 fn resolve_comfy_paths(

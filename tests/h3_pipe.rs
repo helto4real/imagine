@@ -12,7 +12,9 @@ use std::{collections::BTreeMap, os::unix::fs::PermissionsExt, path::Path, time:
 use tokio::sync::watch;
 fn input(prompt: &str) -> h3::Request {
     h3::Request {
+        preview: None,
         references: Default::default(),
+        options: Default::default(),
         capture_continuation: false,
         continuation: None,
         continuation_bytes: vec![],
@@ -78,9 +80,26 @@ if q['prompt']=='oversize':
  w.write(struct.pack('>I',len(h))+h+struct.pack('>I',4194305));w.flush();time.sleep(60)
 if q['prompt']=='unknown':
  emit(dict(type='error',id=q['id'],code='generation_failed',message='PRIVATE SYNTHETIC ERROR'));sys.exit(0)
+if q['prompt'].startswith('cache-'):
+ emit(dict(type='reference_cache',id=q['id'],command=dict(operation='lookup',key='a'*64)))
+ reply=json.loads(read());cached=read()
+ if q['prompt']=='cache-hit':
+  assert reply['state']=='chunk' and cached==bytes([1,2,3,4])
+ elif q['prompt']=='cache-off':
+  assert reply==dict(state='miss',ticket=None) and not cached
+ else:
+  assert reply['state']=='miss' and reply['ticket'] is not None and not cached
+  emit(dict(type='reference_cache',id=q['id'],command=dict(operation='store',ticket=reply['ticket'],descriptor=dict(shape=[2],dtype='f16'),offset=0)),bytes([1,2,3,4]))
+  reply=json.loads(read());assert not read()
+  assert reply==dict(state='stored',accepted=True,complete=True)
 for phase in ['loading_text','encoding_text','loading_dit','sampling','loading_video_vae','decoding_video','loading_audio_vae','decoding_audio']:
  emit(dict(type='phase',id=q['id'],phase=phase))
 for i in range(1,21):emit(dict(type='progress',id=q['id'],completed=i,total=20,elapsed_seconds=i/10))
+if q['prompt']=='preview':
+ assert q['preview']['enabled']
+ emit(dict(type='sampling_preview',id=q['id'],metadata=dict(sequence=1,step=20,width=2,height=1,frames=2,frame_duration_ms=812,source_duration_seconds=39/24)),bytes([7])*12)
+ emit(dict(type='preview_warning',id=q['id'],code='fast_preview_failed'))
+ time.sleep(.3)
 shape=q['shape']; count=shape['frames']; samples=(count*4000+1)//3
 for i in range(count):emit(dict(type='video_frame',id=q['id'],index=i),bytes([i%256])*shape['width']*shape['height']*3)
 if q['prompt']=='partial':sys.exit(0)
@@ -130,6 +149,7 @@ time.sleep(60)
         data: dir.path().join("session"),
         bind: "127.0.0.1:0".parse().unwrap(),
         model_root: dir.path().join("models"),
+        private_storage: None,
     };
     let engine = Comfy::new_rust(config, tx, &manifest).unwrap();
     (dir, engine, rx)
@@ -147,6 +167,24 @@ fn image() -> ImagePass {
         seed: 42,
         references: vec![],
     }
+}
+#[tokio::test]
+async fn real_supervised_cache_channel_survives_worker_exit_and_obeys_clear_and_off() {
+    let (_dir, mut engine, _) = fake(false);
+    let control = engine.reference_cache().unwrap();
+    assert_eq!(control.status().unwrap().entries, 0);
+    engine.generate_video(&input("cache-miss")).await.unwrap();
+    let status = control.status().unwrap();
+    assert_eq!((status.entries, status.used_bytes, status.busy), (1, 4, 0));
+    engine.generate_video(&input("cache-hit")).await.unwrap();
+    assert_eq!(control.status().unwrap().used_bytes, 4);
+    control.clear().unwrap();
+    assert_eq!(control.status().unwrap().used_bytes, 0);
+    engine.generate_video(&input("cache-miss")).await.unwrap();
+    control.configure(0, false).unwrap();
+    engine.generate_video(&input("cache-off")).await.unwrap();
+    assert_eq!(control.status().unwrap().entries, 0);
+    engine.stop().await.unwrap();
 }
 #[tokio::test]
 async fn image_video_image_share_one_supervised_slot_and_reap_h3_on_success() {
@@ -221,6 +259,36 @@ async fn nondefault_shape_survives_the_real_pipe_boundary() {
 }
 
 #[tokio::test]
+async fn disposable_preview_crosses_actual_pipe_but_never_changes_final_av() {
+    let (_dir, mut engine, state) = fake(false);
+    engine.begin_job("public-job");
+    let hub = state.borrow().sampling_preview.clone();
+    let request = input("preview");
+    let observe = async {
+        for _ in 0..200 {
+            if let Some(clip) = hub.snapshot("public-job", 0) {
+                assert_eq!(clip.bytes, [7; 12]);
+                assert_eq!(clip.metadata.frames, 2);
+                assert!(hub.snapshot("fixture-42", 0).is_none());
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        false
+    };
+    let (output, observed) = tokio::join!(engine.generate_video(&request), observe);
+    let output = output.unwrap();
+    assert!(observed);
+    assert!(output.valid());
+    assert_eq!(output.frames[38][0], 38);
+    assert!(output.pcm.iter().all(|v| *v == 0));
+    assert!(hub.snapshot("public-job", 0).is_none());
+    assert!(state.borrow().pid.is_none());
+    engine.mark_idle();
+    assert!(hub.status().active_job.is_none());
+}
+
+#[tokio::test]
 async fn i2v_rgb_is_private_and_profile_switch_reaps_each_worker() {
     let (_dir, mut engine, state) = fake(false);
     let mut r = input("synthetic");
@@ -270,7 +338,7 @@ fn observer_output_is_declared_only_in_the_h3_runtime_contract() {
 }
 
 #[test]
-fn profile_checkpoint_or_pillow_manifest_drift_rejects_before_worker() {
+fn historical_provenance_is_optional_but_required_pillow_remains_checked() {
     let (dir, _engine, state) = fake(false);
     let path = dir.path().join("runtime.json");
     let original: serde_json::Value =
@@ -283,10 +351,16 @@ fn profile_checkpoint_or_pillow_manifest_drift_rejects_before_worker() {
                 .unwrap()
                 .remove("IMAGINE_PILLOW_LIBRARY");
         } else {
+            changed["reference_revision"] = "own-compatible-rebuild".into();
+            changed["h3"]["identity"]["core_revision"] = "own-compatible-rebuild".into();
+            changed["h3"]["identity"]["model_lock_sha256"] = "b".repeat(64).into();
             changed["h3"]["profile_checkpoints"]["h3-fl2va-i2va-v1"] = "0".repeat(64).into();
         }
         std::fs::write(&path, serde_json::to_vec(&changed).unwrap()).unwrap();
-        assert!(imagine_server::rust_runtime::Runtime::load(&path).is_err());
+        assert_eq!(
+            imagine_server::rust_runtime::Runtime::load(&path).is_err(),
+            pillow
+        );
         assert!(state.borrow().pid.is_none());
     }
 }

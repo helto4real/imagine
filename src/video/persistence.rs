@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs::File,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,6 +93,9 @@ pub struct Resource {
     pub kind: ResourceKind,
     pub sha256: String,
     pub bytes: u64,
+    /// User-selected original. None retains the legacy owned-blob representation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source: Option<PathBuf>,
 }
 impl Resource {
     pub fn key(&self) -> BlobKey {
@@ -114,11 +117,46 @@ impl Resource {
             kind,
             sha256,
             bytes,
+            source: None,
         };
         resource.validate()?;
         Ok(resource)
     }
+    /// Describe an original without copying its bytes into session/project storage.
+    pub fn external(
+        id: String,
+        kind: ResourceKind,
+        path: &Path,
+        file: &mut File,
+    ) -> Result<Self, StorageError> {
+        if !path.is_absolute() {
+            return Err(StorageError::new("invalid_source_path"));
+        }
+        let original = open_original(path)?;
+        let before = source_witness(file)?;
+        if before != source_witness(&original)? {
+            return Err(StorageError::new("source_changed"));
+        }
+        let mut resource = Self::inspect(id, kind, file)?;
+        if before != source_witness(file)? {
+            return Err(StorageError::new("source_changed"));
+        }
+        resource.source = Some(path.to_owned());
+        resource.validate()?;
+        Ok(resource)
+    }
+    /// Open the selected original with an independent position. The caller owns
+    /// this descriptor for decoding; no source bytes are staged or rewritten.
+    pub fn open_source(&self) -> Result<Option<File>, StorageError> {
+        self.source
+            .as_deref()
+            .map(|path| open_external(path, &self.sha256, self.bytes))
+            .transpose()
+    }
     fn validate(&self) -> Result<(), StorageError> {
+        if self.source.as_ref().is_some_and(|path| !path.is_absolute()) {
+            return Err(StorageError::new("invalid_source_path"));
+        }
         if self.id.trim().is_empty()
             || self.sha256.len() != 64
             || !self
@@ -165,6 +203,64 @@ impl Resource {
         Ok(())
     }
 }
+
+/// Open a linked original with its stored content identity, without staging or
+/// rewriting the source. The returned descriptor has an independent position.
+pub fn open_external(path: &Path, sha256: &str, bytes: u64) -> Result<File, StorageError> {
+    let mut file = open_original(path)?;
+    let before = source_witness(&file)?;
+    let actual = bundle::digest(&mut file).map_err(|_| StorageError::new("source_unavailable"))?;
+    if before != source_witness(&file)? || actual.0 != sha256 || actual.1 != bytes {
+        return Err(StorageError::new("source_changed"));
+    }
+    Ok(file)
+}
+
+fn open_original(path: &Path) -> Result<File, StorageError> {
+    use std::os::unix::fs::OpenOptionsExt;
+    if !path.is_absolute() {
+        return Err(StorageError::new("invalid_source_path"));
+    }
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK)
+        .open(path)
+        .map_err(|error| {
+            StorageError::new(match error.kind() {
+                std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory => {
+                    "source_missing"
+                }
+                _ => "source_unavailable",
+            })
+        })?;
+    source_witness(&file)?;
+    Ok(file)
+}
+
+#[derive(PartialEq, Eq)]
+pub(crate) struct SourceWitness {
+    device: u64,
+    inode: u64,
+    bytes: u64,
+    modified: (i64, i64),
+    changed: (i64, i64),
+}
+pub(crate) fn source_witness(file: &File) -> Result<SourceWitness, StorageError> {
+    use std::os::unix::fs::MetadataExt;
+    let value = file
+        .metadata()
+        .map_err(|_| StorageError::new("source_unavailable"))?;
+    if !value.is_file() {
+        return Err(StorageError::new("invalid_source_file"));
+    }
+    Ok(SourceWitness {
+        device: value.dev(),
+        inode: value.ino(),
+        bytes: value.len(),
+        modified: (value.mtime(), value.mtime_nsec()),
+        changed: (value.ctime(), value.ctime_nsec()),
+    })
+}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TakeStatus {
@@ -182,6 +278,10 @@ pub struct AssetVersion {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TakeProvenance {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boundary: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolved_loras: Option<imagine_video_contract::loras::Stack>,
     pub model: ModelSelection,
     pub seed: u64,
     pub input_revision: String,
@@ -211,7 +311,32 @@ pub struct StoredTake {
     pub id: TakeId,
     pub scene_id: SceneId,
     pub status: TakeStatus,
-    pub provenance: TakeProvenance,
+    /// None is an imported video with no known generation recipe, not a default recipe.
+    pub provenance: Option<TakeProvenance>,
+}
+impl StoredTake {
+    pub fn generated(&self) -> Result<&TakeProvenance, StorageError> {
+        self.provenance
+            .as_ref()
+            .ok_or_else(|| StorageError::new("take_generation_recipe_unknown"))
+    }
+    pub fn accepted_summary(&self, resources: &[Resource]) -> Result<AcceptedTake, StorageError> {
+        let (model, source_fingerprint) = if let Some(provenance) = &self.provenance {
+            (
+                Some(provenance.model.clone()),
+                provenance.input_revision.clone(),
+            )
+        } else {
+            let video = resources.iter().find(|r| matches!(&r.kind, ResourceKind::TakeVideo { take_id } if take_id == &self.id))
+                .ok_or_else(|| StorageError::new("take_resource_missing"))?;
+            (None, video.sha256.clone())
+        };
+        Ok(AcceptedTake {
+            id: self.id.clone(),
+            model,
+            source_fingerprint,
+        })
+    }
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -224,9 +349,15 @@ pub struct LibraryOrigin {
 #[serde(deny_unknown_fields)]
 pub struct ProjectDocument {
     pub schema_version: u32,
+    /// Only explicitly saved private projects use the new output/work layout.
+    /// Absence retains legacy media/takes/continuity paths without migration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage_layout: Option<u32>,
     pub project: VideoProject,
     pub resources: Vec<Resource>,
     pub takes: Vec<StoredTake>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub captures: BTreeMap<TakeId, imagine_video_contract::captures::Capture>,
     pub origin: Option<LibraryOrigin>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub locked_takes: BTreeMap<SceneId, TakeId>,
@@ -246,9 +377,11 @@ impl ProjectDocument {
     pub fn new(project: VideoProject) -> Self {
         Self {
             schema_version: 1,
+            storage_layout: None,
             project,
             resources: vec![],
             takes: vec![],
+            captures: BTreeMap::new(),
             origin: None,
             locked_takes: BTreeMap::new(),
             authoring: vec![],
@@ -283,11 +416,57 @@ impl Bundle for ProjectDocument {
     fn resources(&self) -> Vec<&Resource> {
         self.resources.iter().collect()
     }
+    fn resource_directory(&self, resource: &Resource) -> &'static str {
+        if self.storage_layout != Some(1) {
+            return resource.key().bucket.directory();
+        }
+        match &resource.kind {
+            ResourceKind::TakeVideo { .. } => "outputs/videos",
+            ResourceKind::TakeAudio { .. } => "outputs/audio",
+            ResourceKind::Reference { asset_id, .. } => {
+                match self.project.assets.get(asset_id).map(|asset| &asset.kind) {
+                    Some(MediaKind::Video) => "outputs/videos",
+                    Some(MediaKind::Audio) => "outputs/audio",
+                    _ => "outputs/images",
+                }
+            }
+            _ => "work/continuity",
+        }
+    }
+    fn released_directories(&self, key: &BlobKey) -> Vec<&'static str> {
+        if self.storage_layout != Some(1) {
+            return vec![key.bucket.directory()];
+        }
+        match key.bucket {
+            Bucket::Media => vec!["outputs/images", "outputs/videos", "outputs/audio"],
+            Bucket::Takes => vec!["outputs/videos", "outputs/audio"],
+            Bucket::Continuity => vec!["work/continuity"],
+        }
+    }
+    fn prepared_directories(&self) -> &'static [&'static str] {
+        if self.storage_layout == Some(1) {
+            &["outputs", "work", "tmp", "autosave"]
+        } else {
+            &[]
+        }
+    }
     fn validate(&self) -> Result<(), StorageError> {
-        if self.schema_version != 1 {
+        if self.schema_version != 1 || self.storage_layout.is_some_and(|version| version != 1) {
             return Err(StorageError::new("unsupported_storage_schema"));
         }
         self.project.validate()?;
+        for (id, capture) in &self.captures {
+            if !self.takes.iter().any(|take| &take.id == id)
+                || capture.source_capture.as_ref().is_some_and(|source| {
+                    source == id || !self.takes.iter().any(|take| &take.id == source)
+                })
+            {
+                return Err(StorageError::new("capture_source_missing"));
+            }
+            if let Some(source) = &capture.imported_from
+                && !self.resources.iter().any(|r| matches!(&r.kind,ResourceKind::Reference {asset_id,revision} if asset_id == &source.asset_id && *revision == source.revision))
+            { return Err(StorageError::new("capture_source_missing")); }
+        }
         for (scene, id) in &self.locked_takes {
             if !self.takes.iter().any(|take| {
                 &take.id == id
@@ -322,9 +501,11 @@ impl Bundle for ProjectDocument {
         for take in &self.takes {
             if take.id.0.trim().is_empty()
                 || !take_ids.insert(&take.id)
-                || self.project.scene(&take.scene_id).is_err()
-                || take.provenance.seed > MAX_INTEGER
-                || take.provenance.model != take.provenance.settings.model
+                // Completed outputs retain their original scene identity after a
+                // scene is removed or Story replaces the timeline. Their frozen
+                // prompt/settings, resource and provenance checks remain below.
+                || take.scene_id.0.trim().is_empty()
+                || take.provenance.as_ref().is_some_and(|p| p.model != p.settings.model)
             {
                 return Err(StorageError::new("invalid_take"));
             }
@@ -335,21 +516,23 @@ impl Bundle for ProjectDocument {
             {
                 return Err(StorageError::new("take_resource_missing"));
             }
-            for asset in &take.provenance.references {
-                if !reference(&asset.asset_id, asset.revision) {
-                    return Err(StorageError::new("historical_reference_missing"));
+            if let Some(provenance) = &take.provenance {
+                for asset in &provenance.references {
+                    if !reference(&asset.asset_id, asset.revision) {
+                        return Err(StorageError::new("historical_reference_missing"));
+                    }
                 }
-            }
-            if let Some(source) = &take.provenance.source_take
-                && !self.takes.iter().any(|t| &t.id == source)
-            {
-                return Err(StorageError::new("source_take_missing"));
-            }
-            if let Some(source) = &take.provenance.continuity
-                && (take.provenance.source_take.as_ref() != Some(&source.take_id)
+                if let Some(source) = &provenance.source_take
+                    && !self.takes.iter().any(|t| &t.id == source)
+                {
+                    return Err(StorageError::new("source_take_missing"));
+                }
+                if let Some(source) = &provenance.continuity
+                && (provenance.source_take.as_ref() != Some(&source.take_id)
                     || !self.takes.iter().any(|take| take.id == source.take_id && take.scene_id == source.scene_id)
                     || !self.resources.iter().any(|resource| resource.id == source.resource_id && resource.sha256 == source.sha256 && (matches!(&resource.kind, ResourceKind::H3Endpoint { take_id, schema_version, shape, .. } if source.method==ContinuityMethod::LastFrameFirstFrame && take_id == &source.take_id && *schema_version == source.schema_version && shape == &source.shape) || matches!(&resource.kind, ResourceKind::H3Motion {take_id,descriptor,..} if matches!(source.method,ContinuityMethod::MotionContext|ContinuityMethod::MotionContextExp) && take_id==&source.take_id && descriptor.schema_version==source.schema_version && descriptor.shape==source.shape))))
                 { return Err(StorageError::new("continuity_source_mismatch")); }
+            }
         }
         for scene in &self.project.scenes {
             let accepted: Vec<_> = self
@@ -365,8 +548,7 @@ impl Bundle for ProjectDocument {
                         .find(|t| t.id == summary.id && t.scene_id == scene.id)
                         .ok_or_else(|| StorageError::new("accepted_take_mismatch"))?;
                     if !matches!(selected.status, TakeStatus::Accepted | TakeStatus::Outdated)
-                        || selected.provenance.model != summary.model
-                        || selected.provenance.input_revision != summary.source_fingerprint
+                        || selected.accepted_summary(&self.resources)? != *summary
                         || accepted.iter().any(|t| t.id != summary.id)
                     {
                         return Err(StorageError::new("accepted_take_mismatch"));
@@ -390,10 +572,10 @@ impl Bundle for ProjectDocument {
             }
             if let ResourceKind::H3Endpoint { model, take_id, .. }
             | ResourceKind::H3Motion { model, take_id, .. } = &resource.kind
-                && !self
-                    .takes
-                    .iter()
-                    .any(|take| &take.id == take_id && &take.provenance.model == model)
+                && !self.takes.iter().any(|take| {
+                    &take.id == take_id
+                        && take.provenance.as_ref().is_some_and(|p| &p.model == model)
+                })
             {
                 return Err(StorageError::new("endpoint_model_mismatch"));
             }
@@ -475,26 +657,18 @@ impl ProjectSession {
         id: &str,
         target: &mut impl std::io::Write,
     ) -> Result<(), StorageError> {
-        let resource = self
-            .document
-            .resources
-            .iter()
-            .find(|r| r.id == id)
-            .ok_or_else(|| StorageError::new("resource_missing"))?;
-        let mut source = self
-            .sources
-            .get(&resource.key())
-            .ok_or_else(|| StorageError::new("resource_missing"))?
-            .try_clone()
-            .map_err(|_| StorageError::new("storage_io_failed"))?;
-        if bundle::digest(&mut source)? != (resource.sha256.clone(), resource.bytes) {
-            return Err(StorageError::new("resource_integrity_failed"));
-        }
+        let source = self.resource_file(id)?;
         bundle::stream(&source, target)?;
         Ok(())
     }
     pub fn status(&self) -> &PersistenceStatus {
         &self.status
+    }
+    pub(crate) fn is_bound(&self) -> bool {
+        self.store.is_some()
+    }
+    fn ensure_writable(&self) -> Result<(), StorageError> {
+        self.store.as_ref().map_or(Ok(()), Store::check_writable)
     }
     pub fn resource_file(&self, id: &str) -> Result<File, StorageError> {
         use std::os::fd::AsRawFd;
@@ -504,6 +678,9 @@ impl ProjectSession {
             .iter()
             .find(|r| r.id == id)
             .ok_or_else(|| StorageError::new("resource_missing"))?;
+        if let Some(file) = resource.open_source()? {
+            return Ok(file);
+        }
         let source = self
             .sources
             .get(&resource.key())
@@ -535,6 +712,7 @@ impl ProjectSession {
         inputs: BTreeMap<BlobKey, File>,
         staging: &SessionStaging,
     ) -> Result<PreparedUpdate, StorageError> {
+        self.ensure_writable()?;
         if expected_revision != self.document.project.project_revision {
             return Err(StorageError::new("revision_conflict"));
         }
@@ -547,10 +725,21 @@ impl ProjectSession {
             .ok_or_else(|| StorageError::new("revision_exhausted"))?;
         document.validate()?;
         let mut sources = bundle::clone_files(&self.sources)?;
+        let owned: BTreeSet<_> = document
+            .resources
+            .iter()
+            .filter(|r| r.source.is_none())
+            .map(Resource::key)
+            .collect();
         for (key, mut file) in inputs {
-            sources.insert(key, staging.copy(&mut file)?);
+            if owned.contains(&key) {
+                sources.insert(key, staging.copy(&mut file)?);
+            }
         }
         for resource in &document.resources {
+            if resource.source.is_some() {
+                continue;
+            }
             let file = sources
                 .get_mut(&resource.key())
                 .ok_or_else(|| StorageError::new("resource_missing"))?;
@@ -558,13 +747,35 @@ impl ProjectSession {
                 return Err(StorageError::new("resource_integrity_failed"));
             }
         }
-        let keys: BTreeSet<_> = document.resources.iter().map(Resource::key).collect();
-        sources.retain(|key, _| keys.contains(key));
+        sources.retain(|key, _| owned.contains(key));
         Ok(PreparedUpdate { document, sources })
     }
     pub(crate) fn commit_prepared(&mut self, prepared: PreparedUpdate) {
         self.document = prepared.document;
         self.sources = prepared.sources;
+    }
+    /// Commit document and resource descriptors together; pre-rename failure keeps old source.
+    pub(crate) fn commit_atomic(&mut self, prepared: PreparedUpdate) -> Result<(), StorageError> {
+        let previous_document = std::mem::replace(&mut self.document, prepared.document);
+        let previous_sources = std::mem::replace(&mut self.sources, prepared.sources);
+        if let Err(error) = self.autosave() {
+            if error.code == "storage_durability_uncertain" {
+                return Ok(());
+            }
+            self.document = previous_document;
+            self.sources = previous_sources;
+            return Err(error);
+        }
+        Ok(())
+    }
+    pub(crate) fn prune_capture_files(&self, released: &[BlobKey]) -> Result<(), StorageError> {
+        if released.is_empty() {
+            return Ok(());
+        }
+        if let Some(store) = &self.store {
+            store.prune_released(released)?;
+        }
+        Ok(())
     }
     pub(crate) fn autosave(&mut self) -> Result<(), StorageError> {
         if self.store.is_some() {
@@ -574,6 +785,7 @@ impl ProjectSession {
         }
     }
     pub fn edit(&mut self, request: EditRequest) -> Result<(), StorageError> {
+        self.ensure_writable()?;
         let mut candidate = self.document.clone();
         editing::apply(&mut candidate.project, request)?;
         super::review::invalidate_changed(&self.document.project, &mut candidate)?;
@@ -591,26 +803,42 @@ impl ProjectSession {
         request: EditRequest,
         mut draft: imagine_video_contract::authoring::Draft,
     ) -> Result<(), StorageError> {
+        self.ensure_writable()?;
         let mut candidate = self.document.clone();
         editing::apply(&mut candidate.project, request)?;
         super::review::invalidate_changed(&self.document.project, &mut candidate)?;
-        if candidate.authoring.len() >= 64 || candidate.authoring.iter().any(|d| d.id == draft.id) {
-            return Err(StorageError::new("authoring_record_limit_or_duplicate"));
+        if candidate.authoring.iter().any(|d| d.id == draft.id) {
+            return Err(StorageError::new("authoring_record_duplicate"));
         }
         draft.phase = imagine_video_contract::authoring::Phase::Applied;
         candidate.authoring.push(draft);
         candidate.validate()?;
         let previous = std::mem::replace(&mut self.document, candidate);
         if let Err(error) = self.autosave() {
+            // Rename already committed this source revision. Keep it applied and let
+            // the snapshot's NotSaved/error status expose uncertain durability;
+            // rolling memory back here could overwrite the new manifest on retry.
+            if error.code == "storage_durability_uncertain" {
+                return Ok(());
+            }
             self.document = previous;
             return Err(error);
         }
         Ok(())
     }
     pub fn review(&mut self, request: super::review::ReviewRequest) -> Result<(), StorageError> {
+        self.ensure_writable()?;
         let candidate = super::review::apply(&self.document, request)?;
-        self.document = candidate;
-        self.autosave()
+        let previous = std::mem::replace(&mut self.document, candidate);
+        if let Err(error) = self.autosave() {
+            // After a completed rename, keep memory aligned with the committed file.
+            if error.code == "storage_durability_uncertain" {
+                return Ok(());
+            }
+            self.document = previous;
+            return Err(error);
+        }
+        Ok(())
     }
     /// Explicit first Save. The directory must exist and be empty.
     pub fn save_to(&mut self, path: &Path) -> Result<(), StorageError> {
@@ -642,6 +870,47 @@ impl ProjectSession {
         }
     }
 
+    /// Bind a newly authored session to the verified private project layout.
+    /// Bound legacy projects are never relocated or converted by this method.
+    pub fn save_private(
+        &mut self,
+        root: &crate::private_storage::Root,
+    ) -> Result<(), StorageError> {
+        if self.store.is_some() {
+            return Err(StorageError::new("project_already_bound"));
+        }
+        self.status.state = SaveState::Saving;
+        let mut candidate = self.document.clone();
+        candidate.storage_layout = Some(1);
+        let result = root
+            .project(&candidate.project.id.0)
+            .map_err(StorageError::new)
+            .and_then(|layout| Store::select_private(&layout.root, "project.json", root));
+        let mut store = match result {
+            Ok(store) => store,
+            Err(error) => {
+                self.failed(&error);
+                return Err(error);
+            }
+        };
+        match store.save(&candidate, &mut self.sources) {
+            Ok(()) => {
+                self.document = candidate;
+                self.store = Some(store);
+                self.saved();
+                Ok(())
+            }
+            Err(error) => {
+                if error.code == "storage_durability_uncertain" {
+                    self.document = candidate;
+                    self.store = Some(store);
+                }
+                self.failed(&error);
+                Err(error)
+            }
+        }
+    }
+
     pub fn save(&mut self) -> Result<(), StorageError> {
         self.status.state = SaveState::Saving;
         let result = self
@@ -662,6 +931,12 @@ impl ProjectSession {
     }
     pub fn open(path: &Path) -> Result<Self, StorageError> {
         let (store, document) = Store::<ProjectDocument>::open(path, "project.json")?;
+        Self::from_store(store, document)
+    }
+    fn from_store(
+        store: Store<ProjectDocument>,
+        document: ProjectDocument,
+    ) -> Result<Self, StorageError> {
         let sources = store.files(&document)?;
         let revision = document.project.project_revision;
         Ok(Self {
@@ -674,6 +949,65 @@ impl ProjectSession {
                 error_code: None,
             },
         })
+    }
+    /// Reopen a private-layout project while retaining the mount proof for every save.
+    pub fn open_private(
+        root: &crate::private_storage::Root,
+        id: &ProjectId,
+    ) -> Result<Self, StorageError> {
+        root.proof().map_err(StorageError::new)?;
+        let layout = root.layout().project(&id.0).map_err(StorageError::new)?;
+        let (store, document) =
+            Store::<ProjectDocument>::open_private(&layout.root, "project.json", root)?;
+        let mut session = Self::from_store(store, document)?;
+        if &session.document.project.id != id || session.document.storage_layout != Some(1) {
+            return Err(StorageError::new("private_project_layout_mismatch"));
+        }
+        session
+            .store
+            .as_mut()
+            .expect("open binds store")
+            .guard_private(root)?;
+        Ok(session)
+    }
+    /// Explicitly selected older projects remain readable. Outside the private
+    /// root they require Save As before edits; no file is moved or migrated.
+    pub fn open_for_private(
+        root: &crate::private_storage::Root,
+        path: &Path,
+    ) -> Result<Self, StorageError> {
+        root.proof().map_err(StorageError::new)?;
+        let (store, document) =
+            Store::<ProjectDocument>::open_readonly(path, "project.json", root)?;
+        let mut session = Self::from_store(store, document)?;
+        if session.document.storage_layout == Some(1) {
+            let expected = root
+                .layout()
+                .project(&session.document.project.id.0)
+                .map_err(StorageError::new)?;
+            if path != expected.root {
+                return Err(StorageError::new("private_storage_location_required"));
+            }
+            session
+                .store
+                .as_mut()
+                .expect("open binds store")
+                .guard_private(root)?;
+        } else if path.starts_with(root.layout().root()) {
+            session
+                .store
+                .as_mut()
+                .expect("open binds store")
+                .guard_private(root)?;
+        } else {
+            session
+                .store
+                .as_mut()
+                .expect("open binds store")
+                .block_writes("legacy_project_requires_private_copy");
+            session.status.error_code = Some("legacy_project_requires_private_copy".into());
+        }
+        Ok(session)
     }
     /// Save as switches the active location/identity only after the new bundle commits.
     pub fn save_as(&mut self, path: &Path) -> Result<(), StorageError> {
@@ -698,6 +1032,30 @@ impl ProjectSession {
             }
         }
     }
+    /// Export a separately identified older-format copy without rebinding the session.
+    pub fn export_compatible(
+        &mut self,
+        path: &Path,
+    ) -> Result<super::compatibility::Report, StorageError> {
+        let (copy, report) = super::compatibility::project(&self.document)?;
+        let mut store = Store::select(path, "project.json")?;
+        store.save(&copy, &mut self.sources)?;
+        Ok(report)
+    }
+    /// Explicit older-format copy under a new fixed private identity. This does
+    /// not rebind, rewrite or migrate the active project or external references.
+    pub fn export_compatible_private(
+        &mut self,
+        root: &crate::private_storage::Root,
+    ) -> Result<super::compatibility::Report, StorageError> {
+        let (copy, report) = super::compatibility::project(&self.document)?;
+        let layout = root
+            .project(&copy.project.id.0)
+            .map_err(StorageError::new)?;
+        let mut store = Store::select_private(&layout.root, "project.json", root)?;
+        store.save(&copy, &mut self.sources)?;
+        Ok(report)
+    }
     fn saved(&mut self) {
         self.status = PersistenceStatus {
             state: SaveState::Saved,
@@ -719,12 +1077,24 @@ impl ProjectSession {
     ) -> Result<Self, StorageError> {
         document.project.id = ProjectId(format!("project_{}", uuid::Uuid::new_v4().simple()));
         document.project.project_revision = 0;
+        document.storage_layout = None;
         document.validate()?;
         let mut sources = BTreeMap::new();
+        let owned: BTreeSet<_> = document
+            .resources
+            .iter()
+            .filter(|r| r.source.is_none())
+            .map(Resource::key)
+            .collect();
         for (key, mut source) in inputs {
-            sources.insert(key, staging.copy(&mut source)?);
+            if owned.contains(&key) {
+                sources.insert(key, staging.copy(&mut source)?);
+            }
         }
         for resource in &document.resources {
+            if resource.source.is_some() {
+                continue;
+            }
             let file = sources
                 .get_mut(&resource.key())
                 .ok_or_else(|| StorageError::new("resource_missing"))?;
@@ -746,9 +1116,144 @@ impl ProjectSession {
 }
 
 #[cfg(test)]
+#[path = "private_project_tests.rs"]
+mod private_project_tests;
+
+#[cfg(test)]
+use crate::task_fixtures;
+#[cfg(test)]
+#[path = "external_resource_tests.rs"]
+mod external_resource_tests;
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::{fs, io::Write};
+    #[test]
+    fn imported_take_save_failure_is_atomic_and_reopen_keeps_unknown_recipe() {
+        use crate::video::captures::Import;
+        let fixtures = super::task_fixtures::env_root("TMPDIR");
+        let root = tempfile::tempdir_in(&fixtures).unwrap();
+        let stage = tempfile::tempdir_in(&fixtures).unwrap();
+        let staging = SessionStaging::select(stage.path()).unwrap();
+        let original = stage.path().join("own-original.bin");
+        fs::write(&original, b"OWN EXTERNAL VIDEO FIXTURE").unwrap();
+        let mut session = ProjectSession::new(project()).unwrap();
+        let mut document = session.document.clone();
+        let edit: EditRequest = serde_json::from_str(include_str!(
+            "../../design/video-contract/edit-project.json"
+        ))
+        .unwrap();
+        editing::apply(&mut document.project, edit).unwrap();
+        let scene = document.project.scenes[0].id.clone();
+        let asset_id = AssetId("own-import".into());
+        document.project.assets.insert(
+            asset_id.clone(),
+            Asset {
+                id: asset_id.clone(),
+                name: "Own import".into(),
+                revision: 1,
+                kind: MediaKind::Video,
+                library_source: None,
+            },
+        );
+        let mut input = File::open(&original).unwrap();
+        let reference = Resource::inspect(
+            "own-reference".into(),
+            ResourceKind::Reference {
+                asset_id: asset_id.clone(),
+                revision: 1,
+            },
+            &mut input,
+        )
+        .unwrap();
+        document.resources.push(reference.clone());
+        session
+            .update(
+                0,
+                document,
+                BTreeMap::from([(reference.key(), input)]),
+                &staging,
+            )
+            .unwrap();
+        session.save_to(root.path()).unwrap();
+        let request = |session: &ProjectSession| Import {
+            schema_version: 1,
+            expected_project_revision: session.document.project.project_revision,
+            scene_id: scene.clone(),
+            asset_id: asset_id.clone(),
+            accept: true,
+        };
+        let before = fs::read(root.path().join("project.json")).unwrap();
+        session.store.as_mut().unwrap().fail_commit = true;
+        assert_eq!(
+            session
+                .import_take(request(&session), &staging)
+                .err()
+                .unwrap()
+                .code,
+            "injected_disk_full"
+        );
+        assert!(session.document.takes.is_empty());
+        assert_eq!(fs::read(root.path().join("project.json")).unwrap(), before);
+        session.store.as_mut().unwrap().fail_commit = false;
+        let id = session
+            .import_take(request(&session), &staging)
+            .unwrap()
+            .attached_id
+            .unwrap();
+        assert_eq!(
+            session
+                .import_take(request(&session), &staging)
+                .unwrap()
+                .attached_id,
+            Some(id.clone())
+        );
+        let review = |session: &ProjectSession, action| super::super::review::ReviewRequest {
+            schema_version: 1,
+            expected_project_revision: session.document.project.project_revision,
+            scene_id: scene.clone(),
+            take_id: id.clone(),
+            action,
+        };
+        let before_review = session.document.clone();
+        let before_disk = fs::read(root.path().join("project.json")).unwrap();
+        session.store.as_mut().unwrap().fail_commit = true;
+        assert_eq!(
+            session
+                .review(review(&session, super::super::review::ReviewAction::Reject))
+                .unwrap_err()
+                .code,
+            "injected_disk_full"
+        );
+        assert_eq!(session.document, before_review);
+        assert_eq!(
+            fs::read(root.path().join("project.json")).unwrap(),
+            before_disk
+        );
+        session.store.as_mut().unwrap().fail_commit = false;
+        session
+            .review(review(&session, super::super::review::ReviewAction::Reject))
+            .unwrap();
+        assert!(session.document.project.scenes[0].accepted_take.is_none());
+        session
+            .review(review(&session, super::super::review::ReviewAction::Accept))
+            .unwrap();
+        drop(session);
+        let reopened = ProjectSession::open(root.path()).unwrap();
+        let take = reopened.document.takes.iter().find(|t| t.id == id).unwrap();
+        assert!(take.provenance.is_none());
+        let accepted = reopened.document.project.scenes[0]
+            .accepted_take
+            .as_ref()
+            .unwrap();
+        assert!(accepted.model.is_none());
+        assert_eq!(accepted.source_fingerprint, reference.sha256);
+        assert_eq!(
+            fs::read(root.path().join("takes").join(&reference.sha256)).unwrap(),
+            b"OWN EXTERNAL VIDEO FIXTURE"
+        );
+        assert_eq!(fs::read(original).unwrap(), b"OWN EXTERNAL VIDEO FIXTURE");
+    }
     fn project() -> VideoProject {
         VideoProject::create(
             serde_json::from_str(include_str!(
@@ -757,6 +1262,323 @@ mod tests {
             .unwrap(),
         )
         .unwrap()
+    }
+    #[test]
+    fn capture_delete_is_atomic_and_only_prunes_unshared_owned_blobs() {
+        use crate::video::captures::{Action, Request};
+        let fixtures = super::task_fixtures::env_root("TMPDIR");
+        let root = tempfile::tempdir_in(&fixtures).unwrap();
+        let stage = tempfile::tempdir_in(&fixtures).unwrap();
+        let staging = SessionStaging::select(stage.path()).unwrap();
+        let original = stage.path().join("own-external-original.bin");
+        fs::write(&original, b"OWN SYNTHETIC CAPTURE").unwrap();
+        let mut session = ProjectSession::new(project()).unwrap();
+        let mut document = session.document.clone();
+        let edit: EditRequest = serde_json::from_str(include_str!(
+            "../../design/video-contract/edit-project.json"
+        ))
+        .unwrap();
+        editing::apply(&mut document.project, edit).unwrap();
+        let scene = document.project.scenes[0].id.clone();
+        let model = document.project.default_model.clone();
+        let mut source = File::open(&original).unwrap();
+        let first = Resource::inspect(
+            "owned-one".into(),
+            ResourceKind::TakeVideo {
+                take_id: TakeId("one".into()),
+            },
+            &mut source,
+        )
+        .unwrap();
+        let key = first.key();
+        for id in ["one", "two"] {
+            document.takes.push(StoredTake {
+                id: TakeId(id.into()),
+                scene_id: scene.clone(),
+                status: TakeStatus::Candidate,
+                provenance: Some(TakeProvenance {
+                    boundary: None,
+                    resolved_loras: None,
+                    model: model.clone(),
+                    seed: 42,
+                    input_revision: "own-input".into(),
+                    compiled_prompt: "Own synthetic receipt".into(),
+                    settings: SettingsSlot {
+                        model: model.clone(),
+                        schema_version: 1,
+                        values: serde_json::json!({}),
+                    },
+                    references: vec![],
+                    source_take: None,
+                    continuity: None,
+                }),
+            });
+            document.resources.push(Resource {
+                id: format!("owned-{id}"),
+                kind: ResourceKind::TakeVideo {
+                    take_id: TakeId(id.into()),
+                },
+                ..first.clone()
+            });
+        }
+        session
+            .update(
+                0,
+                document,
+                BTreeMap::from([(key.clone(), source)]),
+                &staging,
+            )
+            .unwrap();
+        session.save_to(root.path()).unwrap();
+        let owned = root.path().join("takes").join(&key.sha256);
+        let request = |session: &ProjectSession, id: &str| Request {
+            schema_version: 1,
+            expected_project_revision: session.document.project.project_revision,
+            scene_id: scene.clone(),
+            take_id: TakeId(id.into()),
+            action: Action::Delete,
+        };
+        let before = fs::read(root.path().join("project.json")).unwrap();
+        session.store.as_mut().unwrap().fail_commit = true;
+        assert_eq!(
+            session
+                .capture(request(&session, "one"), &staging)
+                .err()
+                .unwrap()
+                .code,
+            "injected_disk_full"
+        );
+        assert_eq!(session.document.takes.len(), 2);
+        assert_eq!(fs::read(root.path().join("project.json")).unwrap(), before);
+        assert!(owned.exists());
+        session.store.as_mut().unwrap().fail_commit = false;
+        assert!(
+            session
+                .capture(request(&session, "one"), &staging)
+                .unwrap()
+                .cleanup_warning
+                .is_none()
+        );
+        assert!(
+            owned.exists(),
+            "A second Take still owns this content-addressed blob"
+        );
+        assert!(
+            session
+                .capture(request(&session, "two"), &staging)
+                .unwrap()
+                .cleanup_warning
+                .is_none()
+        );
+        assert!(!owned.exists());
+        assert_eq!(fs::read(&original).unwrap(), b"OWN SYNTHETIC CAPTURE");
+        assert!(
+            ProjectSession::open(root.path())
+                .unwrap()
+                .document
+                .takes
+                .is_empty()
+        );
+    }
+    #[test]
+    fn media_relink_precommit_failure_rolls_back_and_postrename_keeps_both_versions() {
+        use super::super::media_health::{Relink, apply_relink};
+        let fixture_root = super::task_fixtures::env_root("IMAGINE_WORKER_A_FIXTURES");
+        let stage = tempfile::tempdir_in(&fixture_root).unwrap();
+        let staging = SessionStaging::select(stage.path()).unwrap();
+        let saved = tempfile::tempdir_in(&fixture_root).unwrap();
+        let mut session = ProjectSession::new(project()).unwrap();
+        let id = AssetId("own-relink".into());
+        let mut document = session.document.clone();
+        document.project.assets.insert(
+            id.clone(),
+            Asset {
+                library_source: None,
+                name: "Own".into(),
+                id: id.clone(),
+                revision: 1,
+                kind: MediaKind::Image,
+            },
+        );
+        let mut old = tempfile::tempfile_in(&fixture_root).unwrap();
+        old.write_all(b"OWN OLD RESOURCE").unwrap();
+        let resource = Resource::inspect(
+            "own-old".into(),
+            ResourceKind::Reference {
+                asset_id: id.clone(),
+                revision: 1,
+            },
+            &mut old,
+        )
+        .unwrap();
+        document.resources.push(resource.clone());
+        session
+            .update(
+                0,
+                document,
+                BTreeMap::from([(resource.key(), old)]),
+                &staging,
+            )
+            .unwrap();
+        session.save_to(saved.path()).unwrap();
+        let original = session.document.clone();
+        let request = Relink {
+            schema_version: 1,
+            expected_project_revision: 1,
+            asset_id: id.clone(),
+            expected_asset_revision: 1,
+            replacement_asset_id: "own-upload".into(),
+        };
+        let new = || {
+            let mut file = tempfile::tempfile_in(&fixture_root).unwrap();
+            file.write_all(b"OWN NEW RESOURCE").unwrap();
+            file
+        };
+        session.store.as_mut().unwrap().fail_commit = true;
+        assert_eq!(
+            apply_relink(&mut session, &request, new(), &MediaKind::Image, &staging)
+                .unwrap_err()
+                .code,
+            "injected_disk_full"
+        );
+        assert_eq!(session.document, original);
+        assert_eq!(
+            ProjectSession::open(saved.path()).unwrap().document,
+            original
+        );
+        let mut old = vec![];
+        session.copy_resource("own-old", &mut old).unwrap();
+        assert_eq!(old, b"OWN OLD RESOURCE");
+        session.store.as_mut().unwrap().fail_commit = false;
+        session
+            .store
+            .as_mut()
+            .unwrap()
+            .inject_sync_failure_after_rename(true);
+        apply_relink(&mut session, &request, new(), &MediaKind::Image, &staging).unwrap();
+        assert_eq!(session.document.project.assets[&id].revision, 2);
+        assert_eq!(session.document.resources.len(), 2);
+        assert_eq!(session.status.state, SaveState::NotSaved);
+        assert_eq!(
+            session.status.error_code.as_deref(),
+            Some("storage_durability_uncertain")
+        );
+        assert_eq!(
+            ProjectSession::open(saved.path()).unwrap().document,
+            session.document
+        );
+    }
+    #[test]
+    fn authoring_precommit_failure_rolls_back_but_postrename_keeps_applied_source() {
+        use imagine_video_contract::authoring::*;
+        use imagine_video_contract::editing::Edit;
+        let root = tempfile::tempdir().unwrap();
+        let mut session = ProjectSession::new(project()).unwrap();
+        session.save_to(root.path()).unwrap();
+        let original = session.document.clone();
+        let request = || EditRequest {
+            schema_version: 1,
+            expected_project_revision: 0,
+            commands: vec![Edit::SetGlobalPrompt {
+                prompt: "Own reviewed source".into(),
+            }],
+        };
+        let draft = Draft {
+            schema_version: 1,
+            id: "own_applied_draft".into(),
+            project_id: original.project.id.clone(),
+            request: Request {
+                schema_version: 1,
+                expected_project_revision: 0,
+                provider_profile_id: "own_fixture".into(),
+                provider: "synthetic".into(),
+                prompt_profile_id: "normal".into(),
+                operation: Operation::Outline,
+                scene_field: None,
+                scene_id: None,
+                section_id: None,
+                brief: String::new(),
+                instruction: String::new(),
+                duration_seconds: 5.,
+                destination: Destination::Append,
+                cast: vec![],
+                images: vec![],
+                add_dialogue: false,
+            },
+            phase: Phase::Review,
+            outline: None,
+            scenes: vec![],
+            text: Some("Own reviewed source".into()),
+            failure: None,
+            failed_index: None,
+            prompt_profile_id: "normal".into(),
+            prompt_profile_revision: "own-test".into(),
+            profile_warning: String::new(),
+            provider_snapshot: serde_json::json!({"provider":"synthetic"}),
+            planned_durations: vec![],
+            inventory: vec![],
+            selected_cast: serde_json::Value::Null,
+            warnings: vec![],
+        };
+        session.store.as_mut().unwrap().fail_commit = true;
+        assert_eq!(
+            session
+                .apply_authoring(request(), draft.clone())
+                .unwrap_err()
+                .code,
+            "injected_disk_full"
+        );
+        assert_eq!(session.document.project, original.project);
+        assert!(session.document.authoring.is_empty());
+        assert_eq!(
+            ProjectSession::open(root.path()).unwrap().document.project,
+            original.project
+        );
+        assert_eq!(session.status.state, SaveState::NotSaved);
+        session.store.as_mut().unwrap().fail_commit = false;
+        session
+            .store
+            .as_mut()
+            .unwrap()
+            .inject_sync_failure_after_rename(true);
+        session.apply_authoring(request(), draft).unwrap();
+        assert_eq!(
+            session.document.project.global_prompt,
+            "Own reviewed source"
+        );
+        assert_eq!(session.document.project.project_revision, 1);
+        assert_eq!(session.document.authoring[0].phase, Phase::Applied);
+        assert_eq!(session.status.state, SaveState::NotSaved);
+        assert_eq!(session.status.saved_revision, Some(0));
+        assert_eq!(
+            session.status.error_code.as_deref(),
+            Some("storage_durability_uncertain")
+        );
+        let disk = ProjectSession::open(root.path()).unwrap();
+        assert_eq!(disk.document.project, session.document.project);
+        assert_eq!(disk.document.authoring, session.document.authoring);
+        session
+            .store
+            .as_mut()
+            .unwrap()
+            .inject_sync_failure_after_rename(false);
+        session.save().unwrap();
+        assert_eq!(session.status.state, SaveState::Saved);
+        assert_eq!(session.status.saved_revision, Some(1));
+        session
+            .edit(EditRequest {
+                schema_version: 1,
+                expected_project_revision: 1,
+                commands: vec![Edit::SetGlobalPrompt {
+                    prompt: "Own subsequent edit".into(),
+                }],
+            })
+            .unwrap();
+        let disk = ProjectSession::open(root.path()).unwrap();
+        assert_eq!(disk.document.project.project_revision, 2);
+        assert_eq!(disk.document.project.global_prompt, "Own subsequent edit");
+        assert_eq!(disk.document.authoring, session.document.authoring);
+        assert_eq!(disk.document.authoring.len(), 1);
     }
     #[test]
     fn interrupted_autosave_keeps_manifest_and_session_draft_for_retry() {

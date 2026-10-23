@@ -1,15 +1,16 @@
-//! Synthetic fixtures only. Run with TMPDIR on the explicitly selected encrypted test volume.
+//! Synthetic fixtures only. Run with TMPDIR inside the approved task root.
 #[path = "support/video_output.rs"]
 mod support;
+#[path = "../shared/task_fixtures.rs"]
+mod task_fixtures;
 use imagine_server::{
     video::output::Destination,
     video_destination::{self as d, Config, Environment},
 };
 use std::sync::Arc;
 fn own() -> tempfile::TempDir {
-    let p = std::env::var("TMPDIR").expect("encrypted test TMPDIR required");
-    assert!(p.starts_with("/run/media/veracrypt1/imagine/.codex-"));
-    tempfile::tempdir().unwrap()
+    let root = task_fixtures::env_root("TMPDIR");
+    tempfile::tempdir_in(root).unwrap()
 }
 #[test]
 fn persists_after_session_and_handles_parallel_names_without_overwriting() {
@@ -37,6 +38,42 @@ fn persists_after_session_and_handles_parallel_names_without_overwriting() {
     }
     drop(dest);
     assert!(names.iter().all(|p| p.exists()));
+}
+#[test]
+fn custom_video_names_preserve_unicode_do_not_overwrite_and_cannot_change_destination() {
+    let root = own();
+    let dest = support::destination(root.path());
+    let proof = serde_json::to_value(dest.proof().unwrap()).unwrap();
+    let mut a = dest.reserve(&proof, 64).unwrap();
+    let first = a.publish_video(b"own first", Some("Min film β")).unwrap();
+    a.commit();
+    let mut b = dest.reserve(&proof, 64).unwrap();
+    let second = b
+        .publish_video(b"own second", Some("Min film β.mp4"))
+        .unwrap();
+    b.commit();
+    assert_eq!(first.path.file_name().unwrap(), "Min film β.mp4");
+    assert_eq!(second.path.file_name().unwrap(), "Min film β_2.mp4");
+    assert_eq!(std::fs::read(&first.path).unwrap(), b"own first");
+    assert_eq!(std::fs::read(&second.path).unwrap(), b"own second");
+    let mut c = dest.reserve(&proof, 64).unwrap();
+    let upper = c.publish_video(b"own upper", Some("Upper.MP4")).unwrap();
+    c.commit();
+    assert_eq!(upper.path.file_name().unwrap(), "Upper.MP4");
+    for name in [
+        "../outside.mp4",
+        "/outside.mp4",
+        "nested/outside.mp4",
+        "nested/",
+        "nested/.",
+        "nul\0.mp4",
+    ] {
+        let mut p = dest.reserve(&proof, 64).unwrap();
+        assert_eq!(
+            p.publish_video(b"own invalid", Some(name)).err(),
+            Some("invalid_output_filename")
+        );
+    }
 }
 #[test]
 fn cancellation_and_failed_publication_remove_only_own_partial() {

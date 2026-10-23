@@ -23,8 +23,6 @@ use tokio_util::sync::CancellationToken;
 #[derive(Clone, Serialize, Deserialize)]
 struct Saved {
     profiles: Vec<Profile>,
-    #[serde(default)]
-    secrets: BTreeMap<String, String>,
 }
 struct Job {
     status: Status,
@@ -37,15 +35,15 @@ struct StateData {
 }
 pub struct Service {
     path: PathBuf,
+    private: Option<(crate::private_storage::Root, PathBuf)>,
     state: Mutex<StateData>,
     http: reqwest::Client,
     slots: Arc<Semaphore>,
 }
-/// Captured configuration and key; the key is never part of public draft state.
+/// Captured provider configuration; external API credentials are not supported.
 #[derive(Clone)]
 pub(crate) struct ProviderSnapshot {
     pub profile: Profile,
-    key: Option<String>,
 }
 #[derive(Clone)]
 pub(crate) struct ProviderImage {
@@ -62,10 +60,7 @@ impl Service {
             .find(|p| p.id == id)
             .cloned()
             .ok_or(Fault::new(404, "enhancement_profile_not_found"))?;
-        Ok(ProviderSnapshot {
-            profile,
-            key: state.saved.secrets.get(id).cloned(),
-        })
+        Ok(ProviderSnapshot { profile })
     }
     pub(crate) async fn authoring_complete(
         &self,
@@ -114,11 +109,7 @@ impl Service {
         } else {
             return Err("unsupported_authoring_provider");
         };
-        let mut request = self.http.post(url).json(&body);
-        if let Some(key) = &snapshot.key {
-            request = request.bearer_auth(key);
-        }
-        let value = self.receive(request).await?;
+        let value = self.receive(self.http.post(url).json(&body)).await?;
         if provider == "ollama" {
             if value["done"] != true {
                 return Err("enhancement_invalid_response");
@@ -135,15 +126,36 @@ impl Service {
             completion_text(&value)
         }
     }
+    /// Explicit fixture/developer path; normal startup uses open_private.
     pub fn open(path: PathBuf) -> Result<Arc<Self>> {
         let saved: Saved = match std::fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes).context("Invalid enhancement profiles")?,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Saved {
                 profiles: vec![Profile::default()],
-                secrets: BTreeMap::new(),
             },
             Err(e) => return Err(e.into()),
         };
+        Self::from_saved(path, None, saved)
+    }
+    pub fn open_private(
+        root: crate::private_storage::Root,
+        relative: PathBuf,
+    ) -> Result<Arc<Self>> {
+        let saved = match root.read(&relative).map_err(anyhow::Error::msg)? {
+            Some(bytes) => {
+                serde_json::from_slice(&bytes).context("Invalid enhancement profiles")?
+            }
+            None => Saved {
+                profiles: vec![Profile::default()],
+            },
+        };
+        Self::from_saved(relative.clone(), Some((root, relative)), saved)
+    }
+    fn from_saved(
+        path: PathBuf,
+        private: Option<(crate::private_storage::Root, PathBuf)>,
+        saved: Saved,
+    ) -> Result<Arc<Self>> {
         let mut ids = std::collections::BTreeSet::new();
         for profile in &saved.profiles {
             validate(profile)?;
@@ -153,6 +165,7 @@ impl Service {
         }
         Ok(Arc::new(Self {
             path,
+            private,
             state: Mutex::new(StateData {
                 saved,
                 jobs: BTreeMap::new(),
@@ -172,34 +185,10 @@ impl Service {
     }
     pub async fn models(&self, lookup: ModelsRequest) -> std::result::Result<Vec<String>, Fault> {
         validate_url(&lookup.base_url).map_err(|_| Fault::new(400, "invalid_enhancement_url"))?;
-        let key = match lookup.api_key {
-            Some(key) => Some(key),
-            None => {
-                let state = self.state.lock().unwrap();
-                state
-                    .saved
-                    .profiles
-                    .iter()
-                    .find(|p| {
-                        p.id == lookup.profile_id
-                            && p.base_url.trim_end_matches('/')
-                                == lookup.base_url.trim_end_matches('/')
-                    })
-                    .and_then(|p| state.saved.secrets.get(&p.id).cloned())
-            }
-        };
-        let mut request = self
+        let request = self
             .http
             .get(format!("{}/models", lookup.base_url.trim_end_matches('/')))
             .timeout(Duration::from_secs(20));
-        if let Some(key) = key.filter(|key| !key.is_empty()) {
-            if key.len() > 8192
-                || reqwest::header::HeaderValue::from_str(&format!("Bearer {key}")).is_err()
-            {
-                return Err(Fault::new(400, "invalid_enhancement_api_key"));
-            }
-            request = request.bearer_auth(key);
-        }
         let mut response = request
             .send()
             .await
@@ -246,6 +235,11 @@ impl Service {
         Ok(models)
     }
     fn persist(&self, saved: &Saved) -> Result<()> {
+        if let Some((root, relative)) = &self.private {
+            return root
+                .write(relative, &serde_json::to_vec_pretty(saved)?)
+                .map_err(anyhow::Error::msg);
+        }
         let directory = self.path.parent().context("Profile directory missing")?;
         std::fs::create_dir_all(directory)?;
         std::fs::set_permissions(directory, std::fs::Permissions::from_mode(0o700))?;
@@ -270,20 +264,7 @@ impl Service {
         validate(&update.profile).map_err(|_| Fault::new(400, "invalid_enhancement_profile"))?;
         let mut state = self.state.lock().unwrap();
         let mut saved = state.saved.clone();
-        let mut profile = update.profile;
-        if let Some(key) = update.api_key {
-            if key.len() > 8192
-                || reqwest::header::HeaderValue::from_str(&format!("Bearer {key}")).is_err()
-            {
-                return Err(Fault::new(400, "invalid_enhancement_api_key"));
-            }
-            if key.is_empty() {
-                saved.secrets.remove(&profile.id);
-            } else {
-                saved.secrets.insert(profile.id.clone(), key);
-            }
-        }
-        profile.has_api_key = false;
+        let profile = update.profile;
         if let Some(existing) = saved.profiles.iter_mut().find(|p| p.id == profile.id) {
             *existing = profile;
         } else {
@@ -292,9 +273,7 @@ impl Service {
             }
             saved.profiles.push(profile);
         }
-        self.persist(&saved)
-            .map_err(|_| Fault::new(500, "enhancement_save_failed"))?;
-        state.saved = saved;
+        self.commit_saved(&mut state, saved)?;
         Ok(public_profiles(&state.saved))
     }
     pub fn delete(&self, id: &str) -> std::result::Result<Vec<Profile>, Fault> {
@@ -304,11 +283,21 @@ impl Service {
             return Err(Fault::new(404, "enhancement_profile_not_found"));
         }
         saved.profiles.retain(|p| p.id != id);
-        saved.secrets.remove(id);
-        self.persist(&saved)
-            .map_err(|_| Fault::new(500, "enhancement_save_failed"))?;
-        state.saved = saved;
+        self.commit_saved(&mut state, saved)?;
         Ok(public_profiles(&state.saved))
+    }
+    fn commit_saved(&self, state: &mut StateData, saved: Saved) -> std::result::Result<(), Fault> {
+        if let Err(error) = self.persist(&saved) {
+            // This exact private backend code means rename succeeded but the
+            // directory sync was uncertain. Match committed disk state in RAM,
+            // while reporting failure rather than claiming durable success.
+            if self.private.is_some() && error.to_string() == "private_storage_write_unconfirmed" {
+                state.saved = saved;
+            }
+            return Err(Fault::new(500, "enhancement_save_failed"));
+        }
+        state.saved = saved;
+        Ok(())
     }
     pub fn start(self: &Arc<Self>, request: Request) -> std::result::Result<(), Fault> {
         if uuid::Uuid::parse_str(&request.id).is_err()
@@ -334,9 +323,6 @@ impl Service {
         if state.jobs.contains_key(&request.id) {
             return Err(Fault::new(409, "enhancement_id_exists"));
         }
-        if state.jobs.len() >= 64 {
-            return Err(Fault::new(429, "enhancement_busy"));
-        }
         let profile = state
             .saved
             .profiles
@@ -344,7 +330,6 @@ impl Service {
             .find(|p| p.id == request.profile_id)
             .cloned()
             .ok_or(Fault::new(404, "enhancement_profile_not_found"))?;
-        let key = state.saved.secrets.get(&profile.id).cloned();
         let cancel = CancellationToken::new();
         state.jobs.insert(
             request.id.clone(),
@@ -361,7 +346,7 @@ impl Service {
             let status = tokio::select! {
                 biased;
                 _ = cancel.cancelled() => Status::Cancelled,
-                result = service.complete(profile, key, request.prompt) => match result {
+                result = service.complete(profile, request.prompt) => match result {
                     Ok(text) => Status::Succeeded { text },
                     Err(code) => Status::Failed { code: code.into() },
                 },
@@ -389,7 +374,6 @@ impl Service {
     async fn complete(
         &self,
         profile: Profile,
-        key: Option<String>,
         prompt: String,
     ) -> std::result::Result<String, &'static str> {
         let mut body = json!({"model": profile.model, "messages": [
@@ -401,16 +385,13 @@ impl Service {
             body["temperature"] = json!(temperature);
         }
         body.as_object_mut().unwrap().extend(profile.parameters);
-        let mut request = self
+        let request = self
             .http
             .post(format!(
                 "{}/chat/completions",
                 profile.base_url.trim_end_matches('/')
             ))
             .json(&body);
-        if let Some(key) = key {
-            request = request.bearer_auth(key);
-        }
         let value = self.receive(request).await?;
         completion_text(&value)
     }
@@ -469,15 +450,7 @@ fn completion_text(value: &Value) -> std::result::Result<String, &'static str> {
     Ok(text.trim().to_owned())
 }
 fn public_profiles(saved: &Saved) -> Vec<Profile> {
-    saved
-        .profiles
-        .iter()
-        .cloned()
-        .map(|mut p| {
-            p.has_api_key = saved.secrets.contains_key(&p.id);
-            p
-        })
-        .collect()
+    saved.profiles.clone()
 }
 pub fn validate(p: &Profile) -> Result<()> {
     validate_url(&p.base_url)?;

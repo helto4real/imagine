@@ -92,45 +92,15 @@ impl Client {
         };
         Ok(response.json().await?)
     }
-    pub async fn upload(&self, bytes: Vec<u8>) -> Result<String> {
+    pub async fn link(&self, path: &std::path::Path) -> Result<Value> {
         let r = self
-            .bound(self.http.post(format!("{}/v1/assets", self.base)))
-            .header("Content-Type", "image/png")
-            .body(bytes)
+            .bound(self.http.post(format!("{}/v1/assets/link", self.base)))
+            .json(&serde_json::json!({"path":path,"normalize_image":true}))
             .send()
             .await?;
         if !r.status().is_success() {
             bail!("reference storage was rejected by Imagine")
         };
-        r.json::<Value>().await?["id"]
-            .as_str()
-            .map(str::to_string)
-            .ok_or_else(|| anyhow!("invalid reference storage response"))
-    }
-    pub async fn download(&self, id: &str) -> Result<Vec<u8>> {
-        if !id
-            .bytes()
-            .all(|c| c.is_ascii_alphanumeric() || b"_-".contains(&c))
-        {
-            bail!("invalid image reference")
-        };
-        let mut r = self
-            .bound(self.http.get(format!("{}/v1/assets/{id}", self.base)))
-            .send()
-            .await?;
-        if !r.status().is_success() {
-            bail!("image download failed")
-        };
-        let mut bytes = Vec::new();
-        while let Some(chunk) = r.chunk().await? {
-            if bytes.len() + chunk.len() > 64 * 1024 * 1024 {
-                bail!("image exceeds the transfer limit")
-            };
-            bytes.extend(chunk)
-        }
-        if bytes.is_empty() {
-            bail!("image is empty")
-        };
-        Ok(bytes)
+        Ok(r.json().await?)
     }
 }

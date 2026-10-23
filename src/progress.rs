@@ -30,7 +30,7 @@ pub fn parse_step(record: &[u8]) -> Option<(u32, u32, f64)> {
         1.0 / speed.strip_suffix("it/s")?.parse::<f64>().ok()?
     };
     // Reject loading byte counters (MB/s), malformed output and unsupported counts.
-    (step > 0 && step <= total && total <= 100 && seconds.is_finite() && seconds > 0.)
+    (step > 0 && step <= total && seconds.is_finite() && seconds > 0.)
         .then_some((step, total, seconds))
 }
 
@@ -68,6 +68,19 @@ pub async fn read_steps(mut reader: impl AsyncRead + Unpin, mut report: impl FnM
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn positive_130_step_counts_are_numeric_telemetry() {
+        let bar = "=".repeat(50);
+        assert_eq!(
+            super::parse_step(format!("|{bar}| 130/130 - 0.5s/it").as_bytes()),
+            Some((130, 130, 0.5))
+        );
+        for counts in ["0/130", "131/130", "1/0"] {
+            assert!(super::parse_step(format!("|{bar}| {counts} - 0.5s/it").as_bytes()).is_none());
+        }
+        assert!(super::parse_step(format!("|{bar}| 1/130 - NaNs/it").as_bytes()).is_none());
+    }
+
     use super::*;
     use tokio::io::AsyncWriteExt;
 

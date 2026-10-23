@@ -16,6 +16,9 @@ pub struct Service {
     jobs: Mutex<BTreeMap<String, Job>>,
 }
 struct Job {
+    clock: std::time::Instant,
+    clock_completed: usize,
+    clock_elapsed: Option<f64>,
     draft: Draft,
     base: VideoProject,
     profile: profiles::Snapshot,
@@ -52,6 +55,9 @@ impl Service {
         }
         if request.add_dialogue && grounding.cast.as_array().is_none_or(|v| v.len() < 2) {
             return Err(fault("story_dialogue_cast_required"));
+        }
+        if request.scene_field.is_some() && request.operation != Operation::EnhanceScene {
+            return Err(fault("invalid_enhancement_target"));
         }
         if request.operation != Operation::Outline {
             let scene = base
@@ -123,15 +129,15 @@ impl Service {
             warnings: vec![],
         };
         let mut jobs = self.jobs.lock().unwrap();
-        if jobs.len() >= 64 {
-            return Err(Fault::new(429, "authoring_draft_limit"));
-        }
         if jobs.values().any(|j| j.draft.phase.busy()) {
             return Err(Fault::new(409, "authoring_busy"));
         }
         jobs.insert(
             id.clone(),
             Job {
+                clock: std::time::Instant::now(),
+                clock_completed: 0,
+                clock_elapsed: None,
                 draft: draft.clone(),
                 base,
                 profile,
@@ -156,6 +162,37 @@ impl Service {
             .map(|j| j.draft.clone())
             .ok_or(Fault::new(404, "authoring_not_found"))
     }
+    pub fn progress(&self, id: &str) -> Result<serde_json::Value, Fault> {
+        let jobs = self.jobs.lock().unwrap();
+        let job = jobs.get(id).ok_or(Fault::new(404, "authoring_not_found"))?;
+        let draft = &job.draft;
+        let (completed, total) = match draft.phase {
+            Phase::Inventory => (draft.inventory.len(), draft.request.images.len().max(1)),
+            Phase::Expanding
+            | Phase::Review
+            | Phase::Failed
+            | Phase::Cancelled
+            | Phase::Applied
+                if draft.outline.is_some() =>
+            {
+                (
+                    draft.scenes.iter().filter(|s| s.is_some()).count(),
+                    draft.scenes.len().max(1),
+                )
+            }
+            Phase::Outline | Phase::Review | Phase::Applied => (1, 1),
+            _ => (0, 1),
+        };
+        let elapsed = job
+            .clock_elapsed
+            .unwrap_or_else(|| job.clock.elapsed().as_secs_f64());
+        let new = completed.saturating_sub(job.clock_completed);
+        let eta = (new > 0 && draft.phase.busy())
+            .then(|| elapsed / new as f64 * total.saturating_sub(completed) as f64);
+        Ok(
+            json!({"draft_id":id,"phase":draft.phase,"completed":completed,"total":total,"elapsed_seconds":elapsed,"eta_seconds":eta}),
+        )
+    }
     pub fn retry(
         self: &Arc<Self>,
         id: &str,
@@ -174,6 +211,9 @@ impl Service {
         j.cancel = CancellationToken::new();
         j.generation += 1;
         j.draft.phase = Phase::Running;
+        j.clock = std::time::Instant::now();
+        j.clock_elapsed = None;
+        j.clock_completed = j.draft.inventory.len();
         j.draft.failure = None;
         let generation = j.generation;
         let draft = j.draft.clone();
@@ -194,6 +234,7 @@ impl Service {
             j.cancel.cancel();
             j.generation += 1;
             j.draft.phase = Phase::Cancelled;
+            j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
         }
         Ok(j.draft.clone())
     }
@@ -280,6 +321,9 @@ impl Service {
         j.draft.failure = None;
         j.draft.failed_index = None;
         j.draft.phase = Phase::Expanding;
+        j.clock = std::time::Instant::now();
+        j.clock_elapsed = None;
+        j.clock_completed = j.draft.scenes.iter().filter(|s| s.is_some()).count();
         j.cancel = CancellationToken::new();
         j.generation += 1;
         let generation = j.generation;
@@ -375,6 +419,7 @@ impl Service {
                     }
                     Err(code) => {
                         j.draft.phase = Phase::Failed;
+                        j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
                         j.draft.failure = Some(code.into());
                         return;
                     }
@@ -449,11 +494,15 @@ impl Service {
                         && Some(&s.id) == draft.request.section_id.as_ref()
                 });
                 let source = if draft.request.operation == Operation::EnhanceSection {
-                    section.unwrap().prompt.as_str()
+                    section.unwrap().prompt.clone()
                 } else {
-                    scene.description.as_str()
+                    draft
+                        .request
+                        .scene_field
+                        .unwrap_or_default()
+                        .source(&base, scene)
                 };
-                let protected = super::references::Protected::new(source);
+                let protected = super::references::Protected::new(&source);
                 (
                     if section.is_some() {
                         "enhance_section"
@@ -466,7 +515,7 @@ impl Service {
                         if section.is_some() {
                             "Section (prompt)"
                         } else {
-                            "Scene (description)"
+                            draft.request.scene_field.unwrap_or_default().label()
                         },
                         scene.description,
                         draft.request.instruction,
@@ -539,6 +588,7 @@ impl Service {
             }
             if cancel.is_cancelled() {
                 j.draft.phase = Phase::Cancelled;
+                j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
                 return;
             }
             let result = result.and_then(|text| {
@@ -587,6 +637,7 @@ impl Service {
             });
             if let Err(code) = result {
                 j.draft.phase = Phase::Failed;
+                j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
                 j.draft.failure = Some(code.into());
                 j.draft.failed_index = expand.then_some(index);
                 return;
@@ -597,6 +648,7 @@ impl Service {
         if j.generation != generation {
             return;
         }
+        j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
         j.draft.phase = if !expand && draft.request.operation == Operation::Outline {
             Phase::Outline
         } else {

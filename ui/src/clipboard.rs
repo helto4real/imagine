@@ -237,7 +237,10 @@ cat > "$0.input"
         drop(ctx);
         let served = program.with_extension("served");
         let deadline = Instant::now() + Duration::from_secs(2);
-        while !served.exists() && Instant::now() < deadline {
+        // A file can exist while the synthetic helper is still copying into it.
+        while std::fs::read_to_string(&served).ok().as_deref() != Some("last: åäö\n")
+            && Instant::now() < deadline
+        {
             std::thread::sleep(Duration::from_millis(5));
         }
         assert_eq!(std::fs::read_to_string(served).unwrap(), "last: åäö\n");

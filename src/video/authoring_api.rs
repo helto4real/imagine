@@ -53,7 +53,10 @@ async fn start(
     Ok((StatusCode::ACCEPTED, Json(json!(draft))))
 }
 async fn read(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Fault> {
-    Ok(Json(json!(registry(&app).await.read(&id)?)))
+    let service = registry(&app).await;
+    let mut value = json!(service.read(&id)?);
+    value["progress"] = service.progress(&id)?;
+    Ok(Json(value))
 }
 async fn cancel(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Fault> {
     let service = app.video.lock().await;

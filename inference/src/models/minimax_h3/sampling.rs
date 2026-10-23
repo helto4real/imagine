@@ -18,18 +18,25 @@ use crate::{
     },
 };
 use tch::{Kind, Tensor};
+mod sampler_execution;
 
 pub fn selected_schedule(rt: &Runtime) -> Result<ModelSampling, Error> {
+    schedule(rt, 12., 3.)
+}
+pub fn schedule(rt: &Runtime, video_shift: f64, audio_shift: f64) -> Result<ModelSampling, Error> {
     ModelSampling::new(
         &rt.native,
         Flavor::AudioVideo,
-        Config {
-            shift: 12.,
-            audio_shift: Some(3.),
-            ..Config::default()
-        },
+        schedule_config(video_shift, audio_shift),
         None,
     )
+}
+pub fn schedule_config(video_shift: f64, audio_shift: f64) -> Config {
+    Config {
+        shift: video_shift,
+        audio_shift: Some(audio_shift),
+        ..Config::default()
+    }
 }
 pub fn parameterization(schedule: &ModelSampling) -> Parameterization {
     Parameterization {
@@ -204,19 +211,13 @@ struct Bound<'a, E> {
     kind: Kind,
     exec: &'a mut E,
 }
-impl<E: TextEncoderExecution> solvers::Execution for Bound<'_, E> {
-    fn denoise(
+impl<E: TextEncoderExecution> Bound<'_, E> {
+    fn prediction(
         &mut self,
         x: &Tensor,
         sigma: &Tensor,
-        cfg: bool,
+        capture: bool,
     ) -> Result<solvers::Prediction, Error> {
-        if cfg {
-            return Err(Error::BindingGap {
-                backend: "h3_cfg1_profile".into(),
-                operation: "post-CFG capture requires the common guidance binding".into(),
-            });
-        }
         self.exec.check_interrupt()?;
         let p = parameterization(self.schedule);
         let input = p.input(sigma, x)?.f_to_kind(self.kind)?;
@@ -266,12 +267,27 @@ impl<E: TextEncoderExecution> solvers::Execution for Bound<'_, E> {
                 .as_tensor()?
                 .f_to_kind(Kind::Float)?;
         let denoised = p.denoised(sigma, &output, x)?;
-        let denoised = qwen_image21::single_full_condition_cfg1(x, &denoised)?;
-        Ok(solvers::Prediction {
-            denoised,
-            uncond_denoised: None,
-            cond_denoised: None,
-        })
+        sampler_execution::positive_prediction(x, &denoised, capture)
+    }
+}
+impl<E: TextEncoderExecution> solvers::Execution for Bound<'_, E> {
+    fn denoise(
+        &mut self,
+        x: &Tensor,
+        sigma: &Tensor,
+        capture: bool,
+    ) -> Result<solvers::Prediction, Error> {
+        self.prediction(x, sigma, capture)
+    }
+    fn denoise_with_capture(
+        &mut self,
+        x: &Tensor,
+        sigma: &Tensor,
+        _: bool,
+    ) -> Result<solvers::Prediction, Error> {
+        // None remains absent even when CFG1 optimization is disabled: the
+        // aggregator produces its explicit zero/count result without a model call.
+        self.prediction(x, sigma, true)
     }
     fn scale_latent_inpaint(
         &mut self,
@@ -303,6 +319,15 @@ impl<E: TextEncoderExecution> solvers::Execution for Bound<'_, E> {
             backend: "h3_cfg1_euler_probe".into(),
             operation: "unexpected stochastic noise request".into(),
         })
+    }
+    fn percent_to_sigma(&self, percent: f64) -> Result<f64, Error> {
+        match self.schedule.percent_to_sigma(&self.rt.native, percent)? {
+            V::Float(value) => Ok(value),
+            _ => Err(Error::BindingGap {
+                backend: "h3_av_model_sampling".into(),
+                operation: "Expected scalar percent_to_sigma result".into(),
+            }),
+        }
     }
     fn callback(&mut self, step: qwen_image21::EulerStep<'_>) -> Result<(), Error> {
         self.exec
@@ -340,7 +365,7 @@ pub unsafe fn sample_euler_cfg1<E: TextEncoderExecution>(
     request: EulerRequest<'_>,
     exec: &mut E,
 ) -> Result<NestedTensor, Error> {
-    unsafe { sample_cfg1(rt, model, schedule, request, exec, false) }
+    unsafe { sample_named_cfg1("euler", rt, model, schedule, request, exec) }
 }
 /// Director-compatible deterministic res_multistep: eta=0, s_noise=1, CFG++ off.
 /// Uses the same AV parameterization and positive-only CFG1 conditions as Euler.
@@ -353,15 +378,21 @@ pub unsafe fn sample_res_multistep_cfg1<E: TextEncoderExecution>(
     request: EulerRequest<'_>,
     exec: &mut E,
 ) -> Result<NestedTensor, Error> {
-    unsafe { sample_cfg1(rt, model, schedule, request, exec, true) }
+    unsafe { sample_named_cfg1("res_multistep", rt, model, schedule, request, exec) }
 }
-unsafe fn sample_cfg1<E: TextEncoderExecution>(
+/// Bind a registered shared solver to H3's positive-only BasicGuider path.
+/// CFG++ captures the positive aggregation and absent-condition zero/count result
+/// from the common conditioning/CFG contracts; no negative model call is made.
+///
+/// # Safety
+/// Selected H3 parameters, two-stream geometry and callbacks satisfy the ABI.
+pub unsafe fn sample_named_cfg1<E: TextEncoderExecution>(
+    name: &str,
     rt: &Runtime,
     model: &dit::Denoiser,
     schedule: &ModelSampling,
     request: EulerRequest<'_>,
     exec: &mut E,
-    multistep: bool,
 ) -> Result<NestedTensor, Error> {
     let (latent, shapes) = request.latent.pack()?;
     let (noise, _) = request.noise.pack()?;
@@ -415,22 +446,21 @@ unsafe fn sample_cfg1<E: TextEncoderExecution>(
             noise: &noise,
             latent: &latent,
             mask: request.denoise_mask,
-            random_inpaint: false,
+            random_inpaint: sampler_execution::random_inpaint(name),
             seed: ksampler::Seed::Integer(i128::from(request.payload.seed)),
             maximum_sigma: schedule.sigma_max()?.double_value(&[]),
             parameterization: parameterization(schedule),
             mask_function: None,
         },
         |e, x, s| {
-            if multistep {
-                return solvers::res_multistep(e, x, s, parameterization(schedule), 0., 1., false);
-            }
-            solvers::churn(
+            sampler_execution::run(
+                name,
                 e,
+                &rt.native,
                 x,
                 s,
-                qwen_image21::EulerSettings::default(),
-                solvers::ChurnSolver::Euler,
+                parameterization(schedule),
+                request.payload.seed,
             )
         },
     )?;

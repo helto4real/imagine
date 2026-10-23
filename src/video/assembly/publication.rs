@@ -32,6 +32,8 @@ pub fn prepare(
     document.project.assets.insert(
         asset_id.clone(),
         Asset {
+            library_source: None,
+            name: String::new(),
             id: asset_id.clone(),
             revision: 1,
             kind: MediaKind::Video,

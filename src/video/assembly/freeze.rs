@@ -1,14 +1,20 @@
 use super::*;
 use crate::video::{contract::*, persistence::*, service::Service};
-use std::{collections::BTreeMap, fs::File};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fs::File,
+};
 pub struct Frozen {
     pub plan: Plan,
     pub files: BTreeMap<String, File>,
+    /// Runtime-only identity of linked originals, whose bytes may change after freeze.
+    pub external_sources: BTreeSet<String>,
 }
 impl Frozen {
     pub fn try_clone(&self) -> Result<Self, StorageError> {
         Ok(Self {
             plan: self.plan.clone(),
+            external_sources: self.external_sources.clone(),
             files: self
                 .files
                 .iter()
@@ -33,8 +39,16 @@ fn source(
     files: &mut BTreeMap<String, File>,
 ) -> Result<Source, StorageError> {
     let mut source = session.resource_file(&resource.id)?;
-    let copy = staging.copy(&mut source)?;
-    let info = crate::video::media::detect(&copy).map_err(fail)?;
+    let copy = if resource.source.is_some() {
+        source
+    } else {
+        staging.copy(&mut source)?
+    };
+    let witness = source_witness(&copy)?;
+    let info = crate::video::media::detect_streamed(&copy).map_err(fail)?;
+    if witness != source_witness(&copy)? {
+        return Err(fail("source_changed"));
+    }
     files.insert(resource.id.clone(), copy);
     let duration = info
         .frames
@@ -70,6 +84,7 @@ fn reference<'a>(session: &'a ProjectSession, id: &AssetId) -> Result<&'a Resour
         .ok_or_else(|| fail("asset_not_found"))?;
     session.document().resources.iter().find(|r|matches!(&r.kind,ResourceKind::Reference{asset_id,revision} if asset_id==id&&*revision==asset.revision)).ok_or_else(||fail("reference_resource_missing"))
 }
+
 pub fn freeze(
     service: &Service,
     request: &Request,
@@ -85,7 +100,9 @@ pub fn freeze(
     }
     let delivery = project.delivery.clone();
     let fps = seconds(delivery.fps);
-    let options = &request.options;
+    let mut normalized = request.options.clone();
+    normalized.output_filename = output_filename(normalized.output_filename.as_deref())?;
+    let options = &normalized;
     let frame_bytes = (delivery.width as u64)
         .checked_mul(delivery.height as u64)
         .and_then(|n| n.checked_mul(12));
@@ -131,37 +148,40 @@ pub fn freeze(
     };
     let mut files = BTreeMap::new();
     for scene in &project.scenes {
-        let (resource, take_id, asset_id, source_in, source_out, include_audio) =
-            if let Some(clip) = project.assembly.clips.get(&scene.id) {
-                (
-                    reference(session, &clip.asset)?,
-                    None,
-                    Some(clip.asset.clone()),
-                    clip.source_in,
-                    clip.source_out,
-                    clip.include_audio,
-                )
-            } else {
-                let take = scene
-                    .accepted_take
-                    .as_ref()
-                    .ok_or_else(|| fail("assembly_scene_without_take"))?;
-                let resource = session
-                    .document()
-                    .resources
-                    .iter()
-                    .find(
-                        |r| matches!(&r.kind,ResourceKind::TakeVideo{take_id} if take_id==&take.id),
-                    )
-                    .ok_or_else(|| fail("take_resource_missing"))?;
-                if crate::video::review::states(session.document())
-                    .get(&take.id)
-                    .is_some_and(|s| s.outdated)
-                {
-                    plan.warnings.push(format!("outdated_take:{}", scene.id.0));
-                }
-                (resource, Some(take.id.clone()), None, time(0.), None, true)
-            };
+        let (resource, take_id, asset_id, source_in, source_out, include_audio) = if project
+            .scene_kind(&scene.id)
+            == imagine_video_contract::creative::SceneKind::Imported
+        {
+            let clip = project
+                .scene_clip(&scene.id)
+                .ok_or_else(|| fail("assembly_imported_clip_missing"))?;
+            (
+                reference(session, &clip.asset)?,
+                None,
+                Some(clip.asset.clone()),
+                clip.source_in,
+                clip.source_out,
+                clip.include_audio,
+            )
+        } else {
+            let take = scene
+                .accepted_take
+                .as_ref()
+                .ok_or_else(|| fail("assembly_scene_without_take"))?;
+            let resource = session
+                .document()
+                .resources
+                .iter()
+                .find(|r| matches!(&r.kind,ResourceKind::TakeVideo{take_id} if take_id==&take.id))
+                .ok_or_else(|| fail("take_resource_missing"))?;
+            if crate::video::review::states(session.document())
+                .get(&take.id)
+                .is_some_and(|s| s.outdated)
+            {
+                plan.warnings.push(format!("outdated_take:{}", scene.id.0));
+            }
+            (resource, Some(take.id.clone()), None, time(0.), None, true)
+        };
         let source = source(session, resource, staging, &mut files)?;
         if source.width == 0 || source.height == 0 {
             return Err(fail("video_stream_missing"));
@@ -175,9 +195,29 @@ pub fn freeze(
                 .find(|b| b.left == left.scene_id && b.right == scene.id)
         });
         let mode = boundary.map(|b| b.mode).unwrap_or_default();
-        // A generated transition requires a real bridge Take. Never pretend a hard cut is one.
-        if mode == BoundaryMode::Transition {
-            return Err(fail("assembly_transition_take_required"));
+        // A successful worker confirms the exact frozen incoming dependency.
+        // Old/unrelated Takes remain usable with Director's explicit warning.
+        let applied = take_id
+            .as_ref()
+            .and_then(|id| session.document().takes.iter().find(|t| &t.id == id))
+            .and_then(|t| t.provenance.as_ref())
+            .and_then(|p| p.boundary.as_ref())
+            .is_some_and(|receipt| {
+                receipt["applied"] == true
+                    && imagine_video_contract::boundary::resolve(project, &scene.id)
+                        .ok()
+                        .flatten()
+                        .is_some_and(|current| {
+                            receipt["dependency"]
+                                == imagine_video_contract::boundary::dependency(
+                                    &current,
+                                    receipt["dependency"]["reference_previous_clip"] == true,
+                                )
+                        })
+            });
+        if mode == BoundaryMode::Transition && !applied {
+            plan.warnings
+                .push("Transition was not generated; joining the existing Takes.".into());
         }
         let overlap = if mode == BoundaryMode::BlendSeam {
             boundary.unwrap().blend_frames as u64
@@ -293,5 +333,90 @@ pub fn freeze(
         }
     }
     plan.fingerprint=crate::storage::hash(&serde_json::to_vec(&serde_json::json!({"project":project,"options":options,"clips":plan.clips,"audio":plan.audio})).map_err(|_|fail("invalid_assembly_plan"))?);
-    Ok(Frozen { plan, files })
+    let external_sources = session
+        .document()
+        .resources
+        .iter()
+        .filter(|resource| resource.source.is_some() && files.contains_key(&resource.id))
+        .map(|resource| resource.id.clone())
+        .collect();
+    Ok(Frozen {
+        plan,
+        files,
+        external_sources,
+    })
+}
+
+#[cfg(test)]
+mod external_source_tests {
+    use super::*;
+    use std::os::unix::fs::MetadataExt;
+    #[test]
+    fn assembly_external_audio_source_is_the_original_file_not_a_staged_copy() {
+        let root =
+            tempfile::tempdir_in(crate::task_fixtures::env_root("IMAGINE_WORKER_A_FIXTURES"))
+                .unwrap();
+        let path = root.path().join("own-sine-placeholder.wav");
+        let mut wav = Vec::new();
+        wav.extend_from_slice(b"RIFF");
+        wav.extend_from_slice(&(36_u32 + 64).to_le_bytes());
+        wav.extend_from_slice(b"WAVEfmt ");
+        wav.extend_from_slice(&16_u32.to_le_bytes());
+        wav.extend_from_slice(&1_u16.to_le_bytes());
+        wav.extend_from_slice(&1_u16.to_le_bytes());
+        wav.extend_from_slice(&32000_u32.to_le_bytes());
+        wav.extend_from_slice(&64000_u32.to_le_bytes());
+        wav.extend_from_slice(&2_u16.to_le_bytes());
+        wav.extend_from_slice(&16_u16.to_le_bytes());
+        wav.extend_from_slice(b"data");
+        wav.extend_from_slice(&64_u32.to_le_bytes());
+        wav.extend_from_slice(&[0; 64]);
+        std::fs::write(&path, &wav).unwrap();
+        let asset = AssetId("own-audio".into());
+        let mut file = File::open(&path).unwrap();
+        let resource = Resource::external(
+            "own-audio-resource".into(),
+            ResourceKind::Reference {
+                asset_id: asset.clone(),
+                revision: 1,
+            },
+            &path,
+            &mut file,
+        )
+        .unwrap();
+        let project = VideoProject::create(
+            serde_json::from_str(include_str!(
+                "../../../design/video-contract/create-project.json"
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let mut session = ProjectSession::new(project).unwrap();
+        let mut document = session.document().clone();
+        document.project.assets.insert(
+            asset.clone(),
+            Asset {
+                id: asset,
+                revision: 1,
+                kind: MediaKind::Audio,
+                name: String::new(),
+                library_source: None,
+            },
+        );
+        document.resources.push(resource.clone());
+        let staging = SessionStaging::select(root.path()).unwrap();
+        session
+            .update(0, document, BTreeMap::new(), &staging)
+            .unwrap();
+        let mut files = BTreeMap::new();
+        let description = source(&session, &resource, &staging, &mut files).unwrap();
+        assert!(description.audio);
+        assert_eq!(description.bytes, wav.len() as u64);
+        let actual = files[&resource.id].metadata().unwrap();
+        let original = std::fs::metadata(&path).unwrap();
+        assert_eq!(
+            (actual.dev(), actual.ino()),
+            (original.dev(), original.ino())
+        );
+    }
 }

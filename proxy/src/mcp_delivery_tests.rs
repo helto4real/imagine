@@ -3,16 +3,17 @@ use std::path::Path;
 
 async fn setup() -> (tempfile::TempDir, Mcp) {
     let dir = tempfile::tempdir().unwrap();
-
+    let published = dir.path().join("projects/own-workspace/outputs/images");
+    std::fs::create_dir_all(&published).unwrap();
+    let proof = test_destination(&published);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
-    let proof = test_destination(dir.path());
     let router = Router::new()
         .route(
             "/v1/media-destination",
             axum::routing::get(move || {
-                let p = proof.clone();
-                async move { axum::Json(p) }
+                let proof = proof.clone();
+                async move { axum::Json(proof) }
             }),
         )
         .route(
@@ -25,21 +26,25 @@ async fn setup() -> (tempfile::TempDir, Mcp) {
     let mcp = Mcp::new(Config {
         coordinator_socket: Some(dir.path().join("gpu.sock").to_string_lossy().into()),
         imagine_url: url,
-
-        mcp_output_dir: Some(dir.path().join("output").to_string_lossy().into()),
+        // An obsolete cache outside the new output proof is harmless and unused.
+        mcp_output_dir: Some(dir.path().join("old-cache").to_string_lossy().into()),
+        mcp_input_dir: dir.path().to_string_lossy().into(),
         ..Default::default()
     })
     .await
     .unwrap();
     mcp.refresh_session().await.unwrap();
+    assert!(!dir.path().join("old-cache").exists());
     (dir, mcp)
 }
 fn job(mcp: &Mcp, id: &str, count: usize, batch: bool) -> Value {
-    let directory = mcp.inner.storage.directory(&format!("job-{id}")).unwrap();
-    let items: Vec<_> = (0..count).map(|index| {
-        let bytes = format!("synthetic file bytes {id} {index}");
-        json!({"index":index,"status":"succeeded","images":references::save_result(&mcp.inner.storage,&directory,index,bytes.as_bytes()).unwrap(),"error":null})
-    }).collect();
+    let items=(0..count).map(|index| {
+        let bytes=format!("own procedural published bytes {id} {index}");
+        let path=mcp.inner.storage.persistent_root().join(format!("{id}-{index}.png"));
+        std::fs::write(&path,bytes.as_bytes()).unwrap();
+        let asset=json!({"saved_path":path,"persistent":true,"mime_type":"image/png","bytes":bytes.len(),"sha256":references::hash(bytes.as_bytes())});
+        json!({"index":index,"status":"succeeded","images":references::persistent_result(&mcp.inner.storage,&asset).unwrap(),"error":null})
+    }).collect::<Vec<_>>();
     let mut snapshot = if batch {
         json!({"items":items})
     } else {
@@ -51,7 +56,6 @@ fn job(mcp: &Mcp, id: &str, count: usize, batch: bool) -> Value {
     mcp.inner.jobs.lock().unwrap().insert(
         id.into(),
         Job {
-            directory,
             fingerprint: vec![],
             result,
             task: None,
@@ -60,189 +64,107 @@ fn job(mcp: &Mcp, id: &str, count: usize, batch: bool) -> Value {
     );
     snapshot
 }
-fn copy_and_verify(image: &Value, destination: &Path) -> Value {
-    std::fs::copy(image["path"].as_str().unwrap(), destination).unwrap();
-    let metadata = std::fs::metadata(destination).unwrap();
-    assert!(metadata.is_file());
-    let sha256 = references::hash(&std::fs::read(destination).unwrap());
-    assert_eq!(image["bytes"], metadata.len());
-    assert_eq!(image["sha256"], sha256);
-    json!({"image_id":image["image_id"],"saved_path":destination,"bytes":metadata.len(),"sha256":sha256})
+fn acknowledgement(image: &Value) -> Value {
+    json!({"image_id":image["image_id"],"saved_path":image["saved_path"],"bytes":image["bytes"],"sha256":image["sha256"]})
 }
 async fn confirm(mcp: &Mcp, id: &str, images: Value) -> Value {
-    // Exercise the RPC dispatcher and published tool schema as well as deletion.
-    dispatch_rpc(
-        mcp.clone(),
-        json!({"jsonrpc":"2.0","id":1,"method":"tools/call",
-        "params":{"name":"confirm_saved","arguments":{"job_id":id,"images":images}}}),
-        false,
-    )
-    .await["result"]
-        .clone()
+    dispatch_rpc(mcp.clone(),json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"confirm_saved","arguments":{"job_id":id,"images":images}}}),false).await["result"].clone()
 }
 #[tokio::test]
-async fn single_confirmation_updates_recovery_and_is_idempotent() {
+async fn persistent_confirmation_is_idempotent_and_never_copies_or_deletes() {
     let (dir, mcp) = setup().await;
-    let result = job(&mcp, "single", 1, false);
-    let image = &result["images"][0];
-    let temporary = PathBuf::from(image["path"].as_str().unwrap());
-    let saved = copy_and_verify(image, &dir.path().join("saved.png"));
-    let discovered = dispatch_rpc(
+    let snapshot = job(&mcp, "single", 1, false);
+    let image = &snapshot["images"][0];
+    let saved = acknowledgement(image);
+    let path = Path::new(image["path"].as_str().unwrap());
+    let before = std::fs::read(path).unwrap();
+    assert_eq!(image["storage"], "saved");
+    let tools = dispatch_rpc(
         mcp.clone(),
         json!({"jsonrpc":"2.0","id":1,"method":"tools/list"}),
         false,
     )
     .await;
     assert!(
-        discovered["result"]["tools"]
+        tools["result"]["tools"]
             .as_array()
             .unwrap()
             .iter()
-            .any(|t| t["name"] == "confirm_saved" && t["annotations"]["destructiveHint"] == true)
+            .any(|tool| tool["name"] == "confirm_saved"
+                && tool["annotations"]["destructiveHint"] == false)
     );
-    let a = confirm(&mcp, "single", json!([saved])).await;
-    assert_eq!(a["isError"], false, "{a}");
-    assert!(!temporary.exists());
-    assert!(!temporary.parent().unwrap().exists());
-    assert!(dir.path().join("saved.png").exists());
-    assert_eq!(confirm(&mcp, "single", json!([saved])).await, a);
-    let recovered = mcp.get("single", true).await.unwrap();
-    assert_eq!(recovered["images"], a["structuredContent"]["images"]);
-    assert_eq!(recovered["images"][0]["path"], saved["saved_path"]);
-    assert_eq!(recovered["images"][0]["storage"], "saved");
-    let mut different = saved;
-    different["saved_path"] = json!(dir.path().join("other.png"));
+    let confirmed = confirm(&mcp, "single", json!([saved])).await;
+    assert_eq!(confirmed["isError"], false, "{confirmed}");
+    assert_eq!(confirm(&mcp, "single", json!([saved])).await, confirmed);
+    assert_eq!(mcp.get("single", true).await.unwrap(), snapshot);
+    assert_eq!(std::fs::read(path).unwrap(), before);
     assert_eq!(
-        confirm(&mcp, "single", json!([different])).await["isError"],
-        true
+        std::fs::read_dir(mcp.inner.storage.persistent_root())
+            .unwrap()
+            .count(),
+        1
     );
+    assert!(!dir.path().join("old-cache").exists());
+    mcp.close().await;
+    assert_eq!(std::fs::read(path).unwrap(), before);
 }
 #[tokio::test]
-async fn invalid_acknowledgements_delete_nothing_and_batches_allow_subsets() {
-    let (dir, mcp) = setup().await;
-    let result = job(&mcp, "batch", 2, true);
+async fn invalid_acknowledgements_leave_outputs_and_batch_metadata_untouched() {
+    let (_dir, mcp) = setup().await;
+    let snapshot = job(&mcp, "batch", 2, true);
     let other = job(&mcp, "other", 1, false);
-    let a = &result["items"][0]["images"][0];
-    let b = &result["items"][1]["images"][0];
-    assert_eq!(
-        Path::new(a["path"].as_str().unwrap()).parent(),
-        Path::new(b["path"].as_str().unwrap()).parent()
-    );
-    let first = copy_and_verify(a, &dir.path().join("a.png"));
-    let second = copy_and_verify(b, &dir.path().join("b.png"));
-    let mut variants = vec![json!({})];
+    let first = acknowledgement(&snapshot["items"][0]["images"][0]);
+    let second = acknowledgement(&snapshot["items"][1]["images"][0]);
     for (key, value) in [
         ("bytes", json!(0)),
         ("sha256", json!("0".repeat(64))),
         ("image_id", other["images"][0]["image_id"].clone()),
-        ("saved_path", a["path"].clone()),
-        ("saved_path", json!("relative.png")),
-        ("saved_path", json!("/workspace/../image.png")),
         ("saved_path", first["saved_path"].clone()),
+        ("saved_path", json!("relative.png")),
         ("unexpected", json!(true)),
     ] {
         let mut wrong = second.clone();
         wrong[key] = value;
-        variants.push(wrong);
-    }
-    variants.push(first.clone());
-    for wrong in variants {
         assert_eq!(
             confirm(&mcp, "batch", json!([first, wrong])).await["isError"],
             true
         );
-        assert!(Path::new(a["path"].as_str().unwrap()).exists());
-        assert!(Path::new(b["path"].as_str().unwrap()).exists());
+        assert_eq!(mcp.get("batch", false).await.unwrap(), snapshot);
     }
     assert_eq!(confirm(&mcp, "batch", json!([])).await["isError"], true);
     assert_eq!(
         confirm(&mcp, "unknown", json!([first])).await["isError"],
         true
     );
-    mcp.inner.jobs.lock().unwrap()["batch"]
-        .result
-        .send_modify(|v| v["status"] = json!("generating"));
-    assert_eq!(
-        confirm(&mcp, "batch", json!([first])).await["isError"],
-        true
-    );
-    mcp.inner.jobs.lock().unwrap()["batch"]
-        .result
-        .send_modify(|v| {
-            v["status"] = json!("partial");
-            v["items"]
-                .as_array_mut()
-                .unwrap()
-                .push(json!({"index":2,"status":"failed","images":[]}));
-        });
     assert_eq!(
         confirm(&mcp, "batch", json!([first])).await["isError"],
         false
     );
-    assert!(!Path::new(a["path"].as_str().unwrap()).exists());
-    assert!(Path::new(b["path"].as_str().unwrap()).exists());
     assert_eq!(
         confirm(&mcp, "batch", json!([first, second])).await["isError"],
         false
     );
-    assert!(
-        !Path::new(b["path"].as_str().unwrap())
-            .parent()
-            .unwrap()
-            .exists()
-    );
-    assert!(Path::new(other["images"][0]["path"].as_str().unwrap()).exists());
+    for item in snapshot["items"].as_array().unwrap() {
+        assert!(Path::new(item["images"][0]["path"].as_str().unwrap()).exists());
+    }
+    mcp.close().await;
 }
 #[tokio::test]
-async fn cleanup_failure_is_retryable_and_never_follows_directory_symlinks() {
+async fn session_reset_discards_only_ram_and_leaves_published_and_historical_files() {
     let (dir, mcp) = setup().await;
-    let result = job(&mcp, "safe", 1, false);
-    let image = &result["images"][0];
-    let path = PathBuf::from(image["path"].as_str().unwrap());
-    let directory = path.parent().unwrap();
-    let saved = copy_and_verify(image, &dir.path().join("saved.png"));
-    let moved = dir.path().join("moved");
-    std::fs::rename(directory, &moved).unwrap();
-    std::os::unix::fs::symlink(&moved, directory).unwrap();
-    assert_eq!(confirm(&mcp, "safe", json!([saved])).await["isError"], true);
-    assert!(moved.join("0.png").exists());
+    let historical = dir.path().join("own-historical-cache");
+    std::fs::create_dir(&historical).unwrap();
+    std::fs::write(historical.join("own-old.bin"), b"own old fixture").unwrap();
+    let snapshot = job(&mcp, "retained", 1, false);
+    let path = Path::new(snapshot["images"][0]["path"].as_str().unwrap());
+    mcp.clear_session().await.unwrap();
+    assert!(mcp.inner.jobs.lock().unwrap().is_empty());
+    assert!(mcp.inner.references.lock().unwrap().is_empty());
+    assert!(path.exists());
     assert_eq!(
-        mcp.get("safe", false).await.unwrap()["images"][0]["storage"],
-        "temporary"
+        std::fs::read(historical.join("own-old.bin")).unwrap(),
+        b"own old fixture"
     );
-    std::fs::remove_file(directory).unwrap();
-    std::fs::rename(&moved, directory).unwrap();
-    // A failed unlink must retain metadata and permit retry, without recursive cleanup.
-    std::fs::remove_file(&path).unwrap();
-    std::fs::create_dir(&path).unwrap();
-    assert_eq!(confirm(&mcp, "safe", json!([saved])).await["isError"], true);
-    assert!(path.is_dir());
-    std::fs::remove_dir(&path).unwrap();
-    assert_eq!(
-        confirm(&mcp, "safe", json!([saved])).await["isError"],
-        false
-    );
-    assert!(dir.path().join("saved.png").exists());
-}
-#[tokio::test]
-async fn partial_cleanup_failure_retains_confirmed_progress() {
-    let (dir, mcp) = setup().await;
-    let result = job(&mcp, "partial-cleanup", 2, true);
-    let a = copy_and_verify(&result["items"][0]["images"][0], &dir.path().join("a.png"));
-    let b = copy_and_verify(&result["items"][1]["images"][0], &dir.path().join("b.png"));
-    let path = PathBuf::from(result["items"][1]["images"][0]["path"].as_str().unwrap());
-    std::fs::remove_file(&path).unwrap();
-    std::fs::create_dir(&path).unwrap();
-    assert_eq!(
-        confirm(&mcp, "partial-cleanup", json!([a, b])).await["isError"],
-        true
-    );
-    let state = mcp.get("partial-cleanup", false).await.unwrap();
-    assert_eq!(state["items"][0]["images"][0]["storage"], "saved");
-    assert_eq!(state["items"][1]["images"][0]["storage"], "temporary");
-    std::fs::remove_dir(&path).unwrap();
-    assert_eq!(
-        confirm(&mcp, "partial-cleanup", json!([a, b])).await["isError"],
-        false
-    );
+    assert!(!dir.path().join("old-cache").exists());
+    mcp.close().await;
 }

@@ -10,9 +10,11 @@ use std::{
 pub const MODEL: &str = "qwen-image-2.1-int8";
 #[path = "enhancement_client.rs"]
 mod enhancement;
+#[path = "sampling_preview_client.rs"]
+pub(crate) mod sampling_preview;
 #[path = "timeline_client.rs"]
 mod timeline;
-pub use timeline::TimelineFailure;
+pub use timeline::{TimelineFailure, TimelineSession};
 #[derive(Clone)]
 pub struct Client {
     http: reqwest::Client,
@@ -116,7 +118,7 @@ pub(crate) fn job_progress(value: &Value) -> Progress {
     let sampling = if matches!(status, "running" | "cancelling") {
         serde_json::from_value::<SamplingProgress>(value["progress"].clone())
             .ok()
-            .filter(|p| p.total > 0 && p.total <= 100 && p.completed <= p.total)
+            .filter(|p| p.total > 0 && p.completed <= p.total)
     } else {
         None
     };
@@ -129,6 +131,8 @@ pub(crate) fn job_progress(value: &Value) -> Progress {
             Some("loading_text") => "Loading text encoder",
             Some("encoding_text") => "Encoding prompt",
             Some("loading_dit") => "Loading video model",
+            Some("loading_upscaler") => "Loading latent upscaler",
+            Some("upscaling_latents") => "Upscaling video latents",
             Some("loading_video_vae") => "Loading video decoder",
             Some("decoding_video") => "Decoding video",
             Some("loading_audio_vae") => "Loading audio decoder",
@@ -167,14 +171,24 @@ impl Client {
     ) -> std::result::Result<(), Failure> {
         if submission.job.is_none() {
             let proof: crate::video_destination::Proof = serde_json::from_value(
-                Self::json(self.get("/v1/media-destination").send().await).await?,
+                Self::json(
+                    self.get(if submission.request["model"] == "minimax-h3" {
+                        "/v1/video-destination"
+                    } else {
+                        "/v1/media-destination"
+                    })
+                    .send()
+                    .await,
+                )
+                .await?,
             )
             .map_err(|_| Failure::terminal("Media destination is not configured on the server."))?;
-            if proof.config.root != submission.folder {
+            if !submission.folder.as_os_str().is_empty() && proof.config.root != submission.folder {
                 return Err(Failure::terminal(
                     "The UI output folder differs from the server's verified media destination. Configure the same mounted destination before generating.",
                 ));
             }
+            submission.folder = proof.config.root.clone();
             let (local,fd)=crate::video_destination::inspect(&proof.config,&crate::video_destination::System).map_err(|_|Failure::terminal("The verified media volume is unavailable locally. Remote media storage cannot be verified."))?;
             if local != proof {
                 return Err(Failure::terminal(
@@ -281,12 +295,13 @@ impl Client {
         Ok(body)
     }
     pub async fn upload(&self, path: &Path) -> std::result::Result<Reference, Failure> {
-        let (bytes, mime, preview) =
+        let (_bytes, _mime, preview) =
             read_reference(path).map_err(|e| Failure::terminal(e.to_string()))?;
+        let path = std::path::absolute(path)
+            .map_err(|_| Failure::terminal("Could not resolve the selected image."))?;
         let value = Self::json(
-            self.post("/v1/assets")
-                .header("Content-Type", mime)
-                .body(bytes)
+            self.post("/v1/assets/link")
+                .json(&json!({"path":path}))
                 .send()
                 .await,
         )
@@ -582,7 +597,10 @@ pub fn make_request(
         .get("sampling")
         .and_then(|s| s["custom_sigmas"].as_array())
         && !sigmas.is_empty()
-        && settings.steps as usize + 1 != sigmas.len()
+        && usize::try_from(settings.steps)
+            .ok()
+            .and_then(|n| n.checked_add(1))
+            != Some(sigmas.len())
     {
         bail!(
             "This model requires {} steps. Update Steps in Settings.",
@@ -760,7 +778,7 @@ pub(crate) fn thumbnail(preview: &Preview) -> Preview {
     }
 }
 
-fn decode(bytes: &[u8], thumbnail: bool) -> Result<Preview> {
+pub(crate) fn decode(bytes: &[u8], thumbnail: bool) -> Result<Preview> {
     let mut reader = image::ImageReader::new(Cursor::new(bytes)).with_guessed_format()?;
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(8192);
@@ -801,13 +819,29 @@ pub fn error_message(code: &str) -> String {
         return message.into();
     }
     match code {
+        "source_missing"=>"The original reference file is missing. Use Check Media and Relink to select its current location.",
+        "source_changed"=>"The original reference file changed. Use Check Media and Relink to accept the current file explicitly.",
+        "older_format_external_reference_not_representable"=>"The older project format cannot store original-file links. Save the current format; original media will not be copied.",
+        "source_unavailable"|"invalid_source_path"|"invalid_source_file"=>"The selected original reference file cannot be opened. Check its location and permissions.",
+        "take_requires_video"=>"Choose a file containing a video stream to attach it as a Take.",
+        "take_generation_recipe_unknown"=>"This imported Take has no generation recipe. Choose generation settings for a new Take.",
+        "older_format_imported_take_not_representable"=>"The older project format cannot represent an imported Take without a generation recipe. The original project is unchanged.",
+        "capture_source_missing"=>"The imported Take's source is missing from this project. Choose the video again.",
+        "h3_component_load_failed"|"component_load_failed"=>"H3 could not load a selected model component. Check the selected model, text encoder and VAE files (component_load_failed).",
+        "h3_out_of_memory"|"out_of_memory"=>"H3 ran out of memory while loading or running the model (out_of_memory).",
+        "h3_generation_failed"=>"H3 inference failed (h3_generation_failed). The worker did not identify a more specific component or cause.",
+        "imported_scene_not_generatable"=>"This scene is Imported. Choose a source clip, or change its type to generate a Take.",
+        "latent_upscale_failed"|"h3_latent_upscale_failed"=>"Trained latent upscaling failed. Check the selected upscaler model and the available memory.",
+        "lora_load_failed"|"h3_lora_load_failed"=>"Could not load or apply a selected H3 LoRA. Check its file, adapter format and model compatibility.",
+        "upscale_context_unavailable"|"h3_upscale_context_unavailable"=>"Exp upscaling needs its original high-resolution prefix. This worker transport does not provide it yet.",
+        "assembly_imported_clip_missing"=>"Choose a video clip for each Imported scene before exporting.",
         "output_save_failed"=>"The result could not be saved. Restore the destination and retry. A completed montage is retained in this server session for saving again.",
         "h3_section_reference_unavailable"=>"The section image bindings are retained, but this H3 worker cannot apply these roles yet. Review the bindings or use a runtime that supports them.",
         "story_dialogue_cast_required"=>"Select at least two project characters to plan dialogue.",
         "story_image_pair_incomplete"=>"Choose a directed start frame and its end frame in order.",
         "story_image_missing"|"cast_reference_missing"=>"A selected Story source is no longer in the project. Select its current reference or image.",
         "assembly_scene_without_take"=>"Choose an Accepted Take or imported video for each scene before assembling.",
-        "assembly_transition_take_required"=>"This boundary needs a generated transition Take. Transition assembly is not connected to this runtime yet; choose another boundary to export now.",
+        "assembly_transition_take_required"=>"The selected transition has not been generated. Final can join the existing Takes with an explicit warning.",
         "assembly_blend_exceeds_clip"=>"The blend overlap exceeds a neighbouring clip. Shorten the overlap or lengthen the clips.",
         "assembly_empty_source_range"=>"The selected source trim contains no video frames. Adjust Source in / out and freeze a new plan.",
         "assembly_decode_memory_limit"|"assembly_audio_memory_limit"=>"The montage exceeds the processor's resident memory buffer. Use shorter clips or a smaller delivery canvas.",
@@ -820,6 +854,9 @@ pub fn error_message(code: &str) -> String {
         "video_destination_full" => "The encrypted media destination has insufficient free space. Free space there before retrying.",
         "video_destination_write_failed" => "The output could not be saved on the encrypted destination. No fallback folder was used.",
         "model_component_load_failed" => "A model component could not be loaded. Restart the updated backend and check the selected encoder and VAE files.",
+        "older_format_seed_out_of_range" => "The older project format cannot represent one of the exact Take seeds. The original is unchanged; use the current Imagine version for this project.",
+        "older_format_boundary_not_representable" => "The older project format cannot represent these boundary settings or the Take's applied conditioning receipt. Save with the current Imagine version; the original is unchanged.",
+        "older_format_generation_not_representable" => "The older project format cannot represent this LoRA or trained-upscaling recipe and its Take provenance. Save with the current Imagine format; the original is unchanged.",
         "model_library_update_failed" => "Could not save the model folder or assignments. Check the folder, compatibility and server write permissions.",
         "model_library_scan_failed" => "Could not scan the model folder. Check permissions and folder depth, then refresh.",
         "model_file_missing"|"model_component_missing" => "A model or LoRA file is missing. Refresh Models in Settings and update your selection.",
@@ -834,7 +871,7 @@ pub fn error_message(code: &str) -> String {
         "imagine_proxy_not_configured" => "Restart the proxy with ./start-proxy.sh to enable Imagine coordination.",
         "imagine_upstream_unavailable" => "The proxy cannot reach Imagine. Start ./start-server.sh and retry.",
         "unsupported_resolution"=>"This server does not accept the selected image size. Restart the updated server or choose a supported size.",
-        "unsupported_sampling"=>"Choose a sampler and scheduler supported by this backend, steps between 1 and 100, and CFG between 0 and 20.",
+        "unsupported_sampling"=>"Choose a sampler and scheduler supported by this backend, positive steps and finite CFG.",
         "unsupported_moss_configuration"=>"MOSS currently supports text-to-image with Euler and normal or sgm_uniform, without references or LoRAs.",
         "runtime_suspended"=>"The server is suspended. Resume it through the API before generating.",
         "model_weights_missing"=>"Model files are missing. Check QWEN_MODEL_ROOT on the server.",
@@ -873,6 +910,50 @@ pub fn error_message(code: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn h3_failures_keep_specific_error_category_and_do_not_guess_generic_cause() {
+        for (code, word) in [
+            ("h3_component_load_failed", "component_load_failed"),
+            ("component_load_failed", "component_load_failed"),
+            ("h3_out_of_memory", "out_of_memory"),
+            ("out_of_memory", "out_of_memory"),
+            ("h3_generation_failed", "h3_generation_failed"),
+        ] {
+            let message = super::error_message(code);
+            assert!(message.contains(word));
+            assert!(!message.contains("The server could not complete"));
+        }
+        assert!(super::error_message("h3_generation_failed").contains("did not identify"));
+    }
+    #[test]
+    fn larger_image_sampling_reaches_the_server_and_keeps_130_step_progress() {
+        let settings = GenerationSettings {
+            steps: 130,
+            cfg_scale: 20.1,
+            ..Default::default()
+        };
+        let metadata = imagine_server::contract::model(imagine_server::contract::MODEL).unwrap();
+        let request = make_request("own K2 fixture", "", &[], &metadata, &settings).unwrap();
+        let typed: imagine_server::contract::JobRequest = serde_json::from_value(request).unwrap();
+        typed.validate().unwrap();
+        assert_eq!(typed.sampling.steps, 130);
+        assert_eq!(typed.sampling.cfg_scale, 20.1);
+        let mut value = json!({"status":"running","phase":"sampling","progress":{"completed":101,"total":130,"remaining_seconds":14.5,"updated_at_ms":100}});
+        let Progress::Status {
+            sampling: Some(progress),
+            ..
+        } = job_progress(&value)
+        else {
+            panic!("130-step progress missing")
+        };
+        assert_eq!((progress.completed, progress.total), (101, 130));
+        value["progress"]["completed"] = json!(131);
+        assert!(matches!(
+            job_progress(&value),
+            Progress::Status { sampling: None, .. }
+        ));
+    }
+
     use super::*;
     #[test]
     fn upscale_request_uses_profile_and_one_output_asset_without_generation_overrides() {

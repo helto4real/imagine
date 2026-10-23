@@ -17,9 +17,26 @@ pub fn prepare(
     let session = service.projects.session(&target.project_id)?;
     let mut document = session.document().clone();
     let mut take = target.take;
+    for artifact in artifacts {
+        if let super::artifacts::Produced::BoundaryApplied(receipt) = artifact {
+            let provenance = take
+                .provenance
+                .as_mut()
+                .ok_or_else(|| StorageError::new("boundary_receipt_mismatch"))?;
+            if receipt["applied"] != true
+                || provenance
+                    .boundary
+                    .as_ref()
+                    .is_none_or(|expected| expected["dependency"] != receipt["dependency"])
+            {
+                return Err(StorageError::new("boundary_receipt_mismatch"));
+            }
+            provenance.boundary = Some(receipt.clone());
+        }
+    }
     // A concurrent scene edit retains the result, but never declares it current.
     if planning::input_revision(&document.project, &take.scene_id)?
-        != take.provenance.input_revision
+        != take.generated()?.input_revision
     {
         take.status = TakeStatus::Outdated;
     }
@@ -47,6 +64,9 @@ pub fn prepare(
     inputs.insert(resource.key(), file);
     document.resources.push(resource);
     for artifact in artifacts {
+        if matches!(artifact, super::artifacts::Produced::BoundaryApplied(_)) {
+            continue;
+        }
         let (resource, file) = artifact.prepare(&take, staging)?;
         inputs.insert(resource.key(), file);
         document.resources.push(resource);

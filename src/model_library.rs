@@ -30,6 +30,7 @@ pub struct Library {
     scanned: BTreeMap<String, FileStamp>,
     warnings: Vec<String>,
     settings_path: PathBuf,
+    settings_runtime: Option<PathBuf>,
 }
 // Private execution snapshot, persisted only in the existing in-memory job store.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -102,6 +103,37 @@ impl Library {
         }
         Ok(library)
     }
+    /// The public model file is shared with UI selections; each writer changes
+    /// only its own namespace under the shared runtime lock.
+    pub fn load_namespaced(
+        default_root: PathBuf,
+        settings_path: PathBuf,
+        runtime: PathBuf,
+    ) -> Result<Self> {
+        let settings = crate::settings_store::read_namespace(&settings_path, "catalog")?
+            .map(serde_json::from_value)
+            .transpose()?
+            .unwrap_or(LibrarySettings {
+                root: default_root,
+                ..Default::default()
+            });
+        let mut library = Self {
+            settings,
+            settings_path,
+            settings_runtime: Some(runtime),
+            ..Default::default()
+        };
+        if !library.settings.root.is_absolute() {
+            bail!("The model folder must be an absolute path");
+        }
+        if library.scan().is_err() {
+            library.warnings.push(
+                "Could not scan the model folder. Check permissions and refresh in Settings."
+                    .into(),
+            );
+        }
+        Ok(library)
+    }
     pub fn snapshot(&self) -> LibrarySnapshot {
         let models = self
             .files
@@ -149,9 +181,20 @@ impl Library {
         let mut next = Self {
             settings,
             settings_path: self.settings_path.clone(),
+            settings_runtime: self.settings_runtime.clone(),
             ..Default::default()
         };
         next.scan()?;
+        if let Some(runtime) = &next.settings_runtime {
+            crate::settings_store::write_namespace(
+                &next.settings_path,
+                "catalog",
+                serde_json::to_value(&next.settings)?,
+                runtime,
+            )?;
+            *self = next;
+            return Ok(());
+        }
         let parent = next.settings_path.parent().context("Settings directory")?;
         std::fs::create_dir_all(parent)?;
         let temp = parent.join(format!("model-library-{}.tmp", uuid::Uuid::new_v4()));

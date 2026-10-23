@@ -15,7 +15,12 @@ use std::{
     time::Instant,
 };
 mod comparison;
-pub(in crate::app) use comparison::Comparison;
+#[cfg(test)]
+#[path = "player/lifecycle_tests.rs"]
+mod lifecycle_tests;
+pub(in crate::app) use comparison::{
+    Comparison, Entry as ComparisonEntry, SelectionState as ComparisonState,
+};
 pub struct Preview {
     width: usize,
     height: usize,
@@ -371,12 +376,13 @@ use crate::app::workspace as chrome;
 use egui::{Rect, Sense};
 impl ImagineApp {
     pub(super) fn timeline_viewer(&mut self, ui: &mut egui::Ui, rect: Rect, d: &Snapshot) {
+        let current_scene = self.timeline.primary_scene(&d.project);
         if self.timeline.comparison.as_ref().is_some_and(|c| {
             c.ids.iter().any(|id| {
                 !d.raw["takes"].as_array().into_iter().flatten().any(|t| {
                     t["id"].as_str() == Some(id)
-                        && t["scene_id"].as_str()
-                            == self.timeline.selected.iter().next().map(|s| s.0.as_str())
+                        && t["scene_id"].as_str() == current_scene.as_ref().map(|s| s.0.as_str())
+                        && review::attached(d, t)
                 })
             })
         }) {
@@ -404,6 +410,7 @@ impl ImagineApp {
                     if self.timeline.loading.is_some() {
                         ui.spinner();
                     }
+                    self.sampling_preview_controls(ui);
                 });
             },
         );
@@ -412,11 +419,12 @@ impl ImagineApp {
             egui::pos2(inner.right(), (inner.bottom() - 78.).max(inner.top() + 50.)),
         );
         chrome::region(ui, "timeline-player", picture, |ui| {
-            if let Some(comparison) = &mut self.timeline.comparison {
-                match comparison.show(ui, self.prefs.privacy_mode) {
-                    Ok(true) => self.timeline.clear_preview(),
-                    Ok(false) => {}
-                    Err(error) => self.timeline.error = Some(error),
+            if self.timeline.comparison.is_some() {
+                self.sampling_preview.hide_texture();
+                ui.centered_and_justified(|ui| ui.weak("A/B Take review"));
+            } else if self.sampling_preview_viewer(ui) {
+                if let Some(player) = &mut self.timeline.player {
+                    player.pause();
                 }
             } else if let Some(player) = &mut self.timeline.player {
                 if let Err(error) = player.show(ui, self.prefs.privacy_mode) {
@@ -426,25 +434,113 @@ impl ImagineApp {
                 let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::hover());
                 let reveal =
                     !self.prefs.privacy_mode || (response.hovered() && ui.input(|i| i.focused));
-                ui.painter().text(
-                    rect.center(),
-                    egui::Align2::CENTER_CENTER,
-                    if !reveal {
-                        "Preview hidden"
-                    } else if self.timeline.loading.is_some() {
-                        "Loading preview…"
-                    } else {
-                        "Choose a Take or project media"
-                    },
+                let text = if !reveal {
+                    "Preview hidden"
+                } else if self.timeline.loading.is_some() {
+                    "Loading preview…"
+                } else {
+                    "Choose a Take or project media"
+                };
+                let galley = ui.painter().layout(
+                    text.into(),
                     egui::FontId::proportional(14.),
                     helto::DIM,
+                    (rect.width() - 8.).max(1.),
                 );
+                let position = rect.center() - galley.size() * 0.5;
+                ui.painter().galley(position, galley, helto::DIM);
             }
         });
         let strip = Rect::from_min_max(egui::pos2(inner.left(), inner.bottom() - 72.), inner.max);
         chrome::region(ui, "timeline-takes", strip, |ui| {
-            self.timeline_take_strip(ui, d);
+            egui::ScrollArea::vertical()
+                .id_salt("timeline-take-strip")
+                .show(ui, |ui| {
+                    #[cfg(feature = "ui-preview")]
+                    {
+                        let r = ui.interact(
+                            ui.clip_rect(),
+                            ui.id().with("take-strip-scroll"),
+                            egui::Sense::hover(),
+                        );
+                        super::qa::control(ui, "take-strip-scroll".into(), &r);
+                    }
+                    self.timeline_take_strip(ui, d);
+                    ui.add_space(4.); // Keep a bottom-row keyboard focus ring inside the scroll clip.
+                });
         });
+
+        if self.timeline.comparison.is_some() {
+            self.timeline_comparison_dialog(ui.ctx(), d, current_scene);
+        }
+        if self.timeline.captures.open {
+            self.timeline_captures_dialog(ui.ctx(), d);
+        }
+    }
+    fn timeline_comparison_dialog(
+        &mut self,
+        ctx: &egui::Context,
+        d: &Snapshot,
+        current_scene: Option<SceneId>,
+    ) {
+        let bounds = ctx.content_rect();
+        let mut interaction = None;
+        let response =
+            egui::Modal::new(egui::Id::new("timeline-comparison-dialog")).show(ctx, |ui| {
+                ui.set_width((bounds.width() - 48.).clamp(260., 1100.));
+                ui.set_height((bounds.height() - 80.).max(240.));
+                if let Some(comparison) = &mut self.timeline.comparison {
+                    let entries = current_scene
+                        .as_ref()
+                        .map(|id| super::review::comparison_entries(d, id))
+                        .unwrap_or_default();
+                    match comparison.show(
+                        ui,
+                        self.prefs.privacy_mode,
+                        &entries,
+                        !self.timeline.busy && !self.timeline.admitting,
+                    ) {
+                        Ok(value) => interaction = Some(value),
+                        Err(error) => self.timeline.error = Some(error),
+                    }
+                    let pair = comparison.ids.clone().map(Some);
+                    self.timeline.comparison_explicit |= self.timeline.comparison_selection != pair;
+                    self.timeline.comparison_selection = pair;
+                }
+            });
+        if response.should_close() {
+            self.timeline.clear_preview();
+            return;
+        }
+        if let Some(value) = interaction {
+            if value.close {
+                self.timeline.clear_preview();
+            } else if let Some((side, id)) = value.select {
+                self.timeline.comparison_explicit = true;
+                let entries = current_scene
+                    .as_ref()
+                    .map(|id| super::review::comparison_entries(d, id))
+                    .unwrap_or_default();
+                let ids = entries.into_iter().map(|e| e.id).collect::<Vec<_>>();
+                let accepted = current_scene
+                    .as_ref()
+                    .and_then(|id| d.project.scene(id).ok())
+                    .and_then(|s| s.accepted_take.as_ref())
+                    .map(|t| t.id.0.as_str());
+                self.timeline.comparison_selection = super::take_selection::update(
+                    &ids,
+                    accepted,
+                    &self.timeline.comparison_selection,
+                    side,
+                    &id,
+                );
+                self.timeline_compare(ctx, d);
+            } else if let Some((id, action)) = value.review
+                && let Some(scene) = &current_scene
+            {
+                self.timeline_apply_review(ctx, scene.clone(), TakeId(id), action);
+            }
+        }
     }
 }
 
