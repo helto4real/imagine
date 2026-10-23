@@ -115,6 +115,20 @@ impl ImagineApp {
             .iter()
             .any(|j| j.error.is_some() || j.terminal() && j.observation["status"] != "succeeded")
     }
+    /// "Scene N" for a scene job in the open project, from its position on the Timeline.
+    fn job_scene_label(&self, job: &Job) -> String {
+        self.timeline
+            .document
+            .as_ref()
+            .filter(|d| job.request["project_id"] == json!(d.project.id))
+            .and_then(|d| {
+                d.project
+                    .scenes
+                    .iter()
+                    .position(|s| job.request["scene_id"] == json!(s.id))
+            })
+            .map_or_else(|| "Video scene".into(), |n| format!("Scene {}", n + 1))
+    }
     /// The video service was checked and no session could be opened.
     pub(in crate::app) fn timeline_unreachable(&self) -> bool {
         self.timeline.session_checked && self.timeline.session.is_none() && !self.timeline.busy
@@ -172,9 +186,10 @@ impl ImagineApp {
             if job.observation["status"] == "succeeded" {
                 continue;
             }
+            let _ = index; // Names QA controls in preview builds.
             ui.push_id(("scene-job",&job.id),|ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(format!("{} · {}",if job.request["kind"]=="video_assembly"{"Final video"}else{"Video scene"},index+1));
+                    ui.label(if job.request["kind"]=="video_assembly"{"Final video".into()}else{self.job_scene_label(job)});
                     let label=if job.terminal() {match job.observation["status"].as_str() {Some("cancelled")=>"Cancelled",Some("interrupted")=>"Interrupted",_=>"Failed"}.to_owned()} else if !job.monitoring {"Connection lost".into()} else if job.request["kind"]=="video_assembly"{match job.observation["status"].as_str(){Some("queued")=>"Queued",Some("cancelling")=>"Cancelling",_=>"Exporting"}.into()}else {let Progress::Status{label,..}=client::job_progress(&job.observation) else {unreachable!()};label};
                     ui.weak(label);
                     if !job.terminal() {
@@ -261,7 +276,7 @@ impl ImagineApp {
                 .is_some_and(|d| job.request["project_id"] == json!(d.project.id));
             let enabled = current && !self.timeline.busy && self.timeline.draft_edits().is_empty();
             let label = if revealed {
-                format!("Scene result {}", index + 1)
+                format!("{} result", self.job_scene_label(job))
             } else {
                 "Hidden result".into()
             };

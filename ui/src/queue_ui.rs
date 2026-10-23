@@ -82,6 +82,7 @@ impl ImagineApp {
         );
         let mut cancel = None;
         let mut retry = None;
+        let mut dismiss = None;
         region(ui, "queued-jobs", queue_rect, |ui| {
             egui::ScrollArea::vertical()
                 .id_salt("queue-rows")
@@ -93,7 +94,7 @@ impl ImagineApp {
                         .jobs
                         .iter()
                         .enumerate()
-                        .filter(|(_, j)| j.working || j.error.is_some())
+                        .filter(|(_, j)| j.working || j.error.is_some() || j.cancelled())
                     {
                         ui.push_id(&job.id, |ui| {
                             ui.horizontal(|ui| {
@@ -156,6 +157,17 @@ impl ImagineApp {
                                     {
                                         cancel = Some(job.id.clone());
                                     }
+                                } else if job.cancelled() {
+                                    if helto::icon_button(
+                                        ui,
+                                        Icon::Close,
+                                        &format!("Dismiss job {}", index + 1),
+                                        false,
+                                    )
+                                    .clicked()
+                                    {
+                                        dismiss = Some(job.id.clone());
+                                    }
                                 } else if ui
                                     .add_enabled_ui(
                                         self.client.is_some() && !self.connecting,
@@ -193,7 +205,7 @@ impl ImagineApp {
                         .queue
                         .jobs
                         .iter()
-                        .any(|j| j.working || j.error.is_some())
+                        .any(|j| j.working || j.error.is_some() || j.cancelled())
                         && self.timeline_queue_counts() == (0, 0)
                         && !self.timeline_has_job_errors()
                     {
@@ -215,9 +227,11 @@ impl ImagineApp {
                     .color(helto::DIM),
                 );
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui
-                        .checkbox(&mut self.queue.follow, "Follow latest")
-                        .changed()
+                    // Follow latest and Reuse settings act on the image desk only.
+                    if self.workspace != Workspace::Video
+                        && ui
+                            .checkbox(&mut self.queue.follow, "Follow latest")
+                            .changed()
                         && self.queue.follow
                     {
                         selection = self.queue.gallery.last().map(|r| r.id.clone());
@@ -319,6 +333,7 @@ impl ImagineApp {
                                                 .color(helto::DIM),
                                         );
                                         if item.snapshot.is_some()
+                                            && self.workspace != Workspace::Video
                                             && ui
                                                 .add_enabled_ui(self.editable(), |ui| {
                                                     helto::icon_button(
@@ -348,6 +363,9 @@ impl ImagineApp {
         }
         if let Some(id) = retry {
             self.retry_queue_job(ui.ctx(), &id);
+        }
+        if let Some(id) = dismiss {
+            self.queue.jobs.retain(|job| job.id != id);
         }
         if let Some(id) = selection {
             self.select_queue_result(ui.ctx(), &id);

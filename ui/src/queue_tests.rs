@@ -677,3 +677,24 @@ fn opening_a_result_never_discards_an_open_edit() {
     assert!(desk.app.edit.open);
     assert_eq!(desk.app.workspace, Workspace::ImageEdit);
 }
+
+#[test]
+fn cancelled_jobs_stay_listed_until_dismissed() {
+    let mut desk = Desk::new();
+    let ids = stage(&mut desk, &["Own cancelled prompt"]);
+    desk.app.queue_message(
+        &desk.ctx,
+        Event::Finished(
+            ids[0].clone(),
+            Err(Failure {
+                message: "Generation cancelled.".into(),
+                retryable: false,
+            }),
+        ),
+    );
+    desk.app.prefs.privacy_mode = false;
+    desk.frame(vec![]);
+    assert!(desk.app.queue.jobs[0].cancelled());
+    desk.click("Dismiss job 1");
+    assert!(desk.app.queue.jobs.is_empty());
+}

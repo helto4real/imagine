@@ -71,6 +71,12 @@ impl ImagineApp {
         self.queue.seen_work = work;
     }
 }
+impl Job {
+    /// Cancelled by the user; kept in the list until dismissed.
+    pub(super) fn cancelled(&self) -> bool {
+        !self.working && self.error.is_none() && self.status == "Cancelled"
+    }
+}
 impl Queue {
     pub fn stage(&mut self, prepared: Vec<(Submission, Snapshot)>) -> String {
         let batch = uuid::Uuid::new_v4().to_string();
