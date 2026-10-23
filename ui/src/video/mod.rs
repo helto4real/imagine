@@ -855,7 +855,7 @@ impl ImagineApp {
                         .timeline
                         .document
                         .as_ref()
-                        .is_some_and(|d| json!(d.project.id) == old.request["project_id"]);
+                        .is_some_and(|d| old.project_id() == Some(&d.project.id.0));
                 if refresh {
                     if self.timeline.busy {
                         self.timeline.refresh_after_busy = true;
@@ -890,7 +890,7 @@ impl ImagineApp {
                     match result {
                         Ok(()) => {
                             if !job.terminal() {
-                                job.observation["status"] = json!("cancelling");
+                                job.set_status(jobs::JobStatus::Cancelling);
                             }
                         }
                         Err(error) => job.error = Some(error.message),
@@ -1562,7 +1562,7 @@ impl Timeline {
             job.id == id
                 && !job.acting
                 && job.matches(project, scene)
-                && job.observation["status"] == "running"
+                && job.status() == jobs::JobStatus::Running
         })
     }
     fn scene_active(&self) -> bool {

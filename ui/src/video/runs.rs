@@ -180,7 +180,7 @@ impl ImagineApp {
                     {
                         // The server reports completed_take_id only after job commit and review.
                         if !job.terminal() {
-                            job.observation["status"] = json!("succeeded");
+                            job.set_status(jobs::JobStatus::Succeeded);
                             job.monitoring = false;
                             job.acting = false;
                         }

@@ -1,9 +1,54 @@
 //! Projection of shared FIFO jobs. A lost observation never creates a new job.
 use super::*;
 
+/// A shared FIFO job's lifecycle as reported by the server.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum JobStatus {
+    Queued,
+    Running,
+    Cancelling,
+    Succeeded,
+    Failed,
+    Cancelled,
+    Interrupted,
+}
+impl JobStatus {
+    fn parse(value: &str) -> Option<Self> {
+        Some(match value {
+            "queued" => Self::Queued,
+            "running" => Self::Running,
+            "cancelling" => Self::Cancelling,
+            "succeeded" => Self::Succeeded,
+            "failed" => Self::Failed,
+            "cancelled" => Self::Cancelled,
+            "interrupted" => Self::Interrupted,
+            _ => return None,
+        })
+    }
+    pub(super) fn as_str(self) -> &'static str {
+        match self {
+            Self::Queued => "queued",
+            Self::Running => "running",
+            Self::Cancelling => "cancelling",
+            Self::Succeeded => "succeeded",
+            Self::Failed => "failed",
+            Self::Cancelled => "cancelled",
+            Self::Interrupted => "interrupted",
+        }
+    }
+    fn terminal(self) -> bool {
+        matches!(
+            self,
+            Self::Succeeded | Self::Failed | Self::Cancelled | Self::Interrupted
+        )
+    }
+}
+
 pub(super) struct Job {
     pub id: String,
     pub request: Value,
+    /// Kept in step with `observation["status"]`; set only through `observe`/`set_status`.
+    status: JobStatus,
     pub observation: Value,
     pub monitoring: bool,
     pub acting: bool,
@@ -38,6 +83,7 @@ impl Job {
             return None;
         }
         Some(Self {
+            status: JobStatus::Queued,
             observation: json!({"id":id,"status":"queued"}),
             id,
             request,
@@ -46,55 +92,56 @@ impl Job {
             error: None,
         })
     }
+    pub fn status(&self) -> JobStatus {
+        self.status
+    }
+    /// A locally known transition, such as a confirmed cancel request.
+    pub fn set_status(&mut self, status: JobStatus) {
+        self.status = status;
+        self.observation["status"] = json!(status.as_str());
+    }
     pub fn terminal(&self) -> bool {
-        matches!(
-            self.observation["status"].as_str(),
-            Some("succeeded" | "failed" | "cancelled" | "interrupted")
-        )
+        self.status.terminal()
     }
     pub fn queued(&self) -> bool {
-        self.observation["status"] == "queued"
+        self.status == JobStatus::Queued
+    }
+    pub fn project_id(&self) -> Option<&str> {
+        self.request["project_id"].as_str()
+    }
+    pub fn scene_id(&self) -> Option<&str> {
+        self.request["scene_id"].as_str()
+    }
+    pub fn is_assembly(&self) -> bool {
+        self.request["kind"] == "video_assembly"
     }
     pub fn take_id(&self) -> Option<&str> {
         let take = &self.observation["output"]["take"];
-        (self.observation["status"] == "succeeded"
-            && take["project_id"] == self.request["project_id"])
+        (self.status == JobStatus::Succeeded && take["project_id"].as_str() == self.project_id())
             .then(|| take["id"].as_str())
             .flatten()
     }
     pub fn matches(&self, project: &ProjectId, scene: &SceneId) -> bool {
-        self.request["project_id"].as_str() == Some(&project.0)
-            && self.request["scene_id"].as_str() == Some(&scene.0)
+        self.project_id() == Some(&project.0) && self.scene_id() == Some(&scene.0)
     }
     pub fn retryable(&self, project: &VideoProject) -> bool {
         self.terminal()
-            && self.observation["status"] != "succeeded"
-            && self.request["project_id"].as_str() == Some(&project.id.0)
-            && (self.request["kind"] == "video_assembly"
+            && self.status != JobStatus::Succeeded
+            && self.project_id() == Some(&project.id.0)
+            && (self.is_assembly()
                 || self.request["expected_project_revision"] == json!(project.project_revision))
     }
     pub fn observe(&mut self, value: Value) -> bool {
-        if value["id"].as_str() != Some(&self.id)
-            || !matches!(
-                value["status"].as_str(),
-                Some(
-                    "queued"
-                        | "running"
-                        | "cancelling"
-                        | "succeeded"
-                        | "failed"
-                        | "cancelled"
-                        | "interrupted"
-                )
-            )
-        {
+        let status = value["status"].as_str().and_then(JobStatus::parse);
+        let Some(status) = status.filter(|_| value["id"].as_str() == Some(&self.id)) else {
             self.monitoring = false;
             self.error = Some("Could not read job status. Reconnect to this job.".into());
             return false;
-        }
-        if self.terminal() && value["status"] != self.observation["status"] {
+        };
+        if self.terminal() && status != self.status {
             return false;
         }
+        self.status = status;
         self.observation = value;
         self.error = None;
         if self.terminal() {
@@ -113,19 +160,19 @@ impl ImagineApp {
         self.timeline
             .jobs
             .iter()
-            .any(|j| j.error.is_some() || j.terminal() && j.observation["status"] != "succeeded")
+            .any(|j| j.error.is_some() || j.terminal() && j.status() != JobStatus::Succeeded)
     }
     /// "Scene N" for a scene job in the open project, from its position on the Timeline.
     fn job_scene_label(&self, job: &Job) -> String {
         self.timeline
             .document
             .as_ref()
-            .filter(|d| job.request["project_id"] == json!(d.project.id))
+            .filter(|d| job.project_id() == Some(&d.project.id.0))
             .and_then(|d| {
                 d.project
                     .scenes
                     .iter()
-                    .position(|s| job.request["scene_id"] == json!(s.id))
+                    .position(|s| job.scene_id() == Some(&s.id.0))
             })
             .map_or_else(|| "Video scene".into(), |n| format!("Scene {}", n + 1))
     }
@@ -186,14 +233,14 @@ impl ImagineApp {
             });
         }
         for (index, job) in self.timeline.jobs.iter().enumerate() {
-            if job.observation["status"] == "succeeded" {
+            if job.status() == JobStatus::Succeeded {
                 continue;
             }
             let _ = index; // Names QA controls in preview builds.
             ui.push_id(("scene-job",&job.id),|ui| {
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(if job.request["kind"]=="video_assembly"{"Final video".into()}else{self.job_scene_label(job)});
-                    let label=if job.terminal() {match job.observation["status"].as_str() {Some("cancelled")=>"Cancelled",Some("interrupted")=>"Interrupted",_=>"Failed"}.to_owned()} else if !job.monitoring {"Connection lost".into()} else if job.request["kind"]=="video_assembly"{match job.observation["status"].as_str(){Some("queued")=>"Queued",Some("cancelling")=>"Cancelling",_=>"Exporting"}.into()}else {let Progress::Status{label,..}=client::job_progress(&job.observation) else {unreachable!()};label};
+                    ui.label(if job.is_assembly(){"Final video".into()}else{self.job_scene_label(job)});
+                    let label=if job.terminal() {match job.status() {JobStatus::Cancelled=>"Cancelled",JobStatus::Interrupted=>"Interrupted",_=>"Failed"}.to_owned()} else if !job.monitoring {"Connection lost".into()} else if job.request["kind"]=="video_assembly"{match job.observation["status"].as_str(){Some("queued")=>"Queued",Some("cancelling")=>"Cancelling",_=>"Exporting"}.into()}else {let Progress::Status{label,..}=client::job_progress(&job.observation) else {unreachable!()};label};
                     ui.weak(label);
                     if !job.terminal() {
                         if !job.monitoring {
@@ -202,13 +249,13 @@ impl ImagineApp {
                             super::qa::control(ui,format!("job-reconnect-{index}"),&response);
                             if response.clicked(){reconnect=Some(job.id.clone());}
                         }
-                        let response=helto::action(ui,crate::icons::Icon::Stop,"Cancel",false,(job.acting || job.observation["status"]=="cancelling").then_some("Cancelling."));
+                        let response=helto::action(ui,crate::icons::Icon::Stop,"Cancel",false,(job.acting || job.status()==JobStatus::Cancelling).then_some("Cancelling."));
                         #[cfg(feature="ui-preview")]
                         super::qa::control(ui,format!("job-cancel-{index}"),&response);
                         if response.clicked(){cancel=Some(job.id.clone());}
                     } else {
                         let can_retry=self.timeline.document.as_ref().is_some_and(|d| job.retryable(&d.project)) && !self.timeline.admitting && self.timeline.pending.is_none();
-                        let response=helto::action(ui,crate::icons::Icon::Retry,if job.request["kind"]=="video_assembly"{"Retry export"}else{"Retry scene"},false,(!can_retry).then_some("Open the source project to retry. A montage retry uses its frozen media.")).on_hover_text("A completed montage is saved again without rendering. Otherwise its frozen sources are rendered again.");
+                        let response=helto::action(ui,crate::icons::Icon::Retry,if job.is_assembly(){"Retry export"}else{"Retry scene"},false,(!can_retry).then_some("Open the source project to retry. A montage retry uses its frozen media.")).on_hover_text("A completed montage is saved again without rendering. Otherwise its frozen sources are rendered again.");
                         #[cfg(feature="ui-preview")]
                         super::qa::control(ui,format!("job-retry-{index}"),&response);
                         if response.clicked() {retry=Some(job.id.clone());}
@@ -240,7 +287,7 @@ impl ImagineApp {
             .iter()
             .filter(|j| {
                 j.take_id().is_some()
-                    || j.observation["status"] == "succeeded"
+                    || j.status() == JobStatus::Succeeded
                         && j.observation["output"]["delivery"].is_object()
             })
             .count()
@@ -253,7 +300,7 @@ impl ImagineApp {
             .jobs
             .iter()
             .enumerate()
-            .filter(|(_, j)| j.observation["status"] == "succeeded")
+            .filter(|(_, j)| j.status() == JobStatus::Succeeded)
         {
             let Some(take) = job.take_id() else {
                 if job.observation["output"]["delivery"].is_object() {
@@ -276,7 +323,7 @@ impl ImagineApp {
                 .timeline
                 .document
                 .as_ref()
-                .is_some_and(|d| job.request["project_id"] == json!(d.project.id));
+                .is_some_and(|d| job.project_id() == Some(&d.project.id.0));
             let enabled = current && !self.timeline.busy && self.timeline.draft_edits().is_empty();
             let label = if revealed {
                 format!("{} result", self.job_scene_label(job))
@@ -291,10 +338,7 @@ impl ImagineApp {
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, format!("job-result-{index}"), &response);
             if response.clicked() {
-                view = Some((
-                    job.request["scene_id"].as_str().unwrap_or("").to_owned(),
-                    take.to_owned(),
-                ));
+                view = Some((job.scene_id().unwrap_or("").to_owned(), take.to_owned()));
             }
         }
         if let Some((scene, take)) = view {
@@ -367,8 +411,8 @@ impl ImagineApp {
         };
         if self.timeline.jobs.iter().any(|other| {
             !other.terminal()
-                && other.request["project_id"] == job.request["project_id"]
-                && other.request["scene_id"] == job.request["scene_id"]
+                && other.project_id() == job.project_id()
+                && other.scene_id() == job.scene_id()
         }) {
             return;
         }
@@ -417,5 +461,27 @@ mod tests {
         assert_eq!(job.take_id(), Some("take_1"));
         job.observe(json!({"id":"job_1","status":"succeeded","output":{"take":{"id":"take_other","project_id":"other"}}}));
         assert!(job.take_id().is_none());
+    }
+}
+
+#[cfg(test)]
+mod status_tests {
+    use super::*;
+    #[test]
+    fn observations_set_a_typed_status_and_terminal_states_hold() {
+        let mut job = Job::new("own-job".into(), json!({"project_id":"p","scene_id":"s"})).unwrap();
+        assert_eq!(job.status(), JobStatus::Queued);
+        assert!(!job.observe(json!({"id":"own-job","status":"unknown"})));
+        assert!(!job.monitoring && job.error.is_some());
+        assert!(job.observe(json!({"id":"own-job","status":"running"})));
+        assert_eq!(job.status(), JobStatus::Running);
+        assert!(!job.observe(json!({"id":"other","status":"failed"})));
+        assert!(job.observe(json!({"id":"own-job","status":"failed"})));
+        assert!(job.terminal());
+        assert!(!job.observe(json!({"id":"own-job","status":"running"})));
+        assert_eq!(job.status(), JobStatus::Failed);
+        job.set_status(JobStatus::Interrupted);
+        assert_eq!(job.observation["status"], "interrupted");
+        assert_eq!((job.project_id(), job.scene_id()), (Some("p"), Some("s")));
     }
 }

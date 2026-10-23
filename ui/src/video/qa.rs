@@ -634,7 +634,7 @@ impl Runner {
                 message_contains,
             } => {
                 let Some(job) = app.timeline.jobs.iter().find(|j| {
-                    j.observation["status"] == "failed"
+                    j.status() == super::jobs::JobStatus::Failed
                         && j.observation["error"]["code"] == json!(code)
                 }) else {
                     return Ok(());
@@ -1168,7 +1168,7 @@ impl Runner {
                     .timeline
                     .jobs
                     .iter()
-                    .filter(|j| j.observation["status"].as_str() == Some(status))
+                    .filter(|j| j.status().as_str() == status.as_str())
                     .count()
                     != *count
                 {

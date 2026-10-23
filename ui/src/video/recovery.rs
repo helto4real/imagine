@@ -10,7 +10,7 @@ impl Timeline {
         }
         for job in &mut self.jobs {
             if !job.terminal() {
-                job.observation["status"] = json!("interrupted");
+                job.set_status(super::jobs::JobStatus::Interrupted);
                 job.monitoring = false;
                 job.acting = false;
                 job.error = Some("Server session ended. No job was resumed.".into());

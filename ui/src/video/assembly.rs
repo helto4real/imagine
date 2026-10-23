@@ -696,7 +696,7 @@ impl ImagineApp {
             .timeline
             .jobs
             .iter()
-            .any(|j| j.request["kind"] == "video_assembly" && !j.terminal());
+            .any(|j| j.is_assembly() && !j.terminal());
         if active
             && !busy
             && self
