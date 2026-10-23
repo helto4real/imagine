@@ -1014,7 +1014,7 @@ pub(super) fn boundary_for(
             ..Boundary::new(left.clone(), right.clone())
         })
 }
-/// A Continuous shot also starts the Scene from the previous Scene's last frame;
+/// A Continuous shot also carries the previous Scene's motion into this one;
 /// a Hard cut removes that again. Other continuity the user chose is kept.
 fn linked_continuity(
     project: &VideoProject,
@@ -1025,11 +1025,6 @@ fn linked_continuity(
 ) -> Option<Option<Continuity>> {
     use imagine_video_contract::assembly::BoundaryMode;
     use imagine_video_contract::creative::SceneKind;
-    let last_frame = Continuity {
-        source_scene: left.clone(),
-        method: ContinuityMethod::LastFrameFirstFrame,
-        include_audio: false,
-    };
     match (before, after) {
         (_, BoundaryMode::ContinuousShot)
             if scene.continuity.is_none()
@@ -1037,10 +1032,17 @@ fn linked_continuity(
                     .into_iter()
                     .any(|id| project.scene_kind(id) == SceneKind::Imported) =>
         {
-            Some(Some(last_frame))
+            Some(Some(Continuity {
+                source_scene: left.clone(),
+                method: ContinuityMethod::MotionContextExp,
+                include_audio: false,
+            }))
         }
+        // Whether it continues the source audio is the user's choice either way.
         (BoundaryMode::ContinuousShot, BoundaryMode::HardCut)
-            if scene.continuity.as_ref() == Some(&last_frame) =>
+            if scene.continuity.as_ref().is_some_and(|c| {
+                &c.source_scene == left && c.method == ContinuityMethod::MotionContextExp
+            }) =>
         {
             Some(None)
         }
@@ -1290,7 +1292,7 @@ mod tests {
         assert!(earlier_snapshot(&plan, Some(&baseline), &document));
     }
     #[test]
-    fn a_continuous_shot_starts_from_the_previous_last_frame_and_a_hard_cut_removes_it() {
+    fn a_continuous_shot_carries_the_previous_motion_and_a_hard_cut_removes_it() {
         use imagine_video_contract::assembly::BoundaryMode::*;
         use imagine_video_contract::creative::SceneKind;
         let mut project = media_picker::tests::project();
@@ -1303,14 +1305,14 @@ mod tests {
         let link = |project: &VideoProject, scene: &Scene, before, after| {
             linked_continuity(project, scene, &left, &before, &after)
         };
-        let last_frame = Continuity {
+        let motion = Continuity {
             source_scene: left.clone(),
-            method: ContinuityMethod::LastFrameFirstFrame,
+            method: ContinuityMethod::MotionContextExp,
             include_audio: false,
         };
         assert_eq!(
             link(&project, &scene, HardCut, ContinuousShot),
-            Some(Some(last_frame.clone()))
+            Some(Some(motion.clone()))
         );
         let mut boundary = boundary_for(&project, &left, &scene.id);
         boundary.mode = ContinuousShot;
@@ -1323,15 +1325,20 @@ mod tests {
                 commands: vec![
                     Edit::SetContinuity {
                         scene_id: scene.id.clone(),
-                        continuity: Some(last_frame.clone()),
+                        continuity: Some(motion.clone()),
                     },
                     Edit::SetAssemblyBoundary { boundary },
                 ],
             },
         )
         .unwrap();
-        let scene = project.scenes[1].clone();
-        assert_eq!(scene.continuity, Some(last_frame.clone()));
+        let mut scene = project.scenes[1].clone();
+        assert_eq!(scene.continuity, Some(motion.clone()));
+        assert_eq!(link(&project, &scene, ContinuousShot, HardCut), Some(None));
+        scene.continuity = Some(Continuity {
+            include_audio: true,
+            ..motion.clone()
+        });
         assert_eq!(link(&project, &scene, ContinuousShot, HardCut), Some(None));
         // Blend seams and transitions keep it; the Scene already continues.
         for after in [BlendSeam, Transition] {
@@ -1339,23 +1346,27 @@ mod tests {
         }
         assert_eq!(link(&project, &scene, BlendSeam, ContinuousShot), None);
         // Continuity the user chose stays through a Hard cut.
-        let mut motion = scene.clone();
-        motion.continuity = Some(Continuity {
-            method: ContinuityMethod::MotionContext,
-            ..last_frame
-        });
-        assert_eq!(link(&project, &motion, ContinuousShot, HardCut), None);
-        assert_eq!(link(&project, &motion, HardCut, ContinuousShot), None);
-        // An imported clip has no Take to take a last frame from.
-        let mut fresh = scene.clone();
-        fresh.continuity = None;
-        for id in [&left, &fresh.id] {
+        for method in [
+            ContinuityMethod::LastFrameFirstFrame,
+            ContinuityMethod::MotionContext,
+        ] {
+            let mut own = scene.clone();
+            own.continuity = Some(Continuity {
+                method,
+                ..motion.clone()
+            });
+            assert_eq!(link(&project, &own, ContinuousShot, HardCut), None);
+            assert_eq!(link(&project, &own, HardCut, ContinuousShot), None);
+        }
+        // An imported clip has no Take to carry motion from.
+        scene.continuity = None;
+        for id in [&left, &scene.id] {
             let mut imported = project.clone();
             imported
                 .creative
                 .scene_kinds
                 .insert(id.clone(), SceneKind::Imported);
-            assert_eq!(link(&imported, &fresh, HardCut, ContinuousShot), None);
+            assert_eq!(link(&imported, &scene, HardCut, ContinuousShot), None);
         }
     }
     #[test]
