@@ -26,7 +26,7 @@ pub(super) struct State {
     profiles: Value,
     providers: Value,
     pub(super) draft: Option<Draft>,
-    history: Vec<Draft>,
+    pub(super) history: Vec<Draft>,
     pub(super) failure: Option<String>,
     pub(super) selected: usize,
     poll_at: Option<std::time::Instant>,
@@ -170,7 +170,8 @@ fn authoring_stale(draft: &Draft, document: &Option<Snapshot>) -> bool {
             || s.project.project_revision != draft.request.expected_project_revision
     })
 }
-/// Expand (or retry from the failed scene) and Apply for a reviewed draft.
+/// Expand (or retry from the failed scene), Apply, Generate again and Discard
+/// for a reviewed draft.
 pub(super) fn authoring_draft_actions(
     ui: &mut egui::Ui,
     draft: &mut Draft,
@@ -181,6 +182,7 @@ pub(super) fn authoring_draft_actions(
     let editable = draft.phase != Phase::Applied;
     let mut expand = None;
     let mut apply = false;
+    let mut again = None;
     ui.horizontal_wrapped(|ui| {
         if draft.outline.is_some() {
             let r = helto::action(
@@ -216,7 +218,40 @@ pub(super) fn authoring_draft_actions(
         );
         control(ui, "story-apply", &r);
         apply = r.clicked();
+        // The same request against the current project; this draft stays in history.
+        let r = helto::action(
+            ui,
+            crate::icons::Icon::Retry,
+            "Generate again",
+            false,
+            document
+                .is_none()
+                .then_some("Create or open a project first."),
+        );
+        control(ui, "story-again", &r);
+        if r.clicked()
+            && let Some(d) = document
+        {
+            let mut request = draft.request.clone();
+            request.expected_project_revision = d.project.project_revision;
+            again = Some((d.project.id.0.clone(), request));
+        }
+        let r = helto::icon_button(ui, crate::icons::Icon::Close, "Discard proposal", false);
+        control(ui, "story-discard", &r);
+        if r.clicked() {
+            actions.new_proposal = true;
+            actions.close = true;
+        }
     });
+    if let Some((project, request)) = again {
+        actions.new_proposal = true;
+        actions.call = Some((
+            Reply::Draft,
+            true,
+            format!("/v1/video/projects/{project}/authoring"),
+            Some(json!(request)),
+        ));
+    }
     if let Some(index) = expand {
         actions.call = Some((
             Reply::Draft,

@@ -268,5 +268,48 @@ mod tests {
         assert_eq!(app.timeline.authoring.selected, 1);
         let hidden = frame(&mut app, true, vec![egui::Event::PointerGone]);
         assert!(!has(&hidden, "Own arrival") && !has(&hidden, "Own brief"));
+        // Generate again keeps this draft in history; Discard also leaves the view.
+        let click = |app: &mut ImagineApp, label: &str| {
+            let nodes = frame(app, false, vec![]);
+            let bounds = nodes
+                .iter()
+                .find(|(_, n)| n.label().is_some_and(|t| t == label))
+                .and_then(|(_, n)| n.bounds())
+                .unwrap_or_else(|| panic!("{label}"));
+            let pos = egui::pos2(
+                ((bounds.x0 + bounds.x1) / 2.) as f32,
+                ((bounds.y0 + bounds.y1) / 2.) as f32,
+            );
+            for pressed in [true, false] {
+                frame(
+                    app,
+                    false,
+                    vec![
+                        egui::Event::PointerMoved(pos),
+                        egui::Event::PointerButton {
+                            pos,
+                            button: egui::PointerButton::Primary,
+                            pressed,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                );
+            }
+        };
+        click(&mut app, "Generate again");
+        assert!(app.timeline.authoring.draft.is_none() && app.timeline.authoring.busy);
+        assert_eq!(app.timeline.authoring.history.len(), 1);
+        // The request reaches the unreachable fixture endpoint and fails.
+        let start = std::time::Instant::now();
+        while app.timeline.authoring.busy && start.elapsed().as_secs() < 10 {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+            frame(&mut app, false, vec![]);
+        }
+        assert!(app.timeline.authoring.failure.is_some());
+        app.timeline.authoring.draft = app.timeline.authoring.history.pop();
+        click(&mut app, "Discard proposal");
+        assert!(app.timeline.authoring.draft.is_none());
+        assert_eq!(app.timeline.authoring.history.len(), 1);
+        assert!(!app.timeline_story_open());
     }
 }
