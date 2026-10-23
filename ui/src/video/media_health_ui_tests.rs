@@ -107,10 +107,10 @@ fn media_health_ui_actual_frames_normal_small_privacy_and_preview() {
                     .get_mut(&AssetId("image".into()))
                     .unwrap()
                     .name = "OWN_PRIVATE_MEDIA_NAME".into();
-                app.timeline.document = Some(Snapshot {
-                    raw: json!({"runtime_assets":{}}),
-                    project: project.clone(),
-                });
+                app.timeline.document = Some(Snapshot::with(
+                    project.clone(),
+                    json!({"runtime_assets":{}}),
+                ));
                 app.timeline.media_health = State {
                     open: true,
                     project: Some(project.id.clone()),

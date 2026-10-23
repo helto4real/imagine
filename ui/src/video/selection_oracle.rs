@@ -22,10 +22,7 @@ fn project(spans: &[(f64, f64)]) -> VideoProject {
 
 fn timeline(project: &VideoProject) -> Timeline {
     let mut timeline = Timeline::default();
-    timeline.document = Some(Snapshot {
-        project: project.clone(),
-        raw: json!({}),
-    });
+    timeline.document = Some(Snapshot::with(project.clone(), json!({})));
     timeline
 }
 

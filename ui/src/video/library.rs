@@ -427,8 +427,8 @@ impl ImagineApp {
                 return;
             };
             let media = |asset: &AssetId| {
-                document.raw["runtime_assets"][&asset.0]
-                    .as_str()
+                document
+                    .runtime_asset(&asset.0)
                     .map(str::to_owned)
                     .ok_or_else(|| {
                         "Project media is unavailable; refresh the project and try again."

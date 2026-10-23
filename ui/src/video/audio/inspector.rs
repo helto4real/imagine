@@ -161,11 +161,7 @@ impl ImagineApp {
                             .changed();
                     }
                 });
-            if let Some(runtime) = c
-                .asset
-                .as_ref()
-                .and_then(|id| d.raw["runtime_assets"][&id.0].as_str())
-            {
+            if let Some(runtime) = c.asset.as_ref().and_then(|id| d.runtime_asset(&id.0)) {
                 let response =
                     helto::icon_button(ui, crate::icons::Icon::Play, "Preview source", false);
                 #[cfg(feature = "ui-preview")]

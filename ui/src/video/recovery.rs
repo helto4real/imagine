@@ -46,7 +46,7 @@ impl ImagineApp {
                 .timeline
                 .document
                 .as_ref()
-                .is_some_and(|d| d.raw["storage_layout"] == 1)
+                .is_some_and(|d| d.view.storage_layout == Some(1))
         {
             let id = self.timeline.document.as_ref().unwrap().project.id.clone();
             self.timeline_request(
@@ -91,10 +91,10 @@ mod tests {
             let id = p.id.clone();
             let scene = p.scenes[0].id.clone();
             let section = p.scenes[0].sections[0].id.clone();
-            app.timeline.document = Some(Snapshot {
-                project: p.clone(),
-                raw: json!({"project":p,"persistence":{"state":"saved"}}),
-            });
+            app.timeline.document = Some(Snapshot::with(
+                p.clone(),
+                json!({"project":p,"persistence":{"state":"saved"}}),
+            ));
             app.timeline.session = Some("old-own-session".into());
             app.timeline.folder = Some(PathBuf::from(
                 "/run/media/veracrypt1/imagine/.codex-video-night-20261020-a6428d9e/own-unit-folder",

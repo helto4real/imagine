@@ -142,7 +142,7 @@ impl ImagineApp {
             .timeline
             .document
             .as_ref()
-            .and_then(|d| d.raw["runtime_assets"][&asset.id.0].as_str())
+            .and_then(|d| d.runtime_asset(&asset.id.0))
             .map(|id| format!("/v1/video/assets/{id}/waveform?peaks={needed}"));
         let (Some(client), Some(session), Some(path)) =
             (self.client.clone(), self.timeline.session.clone(), path)

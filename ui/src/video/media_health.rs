@@ -416,7 +416,7 @@ impl ImagineApp {
                     ui.strong("Relink impact preview");
                     let label = |asset: &Asset| if asset.name.is_empty() { asset.id.0.clone() } else { asset.name.clone() };
                     let current = value["request"]["asset_id"].as_str().and_then(|id| document.project.assets.get(&AssetId(id.into()))).map(label).unwrap_or_else(|| "Current media".into());
-                    let replacement = value["replacement_label"].as_str().map(str::to_owned).or_else(|| document.project.assets.values().find(|asset| document.raw["runtime_assets"][&asset.id.0] == value["request"]["replacement_asset_id"]).map(label)).unwrap_or_else(|| "Selected replacement".into());
+                    let replacement = value["replacement_label"].as_str().map(str::to_owned).or_else(|| document.project.assets.values().find(|asset| value["request"]["replacement_asset_id"].as_str().is_some_and(|r| document.runtime_asset(&asset.id.0) == Some(r))).map(label)).unwrap_or_else(|| "Selected replacement".into());
                     ui.label(format!("Current: {current}"));
                     ui.label(format!("Replacement: {replacement}"));
                     ui.label("Asset identity and listed bindings are kept. Existing Takes keep their source revision.");
@@ -439,7 +439,7 @@ impl ImagineApp {
                                 #[cfg(feature="ui-preview")] super::qa::control(ui,format!("relink-file-{}",asset.id.0),&r);
                                 if r.clicked(){choose=Some((asset.id.clone(),asset.kind.clone()));ui.close();}
                                 ui.separator();
-                                for replacement in document.project.assets.values().filter(|a|a.id!=asset.id && a.kind==asset.kind){if let Some(runtime)=document.raw["runtime_assets"][&replacement.id.0].as_str(){let label=if hidden{"Replacement media".into()}else if replacement.name.is_empty(){replacement.id.0.clone()}else{replacement.name.clone()};let r=ui.button(label);
+                                for replacement in document.project.assets.values().filter(|a|a.id!=asset.id && a.kind==asset.kind){if let Some(runtime)=document.runtime_asset(&replacement.id.0){let label=if hidden{"Replacement media".into()}else if replacement.name.is_empty(){replacement.id.0.clone()}else{replacement.name.clone()};let r=ui.button(label);
                                 #[cfg(feature="ui-preview")] super::qa::control(ui,format!("relink-replacement-{}",replacement.id.0),&r);
                                 if r.clicked(){preview=Some(json!({"schema_version":1,"expected_project_revision":document.project.project_revision,"asset_id":asset.id,"expected_asset_revision":asset.revision,"replacement_asset_id":runtime}));ui.close();}}}});
                             #[cfg(feature="ui-preview")] super::qa::control(ui,format!("relink-{}",asset.id.0),&menu);
@@ -585,10 +585,7 @@ mod selector_tests {
             let mut app = ImagineApp::synthetic_preview(&ctx, root);
             app.client = None;
             let project = project();
-            app.timeline.document = Some(Snapshot {
-                raw: json!({}),
-                project: project.clone(),
-            });
+            app.timeline.document = Some(Snapshot::with(project.clone(), json!({})));
             app.timeline.media_health = State {
                 open: true,
                 project: Some(project.id.clone()),

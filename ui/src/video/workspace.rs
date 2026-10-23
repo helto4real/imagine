@@ -429,20 +429,18 @@ impl ImagineApp {
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, "project-menu".into(), &_menu);
         }
-        let saved = document
-            .as_ref()
-            .and_then(|d| d.raw["persistence"]["state"].as_str())
-            .unwrap_or("No project");
+        use snapshot::SaveState;
+        let saved = document.as_ref().and_then(|d| d.save_state());
         ui.label(
             RichText::new(match saved {
-                "session_only" => "Unsaved project",
-                "saved" => "Saved",
-                "not_saved" => "Not saved",
-                "saving" => "Saving…",
-                s => s,
+                None => "No project",
+                Some(SaveState::SessionOnly) => "Unsaved project",
+                Some(SaveState::Saved) => "Saved",
+                Some(SaveState::NotSaved) => "Not saved",
+                Some(SaveState::Saving) => "Saving…",
             })
             .small()
-            .color(if saved == "not_saved" {
+            .color(if saved == Some(&SaveState::NotSaved) {
                 helto::ERROR
             } else {
                 helto::DIM
@@ -769,10 +767,10 @@ mod tests {
             ("not_saved", true),
         ] {
             app.timeline.replace_pending = None;
-            app.timeline.document = Some(Snapshot {
-                project: project.clone(),
-                raw: json!({"persistence":{"state":state}}),
-            });
+            app.timeline.document = Some(Snapshot::with(
+                project.clone(),
+                json!({"persistence":{"state":state}}),
+            ));
             app.workspace = Workspace::Image;
             assert_eq!(app.timeline_hold_replace(Replace::Animate), held, "{state}");
             assert_eq!(app.timeline.replace_pending.is_some(), held);
@@ -792,10 +790,10 @@ mod tests {
             app.workspace = Workspace::Video;
             app.timeline.session = Some("own-synthetic-session".into());
             app.timeline.session_checked = true;
-            app.timeline.document = Some(Snapshot {
-                project: project.clone(),
-                raw: json!({"persistence":{"state":"saved"}}),
-            });
+            app.timeline.document = Some(Snapshot::with(
+                project.clone(),
+                json!({"persistence":{"state":"saved"}}),
+            ));
             app.timeline.selected.insert(project.scenes[0].id.clone());
             app.video.available = true;
             app.video.checked = true;
@@ -836,10 +834,10 @@ mod tests {
             app.workspace = Workspace::Video;
             app.timeline.session = Some("own-synthetic-session".into());
             app.timeline.session_checked = true;
-            app.timeline.document = Some(Snapshot {
-                project: project.clone(),
-                raw: json!({"persistence":{"state":"saved"}}),
-            });
+            app.timeline.document = Some(Snapshot::with(
+                project.clone(),
+                json!({"persistence":{"state":"saved"}}),
+            ));
             app.timeline.selected.insert(project.scenes[0].id.clone());
             app.video.available = true;
             app.video.checked = true;

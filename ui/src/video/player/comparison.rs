@@ -108,22 +108,15 @@ impl ImagineApp {
             return;
         };
         if [&a, &b].into_iter().any(|id| {
-            !document.raw["takes"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .any(|t| {
-                    t["id"].as_str() == Some(id)
-                        && t["scene_id"] == json!(scene.id)
-                        && super::super::review::attached(document, t)
-                })
+            !document.view.takes.iter().any(|t| {
+                t.id.0 == *id
+                    && t.scene_id == scene.id
+                    && super::super::review::attached(document, t)
+            })
         }) {
             return;
         }
-        let sources = [
-            document.raw["runtime_takes"][&a].as_str(),
-            document.raw["runtime_takes"][&b].as_str(),
-        ];
+        let sources = [document.runtime_take(&a), document.runtime_take(&b)];
         let [Some(source_a), Some(source_b)] = sources else {
             self.timeline.error = Some(
                 "Both Take media sources must be available. Metadata remains available.".into(),

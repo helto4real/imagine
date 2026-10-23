@@ -685,10 +685,7 @@ mod tests {
     fn immediate_project_action_flushes_pending_cast_and_scene_text_in_one_edit() {
         let project = super::super::media_picker::tests::project();
         let mut timeline = Timeline::default();
-        timeline.document = Some(Snapshot {
-            project: project.clone(),
-            raw: serde_json::json!({}),
-        });
+        timeline.document = Some(Snapshot::with(project.clone(), serde_json::json!({})));
         timeline.selected.insert(SceneId("scene".into()));
         timeline.draft_scene = Some(SceneId("scene".into()));
         timeline.draft_scene_prompt.summary = "Own new scene summary".into();

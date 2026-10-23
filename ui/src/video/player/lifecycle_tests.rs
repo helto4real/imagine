@@ -9,10 +9,7 @@ fn app() -> (egui::Context, ImagineApp) {
     );
     app.client = None;
     let p = super::super::media_picker::tests::project();
-    app.timeline.document = Some(Snapshot {
-        project: p.clone(),
-        raw: json!({"project":p}),
-    });
+    app.timeline.document = Some(Snapshot::with(p.clone(), json!({"project":p})));
     app.timeline.epoch = 9;
     (ctx, app)
 }

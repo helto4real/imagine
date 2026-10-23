@@ -159,8 +159,7 @@ impl ImagineApp {
                                     }
                                     if helto::icon_button(ui, Icon::Play, "Preview", false)
                                         .clicked()
-                                        && let Some(id) =
-                                            d.raw["runtime_assets"][&asset.id.0].as_str()
+                                        && let Some(id) = d.runtime_asset(&asset.id.0)
                                     {
                                         self.timeline.selected_take = None;
                                         self.timeline_load_media(ui.ctx(), id.to_owned());

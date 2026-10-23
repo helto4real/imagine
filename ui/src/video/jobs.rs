@@ -302,7 +302,7 @@ impl ImagineApp {
                 .timeline
                 .document
                 .as_ref()
-                .and_then(|d| d.raw["runtime_takes"][&take].as_str())
+                .and_then(|d| d.runtime_take(&take))
                 .map(str::to_owned);
             if let Some(asset) = asset {
                 self.workspace = Workspace::Video;

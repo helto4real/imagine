@@ -377,9 +377,8 @@ impl ImagineApp {
         let mut pick_images = false;
         let document = self.timeline.document.clone();
         if let Some(d) = &document {
-            for value in d.raw["authoring"].as_array().into_iter().flatten() {
-                if let Ok(draft) = serde_json::from_value::<Draft>(value.clone())
-                    && !state.history.iter().any(|old| old.id == draft.id)
+            for draft in d.view.authoring.iter().cloned() {
+                if !state.history.iter().any(|old| old.id == draft.id)
                     && state
                         .draft
                         .as_ref()

@@ -565,7 +565,7 @@ impl ImagineApp {
                                         .timeline
                                         .document
                                         .as_ref()
-                                        .and_then(|d| d.raw["runtime_assets"][&asset.0].as_str())
+                                        .and_then(|d| d.runtime_asset(&asset.0))
                                         .map(str::to_owned)
                                     {
                                         self.timeline_load_media(ui.ctx(), runtime);

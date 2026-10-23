@@ -2,33 +2,28 @@
 use super::*;
 use imagine_video_contract::review::{ReviewAction, ReviewRequest};
 
-pub(super) fn attached(document: &Snapshot, take: &Value) -> bool {
-    let id = take["id"].as_str().unwrap_or("");
-    document.raw["captures"][id]["detached"] != true
-        && document.raw["captures"][id]["removed"] != true
+pub(super) fn attached(document: &Snapshot, take: &snapshot::TakeView) -> bool {
+    document
+        .capture(&take.id)
+        .is_none_or(|capture| !capture.detached && !capture.removed)
 }
 
 pub(super) fn comparison_entries(
     document: &Snapshot,
     scene: &SceneId,
 ) -> Vec<player::ComparisonEntry> {
-    document.raw["takes"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter(|take| take["scene_id"] == json!(scene))
+    document
+        .view
+        .takes
+        .iter()
+        .filter(|take| &take.scene_id == scene)
         .filter(|take| attached(document, take))
-        .filter_map(|take| take["id"].as_str().map(|id| (id, take)))
         .enumerate()
-        .map(|(index, (id, take))| player::ComparisonEntry {
-            id: id.into(),
-            label: format!(
-                "Take {:03} · {}",
-                index + 1,
-                take["status"].as_str().unwrap_or("candidate")
-            ),
-            accepted: document.raw["take_states"][id]["accepted"] == true,
-            rejected: take["status"] == "rejected",
+        .map(|(index, take)| player::ComparisonEntry {
+            id: take.id.0.clone(),
+            label: format!("Take {:03} · {}", index + 1, take.status.label()),
+            accepted: document.take_state(&take.id).accepted,
+            rejected: take.status == snapshot::TakeStatus::Rejected,
         })
         .collect()
 }
@@ -125,22 +120,17 @@ impl ImagineApp {
                 self.timeline.clear_preview();
                 self.timeline.captures.open = true;
             }
-            for (index, take) in document.raw["takes"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter(|take| {
-                    take["scene_id"].as_str() == selected.as_ref().map(|id| id.0.as_str())
-                })
+            for (index, take) in document
+                .view
+                .takes
+                .iter()
+                .filter(|take| Some(&take.scene_id) == selected.as_ref())
                 .filter(|take| attached(document, take))
                 .enumerate()
             {
-                let Some(id) = take["id"].as_str() else {
-                    continue;
-                };
-                let state = &document.raw["take_states"][id];
-                let accepted = state["accepted"].as_bool().unwrap_or(false);
-                let outdated = state["outdated"].as_bool().unwrap_or(false);
+                let id = take.id.0.as_str();
+                let state = document.take_state(&take.id);
+                let (accepted, outdated) = (state.accepted, state.outdated);
                 let label = format!(
                     "{}{}{}",
                     index + 1,
@@ -154,7 +144,7 @@ impl ImagineApp {
                 )
                 .on_hover_text(format!(
                     "{}{}",
-                    take["status"].as_str().unwrap_or("candidate"),
+                    take.status.label(),
                     if outdated { " · Inputs changed" } else { "" }
                 ));
                 #[cfg(feature = "ui-preview")]
@@ -162,7 +152,7 @@ impl ImagineApp {
                 if response.clicked() {
                     self.timeline.clear_audio_selection();
                     self.timeline.selected_take = Some(id.to_owned());
-                    if let Some(asset) = document.raw["runtime_takes"][id].as_str() {
+                    if let Some(asset) = document.runtime_take(id) {
                         self.timeline_load_media(ui.ctx(), asset.to_owned());
                     }
                 }
@@ -194,22 +184,16 @@ impl ImagineApp {
         if compare {
             self.timeline_compare(ui.ctx(), document);
         }
-        let Some(id) = self.timeline.selected_take.clone().filter(|id| {
-            document.raw["takes"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .any(|take| {
-                    take["id"].as_str() == Some(id.as_str())
-                        && take["scene_id"].as_str() == Some(scene.0.as_str())
-                        && attached(document, take)
+        let Some(id) =
+            self.timeline.selected_take.clone().filter(|id| {
+                document.view.takes.iter().any(|take| {
+                    take.id.0 == *id && take.scene_id == scene && attached(document, take)
                 })
-        }) else {
+            })
+        else {
             return;
         };
-        let outdated = document.raw["take_states"][&id]["outdated"]
-            .as_bool()
-            .unwrap_or(false);
+        let outdated = document.take_state(&TakeId(id.clone())).outdated;
         let mut action = None;
         ui.add_enabled_ui(!self.timeline.busy && !self.timeline.admitting, |ui| {
             ui.horizontal_wrapped(|ui| {
@@ -277,13 +261,8 @@ impl ImagineApp {
                         return;
                     }
                     let pair = self.timeline.comparison_selection.each_ref().map(|id| {
-                        id.as_ref().and_then(|id| {
-                            document.raw["takes"]
-                                .as_array()
-                                .into_iter()
-                                .flatten()
-                                .find(|t| t["id"].as_str() == Some(id))
-                        })
+                        id.as_ref()
+                            .and_then(|id| document.take(&TakeId(id.clone())))
                     });
                     egui::Grid::new("take-metadata-differences").show(ui, |ui| {
                         ui.strong("Setting");
@@ -291,25 +270,28 @@ impl ImagineApp {
                         ui.strong("B");
                         ui.end_row();
                         for (label, path) in [
-                            ("Status", "/status"),
-                            ("Seed", "/provenance/seed"),
-                            ("Model", "/provenance/model/model"),
-                            ("Variant", "/provenance/model/variant"),
-                            ("Profile", "/provenance/model/profile"),
-                            ("Profile revision", "/provenance/model/profile_revision"),
-                            (
-                                "First stage steps",
-                                "/provenance/settings/values/stage_one/steps",
-                            ),
+                            ("Status", ""),
+                            ("Seed", "/seed"),
+                            ("Model", "/model/model"),
+                            ("Variant", "/model/variant"),
+                            ("Profile", "/model/profile"),
+                            ("Profile revision", "/model/profile_revision"),
+                            ("First stage steps", "/settings/values/stage_one/steps"),
                         ] {
-                            let values = pair.map(|take| {
-                                take.and_then(|t| t.pointer(path))
+                            // Recipe fields are shown as recorded; an imported Take has none.
+                            let values = pair.map(|take| match take {
+                                Some(t) if path.is_empty() => t.status.label().into(),
+                                Some(t) => t
+                                    .provenance
+                                    .as_ref()
+                                    .and_then(|p| p.pointer(path))
                                     .map(|v| {
                                         v.as_str()
                                             .map(str::to_owned)
                                             .unwrap_or_else(|| v.to_string())
                                     })
-                                    .unwrap_or_else(|| "—".into())
+                                    .unwrap_or_else(|| "—".into()),
+                                None => "—".into(),
                             });
                             ui.label(label);
                             let different = values[0] != values[1];

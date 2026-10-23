@@ -26,8 +26,8 @@ impl ImagineApp {
         if asset.kind != MediaKind::Image {
             return;
         }
-        let path = d.raw["runtime_assets"][&asset.id.0]
-            .as_str()
+        let path = d
+            .runtime_asset(&asset.id.0)
             .map(|id| format!("/v1/assets/{id}"));
         self.timeline_thumbnail_path(ui, &d.project.id, asset, path);
     }

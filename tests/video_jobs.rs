@@ -981,6 +981,19 @@ async fn manual_take_review_conflicts_invalidation_and_reopen_keep_media_and_pro
     )
     .await;
     assert_eq!(code, 200, "{reopened}");
+    // Every snapshot response parses into the shared client view.
+    for snapshot in [&accepted, &rejected, &edited, &old, &saved, &reopened] {
+        let (project, view) = imagine_video_contract::snapshot::parse(snapshot)
+            .unwrap_or_else(|| panic!("client view rejects {snapshot}"));
+        assert_eq!(view.takes.len(), 2);
+        assert_eq!(view.take_states.len(), 2);
+        assert!(project.scenes.iter().any(|s| s.id.0 == "s1"));
+    }
+    let view = imagine_video_contract::snapshot::parse(&saved).unwrap().1;
+    assert_eq!(
+        view.persistence.unwrap().state,
+        imagine_video_contract::snapshot::SaveState::Saved
+    );
     assert_eq!(reopened["takes"], saved["takes"]);
     assert_eq!(reopened["take_states"], saved["take_states"]);
     assert_eq!(reopened["runtime_takes"].as_object().unwrap().len(), 2);

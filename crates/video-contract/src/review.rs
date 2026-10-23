@@ -23,7 +23,7 @@ pub struct ReviewRequest {
     pub action: ReviewAction,
 }
 
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct TakeState {
     pub accepted: bool,
     pub outdated: bool,

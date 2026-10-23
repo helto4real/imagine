@@ -76,14 +76,11 @@ fn earlier_snapshot(plan: &Plan, baseline: Option<&VideoProject>, document: &Sna
     };
     let mut current = document.project.clone();
     current.project_revision = baseline.project_revision;
-    for delivery in document.raw["deliveries"].as_array().into_iter().flatten() {
-        if delivery["plan"]["project_id"].as_str() != Some(plan.project_id.0.as_str()) {
+    for delivery in &document.view.deliveries {
+        if delivery.plan.project_id != plan.project_id {
             continue;
         }
-        let Some(id) = delivery["asset_id"].as_str() else {
-            continue;
-        };
-        let id = AssetId(id.into());
+        let id = delivery.asset_id.clone();
         if baseline.assets.contains_key(&id) {
             continue;
         }
@@ -121,10 +118,7 @@ impl ImagineApp {
         ) else {
             return;
         };
-        let Some(runtime_id) = document.raw["runtime_assets"][&asset.0]
-            .as_str()
-            .map(str::to_owned)
-        else {
+        let Some(runtime_id) = document.runtime_asset(&asset.0).map(str::to_owned) else {
             return;
         };
         self.timeline.busy = true;
@@ -662,9 +656,9 @@ impl ImagineApp {
             if self.timeline.assembly.progress["rendered_result_available"]==true{ui.weak("The encoded export is retained in this session. Retry export in the queue to save it again.");}
             ui.separator();ui.weak("Saved deliveries");
             if let Some(d)=&document{
-                for (i,delivery) in d.raw["deliveries"].as_array().into_iter().flatten().enumerate(){
-                    let r=ui.button(format!("Delivery {} · revision {}",i+1,delivery["plan"]["project_revision"]));control(ui,&format!("assembly-delivery-{i}"),&r);
-                    if r.clicked(){preview=delivery["asset_id"].as_str().and_then(|id|d.raw["runtime_assets"][id].as_str()).map(str::to_owned);}
+                for (i,delivery) in d.view.deliveries.iter().enumerate(){
+                    let r=ui.button(format!("Delivery {} · revision {}",i+1,delivery.plan.project_revision));control(ui,&format!("assembly-delivery-{i}"),&r);
+                    if r.clicked(){preview=d.runtime_asset(&delivery.asset_id.0).map(str::to_owned);}
                 }
             }
             ui.weak("Exports are separate deliveries. They do not replace Accepted Takes.");
@@ -790,13 +784,7 @@ mod tests {
             audio: vec![],
             warnings: vec![],
         };
-        (
-            Snapshot {
-                project,
-                raw: json!({"deliveries":[]}),
-            },
-            plan,
-        )
+        (Snapshot::with(project, json!({"deliveries":[]})), plan)
     }
     fn publish_delivery(document: &mut Snapshot, plan: &Plan, id: &str) {
         let asset = AssetId(id.into());
@@ -811,10 +799,11 @@ mod tests {
             },
         );
         document.project.project_revision += 1;
-        document.raw["deliveries"]
-            .as_array_mut()
-            .unwrap()
-            .push(json!({"asset_id":id,"plan":plan}));
+        document.view.deliveries.push(snapshot::DeliveryView {
+            id: format!("delivery-{id}"),
+            asset_id: AssetId(id.into()),
+            plan: plan.clone(),
+        });
     }
     #[test]
     fn final_phases_distinguish_encoding_saving_and_saved() {
@@ -872,7 +861,7 @@ mod tests {
             .unwrap()
             .name
             .clear();
-        delivered.raw["deliveries"] = json!([]);
+        delivered.view.deliveries.clear();
         assert!(earlier_snapshot(&plan, Some(&baseline), &delivered));
         let mut existing = document;
         existing

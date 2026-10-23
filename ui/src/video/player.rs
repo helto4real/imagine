@@ -383,9 +383,9 @@ impl ImagineApp {
         let current_scene = self.timeline.primary_scene(&d.project);
         if self.timeline.comparison.as_ref().is_some_and(|c| {
             c.ids.iter().any(|id| {
-                !d.raw["takes"].as_array().into_iter().flatten().any(|t| {
-                    t["id"].as_str() == Some(id)
-                        && t["scene_id"].as_str() == current_scene.as_ref().map(|s| s.0.as_str())
+                !d.view.takes.iter().any(|t| {
+                    t.id.0 == *id
+                        && Some(&t.scene_id) == current_scene.as_ref()
                         && review::attached(d, t)
                 })
             })

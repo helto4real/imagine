@@ -1,5 +1,6 @@
 //! Native Timeline session. Server documents are authoritative; drafts/history stay in memory.
 use super::*;
+use imagine_video_contract::snapshot;
 use imagine_video_contract::{
     contract::*,
     editing::{Edit, EditRequest},
@@ -54,16 +55,43 @@ mod workspace;
 #[derive(Clone)]
 struct Snapshot {
     project: VideoProject,
+    /// Typed runtime and review state from the same response.
+    view: snapshot::SnapshotView,
+    /// The response itself, for rare one-shot extras such as export reports.
     raw: Value,
 }
 impl Snapshot {
     fn parse(raw: Value) -> Result<Self, String> {
-        let project: VideoProject = serde_json::from_value(raw["project"].clone())
-            .map_err(|_| "Invalid project response.")?;
-        project
-            .validate()
-            .map_err(|_| "Invalid project response.")?;
-        Ok(Self { project, raw })
+        let (project, view) = snapshot::parse(&raw).ok_or("Invalid project response.")?;
+        Ok(Self { project, view, raw })
+    }
+    /// A synthetic snapshot; panics on fixture data the server would never send.
+    #[cfg(test)]
+    fn with(project: VideoProject, raw: Value) -> Self {
+        let view = serde_json::from_value(raw.clone()).expect("synthetic snapshot view");
+        Self { project, view, raw }
+    }
+    /// The session media id serving project asset `id`.
+    fn runtime_asset(&self, id: &str) -> Option<&str> {
+        let (_, runtime) = self.view.runtime_assets.iter().find(|(a, _)| a.0 == id)?;
+        Some(runtime)
+    }
+    /// The session media id serving Take `id`.
+    fn runtime_take(&self, id: &str) -> Option<&str> {
+        let (_, runtime) = self.view.runtime_takes.iter().find(|(t, _)| t.0 == id)?;
+        Some(runtime)
+    }
+    fn save_state(&self) -> Option<&snapshot::SaveState> {
+        self.view.persistence.as_ref().map(|p| &p.state)
+    }
+    fn take_state(&self, id: &TakeId) -> imagine_video_contract::review::TakeState {
+        self.view.take_states.get(id).cloned().unwrap_or_default()
+    }
+    fn take(&self, id: &TakeId) -> Option<&snapshot::TakeView> {
+        self.view.takes.iter().find(|t| &t.id == id)
+    }
+    fn capture(&self, id: &TakeId) -> Option<&imagine_video_contract::captures::Capture> {
+        self.view.captures.get(id)
     }
 }
 #[derive(Default)]
@@ -1078,7 +1106,7 @@ impl ImagineApp {
             || !d.project.assets.is_empty()
             || !d.project.audio_tracks.is_empty();
         !self.timeline.draft_edits().is_empty()
-            || has_content && d.raw["persistence"]["state"].as_str() != Some("saved")
+            || has_content && d.save_state() != Some(&snapshot::SaveState::Saved)
     }
     /// Holds `replace` for confirmation when it would discard unsaved work.
     pub(super) fn timeline_hold_replace(&mut self, replace: Replace) -> bool {
@@ -1305,7 +1333,7 @@ impl ImagineApp {
         let Some(document) = &self.timeline.document else {
             return;
         };
-        if document.raw["persistence"]["state"] == "session_only" {
+        if document.save_state() == Some(&snapshot::SaveState::SessionOnly) {
             self.timeline_choose_folder(ctx, FolderMode::Save);
             return;
         }
@@ -1796,10 +1824,7 @@ mod mixed_selection_regression {
             )],
         }];
         let mut state = Timeline::default();
-        state.document = Some(Snapshot {
-            project: p,
-            raw: json!({}),
-        });
+        state.document = Some(Snapshot::with(p, json!({})));
         state.section_selection = vec![section.clone()];
         state.audio_primary = Some(audio.clone());
         state.audio_selected = BTreeSet::from([audio.clone()]);

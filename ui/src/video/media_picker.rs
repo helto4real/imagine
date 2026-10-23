@@ -544,11 +544,7 @@ impl ImagineApp {
                 .map(|document| {
                     assets
                         .iter()
-                        .filter_map(|id| {
-                            document.raw["runtime_assets"][&id.0]
-                                .as_str()
-                                .map(|id| AssetId(id.into()))
-                        })
+                        .filter_map(|id| document.runtime_asset(&id.0).map(|id| AssetId(id.into())))
                         .collect()
                 })
                 .unwrap_or_default();
@@ -617,10 +613,7 @@ pub(super) mod tests {
         );
         app.client = None;
         let p = project();
-        app.timeline.document = Some(Snapshot {
-            project: p.clone(),
-            raw: json!({"project":p}),
-        });
+        app.timeline.document = Some(Snapshot::with(p.clone(), json!({"project":p})));
         app.timeline.media_picker = State {
             open: true,
             library_id: Some("own-library".into()),

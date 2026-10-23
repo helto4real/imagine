@@ -291,10 +291,7 @@ mod tests {
             )
             .unwrap(),
         );
-        app.timeline.document = Some(super::super::Snapshot {
-            project,
-            raw: json!({}),
-        });
+        app.timeline.document = Some(super::super::Snapshot::with(project, json!({})));
         app.timeline_open_loras(None);
         app.timeline.loras.catalog.filter_unavailable_for_test();
         let name = "/manual/free alternative.weights";

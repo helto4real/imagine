@@ -132,7 +132,7 @@ impl ImagineApp {
                     .is_some_and(|b| b.policy != imagine_video_contract::boundary::Policy::None);
                 let response = ui.weak(if !active {
                     "Hard Cut does not apply Combo/Influence conditioning."
-                } else if boundary_video_ready(&d.project, &d.raw, &value.source_scene) {
+                } else if boundary_video_ready(&d.project, &d.view.resources, &value.source_scene) {
                     "Source video ready; opening conditioning uses the incoming boundary settings."
                 } else {
                     "Choose a source video or accept a source Take."
@@ -143,24 +143,20 @@ impl ImagineApp {
                 let _ = response;
             } else if let Ok(source) = d.project.scene(&value.source_scene) {
                 let accepted = source.accepted_take.as_ref().is_some_and(|selected| {
-                    d.raw["takes"].as_array().into_iter().flatten().any(|take| {
-                        take["id"].as_str() == Some(selected.id.0.as_str())
-                            && take["status"] == "accepted"
-                    })
+                    d.take(&selected.id)
+                        .is_some_and(|take| take.status == snapshot::TakeStatus::Accepted)
                 });
                 let endpoint = source.accepted_take.as_ref().is_some_and(|take| {
-                    d.raw["resources"]
-                        .as_array()
-                        .into_iter()
-                        .flatten()
+                    d.view
+                        .resources
+                        .iter()
                         .filter(|resource| {
-                            resource["kind"]["kind"]
-                                == if motion { "h3_motion" } else { "h3_endpoint" }
-                                && resource["kind"]["take_id"].as_str() == Some(take.id.0.as_str())
+                            resource.kind() == if motion { "h3_motion" } else { "h3_endpoint" }
+                                && resource.take_id() == Some(take.id.0.as_str())
                                 && (if motion {
-                                    &resource["kind"]["descriptor"]["schema_version"]
+                                    &resource.kind["descriptor"]["schema_version"]
                                 } else {
-                                    &resource["kind"]["schema_version"]
+                                    &resource.kind["schema_version"]
                                 }) == 1
                         })
                         .count()
@@ -244,24 +240,26 @@ fn method_label(method: &ContinuityMethod) -> &'static str {
 
 // Boundary conditioning consumes video bytes, not the latent/endpoint artifacts
 // used by Motion Context and Last Frame FirstFrame.
-fn boundary_video_ready(project: &VideoProject, raw: &serde_json::Value, source: &SceneId) -> bool {
+fn boundary_video_ready(
+    project: &VideoProject,
+    resources: &[snapshot::ResourceView],
+    source: &SceneId,
+) -> bool {
     let Ok(scene) = project.scene(source) else {
         return false;
     };
-    let mut resources = raw["resources"].as_array().into_iter().flatten();
+    let mut resources = resources.iter();
     if let Some(take) = &scene.accepted_take {
-        return resources.any(|r| {
-            r["kind"]["kind"] == "take_video"
-                && r["kind"]["take_id"].as_str() == Some(take.id.0.as_str())
-        });
+        return resources
+            .any(|r| r.kind() == "take_video" && r.take_id() == Some(take.id.0.as_str()));
     }
     project.scene_clip(source).is_some_and(|clip| {
         project.assets.get(&clip.asset).is_some_and(|asset| {
             asset.kind == MediaKind::Video
                 && resources.any(|r| {
-                    r["kind"]["kind"] == "reference"
-                        && r["kind"]["asset_id"].as_str() == Some(asset.id.0.as_str())
-                        && r["kind"]["revision"].as_u64() == Some(asset.revision)
+                    r.kind() == "reference"
+                        && r.asset_id() == Some(asset.id.0.as_str())
+                        && r.kind["revision"].as_u64() == Some(asset.revision)
                 })
         })
     })
@@ -270,6 +268,9 @@ fn boundary_video_ready(project: &VideoProject, raw: &serde_json::Value, source:
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn resources(value: serde_json::Value) -> Vec<snapshot::ResourceView> {
+        serde_json::from_value(value).unwrap()
+    }
     #[test]
     fn boundary_readiness_uses_current_video_bytes_not_endpoint_or_latent_artifacts() {
         let mut p = VideoProject::create(CreateProject {
@@ -302,12 +303,12 @@ mod tests {
         });
         assert!(!boundary_video_ready(
             &p,
-            &json!({"resources":[{"kind":{"kind":"h3_endpoint","take_id":"own-take"}}]}),
+            &resources(json!([{"kind":{"kind":"h3_endpoint","take_id":"own-take"}}])),
             &id
         ));
         assert!(boundary_video_ready(
             &p,
-            &json!({"resources":[{"kind":{"kind":"take_video","take_id":"own-take"}}]}),
+            &resources(json!([{"kind":{"kind":"take_video","take_id":"own-take"}}])),
             &id
         ));
         p.scenes[0].accepted_take = None;
@@ -334,12 +335,12 @@ mod tests {
         );
         assert!(!boundary_video_ready(
             &p,
-            &json!({"resources":[{"kind":{"kind":"reference","asset_id":"own-video","revision":1}}]}),
+            &resources(json!([{"kind":{"kind":"reference","asset_id":"own-video","revision":1}}])),
             &id
         ));
         assert!(boundary_video_ready(
             &p,
-            &json!({"resources":[{"kind":{"kind":"reference","asset_id":"own-video","revision":2}}]}),
+            &resources(json!([{"kind":{"kind":"reference","asset_id":"own-video","revision":2}}])),
             &id
         ));
     }

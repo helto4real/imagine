@@ -1008,14 +1008,15 @@ impl Runner {
                 let Some(document) = &app.timeline.document else {
                     return Ok(());
                 };
-                let entry = document.raw["takes"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .find(|t| t["id"].as_str() == Some(take));
+                let entry = document.view.takes.iter().find(|t| t.id.0 == *take);
                 if entry.is_some() != *exists
                     || entry.is_some_and(|t| super::review::attached(document, t)) != *attached
-                    || (document.raw["captures"][take]["removed"] == true) != *removed
+                    || document
+                        .view
+                        .captures
+                        .iter()
+                        .any(|(id, c)| id.0 == *take && c.removed)
+                        != *removed
                 {
                     return Ok(());
                 }
@@ -1033,13 +1034,9 @@ impl Runner {
                 let Some(document) = &app.timeline.document else {
                     return Ok(());
                 };
-                let current = document.raw["takes"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .find(|entry| entry["id"].as_str() == Some(take));
-                if current.is_none_or(|entry| entry["status"] != json!(status))
-                    || document.raw["take_states"][take]["accepted"] != json!(accepted)
+                let current = document.view.takes.iter().find(|entry| entry.id.0 == *take);
+                if current.is_none_or(|entry| entry.status.label() != status.as_str())
+                    || document.take_state(&TakeId(take.clone())).accepted != *accepted
                 {
                     return Ok(());
                 }
@@ -1831,11 +1828,7 @@ impl Runner {
                         app.timeline
                             .document
                             .as_ref()
-                            .is_some_and(|d| d.raw["deliveries"]
-                                .as_array()
-                                .map(Vec::len)
-                                .unwrap_or(0)
-                                == *count),
+                            .is_some_and(|d| d.view.deliveries.len() == *count),
                         "Unexpected delivery count"
                     );
                 }
@@ -1913,11 +1906,11 @@ impl Runner {
                     .collect::<Vec<_>>();
                 if let Some(expected) = endpoints {
                     anyhow::ensure!(
-                        document.raw["resources"]
-                            .as_array()
-                            .into_iter()
-                            .flatten()
-                            .filter(|resource| resource["kind"]["kind"] == "h3_endpoint")
+                        document
+                            .view
+                            .resources
+                            .iter()
+                            .filter(|resource| resource.kind() == "h3_endpoint")
                             .count()
                             == *expected,
                         "Unexpected QA endpoint count"
@@ -1925,11 +1918,11 @@ impl Runner {
                 }
                 if let Some(expected) = motion_artifacts {
                     anyhow::ensure!(
-                        document.raw["resources"]
-                            .as_array()
-                            .unwrap()
+                        document
+                            .view
+                            .resources
                             .iter()
-                            .filter(|r| r["kind"]["kind"] == "h3_motion")
+                            .filter(|r| r.kind() == "h3_motion")
                             .count()
                             == *expected,
                         "Unexpected motion artifact count"
@@ -2013,11 +2006,17 @@ impl Runner {
                     [(accepted_takes, "accepted"), (outdated_takes, "outdated")]
                 {
                     if let Some(expected) = expected {
-                        let actual = document.raw["take_states"]
-                            .as_object()
-                            .into_iter()
-                            .flat_map(|states| states.values())
-                            .filter(|state| state[field].as_bool() == Some(true))
+                        let actual = document
+                            .view
+                            .take_states
+                            .values()
+                            .filter(|state| {
+                                if field == "accepted" {
+                                    state.accepted
+                                } else {
+                                    state.outdated
+                                }
+                            })
                             .count();
                         anyhow::ensure!(actual == *expected, "Unexpected QA Take {field} count");
                     }
@@ -2087,14 +2086,12 @@ impl Runner {
                     );
                 }
                 if let Some(n) = takes {
-                    anyhow::ensure!(
-                        document.raw["takes"].as_array().map(Vec::len) == Some(*n),
-                        "Unexpected QA Take count"
-                    );
+                    anyhow::ensure!(document.view.takes.len() == *n, "Unexpected QA Take count");
                 }
                 if let Some(saved) = saved {
                     anyhow::ensure!(
-                        (document.raw["persistence"]["state"] == "saved") == *saved,
+                        (document.save_state() == Some(&super::snapshot::SaveState::Saved))
+                            == *saved,
                         "Unexpected QA save state"
                     );
                 }

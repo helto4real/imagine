@@ -15,3 +15,4 @@ pub mod prompt_catalog;
 pub mod references;
 pub mod review;
 pub mod runs;
+pub mod snapshot;

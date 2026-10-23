@@ -299,10 +299,7 @@ mod tests {
                 .collect(),
         }];
         let mut t = Timeline::default();
-        t.document = Some(Snapshot {
-            project: p.clone(),
-            raw: json!({}),
-        });
+        t.document = Some(Snapshot::with(p.clone(), json!({})));
         (t, p)
     }
     #[test]

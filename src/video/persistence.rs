@@ -4,6 +4,7 @@ use super::{
     contract::*,
     editing::{self, EditRequest},
 };
+pub use imagine_video_contract::snapshot::{PersistenceStatus, SaveState, TakeStatus};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -260,14 +261,6 @@ pub(crate) fn source_witness(file: &File) -> Result<SourceWitness, StorageError>
         modified: (value.mtime(), value.mtime_nsec()),
         changed: (value.ctime(), value.ctime_nsec()),
     })
-}
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TakeStatus {
-    Candidate,
-    Accepted,
-    Rejected,
-    Outdated,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -602,20 +595,6 @@ impl SessionStaging {
     pub(crate) fn temporary(&self) -> Result<File, StorageError> {
         self.root.temporary()
     }
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SaveState {
-    SessionOnly,
-    Saving,
-    Saved,
-    NotSaved,
-}
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct PersistenceStatus {
-    pub state: SaveState,
-    pub saved_revision: Option<u64>,
-    pub error_code: Option<String>,
 }
 /// All mutation/save methods require exclusive access. No background task is launched.
 /// A caller may debounce edits; update() autosaves synchronously once Save has bound a root.
