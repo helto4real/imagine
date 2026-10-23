@@ -149,6 +149,45 @@ impl Chip {
         self.tone == Tone::Plain
     }
 }
+/// The Scene holding `section`, and the Section itself.
+fn owner<'a>(project: &'a VideoProject, section: &SectionId) -> Option<(&'a Scene, &'a Section)> {
+    project
+        .scenes
+        .iter()
+        .find_map(|s| Some((s, s.sections.iter().find(|v| &v.id == section)?)))
+}
+impl Timeline {
+    /// While a drag lasts, the tracks show `edits` applied to the project as the
+    /// drag began; once it ends they are sent.
+    pub(super) fn drag_edits(
+        &mut self,
+        before: &VideoProject,
+        edits: Vec<Edit>,
+        done: bool,
+        commands: &mut Vec<Edit>,
+    ) {
+        if done {
+            self.drag_preview = None;
+            commands.extend(edits);
+            return;
+        }
+        let mut preview = before.clone();
+        let applied = edits.is_empty()
+            || imagine_video_contract::editing::apply(
+                &mut preview,
+                imagine_video_contract::editing::EditRequest {
+                    schema_version: 1,
+                    expected_project_revision: before.project_revision,
+                    commands: edits,
+                },
+            )
+            .is_ok();
+        // An edit the project would refuse keeps the last valid picture.
+        if applied {
+            self.drag_preview = Some(preview);
+        }
+    }
+}
 /// Director's playhead: a gold line over every track with a marker in the ruler.
 fn playhead(ui: &egui::Ui, canvas: Rect, x: f32) {
     let painter = ui.painter();
@@ -282,6 +321,12 @@ impl ImagineApp {
         enabled: bool,
         commands: &mut Vec<Edit>,
     ) {
+        // A drag in progress draws its result live; the drag sends it on release.
+        if self.timeline.drag.is_none() {
+            self.timeline.drag_preview = None;
+        }
+        let preview = self.timeline.drag_preview.clone();
+        let project = preview.as_ref().unwrap_or(project);
         chrome::panel(ui, rect, false);
         chrome::region(ui, "video-timeline-tracks", rect.shrink(8.), |ui| {
             let whole = navigation::duration(project);
@@ -624,6 +669,14 @@ impl ImagineApp {
                         );
                     #[cfg(feature = "ui-preview")]
                     super::qa::control(ui, format!("scene-{}", scene.id.0), &response);
+                    response.widget_info(|| {
+                        egui::WidgetInfo::selected(
+                            egui::WidgetType::Button,
+                            enabled,
+                            active,
+                            format!("Scene {}", index + 1),
+                        )
+                    });
                     if response.clicked() || response.secondary_clicked() {
                         response.request_focus();
                         self.timeline.keyboard_focus = Some(response.id);
@@ -656,20 +709,14 @@ impl ImagineApp {
                     }
                     if let Some((before, dx, done)) =
                         move_gesture(&mut self.timeline, &response, project)
+                        && let Ok(source) = before.scene(&scene.id)
                     {
-                        ui.painter().rect_stroke(
-                            bar.translate(egui::vec2(dx, 0.)),
-                            3,
-                            Stroke::new(1.5, helto::FOCUS),
-                            egui::StrokeKind::Inside,
+                        let edits = self.timeline.move_selection(
+                            &before,
+                            seconds(source.start),
+                            f64::from(dx / self.timeline.zoom),
                         );
-                        if done {
-                            commands.extend(self.timeline.move_selection(
-                                &before,
-                                seconds(scene.start),
-                                f64::from(dx / self.timeline.zoom),
-                            ));
-                        }
+                        self.timeline.drag_edits(&before, edits, done, commands);
                     }
                     let edge = Rect::from_min_max(egui::pos2(bar.right() - 6., bar.top()), bar.max);
                     let resize = ui
@@ -696,7 +743,6 @@ impl ImagineApp {
                         self.timeline.keyboard_focus = Some(resize.id);
                     }
                     if let Some((before, dx, done)) = gesture(&mut self.timeline, &resize, project)
-                        && done
                         && let Ok(source) = before.scene(&scene.id)
                     {
                         let end = editing::snapped(
@@ -706,12 +752,13 @@ impl ImagineApp {
                             self.timeline.snap,
                             project.delivery.fps,
                         );
-                        commands.extend(resize_scene(
+                        let edits = resize_scene(
                             &before,
                             source,
                             seconds(end) - seconds(source.start),
                             self.timeline.mode,
-                        ));
+                        );
+                        self.timeline.drag_edits(&before, edits, done, commands);
                     }
                     for section in &scene.sections {
                         let a = x + seconds(section.start) as f32 * self.timeline.zoom;
@@ -747,6 +794,19 @@ impl ImagineApp {
                                 Some(&section.id),
                             );
                         }
+                        let number = scene.sections.iter().position(|v| v.id == section.id);
+                        response.widget_info(|| {
+                            egui::WidgetInfo::selected(
+                                egui::WidgetType::Button,
+                                enabled,
+                                selected,
+                                format!(
+                                    "Section {} of Scene {}",
+                                    number.map_or(0, |n| n + 1),
+                                    index + 1
+                                ),
+                            )
+                        });
                         #[cfg(feature = "ui-preview")]
                         super::qa::control(ui, format!("section-{}", section.id.0), &response);
                         if response.clicked() || response.secondary_clicked() {
@@ -867,19 +927,21 @@ impl ImagineApp {
                                 );
                             }
                         }
+                        // Positions come from the project as the drag began; the
+                        // drawn one already shows the drag.
                         if let Some((before, dx, done)) =
                             move_gesture(&mut self.timeline, &response, project)
-                            && done
-                            && let Ok(source) = before.scene(&scene.id)
+                            && let Some((source, part)) = owner(&before, &section.id)
                         {
                             match group_commands::prepared(&before, self.timeline.draft_edits()) {
                                 Ok(current) => {
-                                    commands.extend(editing::difference(&before, &current));
-                                    commands.extend(self.timeline.move_selection(
+                                    let mut edits = editing::difference(&before, &current);
+                                    edits.extend(self.timeline.move_selection(
                                         &current,
-                                        seconds(source.start) + seconds(section.start),
+                                        seconds(source.start) + seconds(part.start),
                                         f64::from(dx / self.timeline.zoom),
                                     ));
+                                    self.timeline.drag_edits(&before, edits, done, commands);
                                 }
                                 Err(e) => {
                                     self.timeline.error =
@@ -928,17 +990,17 @@ impl ImagineApp {
                             }
                             if let Some((before, dx, done)) =
                                 gesture(&mut self.timeline, &response, project)
-                                && done
+                                && let Some((source, part)) = owner(&before, &section.id)
                             {
-                                let position = seconds(scene.start)
-                                    + seconds(section.start)
-                                    + if end { seconds(section.duration) } else { 0. }
+                                let position = seconds(source.start)
+                                    + seconds(part.start)
+                                    + if end { seconds(part.duration) } else { 0. }
                                     + f64::from(dx / self.timeline.zoom);
                                 match group_commands::prepared(&before, self.timeline.draft_edits())
                                 {
                                     Ok(current) => {
-                                        commands.extend(editing::difference(&before, &current));
-                                        commands.extend(group_commands::resize(
+                                        let mut edits = editing::difference(&before, &current);
+                                        edits.extend(group_commands::resize(
                                             &current,
                                             &section.id,
                                             end,
@@ -946,6 +1008,7 @@ impl ImagineApp {
                                             self.timeline.snap,
                                             self.timeline.mode,
                                         ));
+                                        self.timeline.drag_edits(&before, edits, done, commands);
                                     }
                                     Err(e) => {
                                         self.timeline.error =

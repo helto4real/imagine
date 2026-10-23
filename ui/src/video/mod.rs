@@ -187,6 +187,8 @@ pub(super) struct Timeline {
     inspector_collapsed: bool,
     keyboard_focus: Option<egui::Id>,
     drag: Option<tracks::Drag>,
+    /// The project as the drag in progress would leave it, drawn until release.
+    drag_preview: Option<VideoProject>,
 }
 pub(super) enum Event {
     CleanupPreview {

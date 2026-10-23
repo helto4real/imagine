@@ -1,6 +1,6 @@
 use super::editing::resize_clip;
 use super::*;
-use egui::{Rect, Sense, Stroke};
+use egui::{Rect, Sense};
 impl ImagineApp {
     pub(in crate::app::timeline) fn timeline_audio_tracks(
         &mut self,
@@ -123,20 +123,14 @@ impl ImagineApp {
                         &response,
                         project,
                     )
+                    && let Some(source) = clip(&before, &c.id)
                 {
-                    ui.painter().rect_stroke(
-                        bar.translate(egui::vec2(dx, 0.)),
-                        3,
-                        Stroke::new(1., helto::FOCUS),
-                        egui::StrokeKind::Inside,
+                    let edits = self.timeline.move_selection(
+                        &before,
+                        seconds(source.start),
+                        f64::from(dx / self.timeline.zoom),
                     );
-                    if done {
-                        commands.extend(self.timeline.move_selection(
-                            &before,
-                            seconds(c.start),
-                            f64::from(dx / self.timeline.zoom),
-                        ));
-                    }
+                    self.timeline.drag_edits(&before, edits, done, commands);
                 }
                 for end in [false, true] {
                     let x = if end { bar.right() - 6. } else { bar.left() };
@@ -175,13 +169,13 @@ impl ImagineApp {
                         &mut self.timeline,
                         &response,
                         project,
-                    ) && done
-                        && let Some(source) = clip(&before, &c.id)
+                    ) && let Some(source) = clip(&before, &c.id)
                     {
                         let at = seconds(source.start)
                             + if end { seconds(source.duration) } else { 0. }
                             + f64::from(dx / self.timeline.zoom);
-                        commands.extend(resize_clip(&before, source, end, at, self.timeline.snap));
+                        let edits = resize_clip(&before, source, end, at, self.timeline.snap);
+                        self.timeline.drag_edits(&before, edits, done, commands);
                     }
                 }
                 let revealed = helto::revealed(ui, bar, self.prefs.privacy_mode);

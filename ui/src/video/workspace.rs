@@ -1134,6 +1134,80 @@ mod tests {
     }
 
     #[test]
+    fn dragging_a_section_edge_shows_the_new_length_before_release() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.client = None;
+        let project = super::super::media_picker::tests::project();
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-synthetic-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.document = Some(Snapshot::with(
+            project.clone(),
+            json!({"persistence":{"state":"saved"}}),
+        ));
+        app.timeline.selected.insert(project.scenes[0].id.clone());
+        let frame = |app: &mut ImagineApp, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 800.),
+                    )),
+                    events,
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            output.textures_delta.clear();
+            output.platform_output.accesskit_update.unwrap().nodes
+        };
+        let mut nodes = vec![];
+        for _ in 0..3 {
+            nodes = frame(&mut app, vec![]);
+        }
+        let block = nodes
+            .iter()
+            .find(|(_, n)| n.label() == Some("Section 1 of Scene 1"))
+            .and_then(|(_, n)| n.bounds())
+            .expect("section block");
+        // The start edge, dragged inward: the Section shortens.
+        let edge = egui::pos2(block.x0 as f32 + 2., ((block.y0 + block.y1) / 2.) as f32);
+        let button = |pos, pressed| egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        frame(
+            &mut app,
+            vec![egui::Event::PointerMoved(edge), button(edge, true)],
+        );
+        for dx in [40., 100.] {
+            frame(
+                &mut app,
+                vec![egui::Event::PointerMoved(edge + egui::vec2(dx, 0.))],
+            );
+        }
+        let shown = app.timeline.drag_preview.as_ref().expect("live preview");
+        let length =
+            |p: &VideoProject| super::super::editing::seconds(p.scenes[0].sections[0].duration);
+        assert!(length(shown) < 1.9, "{}", length(shown));
+        // Nothing is sent until release; the document still has the old length.
+        assert_eq!(length(&app.timeline.document.as_ref().unwrap().project), 2.);
+        let end = edge + egui::vec2(100., 0.);
+        frame(
+            &mut app,
+            vec![egui::Event::PointerMoved(end), button(end, false)],
+        );
+        frame(&mut app, vec![]);
+        assert!(app.timeline.drag_preview.is_none());
+    }
+
+    #[test]
     fn header_reports_an_unreachable_video_service() {
         let root = tempfile::tempdir().unwrap();
         let ctx = egui::Context::default();
