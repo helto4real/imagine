@@ -59,6 +59,12 @@ impl ImagineApp {
                 (bounds.height() * 0.3).clamp(210., 300.),
                 150.0..=(bounds.height() * 0.5),
             );
+            // An enhancement shows its proposal under the field: room for both.
+            let wanted = if self.timeline_enhance_open() {
+                wanted.max(400.)
+            } else {
+                wanted
+            };
             // The viewer row keeps at least MIN_UPPER; the inspector yields first.
             wanted.min((bounds.bottom() - top - timeline_h - 12. - MIN_UPPER).max(INSPECTOR_STRIP))
         } else {
@@ -272,7 +278,7 @@ impl ImagineApp {
         self.timeline_loras_window(ui.ctx());
         self.timeline_compatibility_window(ui.ctx());
         self.timeline_catalog_window(ui.ctx());
-        self.timeline_authoring_window(ui.ctx());
+        self.timeline_authoring_background(ui.ctx());
         self.timeline_cast_window(ui.ctx());
         self.timeline_media_picker_window(ui.ctx());
         self.timeline_compiled_window(ui.ctx());
@@ -817,12 +823,12 @@ impl ImagineApp {
                     (
                         imagine_video_contract::authoring::Operation::EnhanceScene,
                         "enhance-scene",
-                        "Enhance scene…",
+                        "Enhance Scene description",
                     ),
                     (
                         imagine_video_contract::authoring::Operation::EnhanceSection,
                         "enhance-section",
-                        "Enhance section…",
+                        "Enhance Section prompt",
                     ),
                 ] {
                     let ready = operation == imagine_video_contract::authoring::Operation::Outline

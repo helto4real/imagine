@@ -1,6 +1,7 @@
-//! Reviewable source proposals. Closing the window retains its session draft.
+//! Reviewable source proposals. Closing a proposal retains its session draft.
 use super::*;
 use imagine_video_contract::authoring::*;
+mod inline;
 #[derive(Clone, Copy)]
 pub(in crate::app) enum Reply {
     Catalog,
@@ -39,6 +40,14 @@ pub(super) struct State {
     show_profiles: bool,
     progress: Value,
     project: Option<ProjectId>,
+    /// An enhancement starts once the prompt profiles are known.
+    auto_generate: bool,
+    /// The pass in which a field drew the enhancement card.
+    shown_in_pass: Option<u64>,
+    /// Profile and provider choices under an enhancement.
+    show_options: bool,
+    /// The proposal, or none for a starting card, last scrolled into view.
+    scrolled_to: Option<Option<String>>,
 }
 fn provider_transport(state: &State) -> String {
     if state.transport_override {
@@ -88,6 +97,10 @@ impl Default for State {
             show_profiles: false,
             progress: Value::Null,
             project: None,
+            auto_generate: false,
+            shown_in_pass: None,
+            show_options: false,
+            scrolled_to: None,
         }
     }
 }
@@ -155,10 +168,10 @@ fn source_image_label(project: &VideoProject, id: &AssetId) -> String {
             )
         })
 }
-/// What a frame of the Story view or window asked for.
+/// What a frame of the Story view or an enhancement card asked for.
 #[derive(Default)]
 pub(super) struct Actions {
-    pub call: Option<(Reply, bool, String, Option<Value>)>,
+    pub call: Option<Call>,
     pub new_proposal: bool,
     pub close: bool,
     pub pick_images: bool,
@@ -263,15 +276,20 @@ pub(super) fn authoring_draft_actions(
         ));
     }
     if apply {
-        actions.call = Some((
-            Reply::Applied,
-            true,
-            format!("/v1/video/authoring/{}/review", draft.id),
-            Some(
-                json!({"schema_version":1,"outline":draft.outline,"scenes":(draft.request.operation==Operation::Outline).then_some(&draft.scenes),"text":draft.text,"then_apply":draft.request.expected_project_revision}),
-            ),
-        ));
+        actions.call = Some(apply_call(draft));
     }
+}
+type Call = (Reply, bool, String, Option<Value>);
+/// Saves the reviewed `draft` and applies it to the project.
+fn apply_call(draft: &Draft) -> Call {
+    (
+        Reply::Applied,
+        true,
+        format!("/v1/video/authoring/{}/review", draft.id),
+        Some(
+            json!({"schema_version":1,"outline":draft.outline,"scenes":(draft.request.operation==Operation::Outline).then_some(&draft.scenes),"text":draft.text,"then_apply":draft.request.expected_project_revision}),
+        ),
+    )
 }
 /// The additional instruction and Generate for a new request.
 pub(super) fn authoring_generate(
@@ -306,53 +324,57 @@ pub(super) fn authoring_generate(
     if r.clicked()
         && let Some(d) = document
     {
-        actions.call = Some((
-            Reply::Draft,
-            true,
-            format!("/v1/video/projects/{}/authoring", d.project.id.0),
-            Some(json!(Request {
-                schema_version: 1,
-                expected_project_revision: d.project.project_revision,
-                provider_profile_id: state.provider_id.clone(),
-                provider: provider_transport(state),
-                prompt_profile_id: state.profile.clone(),
-                operation: state.operation,
-                scene_field: state.scene_field,
-                scene_id: state.target_scene.clone(),
-                section_id: state.target_section.clone(),
-                brief: state.brief.clone(),
-                instruction: state.instruction.clone(),
-                duration_seconds: state.duration,
-                destination: state.destination,
-                cast: if state.operation == Operation::Outline {
-                    state.cast.iter().cloned().collect()
-                } else {
-                    vec![]
-                },
-                images: if state.operation == Operation::Outline {
-                    state
-                        .images
-                        .iter()
-                        .enumerate()
-                        .map(|(i, (asset, usage))| StoryImage {
-                            pair_with: state
-                                .pairs
-                                .get(asset)
-                                .filter(|id| !id.0.is_empty())
-                                .map(|id| id.0.clone()),
-                            id: asset.0.clone(),
-                            asset: asset.clone(),
-                            label: format!("Source image {}", i + 1),
-                            usage: *usage,
-                        })
-                        .collect()
-                } else {
-                    vec![]
-                },
-                add_dialogue: state.operation == Operation::Outline && state.add_dialogue
-            })),
-        ));
+        actions.call = Some(generate_call(state, d));
     }
+}
+/// A new proposal for the state's operation and target against `d`.
+fn generate_call(state: &State, d: &Snapshot) -> Call {
+    (
+        Reply::Draft,
+        true,
+        format!("/v1/video/projects/{}/authoring", d.project.id.0),
+        Some(json!(Request {
+            schema_version: 1,
+            expected_project_revision: d.project.project_revision,
+            provider_profile_id: state.provider_id.clone(),
+            provider: provider_transport(state),
+            prompt_profile_id: state.profile.clone(),
+            operation: state.operation,
+            scene_field: state.scene_field,
+            scene_id: state.target_scene.clone(),
+            section_id: state.target_section.clone(),
+            brief: state.brief.clone(),
+            instruction: state.instruction.clone(),
+            duration_seconds: state.duration,
+            destination: state.destination,
+            cast: if state.operation == Operation::Outline {
+                state.cast.iter().cloned().collect()
+            } else {
+                vec![]
+            },
+            images: if state.operation == Operation::Outline {
+                state
+                    .images
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (asset, usage))| StoryImage {
+                        pair_with: state
+                            .pairs
+                            .get(asset)
+                            .filter(|id| !id.0.is_empty())
+                            .map(|id| id.0.clone()),
+                        id: asset.0.clone(),
+                        asset: asset.clone(),
+                        label: format!("Source image {}", i + 1),
+                        usage: *usage,
+                    })
+                    .collect()
+            } else {
+                vec![]
+            },
+            add_dialogue: state.operation == Operation::Outline && state.add_dialogue
+        })),
+    )
 }
 /// The editable source of one outline scene and its Sections.
 pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index: usize) {
@@ -526,6 +548,21 @@ impl ImagineApp {
         {
             self.timeline.authoring.history.push(draft);
         }
+        if operation != Operation::Outline {
+            // Enhancement shows under its field in the inspector: reveal that
+            // field and start at once unless this field's proposal is open.
+            self.timeline.inspector_collapsed = false;
+            self.timeline.boundary = false;
+            if operation == Operation::EnhanceScene {
+                self.timeline.section = None;
+                self.timeline.section_selection.clear();
+            }
+            self.timeline.authoring.scrolled_to = None;
+            if self.timeline.authoring.draft.is_none() {
+                self.timeline.authoring.instruction.clear();
+                self.timeline.authoring.auto_generate = true;
+            }
+        }
         self.timeline.authoring.scene_field = scene_field;
         self.timeline.authoring.target_scene = target_scene;
         self.timeline.authoring.target_section = target_section;
@@ -643,6 +680,12 @@ impl ImagineApp {
                 if let Some(d) = &mut self.timeline.authoring.draft {
                     d.phase = Phase::Applied;
                 }
+                // A used enhancement is now the field's text; its card closes.
+                if self.authoring_operation() != Operation::Outline {
+                    let state = &mut self.timeline.authoring;
+                    state.history.extend(state.draft.take());
+                    state.open = false;
+                }
                 self.timeline_message(
                     ctx,
                     Event::Document {
@@ -667,6 +710,10 @@ impl ImagineApp {
             .draft
             .as_ref()
             .map_or(state.operation, |d| d.request.operation)
+    }
+    /// Whether a Scene field or Section prompt enhancement is open in the inspector.
+    pub(super) fn timeline_enhance_open(&self) -> bool {
+        self.timeline.authoring.open && self.authoring_operation() != Operation::Outline
     }
     /// Whether a story outline is open; it is shown as the Story view.
     pub(super) fn timeline_story_open(&self) -> bool {
@@ -708,111 +755,17 @@ impl ImagineApp {
         }
         (state, document)
     }
-    /// The floating window for scene and Section enhancement.
-    pub(super) fn timeline_authoring_window(&mut self, ctx: &egui::Context) {
-        if !self.timeline.authoring.open || self.timeline_story_open() {
+    /// Keeps an enhancement polling and its provider settings open while
+    /// its field is not drawn; the field shows the proposal itself.
+    pub(super) fn timeline_authoring_background(&mut self, ctx: &egui::Context) {
+        if !self.timeline.authoring.open
+            || self.timeline_story_open()
+            || self.timeline.authoring.shown_in_pass == Some(ctx.cumulative_pass_nr())
+        {
             return;
         }
-        let (mut state, document) = self.authoring_begin(ctx);
-        let mut actions = Actions::default();
-        let mut open = state.open;
-        egui::Window::new("Story & Enhance")
-            .id(egui::Id::new("video-authoring"))
-            .open(&mut open)
-            .default_width(760.)
-            .default_height(580.)
-            .max_height((ctx.content_rect().height() - 70.).max(200.))
-            .vscroll(true)
-            .show(ctx, |ui| {
-                let reveal = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
-                helto::private_scope(ui, !reveal, |ui| {
-                    #[cfg(feature = "ui-preview")]
-                    {
-                        let r = ui.interact(
-                            ui.clip_rect(),
-                            ui.id().with("qa-story-scroll"),
-                            egui::Sense::hover(),
-                        );
-                        super::qa::control(ui, "story-scroll".into(), &r);
-                    }
-                    self.authoring_header(ui, &mut state, &mut actions);
-                    let (operation, field) = state
-                        .draft
-                        .as_ref()
-                        .map_or((state.operation, state.scene_field), |d| {
-                            (d.request.operation, d.request.scene_field)
-                        });
-                    if operation == Operation::EnhanceScene {
-                        ui.strong(format!("Enhance {}", field.unwrap_or_default().label()));
-                    } else if operation == Operation::EnhanceSection {
-                        ui.strong("Enhance Section prompt");
-                    }
-                    ui.horizontal(|ui| {
-                        let r = helto::icon_button(
-                            ui,
-                            crate::icons::Icon::Close,
-                            "Close review",
-                            false,
-                        );
-                        control(ui, "story-close", &r);
-                        actions.close = r.clicked();
-                    });
-                    self.authoring_failure(ui, &mut state, &mut actions);
-                    if state.draft.is_some() {
-                        self.authoring_draft_status(ui, &mut state, &document, &mut actions);
-                        let busy =
-                            state.busy || state.draft.as_ref().is_some_and(|d| d.phase.busy());
-                        let draft = state.draft.as_mut().unwrap();
-                        ui.add_enabled_ui(!busy, |ui| {
-                            authoring_draft_actions(ui, draft, &document, &mut actions);
-                            if let Some(text) = &mut draft.text {
-                                if let Some(d) = &document
-                                    && let Some(s) =
-                                        d.project.scenes.iter().find(|s| {
-                                            Some(&s.id) == draft.request.scene_id.as_ref()
-                                        })
-                                {
-                                    ui.collapsing("Original", |ui| {
-                                        ui.label(
-                                            if draft.request.operation == Operation::EnhanceSection
-                                            {
-                                                s.sections
-                                                    .iter()
-                                                    .find(|s| {
-                                                        Some(&s.id)
-                                                            == draft.request.section_id.as_ref()
-                                                    })
-                                                    .map(|s| s.prompt.clone())
-                                                    .unwrap_or_default()
-                                            } else {
-                                                draft
-                                                    .request
-                                                    .scene_field
-                                                    .unwrap_or_default()
-                                                    .source(&d.project, s)
-                                            },
-                                        );
-                                    });
-                                }
-                                let editable = draft.phase != Phase::Applied;
-                                ui.label("Proposal");
-                                let r = ui.add(
-                                    egui::TextEdit::multiline(text)
-                                        .desired_width(f32::INFINITY)
-                                        .desired_rows(8)
-                                        .interactive(editable),
-                                );
-                                control(ui, "story-proposal-text", &r);
-                            }
-                        });
-                    } else {
-                        self.authoring_sources(ui, &mut state, &mut actions);
-                        authoring_generate(ui, &mut state, &document, &mut actions);
-                    }
-                });
-            });
-        state.open = open;
-        self.authoring_finish(ctx, state, actions);
+        let (state, _) = self.authoring_begin(ctx);
+        self.authoring_finish(ctx, state, Actions::default());
     }
     /// Provider and prompt profile settings, and the profile's prompt files.
     pub(super) fn authoring_header(

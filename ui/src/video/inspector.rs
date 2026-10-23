@@ -411,7 +411,7 @@ impl ImagineApp {
                                 }
                             } else if let Some(section) = &section {
                                 match index {
-                                    0 => self.timeline_section_prompt(ui, d, section, commands),
+                                    0 => self.timeline_section_prompt(ui, d, &scene, section, commands),
                                     1 => self.timeline_section_media(ui, d, &scene, section, commands),
                                     _ => self.timeline_section_timing(ui, d, &scene, section),
                                 }
@@ -445,6 +445,13 @@ impl ImagineApp {
                                             commands.extend(self.timeline.draft_edits());
                                         }
                                         dialogue_warnings(ui, &self.timeline.draft_description);
+                                        self.timeline_inline_enhance(
+                                            ui,
+                                            &scene.id,
+                                            None,
+                                            imagine_video_contract::authoring::SceneField::Description,
+                                            r.rect,
+                                        );
                                         self.timeline_scene_fields(ui, d, &scene, &["summary"], commands);
                                     }
                                     2 => {
@@ -607,14 +614,13 @@ impl ImagineApp {
         commands: &mut Vec<Edit>,
     ) {
         use imagine_video_contract::authoring::SceneField;
-        let p = &mut self.timeline.draft_scene_prompt;
         let mut save = false;
         let mut enhance = None;
-        for (name, label, value, rows) in [
-            ("title", "Title", &mut p.title, 1),
-            ("summary", "Summary", &mut p.summary, 2),
-            ("ambient", "Ambient sound", &mut p.ambient_sound, 2),
-            ("music", "Audience-only music", &mut p.non_diegetic_music, 2),
+        for (name, label, rows) in [
+            ("title", "Title", 1),
+            ("summary", "Summary", 2),
+            ("ambient", "Ambient sound", 2),
+            ("music", "Audience-only music", 2),
         ] {
             if !names.contains(&name) {
                 continue;
@@ -628,7 +634,7 @@ impl ImagineApp {
             ui.horizontal(|ui| {
                 ui.label(label);
                 if let Some(field) = field {
-                    // This loop borrows the source draft; open the enhancement after it.
+                    // The source draft is borrowed below; open the enhancement after the loop.
                     let r =
                         helto::icon_button(ui, Icon::Enhance, &format!("Enhance {label}"), false);
                     #[cfg(feature = "ui-preview")]
@@ -638,6 +644,13 @@ impl ImagineApp {
                     }
                 }
             });
+            let p = &mut self.timeline.draft_scene_prompt;
+            let value = match name {
+                "title" => &mut p.title,
+                "summary" => &mut p.summary,
+                "ambient" => &mut p.ambient_sound,
+                _ => &mut p.non_diegetic_music,
+            };
             let r = prompt_tools::textarea(
                 ui,
                 value,
@@ -651,6 +664,9 @@ impl ImagineApp {
             #[cfg(feature = "ui-preview")]
             super::qa::control(ui, format!("scene-source-{name}"), &r);
             save |= r.lost_focus();
+            if let Some(field) = field {
+                self.timeline_inline_enhance(ui, &scene.id, None, field, r.rect);
+            }
         }
         if save {
             commands.extend(self.timeline.draft_edits());
@@ -664,6 +680,7 @@ impl ImagineApp {
         &mut self,
         ui: &mut egui::Ui,
         d: &Snapshot,
+        scene: &Scene,
         section: &Section,
         commands: &mut Vec<Edit>,
     ) {
@@ -683,6 +700,7 @@ impl ImagineApp {
             commands.extend(self.timeline.draft_edits());
         }
         dialogue_warnings(ui, &self.timeline.draft_section);
+        self.timeline_inline_enhance(ui, &scene.id, Some(&section.id), Default::default(), r.rect);
     }
     /// The Section's image anchors, with images and videos one click away.
     fn timeline_section_media(
