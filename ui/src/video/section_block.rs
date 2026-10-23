@@ -59,14 +59,27 @@ fn source(project: &VideoProject, scene: &Scene, section: &Section) -> Source {
             role: "First frame",
         };
     }
-    let Some(continuity) = &scene.continuity else {
-        return Source::None;
-    };
-    let Some(index) = project
+    // A Continuous shot shows the previous Scene's last frame whatever carries
+    // it across; generation may use the motion rather than that frame.
+    let previous = project
         .scenes
         .iter()
-        .position(|s| s.id == continuity.source_scene)
-    else {
+        .position(|s| s.id == scene.id)
+        .and_then(|index| index.checked_sub(1));
+    let continuous = previous.filter(|&index| {
+        let left = &project.scenes[index].id;
+        super::assembly::boundary_for(project, left, &scene.id).mode
+            == imagine_video_contract::assembly::BoundaryMode::ContinuousShot
+            && project.scene_kind(left) != imagine_video_contract::creative::SceneKind::Imported
+    });
+    let source = match &scene.continuity {
+        Some(continuity) => project
+            .scenes
+            .iter()
+            .position(|s| s.id == continuity.source_scene),
+        None => continuous,
+    };
+    let Some(index) = source else {
         return Source::None;
     };
     Source::Continued {
@@ -75,7 +88,11 @@ fn source(project: &VideoProject, scene: &Scene, section: &Section) -> Source {
             .accepted_take
             .as_ref()
             .map(|t| t.id.clone()),
-        frame: continuity.method == ContinuityMethod::LastFrameFirstFrame,
+        frame: continuous.is_some()
+            || scene
+                .continuity
+                .as_ref()
+                .is_some_and(|c| c.method == ContinuityMethod::LastFrameFirstFrame),
     }
 }
 
@@ -364,6 +381,42 @@ mod tests {
                 ..
             }
         ));
+        // A Continuous shot shows the previous last frame even when the motion
+        // carries it, and with no continuity set at all.
+        let mut q = p.clone();
+        q.scenes[1].continuity.as_mut().unwrap().method = ContinuityMethod::MotionContextExp;
+        let continued = |q: &VideoProject| source(q, &q.scenes[1], &q.scenes[1].sections[0]);
+        assert!(matches!(
+            continued(&q),
+            Source::Continued { frame: false, .. }
+        ));
+        let mut boundary =
+            super::super::assembly::boundary_for(&q, &q.scenes[0].id, &q.scenes[1].id);
+        boundary.mode = imagine_video_contract::assembly::BoundaryMode::ContinuousShot;
+        q.assembly.boundaries.push(boundary);
+        assert!(matches!(
+            continued(&q),
+            Source::Continued {
+                scene: 1,
+                take: Some(_),
+                frame: true
+            }
+        ));
+        q.scenes[1].continuity = None;
+        assert!(matches!(
+            continued(&q),
+            Source::Continued {
+                scene: 1,
+                frame: true,
+                ..
+            }
+        ));
+        // An imported clip has no Take, so there is no frame to wait for.
+        q.creative.scene_kinds.insert(
+            q.scenes[0].id.clone(),
+            imagine_video_contract::creative::SceneKind::Imported,
+        );
+        assert!(matches!(continued(&q), Source::None));
 
         let Some(dir) = std::env::var_os("IMAGINE_UI_PREVIEW_DIR") else {
             return;
