@@ -9,6 +9,16 @@ use std::{
     sync::Arc,
 };
 
+/// Holds the single-instance lock. Dropping it unlocks explicitly: a child
+/// process being spawned at that moment shares the open file until it execs,
+/// and closing only our descriptor would leave the lock held through it.
+pub struct InstanceLock(File);
+impl Drop for InstanceLock {
+    fn drop(&mut self) {
+        let _ = FileExt::unlock(&self.0);
+    }
+}
+
 #[derive(Clone)]
 pub struct Config {
     pub project: PathBuf,
@@ -28,7 +38,7 @@ pub struct PrivatePaths {
     temporary: Arc<File>,
 }
 impl Config {
-    pub fn load(project: PathBuf, data: PathBuf, bind: SocketAddr) -> Result<(Self, File)> {
+    pub fn load(project: PathBuf, data: PathBuf, bind: SocketAddr) -> Result<(Self, InstanceLock)> {
         if !bind.ip().is_loopback() {
             bail!("Imagine is a local API and requires a loopback bind address");
         }
@@ -45,6 +55,7 @@ impl Config {
             .open(data.join("server.lock"))?;
         lock.try_lock_exclusive()
             .context("Another Imagine server owns this data directory")?;
+        let lock = InstanceLock(lock);
         let model_root = model_root(&project);
         Ok((
             Self {
@@ -66,7 +77,7 @@ impl Config {
         bind: SocketAddr,
         home: &Path,
         runtime: PathBuf,
-    ) -> Result<(Self, File)> {
+    ) -> Result<(Self, InstanceLock)> {
         if !bind.ip().is_loopback() {
             bail!("Imagine is a local API and requires a loopback bind address");
         }
@@ -111,6 +122,7 @@ impl Config {
             .map_err(|_| anyhow::anyhow!("server_lock_unavailable"))?;
         lock.try_lock_exclusive()
             .map_err(|_| anyhow::anyhow!("server_instance_already_running"))?;
+        let lock = InstanceLock(lock);
         let model_root = model_root(&project);
         Ok((
             Self {
