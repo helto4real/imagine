@@ -1,6 +1,9 @@
 //! Animate starts the ordinary Timeline workflow; it never submits a generation.
 use super::*;
 
+/// Seconds of a new Animate Scene and the one Section that spans it.
+const SECONDS: u64 = 10;
+
 impl ImagineApp {
     pub(in crate::app) fn can_animate_image(&self) -> bool {
         self.animate_image_blocked().is_none()
@@ -49,7 +52,7 @@ fn request(source: (u32, u32)) -> Result<CreateProject, &'static str> {
     let shape = crate::h3_protocol::Selection {
         ratio: "Source".into(),
         quality: "Standard".into(),
-        seconds: 5.,
+        seconds: SECONDS as f64,
         ..Default::default()
     }
     .resolve_with_source(Some(source))?;
@@ -103,11 +106,22 @@ async fn create(
     let scene = Scene {
         id: SceneId(format!("scene_{}", uuid::Uuid::new_v4().simple())),
         start: Time { num: 0, den: 1 },
-        duration: Time { num: 5, den: 1 },
+        duration: Time {
+            num: SECONDS,
+            den: 1,
+        },
         description: String::new(),
         model: ModelChoice::ProjectDefault,
         settings: vec![],
-        sections: vec![],
+        sections: vec![Section {
+            id: SectionId(format!("section_{}", uuid::Uuid::new_v4().simple())),
+            start: Time { num: 0, den: 1 },
+            duration: Time {
+                num: SECONDS,
+                den: 1,
+            },
+            prompt: String::new(),
+        }],
         bindings: vec![Binding {
             id: BindingId(format!("binding_{}", uuid::Uuid::new_v4().simple())),
             asset,
@@ -225,7 +239,13 @@ mod tests {
         assert!(project.delivery.height > project.delivery.width);
         assert_eq!(project.scenes.len(), 1);
         let scene = &project.scenes[0];
-        assert_eq!(scene.duration, Time { num: 5, den: 1 });
+        assert_eq!(scene.duration, Time { num: 10, den: 1 });
+        assert_eq!(project.effective_model(scene).variant, "i2v");
+        let [section] = scene.sections.as_slice() else {
+            panic!("one Section across the Scene");
+        };
+        assert_eq!(section.start, Time { num: 0, den: 1 });
+        assert_eq!(section.duration, scene.duration);
         assert_eq!(scene.bindings.len(), 1);
         assert_eq!(scene.bindings[0].role, InputRole::FirstFrame);
         assert!(scene.bindings[0].enabled);
