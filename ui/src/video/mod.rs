@@ -31,6 +31,7 @@ mod media_health;
 mod media_picker;
 mod navigation;
 mod player;
+mod preflight;
 mod project_prompt;
 mod project_timing;
 mod prompt_tools;
@@ -100,6 +101,7 @@ pub(super) struct Timeline {
     replace_pending: Option<Replace>,
     captures: captures::State,
     reference_cache: reference_cache::State,
+    preflight: preflight::State,
     media_health: media_health::State,
     compatibility_open: bool,
     compatibility_report: Option<Value>,
@@ -176,6 +178,15 @@ pub(super) struct Timeline {
     drag: Option<tracks::Drag>,
 }
 pub(super) enum Event {
+    Capabilities {
+        epoch: u64,
+        result: Result<Value, client::TimelineFailure>,
+    },
+    Preflight {
+        epoch: u64,
+        key: (ProjectId, u64, SceneId),
+        result: Result<Value, client::TimelineFailure>,
+    },
     Animated {
         epoch: u64,
         result: Result<(client::TimelineSession, Value), client::TimelineFailure>,
@@ -442,6 +453,16 @@ impl ImagineApp {
         }
         match event {
             Event::Animated { .. } => unreachable!(),
+            Event::Capabilities { epoch, result } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline_capabilities_reply(result);
+                }
+            }
+            Event::Preflight { epoch, key, result } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline_preflight_reply(key, result);
+                }
+            }
             Event::ReferenceCache {
                 epoch,
                 nonce,
@@ -619,6 +640,7 @@ impl ImagineApp {
                         self.timeline.authoring.session(&session);
                         self.timeline.library.session(&session);
                         self.timeline.session = Some(session);
+                        self.timeline.preflight.session_changed();
                         self.timeline.error = None;
                     }
                     Err(e) => self.timeline.error = Some(e.message),

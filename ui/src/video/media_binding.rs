@@ -36,10 +36,19 @@ impl ImagineApp {
             video: None,
         });
         let before = binding.clone();
-        let response = ui.add_enabled(
-            enabled,
-            egui::Checkbox::new(&mut binding.enabled, "Use for generation"),
-        );
+        // Offer only inputs the scene's model takes; an enabled binding can still be turned off.
+        let refused = !binding.enabled
+            && self.timeline_accepts(&d.project, scene, &binding.role, &asset.kind) == Some(false);
+        let response = ui
+            .add_enabled(
+                enabled && !refused,
+                egui::Checkbox::new(&mut binding.enabled, "Use for generation"),
+            )
+            .on_disabled_hover_text(if refused {
+                "The scene's model does not take this media as input."
+            } else {
+                "Wait for the current timeline operation."
+            });
         #[cfg(feature = "ui-preview")]
         super::qa::control(ui, format!("media-use-{}", asset.id.0), &response);
         let _ = response;

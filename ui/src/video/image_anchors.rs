@@ -67,6 +67,12 @@ impl ImagineApp {
             return;
         }
         ui.strong("Image anchors");
+        let scene = d
+            .project
+            .scenes
+            .iter()
+            .find(|s| s.sections.iter().any(|x| &x.id == section))
+            .cloned();
         let before_images = state.draft.clone();
         let mut images = state.draft.clone();
         let mut remove = None;
@@ -120,7 +126,30 @@ impl ImagineApp {
                                 ("influence", "Influence"),
                                 ("custom_influence", "Custom influence"),
                             ] {
-                                let r = ui.selectable_value(&mut anchor.role, role.into(), label);
+                                // Auto resolves per shot; explicit roles follow the model's inputs.
+                                let input = match role {
+                                    "first_frame" => Some(InputRole::FirstFrame),
+                                    "last_frame" => Some(InputRole::LastFrame),
+                                    "auto" => None,
+                                    _ => Some(InputRole::VisualReference),
+                                };
+                                let refused = anchor.role != role
+                                    && input.zip(scene.as_ref()).is_some_and(|(input, scene)| {
+                                        self.timeline_accepts(
+                                            &d.project,
+                                            scene,
+                                            &input,
+                                            &MediaKind::Image,
+                                        ) == Some(false)
+                                    });
+                                let r = ui
+                                    .add_enabled_ui(!refused, |ui| {
+                                        ui.selectable_value(&mut anchor.role, role.into(), label)
+                                    })
+                                    .inner
+                                    .on_disabled_hover_text(
+                                        "The scene's model does not take an image in this role.",
+                                    );
                                 #[cfg(feature = "ui-preview")]
                                 super::qa::control(ui, format!("anchor-role-{i}-{role}"), &r);
                                 let _ = r;

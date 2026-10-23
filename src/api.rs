@@ -143,10 +143,17 @@ async fn model(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Va
         .map(Json)
         .ok_or(Fault::new(404, "model_not_found"))
 }
+/// Whether H3 is deployed and its GPU coordinator is reachable.
+pub(crate) fn h3_deployed(app: &App) -> bool {
+    app.engine.borrow().backend == "rust" && app.engine.borrow().h3_available
+}
+pub(crate) fn h3_available(app: &App) -> bool {
+    h3_deployed(app) && app.control.is_coordinated()
+}
 fn model_capability(app: &App, mut value: Value) -> Value {
     if value["id"] == "minimax-h3" {
-        let deployed = app.engine.borrow().backend == "rust" && app.engine.borrow().h3_available;
-        let available = deployed && app.control.is_coordinated();
+        let deployed = h3_deployed(app);
+        let available = h3_available(app);
         value["available"] = json!(available);
         value["execution_enabled"] = json!(available);
         value["experimental"] = json!(true);

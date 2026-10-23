@@ -7,6 +7,65 @@ pub mod prompt;
 fn unsupported(code: &str) -> StorageError {
     StorageError::new(code)
 }
+/// The product H3 variants and what each accepts at admission
+/// (see `execution::freeze`). I2V takes one First Frame image or Last Frame →
+/// First Frame continuity; it has one image input, so no Last Frame role.
+pub fn variants() -> Vec<(ModelSelection, planning::Capabilities)> {
+    use std::collections::{BTreeMap, BTreeSet};
+    let model = |variant: &str, profile: &str| ModelSelection {
+        adapter: "h3".into(),
+        model: "minimax-h3".into(),
+        variant: variant.into(),
+        profile: profile.into(),
+        profile_revision: "2".into(),
+    };
+    let capabilities = |roles: &[(InputRole, MediaKind)], continuity: &[ContinuityMethod]| {
+        let mut input_roles: BTreeMap<InputRole, BTreeSet<MediaKind>> = BTreeMap::new();
+        for (role, kind) in roles {
+            input_roles
+                .entry(role.clone())
+                .or_default()
+                .insert(kind.clone());
+        }
+        planning::Capabilities {
+            revision: "h3-product-2".into(),
+            runtime_available: false,
+            experimental: true,
+            validation_status: planning::ValidationStatus::Unvalidated,
+            input_roles,
+            continuity: continuity.iter().cloned().collect(),
+            incompatible_roles: vec![],
+        }
+    };
+    vec![
+        (
+            model("reference", super::super::job::PROFILE),
+            capabilities(
+                &[
+                    (InputRole::FirstFrame, MediaKind::Image),
+                    (InputRole::LastFrame, MediaKind::Image),
+                    (InputRole::VisualReference, MediaKind::Image),
+                    (InputRole::VideoReference, MediaKind::Video),
+                    (InputRole::VoiceReference, MediaKind::Audio),
+                    (InputRole::AudioReference, MediaKind::Audio),
+                ],
+                &[
+                    ContinuityMethod::Combo,
+                    ContinuityMethod::Influence,
+                    ContinuityMethod::MotionContext,
+                    ContinuityMethod::MotionContextExp,
+                ],
+            ),
+        ),
+        (
+            model("i2v", super::super::job::I2V_PROFILE),
+            capabilities(
+                &[(InputRole::FirstFrame, MediaKind::Image)],
+                &[ContinuityMethod::LastFrameFirstFrame],
+            ),
+        ),
+    ]
+}
 pub fn profile(model: &ModelSelection) -> Result<wire::Profile, StorageError> {
     if model.adapter != "h3" || model.model != "minimax-h3" || model.profile_revision != "2" {
         return Err(unsupported("scene_runtime_unsupported"));

@@ -820,6 +820,15 @@ pub fn error_message(code: &str) -> String {
     }
     match code {
         "source_missing"=>"The original reference file is missing. Use Check Media and Relink to select its current location.",
+        "scene_runtime_unsupported"=>"The scene's inputs cannot run on its model. H3 I2V needs exactly one First Frame image and no other inputs.",
+        "model_settings_required"=>"Choose generation settings for this scene or the project.",
+        "h3_i2v_audio_reference_unavailable"=>"H3 I2V does not take audio references. Use H3 Reference or remove the audio references.",
+        "continuity_first_frame_conflict"=>"Last Frame → First Frame continuity already provides the first frame. Remove the First Frame image.",
+        "continuity_source_not_accepted"=>"Accept a Take in the source scene before using it for continuity.",
+        "continuity_endpoint_incompatible"=>"This continuity method cannot carry audio. Turn off audio continuity.",
+        "scene_profile_mismatch"=>"The scene's H3 profile does not match its variant. Choose the model again.",
+        "invalid_sampling"=>"The scene's sampling settings are invalid. Review them in Generation settings.",
+        "unsupported_h3_geometry"=>"H3 cannot render this canvas size and duration. Change the size or duration.",
         "source_changed"=>"The original reference file changed. Use Check Media and Relink to accept the current file explicitly.",
         "older_format_external_reference_not_representable"=>"The older project format cannot store original-file links. Save the current format; original media will not be copied.",
         "source_unavailable"|"invalid_source_path"|"invalid_source_file"=>"The selected original reference file cannot be opened. Check its location and permissions.",

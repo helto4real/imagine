@@ -119,7 +119,38 @@ async fn compiled_scene_source_dialogue_and_pending_media_are_explicit_without_i
     .err()
     .unwrap();
     assert_eq!(err.code, "scene_runtime_unsupported"); // Fixture has no executable model/settings; media itself is no longer blocked.
+    // The editor's preflight reports the same admission blocker before submission.
+    let project = service
+        .projects
+        .read(&imagine_server::video::contract::ProjectId(id.into()))
+        .unwrap();
+    let blockers = imagine_server::video::execution::preflight(
+        &project,
+        &imagine_server::video::contract::SceneId("own_scene".into()),
+    );
+    assert!(blockers.contains(&err.code), "{blockers:?}");
     drop(service);
+    let (code, preflight) = call(
+        &h,
+        "GET",
+        &format!("/v1/video/projects/{id}/scenes/own_scene/preflight"),
+        None,
+    )
+    .await;
+    assert_eq!(code, 200, "{preflight}");
+    assert_eq!(preflight["project_revision"], 3);
+    assert_eq!(preflight["blockers"], json!(blockers));
+    let (_, capabilities) = call(&h, "GET", "/v1/video/capabilities", None).await;
+    let variants = capabilities["models"].as_array().unwrap();
+    assert_eq!(variants.len(), 2);
+    let i2v = variants
+        .iter()
+        .find(|m| m["model"]["variant"] == "i2v")
+        .unwrap();
+    assert_eq!(
+        i2v["capabilities"]["input_roles"],
+        json!({"first_frame":["image"]})
+    );
     stop(h).await;
 }
 #[tokio::test]

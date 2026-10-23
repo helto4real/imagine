@@ -33,6 +33,145 @@ pub struct Frozen {
 fn issue(code: &str) -> StorageError {
     StorageError::new(code)
 }
+/// Blockers `freeze` would report from the project alone, before any media is
+/// read, so an editor can show them while authoring. Media and receipt checks
+/// still happen only at admission. Codes are unique, in admission order.
+pub fn preflight(project: &VideoProject, id: &SceneId) -> Vec<String> {
+    let mut blockers: Vec<String> = vec![];
+    let mut block = |code: &str| {
+        if !blockers.iter().any(|b| b == code) {
+            blockers.push(code.into());
+        }
+    };
+    let Ok(scene) = project.scene(id) else {
+        block("scene_not_found");
+        return blockers;
+    };
+    let reference_mode = project.effective_model(scene).variant == "reference";
+    let compiled = match super::adapters::h3::bindings::compile(project, scene) {
+        Ok(compiled) => {
+            for code in &compiled.runtime_issues {
+                block(code);
+            }
+            Some(compiled)
+        }
+        Err(error) => {
+            block(&error.code);
+            None
+        }
+    };
+    if !reference_mode
+        && scene.sections.iter().enumerate().any(|(index, section)| {
+            project
+                .creative
+                .sections
+                .get(&section.id)
+                .is_some_and(|source| {
+                    source.images.iter().any(|image| {
+                        index != 0
+                            || image.role != InputRole::FirstFrame
+                            || !scene.bindings.iter().any(|b| {
+                                b.enabled
+                                    && b.asset == image.asset
+                                    && b.role == InputRole::FirstFrame
+                            })
+                    })
+                })
+        })
+    {
+        block("h3_section_reference_unavailable");
+    }
+    if project.scene_kind(&scene.id) == imagine_video_contract::creative::SceneKind::Imported {
+        block("imported_scene_not_generatable");
+    }
+    if !reference_mode
+        && !imagine_video_contract::audio::generation_clips(project, scene).is_empty()
+    {
+        block("h3_i2v_audio_reference_unavailable");
+    }
+    if let Err(error) = super::adapters::h3::profile(project.effective_model(scene)) {
+        block(&error.code);
+    }
+    match project.effective_settings(scene) {
+        None => block("model_settings_required"),
+        Some(settings) if settings.schema_version != 1 => block("settings_schema_unsupported"),
+        Some(settings) => {
+            match serde_json::from_value::<planning::H3Settings>(settings.values.clone()) {
+                Err(_) => block("invalid_sampling"),
+                Ok(sampling) => {
+                    if let Err(error) = sampling.validate() {
+                        block(&error.code);
+                    }
+                }
+            }
+        }
+    }
+    match (h3::Selection {
+        seconds: scene.duration.num as f64 / scene.duration.den as f64,
+        ..Default::default()
+    })
+    .resolve()
+    {
+        Err(code) => block(code),
+        Ok(selected) => {
+            let shape = h3::Shape {
+                width: project.delivery.width,
+                height: project.delivery.height,
+                frames: selected.frames,
+                fps: 24,
+            };
+            if !shape.valid() {
+                block("unsupported_h3_geometry");
+            }
+        }
+    }
+    let lf_ff = scene
+        .continuity
+        .as_ref()
+        .filter(|c| c.method == ContinuityMethod::LastFrameFirstFrame);
+    if let Some(continuity) = lf_ff {
+        if continuity.include_audio {
+            block("continuity_endpoint_incompatible");
+        }
+        if project
+            .scene(&continuity.source_scene)
+            .is_ok_and(|source| source.accepted_take.is_none())
+        {
+            block("continuity_source_not_accepted");
+        }
+        if scene
+            .bindings
+            .iter()
+            .any(|b| b.enabled && b.role == InputRole::FirstFrame)
+        {
+            block("continuity_first_frame_conflict");
+        }
+    }
+    if !reference_mode {
+        let first_frame_bindings =
+            scene
+                .bindings
+                .iter()
+                .filter(|b| b.enabled)
+                .try_fold(0, |count, binding| {
+                    (binding.role == InputRole::FirstFrame
+                        && project.assets[&binding.asset].kind == MediaKind::Image)
+                        .then_some(count + 1)
+                });
+        let has_boundary = compiled
+            .as_ref()
+            .is_some_and(|c| c.reference_manifest["boundary_dependency"].is_object());
+        match first_frame_bindings {
+            // Only one First Frame image, never another role, and only without LF→FF.
+            None => block("scene_runtime_unsupported"),
+            Some(n) if n > 1 => block("scene_runtime_unsupported"),
+            Some(0) if lf_ff.is_none() && !has_boundary => block("scene_runtime_unsupported"),
+            _ => {}
+        }
+    }
+    blockers
+}
+
 pub fn freeze(
     service: &Service,
     request: &Admission,
@@ -491,6 +630,92 @@ mod external_first_frame_tests {
         assert_eq!(
             decode_first_frame(&frozen).err().unwrap().to_string(),
             "source_changed"
+        );
+    }
+}
+
+#[cfg(test)]
+mod preflight_tests {
+    use super::*;
+    fn i2v_project() -> VideoProject {
+        let mut project = VideoProject::create(CreateProject {
+            generation: None,
+            schema_version: 1,
+            default_model: ModelSelection {
+                adapter: "h3".into(),
+                model: "minimax-h3".into(),
+                variant: "i2v".into(),
+                profile: super::super::job::I2V_PROFILE.into(),
+                profile_revision: "2".into(),
+            },
+            delivery: DeliverySettings {
+                width: 384,
+                height: 256,
+                fps: Time { num: 24, den: 1 },
+            },
+        })
+        .unwrap();
+        project.scenes.push(Scene {
+            id: SceneId("own-scene".into()),
+            start: Time { num: 0, den: 1 },
+            duration: Time { num: 2, den: 1 },
+            description: String::new(),
+            model: ModelChoice::ProjectDefault,
+            settings: vec![],
+            sections: vec![],
+            bindings: vec![],
+            continuity: None,
+            accepted_take: None,
+        });
+        for (id, kind) in [
+            ("own-image", MediaKind::Image),
+            ("own-video", MediaKind::Video),
+        ] {
+            project.assets.insert(
+                AssetId(id.into()),
+                Asset {
+                    id: AssetId(id.into()),
+                    revision: 1,
+                    kind,
+                    name: String::new(),
+                    library_source: None,
+                },
+            );
+        }
+        project
+    }
+    fn bind(project: &mut VideoProject, asset: &str, role: InputRole) {
+        let scene = &mut project.scenes[0];
+        scene.bindings.push(Binding {
+            id: BindingId(format!("own-{}", scene.bindings.len())),
+            asset: AssetId(asset.into()),
+            role,
+            enabled: true,
+            video: None,
+        });
+    }
+    #[test]
+    fn i2v_accepts_exactly_one_first_frame_image_and_no_other_role() {
+        let scene = |p: &VideoProject| p.scenes[0].id.clone();
+        let unsupported = |p: &VideoProject| {
+            preflight(p, &scene(p)).contains(&"scene_runtime_unsupported".to_owned())
+        };
+        let mut project = i2v_project();
+        assert!(unsupported(&project), "I2V without a first frame");
+        bind(&mut project, "own-image", InputRole::FirstFrame);
+        assert!(
+            !unsupported(&project),
+            "{:?}",
+            preflight(&project, &scene(&project))
+        );
+        bind(&mut project, "own-image", InputRole::LastFrame);
+        assert!(unsupported(&project), "Last Frame is not an I2V input");
+        let mut project = i2v_project();
+        bind(&mut project, "own-video", InputRole::FirstFrame);
+        assert!(unsupported(&project), "a video is not a first frame");
+        assert_eq!(
+            preflight(&project, &SceneId("missing".into())),
+            vec!["scene_not_found".to_owned()]
         );
     }
 }

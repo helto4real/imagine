@@ -120,6 +120,10 @@ pub fn routes() -> Router<App> {
             "/v1/video/projects/{id}/scenes/{scene}/compiled",
             get(compiled),
         )
+        .route(
+            "/v1/video/projects/{id}/scenes/{scene}/preflight",
+            get(preflight),
+        )
         .route("/v1/video/projects/{id}/review", post(review))
         .route("/v1/video/projects/{id}/assets", post(attach))
         .route("/v1/video/projects/{id}/save", post(save))
@@ -176,11 +180,35 @@ async fn waveform(
         .map_err(media_error)?,
     ))
 }
-async fn capabilities() -> Json<Value> {
+async fn capabilities(State(app): State<App>) -> Json<Value> {
+    let available = crate::api::h3_available(&app);
+    let models = super::adapters::h3::variants()
+        .into_iter()
+        .map(|(model, mut capabilities)| {
+            capabilities.runtime_available = available;
+            json!({"model":model,"capabilities":capabilities})
+        })
+        .collect::<Vec<_>>();
     Json(
         json!({"schema_version":1,"media":{"mime_types":media::MIME_TYPES,"max_upload_bytes":null,"streaming":true,"max_buffered_image_bytes":media::MAX_UPLOAD},
-        "project_operations":["create","read","edits","review","attach_asset","save","open","save_as","export_compatible"],"models":[]}),
+        "project_operations":["create","read","edits","review","attach_asset","save","open","save_as","export_compatible","preflight"],"models":models}),
     )
+}
+/// Project-only admission blockers for a scene; see `execution::preflight`.
+async fn preflight(
+    State(app): State<App>,
+    Path((id, scene)): Path<(String, String)>,
+) -> Result<Json<Value>, Error> {
+    let service = app.video.lock().await;
+    let project = service.projects.read(&ProjectId(id))?;
+    let scene = SceneId(scene);
+    project.scene(&scene)?;
+    Ok(Json(json!({
+        "schema_version": 1,
+        "project_revision": project.project_revision,
+        "scene_id": scene,
+        "blockers": super::execution::preflight(&project, &scene),
+    })))
 }
 async fn create(
     State(app): State<App>,

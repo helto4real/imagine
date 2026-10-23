@@ -230,6 +230,17 @@ impl ImagineApp {
                         "Scene"
                     }));
                     ui.separator();
+                    // The server's own admission checks, shown before Generate is pressed.
+                    let blockers = self.timeline_scene_blockers().to_vec();
+                    if !blockers.is_empty() {
+                        ui.label(helto::error_text("Generate would be refused:", true));
+                        for code in &blockers {
+                            ui.label(
+                                helto::error_text(&client::error_message(code), true).small(),
+                            );
+                        }
+                        ui.add_space(4.);
+                    }
                     ui.add_enabled_ui(enabled, |ui| {
                         ui.label("Scene type");
                         let mut kind=d.project.scene_kind(&scene.id);

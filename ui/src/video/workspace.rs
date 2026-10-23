@@ -10,6 +10,7 @@ impl ImagineApp {
         self.timeline_catalog_install(ui.ctx());
         self.timeline_session(ui.ctx());
         self.timeline_poll_runs(ui.ctx());
+        self.timeline_preflight_poll(ui.ctx());
         if self.timeline.zoom == 0. {
             self.timeline.zoom = 68.;
         }
@@ -367,6 +368,7 @@ impl ImagineApp {
             });
         } else if self.timeline.scene().is_none() {
             Some("Select a scene first.")
+
         } else if self.timeline.scene_active() {
             Some("This scene is already generating.")
         } else {
