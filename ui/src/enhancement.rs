@@ -436,7 +436,21 @@ impl ImagineApp {
                     true,
                 );
                 ui.horizontal(|ui| {
-                    use_text = helto::icon_button(ui, Icon::Check, "Use", true).clicked();
+                    // Applying after another change would overwrite it; keep the text instead.
+                    let changed =
+                        self.enhancement.proposal.as_ref().is_some_and(|p| {
+                            self.enhancement_context(p.run.target) != p.run.context
+                        });
+                    use_text = helto::action(
+                        ui,
+                        Icon::Check,
+                        "Use",
+                        true,
+                        changed.then_some(
+                            "The text changed again. Copy what you need from here, then Discard.",
+                        ),
+                    )
+                    .clicked();
                     discard = helto::icon_button(ui, Icon::Close, "Discard", false).clicked();
                 });
             });

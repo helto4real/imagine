@@ -583,3 +583,22 @@ fn deleting_or_leaving_an_edited_profile_asks_first() {
         "New profile"
     );
 }
+
+#[test]
+fn a_proposal_cannot_be_used_after_its_context_changes_and_keeps_its_text() {
+    let mut h = UiHarness::new();
+    let target = Target {
+        workspace: Workspace::Image,
+        field: Field::Prompt,
+    };
+    let id = h.pending(target);
+    h.app.image.prompt = "SYNTHETIC newer draft".into();
+    h.finish(id, Ok("SYNTHETIC proposal".into()));
+    h.app.image.references.clear();
+    h.frame(vec![], false);
+    h.frame(vec![], false);
+    assert!(h.node("Use").is_disabled());
+    assert!(h.app.enhancement.proposal.is_some());
+    h.click("Discard", false);
+    assert_eq!(h.app.image.prompt, "SYNTHETIC newer draft");
+}

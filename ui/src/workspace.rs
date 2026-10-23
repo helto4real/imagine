@@ -1373,6 +1373,19 @@ impl ImagineApp {
                 if self.workspace == Workspace::Image {
                     self.command_button(ui, Command::MultiplePrompts);
                 }
+                if self.workspace == Workspace::Image
+                    && self.queue.reuse_undo.is_some()
+                    && helto::action(
+                        ui,
+                        Icon::Undo,
+                        "Undo Reuse settings",
+                        false,
+                        self.desk_blocked(),
+                    )
+                    .clicked()
+                {
+                    self.undo_reuse_settings();
+                }
                 if !editing {
                     let target = self
                         .prefs

@@ -42,6 +42,8 @@ pub(super) struct Queue {
     pub drafts: Option<Vec<String>>,
     /// Drafts from a closed Multiple prompts window, restored on reopen.
     pub parked_drafts: Option<Vec<String>>,
+    /// The inputs Reuse settings replaced, until the next generation.
+    pub reuse_undo: Option<Snapshot>,
     pub draft_error: Option<String>,
 }
 impl Default for Queue {
@@ -57,6 +59,7 @@ impl Default for Queue {
             seen_work: 0,
             drafts: None,
             parked_drafts: None,
+            reuse_undo: None,
             draft_error: None,
         }
     }
@@ -205,6 +208,7 @@ impl ImagineApp {
                 return false;
             }
         };
+        self.queue.reuse_undo = None;
         let batch = self.queue.stage(prepared);
         self.image.error = None;
         self.queue.draft_error = None;
@@ -557,6 +561,12 @@ impl ImagineApp {
         else {
             return;
         };
+        // Keep what is replaced so Reuse settings can be undone.
+        self.queue.reuse_undo = Some(Snapshot {
+            prompt: std::mem::take(&mut self.image.prompt),
+            preferences: self.prefs.clone(),
+            references: std::mem::take(&mut self.image.references),
+        });
         self.image.prompt = snapshot.prompt;
         self.image.references = snapshot.references;
         self.prefs.negative_prompt = snapshot.preferences.negative_prompt;
@@ -575,6 +585,24 @@ impl ImagineApp {
             self.metadata = self.selected_model().cloned();
         }
         self.workspace = Workspace::Image;
+        self.save_preferences();
+    }
+    /// Restores the prompt, references and settings Reuse settings replaced.
+    pub(super) fn undo_reuse_settings(&mut self) {
+        let Some(previous) = self.queue.reuse_undo.take() else {
+            return;
+        };
+        self.image.prompt = previous.prompt;
+        self.image.references = previous.references;
+        // Only what Reuse settings changed; later preference changes stay.
+        let before = previous.preferences;
+        self.prefs.negative_prompt = before.negative_prompt;
+        self.prefs.generation = before.generation;
+        self.prefs.model_group = before.model_group;
+        self.prefs.model_groups = before.model_groups;
+        if self.models.catalog.is_some() {
+            self.metadata = self.selected_model().cloned();
+        }
         self.save_preferences();
     }
 }

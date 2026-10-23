@@ -732,3 +732,29 @@ fn gallery_menu_removes_only_the_list_entry() {
     assert!(desk.app.queue.gallery.is_empty());
     assert!(file.exists(), "the saved image is kept");
 }
+
+#[test]
+fn reuse_settings_can_be_undone_until_the_next_generation() {
+    let mut desk = Desk::new();
+    let ids = stage(&mut desk, &["Own earlier prompt"]);
+    let done = completed(desk._root.path(), "reuse-undo", [1, 2, 3, 255]);
+    desk.app.queue_message(
+        &desk.ctx,
+        Event::Finished(ids[0].clone(), Ok(Completion::new(done))),
+    );
+    desk.app.queue.jobs.clear();
+    desk.app.image.prompt = "Own current prompt".into();
+    let gallery = desk.app.queue.gallery[0].id.clone();
+    desk.app.reuse_queue_settings(&gallery);
+    assert_eq!(desk.app.image.prompt, "Own earlier prompt");
+    desk.app.prefs.privacy_mode = !desk.app.prefs.privacy_mode;
+    let privacy = desk.app.prefs.privacy_mode;
+    desk.frame(vec![]);
+    desk.click("Undo Reuse settings");
+    assert_eq!(desk.app.image.prompt, "Own current prompt");
+    assert_eq!(
+        desk.app.prefs.privacy_mode, privacy,
+        "unrelated changes stay"
+    );
+    assert!(desk.app.queue.reuse_undo.is_none());
+}
