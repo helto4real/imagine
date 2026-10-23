@@ -717,6 +717,18 @@ impl ImagineApp {
                                 self.timeline.section = None;
                                 self.timeline.boundary = false;
                             }
+                            // Undo restores a recorded "before" project. An unrecorded
+                            // authoring change in between would be reverted with it, so
+                            // such a change starts a fresh history.
+                            if before.is_none()
+                                && self.timeline.document.as_ref().is_some_and(|old| {
+                                    old.project.id == snapshot.project.id
+                                        && !editing::difference(&old.project, &snapshot.project)
+                                            .is_empty()
+                                })
+                            {
+                                self.timeline.history = Default::default();
+                            }
                             if let Some(before) = before {
                                 match history {
                                     -1 => {
@@ -1936,5 +1948,65 @@ mod mixed_selection_regression {
         state.clear_audio_selection();
         state.sync_draft();
         assert!(state.section_selection.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod undo_regression {
+    use super::*;
+    fn document(
+        app: &mut ImagineApp,
+        ctx: &egui::Context,
+        project: &VideoProject,
+        before: Option<&VideoProject>,
+    ) {
+        app.timeline_message(
+            ctx,
+            Event::Document {
+                epoch: app.timeline.epoch,
+                replace: false,
+                before: before.map(|p| Box::new(p.clone())),
+                history: 0,
+                result: Ok(json!({ "project": project })),
+            },
+        );
+    }
+    #[test]
+    fn undo_never_reverts_a_change_it_did_not_record() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.client = None;
+        let original = super::media_picker::tests::project();
+        app.timeline.document = Some(Snapshot::with(original.clone(), json!({})));
+        // A recorded edit.
+        let mut edited = original.clone();
+        edited.global_prompt = "Own edited prompt".into();
+        edited.project_revision += 1;
+        document(&mut app, &ctx, &edited, Some(&original));
+        assert!(!app.timeline.history.undo_commands(&edited).is_empty());
+        // A server reply that only accepts a Take leaves undo intact.
+        let mut accepted = edited.clone();
+        accepted.scenes[0].accepted_take = Some(AcceptedTake {
+            id: TakeId("own-take".into()),
+            model: None,
+            source_fingerprint: "own-fingerprint".into(),
+        });
+        accepted.project_revision += 1;
+        document(&mut app, &ctx, &accepted, None);
+        assert!(app.timeline.error.is_none(), "{:?}", app.timeline.error);
+        assert!(!app.timeline.history.undo_commands(&accepted).is_empty());
+        // An unrecorded authoring change, as a Library character copy makes:
+        // undoing the earlier edit would silently revert it.
+        let mut copied = accepted.clone();
+        copied.creative.visual_references_enabled = Some(false);
+        copied.project_revision += 1;
+        document(&mut app, &ctx, &copied, None);
+        let undo = app.timeline.history.undo_commands(&copied);
+        assert!(
+            !undo.iter().any(|e| matches!(e, Edit::SetCreative { .. })),
+            "{undo:?}"
+        );
+        assert!(app.timeline.history.undo.is_empty() && app.timeline.history.redo.is_empty());
     }
 }
