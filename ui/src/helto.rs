@@ -280,7 +280,7 @@ pub(crate) fn icon_button(
     label: &str,
     active: bool,
 ) -> egui::Response {
-    paint_icon_button(ui, icon, label, active)
+    paint_icon_button(ui, icon, label, active, ICON_BUTTON)
         .on_hover_cursor(egui::CursorIcon::PointingHand)
         .on_hover_text(label)
         .on_disabled_hover_text(label)
@@ -295,9 +295,24 @@ pub(crate) fn action(
     primary: bool,
     blocked: Option<&str>,
 ) -> egui::Response {
+    action_width(ui, icon, label, primary, blocked, ICON_BUTTON)
+}
+
+/// Icon buttons are square; the main action of a toolbar may be wider.
+pub(crate) const ICON_BUTTON: f32 = 32.;
+
+/// [`action`] at `width`, for a toolbar's main action.
+pub(crate) fn action_width(
+    ui: &mut egui::Ui,
+    icon: Icon,
+    label: &str,
+    primary: bool,
+    blocked: Option<&str>,
+    width: f32,
+) -> egui::Response {
     let response = ui
         .add_enabled_ui(blocked.is_none(), |ui| {
-            paint_icon_button(ui, icon, label, primary)
+            paint_icon_button(ui, icon, label, primary, width)
         })
         .inner
         .on_hover_cursor(egui::CursorIcon::PointingHand)
@@ -308,8 +323,15 @@ pub(crate) fn action(
     }
 }
 
-fn paint_icon_button(ui: &mut egui::Ui, icon: Icon, label: &str, active: bool) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(egui::vec2(32., 32.), egui::Sense::click());
+fn paint_icon_button(
+    ui: &mut egui::Ui,
+    icon: Icon,
+    label: &str,
+    active: bool,
+    width: f32,
+) -> egui::Response {
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(width, ICON_BUTTON), egui::Sense::click());
     response.widget_info(|| {
         egui::WidgetInfo::selected(egui::WidgetType::Button, ui.is_enabled(), active, label)
     });
@@ -352,7 +374,8 @@ fn paint_icon_button(ui: &mut egui::Ui, icon: Icon, label: &str, active: bool) -
         } else {
             TEXT
         };
-        icons::paint(ui.painter(), painted.shrink(7.), icon, color);
+        let glyph = egui::Rect::from_center_size(painted.center(), egui::vec2(18., 18.));
+        icons::paint(ui.painter(), glyph, icon, color);
     }
     response
 }

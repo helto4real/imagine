@@ -609,8 +609,8 @@ impl ImagineApp {
         });
     }
 
-    /// The Timeline's own editing tools, at the head of its tool row: create
-    /// Scenes, Sections and audio, then Undo and Redo.
+    /// The Timeline's own editing tools, at the head of its tool row: Undo and
+    /// Redo as their own group, then creating Scenes, Sections and audio.
     pub(super) fn timeline_edit_tools(
         &mut self,
         ui: &mut egui::Ui,
@@ -618,6 +618,11 @@ impl ImagineApp {
         enabled: bool,
         commands: &mut Vec<Edit>,
     ) {
+        ui.add_enabled_ui(enabled, |ui| {
+            self.command_button(ui, crate::app::Command::TimelineUndo);
+            self.command_button(ui, crate::app::Command::TimelineRedo);
+        });
+        ui.separator();
         ui.add_enabled_ui(enabled, |ui| {
             let add_scene = helto::icon_button(ui, crate::icons::Icon::Scene, "Add Scene", false);
             #[cfg(feature = "ui-preview")]
@@ -665,8 +670,6 @@ impl ImagineApp {
                     }
                 }
             }
-            self.command_button(ui, crate::app::Command::TimelineUndo);
-            self.command_button(ui, crate::app::Command::TimelineRedo);
         });
     }
     fn timeline_toolbar_right(
@@ -678,6 +681,15 @@ impl ImagineApp {
         action: &mut Option<PostAction>,
     ) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            // Generate is the main action: double width at the far right.
+            let response = self.command_button_width(
+                ui,
+                crate::app::Command::TimelineGenerate,
+                2. * helto::ICON_BUTTON,
+            );
+            #[cfg(feature = "ui-preview")]
+            super::qa::control(ui, "timeline-generate".into(), &response);
+            let _ = response;
             // While a run works, the button carries its progress, as Director's does.
             let progress = self.timeline.active_run().map(|run| {
                 (
@@ -764,10 +776,6 @@ impl ImagineApp {
                     }
                 }
             });
-            let response = self.command_button(ui, crate::app::Command::TimelineGenerate);
-            #[cfg(feature = "ui-preview")]
-            super::qa::control(ui, "timeline-generate".into(), &response);
-            let _ = response;
             let r = helto::action(
                 ui,
                 Icon::Review,

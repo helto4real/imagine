@@ -211,6 +211,15 @@ impl ImagineApp {
     }
     /// The command's icon button: name, shortcut and any disabled reason on hover.
     pub(super) fn command_button(&mut self, ui: &mut egui::Ui, command: Command) -> egui::Response {
+        self.command_button_width(ui, command, helto::ICON_BUTTON)
+    }
+    /// [`Self::command_button`] at `width`, for a toolbar's main action.
+    pub(super) fn command_button_width(
+        &mut self,
+        ui: &mut egui::Ui,
+        command: Command,
+        width: f32,
+    ) -> egui::Response {
         let label = self.command_label(command);
         let blocked = self.command_blocked(command);
         let icon = match command {
@@ -218,12 +227,13 @@ impl ImagineApp {
             Command::TimelineGenerate if self.timeline_submission_pending() => Icon::Retry,
             _ => command.icon(),
         };
-        let response = helto::action(
+        let response = helto::action_width(
             ui,
             icon,
             label,
             command.primary() || self.command_active(command),
             blocked.as_deref(),
+            width,
         );
         let response = match command.shortcut() {
             Some(shortcut) => response.on_hover_text(shortcut.label()),
