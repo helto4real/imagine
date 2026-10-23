@@ -208,7 +208,7 @@ impl ImagineApp {
                         return;
                     }
                     let Some(scene) = self.timeline.scene().cloned() else {
-                        ui.strong("Project");
+                        self.timeline_project_inspector(ui, d, enabled, commands);
                         return;
                     };
                     if self.timeline.draft_scene.as_ref() != Some(&scene.id) {
@@ -279,6 +279,9 @@ impl ImagineApp {
                                 duration,
                                 self.timeline.mode,
                             ));
+                        }
+                        if let Some(note) = effective_timing(&d.project, &scene) {
+                            ui.weak(note);
                         }
                         self.timeline_enhance_label(ui,"Description",Some(imagine_video_contract::authoring::SceneField::Description),commands);
                         self.timeline_assembly_clip(ui, d, &scene, commands);
@@ -435,5 +438,104 @@ impl ImagineApp {
                     });
                 });
         });
+    }
+}
+
+/// What H3 will actually render for the scene: the project canvas and the
+/// duration after H3's frame alignment, as compiled by the server.
+fn effective_timing(project: &VideoProject, scene: &Scene) -> Option<String> {
+    if project.effective_model(scene).adapter != "h3" {
+        return None;
+    }
+    let shape = crate::h3_protocol::Selection {
+        seconds: seconds(scene.duration),
+        ..Default::default()
+    }
+    .resolve()
+    .ok()?;
+    Some(format!(
+        "Renders {} × {} · {} frames · {:.3} s",
+        project.delivery.width,
+        project.delivery.height,
+        shape.frames,
+        shape.seconds()
+    ))
+}
+
+impl ImagineApp {
+    /// The inspector with nothing selected: the project's canvas, length and
+    /// model, and its project-wide settings.
+    fn timeline_project_inspector(
+        &mut self,
+        ui: &mut egui::Ui,
+        d: &Snapshot,
+        enabled: bool,
+        commands: &mut Vec<Edit>,
+    ) {
+        let project = &d.project;
+        ui.label(helto::section("Project"));
+        ui.separator();
+        let fps = seconds(project.delivery.fps);
+        ui.label(format!(
+            "{} × {} · {fps} fps",
+            project.delivery.width, project.delivery.height
+        ));
+        ui.label(format!(
+            "{:.2} s · {} scene{}",
+            navigation::duration(project),
+            project.scenes.len(),
+            if project.scenes.len() == 1 { "" } else { "s" }
+        ));
+        let model = &project.default_model;
+        ui.weak(format!("{} · {}", model.variant, model.profile));
+        ui.add_space(8.);
+        let blocked = (!enabled).then_some("Wait for the current timeline operation.");
+        ui.horizontal_wrapped(|ui| {
+            if helto::action(ui, Icon::Fit, "Timeline settings…", false, blocked).clicked() {
+                self.timeline.project_timing.open(project);
+            }
+            if helto::action(ui, Icon::Settings, "Generation settings…", false, blocked).clicked()
+            {
+                self.timeline_open_generation();
+            }
+            if helto::action(ui, Icon::Edit, "Global prompt…", false, blocked).clicked() {
+                self.timeline_open_global_prompt();
+            }
+            if helto::action(ui, Icon::Audio, "Project audio…", false, blocked).clicked() {
+                self.timeline_open_project_audio(d, commands);
+            }
+        });
+        if project.scenes.is_empty() {
+            ui.add_space(8.);
+            ui.weak("Add a scene to start.");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn effective_timing_shows_the_h3_canvas_and_aligned_duration() {
+        let mut project = media_picker::tests::project();
+        project.default_model.adapter = "h3".into();
+        let scene = project.scenes[0].clone();
+        let note = effective_timing(&project, &scene).unwrap();
+        let shape = crate::h3_protocol::Selection {
+            seconds: seconds(scene.duration),
+            ..Default::default()
+        }
+        .resolve()
+        .unwrap();
+        assert_eq!(
+            note,
+            format!(
+                "Renders 64 × 64 · {} frames · {:.3} s",
+                shape.frames,
+                shape.seconds()
+            )
+        );
+        project.default_model.adapter = "synthetic".into();
+        assert!(effective_timing(&project, &scene).is_none());
     }
 }

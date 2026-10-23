@@ -258,6 +258,22 @@ impl ImagineApp {
         self.timeline_assembly_window(ui.ctx());
         self.timeline_replace_window(ui.ctx());
     }
+    pub(super) fn timeline_open_global_prompt(&mut self) {
+        self.timeline.project_prompt_open = true;
+        if self.timeline.global_prompt_options.is_none() {
+            self.timeline.global_prompt_options =
+                Some(imagine_video_contract::creative::GlobalPromptOptions {
+                    enabled: !self.timeline.draft_global.is_empty(),
+                    position: "Prefix".into(),
+                });
+        }
+    }
+    pub(super) fn timeline_open_project_audio(&mut self, d: &Snapshot, commands: &mut Vec<Edit>) {
+        commands.extend(self.timeline.draft_edits());
+        self.timeline.clear_audio_selection();
+        self.timeline.project_audio = true;
+        self.timeline.audio_settings_draft = Some(d.project.audio.clone());
+    }
     /// Why Timeline actions are unavailable; `needs_project` also requires an open project.
     pub(super) fn timeline_blocked(&self, needs_project: bool) -> Option<&'static str> {
         if self.timeline.session.is_none() {
@@ -424,14 +440,7 @@ impl ImagineApp {
                 #[cfg(feature = "ui-preview")]
                 super::qa::control(ui, "project-global-prompt".into(), &r);
                 if r.clicked() {
-                    self.timeline.project_prompt_open = true;
-                    if self.timeline.global_prompt_options.is_none() {
-                        self.timeline.global_prompt_options =
-                            Some(imagine_video_contract::creative::GlobalPromptOptions {
-                                enabled: !self.timeline.draft_global.is_empty(),
-                                position: "Prefix".into(),
-                            });
-                    }
+                    self.timeline_open_global_prompt();
                     ui.close();
                 }
                 let response =
@@ -441,10 +450,7 @@ impl ImagineApp {
                 if response.clicked()
                     && let Some(d) = &document
                 {
-                    commands.extend(self.timeline.draft_edits());
-                    self.timeline.clear_audio_selection();
-                    self.timeline.project_audio = true;
-                    self.timeline.audio_settings_draft = Some(d.project.audio.clone());
+                    self.timeline_open_project_audio(d, commands);
                     ui.close();
                 }
                 let r = ui.button("New project");
@@ -800,6 +806,51 @@ mod tests {
             output.textures_delta.clear();
             assert_eq!(painted(&output.shapes, "01 · Own signal title"), shown);
             assert!(!painted(&output.shapes, "more"));
+        }
+    }
+
+    #[test]
+    fn inspector_without_a_selection_shows_project_settings() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let project = super::super::media_picker::tests::project();
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-synthetic-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.document = Some(Snapshot::with(
+            project,
+            json!({"persistence":{"state":"saved"}}),
+        ));
+        let mut nodes = vec![];
+        for _ in 0..3 {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 800.),
+                    )),
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            output.textures_delta.clear();
+            nodes = output.platform_output.accesskit_update.unwrap().nodes;
+        }
+        let has = |label| {
+            nodes
+                .iter()
+                .any(|(_, n)| n.label() == Some(label) || n.value() == Some(label))
+        };
+        assert!(app.timeline.selected.is_empty());
+        assert!(has("Project") && has("64 × 64 · 24 fps"));
+        for name in [
+            "Timeline settings…",
+            "Generation settings…",
+            "Global prompt…",
+        ] {
+            assert!(has(name), "{name}");
         }
     }
 
