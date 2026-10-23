@@ -397,7 +397,7 @@ impl ImagineApp {
         }
     }
     pub(super) fn model_settings(&mut self, ui: &mut Ui) {
-        ui.label(RichText::new("Models").strong());
+        ui.label(helto::section("Models"));
         let Some(library) = self.models.catalog.clone() else {
             ui.label("Reconnect to load models.");
             return;
@@ -530,7 +530,10 @@ impl ImagineApp {
         let mut group = self.group_settings();
         let before = group.clone();
         ui.horizontal(|ui| {
-            ui.heading("LoRAs · Qwen Image 2.1");
+            ui.heading(format!(
+                "LoRAs · {}",
+                model_group_name(&self.prefs.model_group)
+            ));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if helto::icon_button(ui, Icon::Close, "Close LoRAs", false).clicked() {
                     self.models.open = false;
@@ -686,9 +689,16 @@ impl ImagineApp {
             self.models.dirty = false;
         }
         if let Some(error) = self.models.error.as_ref().or(self.settings_error.as_ref()) {
-            ui.label(
-                RichText::new(if hidden { "Hidden error" } else { error }).color(helto::ERROR),
-            );
+            ui.label(helto::error_text(error, !hidden));
         }
+    }
+}
+
+/// The display name of a model group.
+pub(super) fn model_group_name(group: &str) -> &str {
+    match group {
+        crate::model_catalog::QWEN_GROUP => "Qwen Image 2.1",
+        crate::model_catalog::MOSS_GROUP => "MOSS Image",
+        other => other,
     }
 }

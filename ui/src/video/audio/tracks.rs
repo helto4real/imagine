@@ -182,9 +182,7 @@ impl ImagineApp {
                         commands.extend(resize_clip(&before, source, end, at, self.timeline.snap));
                     }
                 }
-                let revealed = !self.prefs.privacy_mode
-                    || (ui.input(|i| i.focused)
-                        && ui.rect_contains_pointer(bar.intersect(ui.clip_rect())));
+                let revealed = helto::revealed(ui, bar, self.prefs.privacy_mode);
                 let text = if !revealed {
                     "Hidden audio".into()
                 } else if c.name.is_empty() {

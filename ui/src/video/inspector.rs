@@ -209,7 +209,7 @@ impl ImagineApp {
                         self.timeline.sync_draft();
                     }
                     if self.timeline.boundary {
-                        ui.strong("Boundary");
+                        ui.label(helto::section("Boundary"));
                         ui.separator();
                         // Edits made while busy would be dropped, so the controls wait too.
                         ui.add_enabled_ui(enabled, |ui| {
@@ -218,11 +218,11 @@ impl ImagineApp {
                         });
                         return;
                     }
-                    ui.strong(if self.timeline.section.is_some() {
+                    ui.label(helto::section(if self.timeline.section.is_some() {
                         "Section"
                     } else {
                         "Scene"
-                    });
+                    }));
                     ui.separator();
                     ui.add_enabled_ui(enabled, |ui| {
                         ui.label("Scene type");

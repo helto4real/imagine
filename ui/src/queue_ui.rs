@@ -3,17 +3,12 @@ use crate::icons::Icon;
 use egui::{Align, Layout, Rect, RichText, Stroke};
 use workspace::region;
 
-/// A single reveal boundary for the entire dock, including headers and gaps.
-fn panel_revealed(ui: &egui::Ui, rect: Rect, privacy: bool) -> bool {
-    !privacy
-        || (ui.input(|i| i.focused) && ui.rect_contains_pointer(rect.intersect(ui.clip_rect())))
-}
-
 impl ImagineApp {
     pub(super) fn queue_panel(&mut self, ui: &mut egui::Ui, rect: Rect) {
         self.expand_queue_for_new_work();
         workspace::panel(ui, rect, false);
-        let revealed = panel_revealed(ui, rect, self.prefs.privacy_mode);
+        // A single reveal boundary for the entire dock, including headers and gaps.
+        let revealed = helto::revealed(ui, rect, self.prefs.privacy_mode);
         let header = Rect::from_min_max(
             rect.min + egui::vec2(10., 6.),
             egui::pos2(rect.right() - 10., rect.top() + 38.),
@@ -188,15 +183,7 @@ impl ImagineApp {
                             });
                             if let Some(error) = &job.error {
                                 // Error details can contain file names. They share the panel's reveal boundary.
-                                ui.label(
-                                    RichText::new(if revealed {
-                                        error.as_str()
-                                    } else {
-                                        "Hidden error"
-                                    })
-                                    .small()
-                                    .color(helto::ERROR),
-                                );
+                                ui.label(helto::error_text(error, revealed).small());
                             }
                             ui.separator();
                         });

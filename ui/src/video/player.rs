@@ -92,9 +92,8 @@ impl Player {
         self.advance();
         let size = egui::vec2(ui.available_width(), (ui.available_height() - 38.).max(40.));
         let (rect, _response) = ui.allocate_exact_size(size, egui::Sense::hover());
-        let boundary = egui::Rect::from_min_max(rect.min, rect.max + egui::vec2(0., 38.))
-            .intersect(ui.clip_rect());
-        let revealed = !privacy || (ui.input(|i| i.focused) && ui.rect_contains_pointer(boundary));
+        let boundary = egui::Rect::from_min_max(rect.min, rect.max + egui::vec2(0., 38.));
+        let revealed = helto::revealed(ui, boundary, privacy);
         if !revealed {
             self.pause();
             ui.painter().text(

@@ -191,8 +191,7 @@ impl ImagineApp {
                 egui::pos2(bounds.left() + 10., toolbar.bottom() + 4.),
                 egui::vec2(bounds.width() - 20., if recovering { 58. } else { 22. }),
             );
-            let reveal = !self.prefs.privacy_mode
-                || (ui.input(|i| i.focused) && ui.rect_contains_pointer(strip));
+            let reveal = helto::revealed(ui, strip, self.prefs.privacy_mode);
             chrome::region(ui, "timeline-error", strip, |ui| {
                 if recovering {
                     ui.horizontal_wrapped(|ui|{
@@ -204,17 +203,7 @@ impl ImagineApp {
                     });
                 }
                 if let Some(error) = &error {
-                    ui.add(
-                        egui::Label::new(
-                            RichText::new(if reveal {
-                                error.as_str()
-                            } else {
-                                "Hidden error"
-                            })
-                            .color(helto::ERROR),
-                        )
-                        .truncate(),
-                    );
+                    ui.add(egui::Label::new(helto::error_text(error, reveal)).truncate());
                 }
             });
         }

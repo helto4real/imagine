@@ -292,8 +292,7 @@ impl Comparison {
             self.pause();
             return Err(error);
         }
-        let boundary = ui.available_rect_before_wrap().intersect(ui.clip_rect());
-        let revealed = !privacy || ui.input(|i| i.focused) && ui.rect_contains_pointer(boundary);
+        let revealed = helto::revealed(ui, ui.available_rect_before_wrap(), privacy);
         if !revealed {
             self.pause();
         }

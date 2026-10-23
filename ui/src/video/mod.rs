@@ -1128,33 +1128,33 @@ impl ImagineApp {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
-                ui.label(match replace {
-                    Replace::New => {
-                        "Start a new project? Unsaved changes in this project are lost."
-                    }
-                    Replace::Open => {
-                        "Open another project? Unsaved changes in this project are lost."
-                    }
-                    Replace::Animate => {
-                        "Animate into a new project? Unsaved changes in this project are lost."
-                    }
-                });
-                ui.horizontal(|ui| {
-                    let r =
-                        helto::icon_button(ui, crate::icons::Icon::Trash, "Discard changes", false);
-                    #[cfg(feature = "ui-preview")]
-                    qa::control(ui, "replace-discard".into(), &r);
-                    if r.clicked() {
-                        decision = Some(true);
-                    }
-                    let r =
-                        helto::icon_button(ui, crate::icons::Icon::Close, "Keep project", false);
-                    #[cfg(feature = "ui-preview")]
-                    qa::control(ui, "replace-keep".into(), &r);
-                    if r.clicked() {
-                        decision = Some(false);
-                    }
-                });
+                let answer = helto::confirm(
+                    ui,
+                    match replace {
+                        Replace::New => {
+                            "Start a new project? Unsaved changes in this project are lost."
+                        }
+                        Replace::Open => {
+                            "Open another project? Unsaved changes in this project are lost."
+                        }
+                        Replace::Animate => {
+                            "Animate into a new project? Unsaved changes in this project are lost."
+                        }
+                    },
+                    (crate::icons::Icon::Trash, "Discard changes"),
+                    "Keep project",
+                    None,
+                );
+                #[cfg(feature = "ui-preview")]
+                {
+                    qa::control(ui, "replace-discard".into(), &answer.yes);
+                    qa::control(ui, "replace-keep".into(), &answer.no);
+                }
+                if answer.yes.clicked() {
+                    decision = Some(true);
+                } else if answer.no.clicked() {
+                    decision = Some(false);
+                }
             });
         if let Some(discard) = decision {
             self.timeline.replace_pending = None;

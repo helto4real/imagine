@@ -602,11 +602,13 @@ impl ImagineApp {
                             });
                             if done { state.save_as_name = None; }
                         }
-                        if state.confirm_delete {ui.horizontal_wrapped(|ui|{
-                            ui.label(format!("Delete {}?",state.selected));
-                            let r=helto::icon_button(ui,crate::icons::Icon::Trash,"Delete",false);control(ui,"catalog-delete-confirm",&r);if r.clicked(){save=Some((false,true));state.confirm_delete=false;}
-                            let r=helto::icon_button(ui,crate::icons::Icon::Close,"Cancel",false);control(ui,"catalog-delete-cancel",&r);if r.clicked(){state.confirm_delete=false;}
-                        });}
+                        if state.confirm_delete {
+                            let answer = helto::confirm(ui, &format!("Delete {}?", state.selected), (crate::icons::Icon::Trash, "Delete"), "Cancel", None);
+                            control(ui, "catalog-delete-confirm", &answer.yes);
+                            control(ui, "catalog-delete-cancel", &answer.no);
+                            if answer.yes.clicked() { save = Some((false, true)); state.confirm_delete = false; }
+                            if answer.no.clicked() { state.confirm_delete = false; }
+                        }
                         ui.horizontal(|ui| {
                             for (yaml, label) in [(true, "YAML"), (false, "Form")] {
                                 let r = ui.selectable_value(&mut state.yaml, yaml, label);

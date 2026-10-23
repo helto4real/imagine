@@ -2,9 +2,46 @@
 use crate::icons::{self, Icon};
 use eframe::egui::{self, Color32, Stroke};
 
+/// The one Hide previews rule: private content shows only while the pointer
+/// is over its visible part of `rect` in a focused window.
+pub fn revealed(ui: &egui::Ui, rect: egui::Rect, privacy_mode: bool) -> bool {
+    let visible = rect.intersect(ui.clip_rect());
+    // The live pointer position also covers a pointer that left the window.
+    !privacy_mode
+        || ui.rect_contains_pointer(visible)
+            && ui.input(|i| i.focused && i.pointer.hover_pos().is_some_and(|p| visible.contains(p)))
+}
 pub fn reveal_in_viewport(ui: &egui::Ui, privacy_mode: bool) -> bool {
     // Content coordinates move with scrolling; hover belongs to the visible viewport.
-    !privacy_mode || ui.input(|i| i.focused) && ui.rect_contains_pointer(ui.clip_rect())
+    revealed(ui, ui.clip_rect(), privacy_mode)
+}
+/// A section title inside a panel or window.
+pub fn section(title: &str) -> egui::RichText {
+    egui::RichText::new(title).strong().size(14.).color(TEXT)
+}
+/// Error text; details can name files, so they follow Hide previews.
+pub fn error_text(error: &str, revealed: bool) -> egui::RichText {
+    egui::RichText::new(if revealed { error } else { "Hidden error" }).color(ERROR)
+}
+/// The two actions of a consequential question.
+pub(crate) struct Confirm {
+    pub yes: egui::Response,
+    pub no: egui::Response,
+}
+/// Asks `question`, offering `yes` (blocked with a reason when given) or `no`.
+pub(crate) fn confirm(
+    ui: &mut egui::Ui,
+    question: &str,
+    yes: (Icon, &str),
+    no: &str,
+    blocked: Option<&str>,
+) -> Confirm {
+    ui.label(question);
+    ui.horizontal(|ui| Confirm {
+        yes: action(ui, yes.0, yes.1, false, blocked),
+        no: icon_button(ui, Icon::Close, no, false),
+    })
+    .inner
 }
 
 const PRIVACY_MODE: &str = "helto-privacy-mode";
@@ -471,15 +508,7 @@ pub fn textarea(
         .with_stroke(false)
         .show(ui, |ui| {
             let rect = ui.available_rect_before_wrap();
-            let hidden = privacy_mode
-                && !(ui.rect_contains_pointer(rect)
-                    && ui.input(|input| {
-                        input.focused
-                            && input
-                                .pointer
-                                .hover_pos()
-                                .is_some_and(|pos| rect.intersect(ui.clip_rect()).contains(pos))
-                    }));
+            let hidden = !revealed(ui, rect, privacy_mode);
             ui.painter().rect_filled(rect, 5, FIELD);
             let mut response = egui::ScrollArea::vertical()
                 .id_salt((id, "text-scroll"))
@@ -785,6 +814,32 @@ mod tests {
         assert_eq!(frame(vec![], false), (false, false));
         assert_eq!(frame(vec![], true), (false, false));
         assert_eq!(text, "Own typed field!");
+    }
+    #[test]
+    fn confirm_offers_named_actions_and_blocks_with_a_reason() {
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            confirm(
+                ui,
+                "Own question?",
+                (Icon::Trash, "Own yes"),
+                "Own no",
+                Some("Own reason."),
+            );
+        });
+        output.textures_delta.clear();
+        let nodes = output.platform_output.accesskit_update.unwrap().nodes;
+        let node = |label| {
+            nodes
+                .iter()
+                .find(|(_, n)| n.label() == Some(label))
+                .unwrap()
+                .1
+                .clone()
+        };
+        assert!(node("Own yes").is_disabled());
+        assert!(!node("Own no").is_disabled());
     }
     #[test]
     fn viewport_privacy_still_hides_on_leave_and_lost_focus() {

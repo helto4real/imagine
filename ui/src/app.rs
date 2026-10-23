@@ -860,15 +860,7 @@ fn image_view_layers(
         },
     );
     let visible_rect = rect.intersect(ui.clip_rect());
-    let reveal = !privacy_mode
-        || response.hovered()
-            && ui.input(|input| {
-                input.focused
-                    && input
-                        .pointer
-                        .hover_pos()
-                        .is_some_and(|pos| visible_rect.contains(pos))
-            });
+    let reveal = helto::revealed(ui, rect, privacy_mode);
     ui.painter().rect_filled(rect, 0, helto::MEDIA);
     if reveal {
         let original = texture.size_vec2();

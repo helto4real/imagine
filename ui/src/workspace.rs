@@ -1336,14 +1336,7 @@ impl ImagineApp {
                         .show(ui, |ui| {
                             // Error details can name files; they reveal on hover like the queue.
                             let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
-                            ui.colored_label(
-                                helto::ERROR,
-                                if revealed {
-                                    error.as_str()
-                                } else {
-                                    "Hidden error"
-                                },
-                            );
+                            ui.label(helto::error_text(&error, revealed));
                         });
                 });
             }
@@ -1445,12 +1438,7 @@ impl ImagineApp {
                     ui.spacing_mut().interact_size.y = 32.;
                     self.model_settings(ui);
                     ui.add_space(18.);
-                    ui.label(
-                        RichText::new("Generation")
-                            .strong()
-                            .size(14.)
-                            .color(helto::TEXT),
-                    );
+                    ui.label(helto::section("Generation"));
                     ui.add_space(14.);
                     let before = self.prefs.generation.clone();
                     let before_upscale = self.prefs.upscale_target;
@@ -1540,12 +1528,7 @@ impl ImagineApp {
                     ui.add_space(22.);
                     self.enhancement_settings(ui);
                     ui.add_space(16.);
-                    ui.label(
-                        RichText::new("Storage")
-                            .strong()
-                            .size(14.)
-                            .color(helto::TEXT),
-                    );
+                    ui.label(helto::section("Storage"));
                     ui.add_space(12.);
                     ui.label("Save to");
                     ui.horizontal(|ui| {
@@ -1590,12 +1573,7 @@ impl ImagineApp {
                     ui.add_space(24.);
                     ui.separator();
                     ui.add_space(22.);
-                    ui.label(
-                        RichText::new("Privacy")
-                            .strong()
-                            .size(14.)
-                            .color(helto::TEXT),
-                    );
+                    ui.label(helto::section("Privacy"));
                     ui.add_space(14.);
                     ui.horizontal(|ui| {
                         ui.label("Hide previews");
@@ -1610,14 +1588,7 @@ impl ImagineApp {
                     if let Some(error) = &self.settings_error {
                         ui.add_space(14.);
                         let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
-                        ui.colored_label(
-                            helto::ERROR,
-                            if revealed {
-                                error.as_str()
-                            } else {
-                                "Hidden error"
-                            },
-                        );
+                        ui.label(helto::error_text(error, revealed));
                     }
                 });
         });

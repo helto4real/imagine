@@ -482,11 +482,7 @@ impl ImagineApp {
                         .num_columns(2)
                         .show(ui, |ui| {
                             for family in families {
-                                ui.label(match family.as_str() {
-                                    crate::model_catalog::QWEN_GROUP => "Qwen Image 2.1",
-                                    crate::model_catalog::MOSS_GROUP => "MOSS Image",
-                                    _ => &family,
-                                });
+                                ui.label(super::models::model_group_name(&family));
                                 let selected = &mut self
                                     .prefs
                                     .model_groups
@@ -642,31 +638,32 @@ impl ImagineApp {
             }
         }
         if let Some(change) = self.enhancement.confirm.clone() {
-            ui.horizontal_wrapped(|ui| {
-                let delete = change == ProfileChange::Delete;
-                ui.label(if delete {
+            let delete = change == ProfileChange::Delete;
+            let answer = helto::confirm(
+                ui,
+                if delete {
                     "Delete this profile?"
                 } else {
                     "Discard unsaved profile changes?"
-                });
-                let confirm = helto::icon_button(
-                    ui,
+                },
+                (
                     Icon::Trash,
                     if delete {
                         "Delete profile"
                     } else {
                         "Discard changes"
                     },
-                    false,
-                );
-                if confirm.clicked() {
-                    self.enhancement.confirm = None;
-                    self.apply_profile_change(ui.ctx(), change);
-                }
-                if helto::icon_button(ui, Icon::Close, "Keep profile", false).clicked() {
-                    self.enhancement.confirm = None;
-                }
-            });
+                ),
+                "Keep profile",
+                None,
+            );
+            if answer.yes.clicked() {
+                self.enhancement.confirm = None;
+                self.apply_profile_change(ui.ctx(), change);
+            }
+            if answer.no.clicked() {
+                self.enhancement.confirm = None;
+            }
         }
         let Some(draft) = &mut self.enhancement.draft else {
             return;

@@ -266,7 +266,7 @@ impl ImagineApp {
                 }
                 let error=job.failure_message();
                 if let Some(error)=error {
-                    ui.colored_label(helto::ERROR,if revealed {error.as_str()} else {"Hidden error"});
+                    ui.label(helto::error_text(&error,revealed));
                 }
                 ui.separator();
             });

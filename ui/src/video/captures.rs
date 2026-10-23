@@ -84,17 +84,14 @@ impl ImagineApp {
             if let Some(code) = d.raw["capture_result"]["cleanup_warning"].as_str() { ui.colored_label(helto::ERROR, format!("Capture removed. Some owned project files could not be cleaned: {code}. External originals are unchanged.")); }
             if scene.is_none() { ui.weak("Choose a Scene to attach a Capture. Existing Captures can still be previewed or removed."); }
             if let Some(id) = self.timeline.captures.confirm.clone() {
-                ui.label("Remove this Capture and its owned project files? External originals are preserved. Receipts used by other Takes are retained as provenance.");
-                ui.horizontal(|ui| {
-                    let remove = helto::action(ui, crate::icons::Icon::Trash, "Remove Capture", false, self.timeline.busy.then_some("Wait for the current timeline operation."));
-                    control(ui, "capture-confirm-remove", &remove);
-                    if remove.clicked() {
-                        action = Some((id, Action::Delete));
-                        self.timeline.captures.confirm = None;
-                    }
-                    let cancel = helto::icon_button(ui, crate::icons::Icon::Close, "Cancel", false); control(ui, "capture-confirm-cancel", &cancel);
-                    if cancel.clicked() { self.timeline.captures.confirm = None; }
-                });
+                let answer = helto::confirm(ui, "Remove this Capture and its owned project files? External originals are preserved. Receipts used by other Takes are retained as provenance.", (crate::icons::Icon::Trash, "Remove Capture"), "Cancel", self.timeline.busy.then_some("Wait for the current timeline operation."));
+                control(ui, "capture-confirm-remove", &answer.yes);
+                control(ui, "capture-confirm-cancel", &answer.no);
+                if answer.yes.clicked() {
+                    action = Some((id, Action::Delete));
+                    self.timeline.captures.confirm = None;
+                }
+                if answer.no.clicked() { self.timeline.captures.confirm = None; }
                 return;
             }
             let reveal = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
