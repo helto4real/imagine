@@ -227,6 +227,34 @@ pub fn install(ctx: &egui::Context) {
         ctx.set_fonts(fonts);
     }
 }
+/// Edits a copy of `current` with `add` and returns it once the edit settles.
+/// While the widget is dragged or holds keyboard focus the value is a draft
+/// kept under `salt`, so callers that save each change do not send an edit
+/// mid-gesture: saving disables the controls until the reply, which would
+/// end the drag or take the focus away from the field being typed in.
+pub fn settled<T>(
+    ui: &mut egui::Ui,
+    salt: impl std::hash::Hash + std::fmt::Debug,
+    current: &T,
+    add: impl FnOnce(&mut egui::Ui, &mut T) -> egui::Response,
+) -> (egui::Response, Option<T>)
+where
+    T: Clone + PartialEq + Send + Sync + 'static,
+{
+    let key = ui.id().with(("settled-draft", salt));
+    let mut value = ui
+        .data(|d| d.get_temp::<T>(key))
+        .unwrap_or_else(|| current.clone());
+    let response = add(ui, &mut value);
+    if response.dragged() || response.has_focus() {
+        ui.data_mut(|d| d.insert_temp(key, value));
+        return (response, None);
+    }
+    ui.data_mut(|d| d.remove::<T>(key));
+    let settled = (value != *current).then_some(value);
+    (response, settled)
+}
+
 /// A small count pinned to the top-right corner of `anchor`, such as run progress.
 pub fn badge(ui: &egui::Ui, anchor: egui::Rect, text: &str) {
     let galley = ui
@@ -671,6 +699,80 @@ fn redact_text_accessibility(ctx: &egui::Context, id: egui::Id) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_typed_number_settles_once_on_enter_and_keeps_focus_while_typing() {
+        #[derive(Default)]
+        struct Field {
+            stored: f64,
+            settled: Vec<f64>,
+            rect: Option<egui::Rect>,
+            focused: bool,
+        }
+        fn frame(ctx: &egui::Context, field: &mut Field, events: Vec<egui::Event>) {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    events,
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| {
+                    let (r, value) = settled(ui, "own-duration", &field.stored, |ui, v| {
+                        ui.add(egui::DragValue::new(v).suffix(" s"))
+                    });
+                    field.rect = Some(r.rect);
+                    field.focused = r.has_focus();
+                    if let Some(value) = value {
+                        field.settled.push(value);
+                        field.stored = value;
+                    }
+                },
+            );
+            output.textures_delta.clear();
+        }
+        let ctx = egui::Context::default();
+        let mut field = Field {
+            stored: 2.,
+            ..Default::default()
+        };
+        frame(&ctx, &mut field, vec![]);
+        let at = field.rect.unwrap().center();
+        // A click enters text editing; typing replaces the value.
+        for pressed in [true, false] {
+            frame(
+                &ctx,
+                &mut field,
+                vec![
+                    egui::Event::PointerMoved(at),
+                    egui::Event::PointerButton {
+                        pos: at,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: Default::default(),
+                    },
+                ],
+            );
+        }
+        let key = |key, pressed| egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed,
+            repeat: false,
+            modifiers: Default::default(),
+        };
+        frame(&ctx, &mut field, vec![egui::Event::Text("5".into())]);
+        frame(&ctx, &mut field, vec![egui::Event::Text(".5".into())]);
+        assert!(field.settled.is_empty(), "{:?}", field.settled);
+        assert!(field.focused, "typing keeps focus");
+        frame(
+            &ctx,
+            &mut field,
+            vec![key(egui::Key::Enter, true), key(egui::Key::Enter, false)],
+        );
+        frame(&ctx, &mut field, vec![]);
+        assert_eq!(field.settled.len(), 1, "{:?}", field.settled);
+        assert_ne!(field.settled[0], 2., "{:?}", field.settled);
+    }
 
     #[test]
     fn blocked_icon_actions_keep_their_name_and_report_disabled() {

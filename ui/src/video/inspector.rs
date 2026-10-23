@@ -742,16 +742,23 @@ impl ImagineApp {
     ) {
         ui.horizontal(|ui| {
             ui.label("Duration");
-            let mut duration = seconds(scene.duration);
-            if ui
-                .add(
-                    egui::DragValue::new(&mut duration)
-                        .range(0.25..=3600.)
-                        .speed(0.25)
-                        .suffix(" s"),
-                )
-                .changed()
-            {
+            let (r, duration) = helto::settled(
+                ui,
+                ("scene-duration", &scene.id.0),
+                &seconds(scene.duration),
+                |ui, v| {
+                    ui.add(
+                        egui::DragValue::new(v)
+                            .range(0.25..=3600.)
+                            .speed(0.25)
+                            .suffix(" s"),
+                    )
+                },
+            );
+            #[cfg(feature = "ui-preview")]
+            super::qa::control(ui, "scene-duration".into(), &r);
+            let _ = r;
+            if let Some(duration) = duration {
                 commands.extend(resize_scene(
                     &d.project,
                     scene,

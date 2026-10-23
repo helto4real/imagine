@@ -133,16 +133,23 @@ impl ImagineApp {
                             changed = true;
                         }
                         if let Some(time) = value {
-                            let mut seconds = editing::seconds(*time);
-                            let r = ui.add(
-                                egui::DragValue::new(&mut seconds)
-                                    .range(0.0..=f64::MAX)
-                                    .speed(0.05)
-                                    .suffix(" s"),
+                            let (r, seconds) = helto::settled(
+                                ui,
+                                ("video-range", &binding.id.0, title),
+                                &editing::seconds(*time),
+                                |ui, v| {
+                                    ui.add(
+                                        egui::DragValue::new(v)
+                                            .range(0.0..=f64::MAX)
+                                            .speed(0.05)
+                                            .suffix(" s"),
+                                    )
+                                },
                             );
                             #[cfg(feature = "ui-preview")]
                             super::qa::control(ui, format!("video-{_id}-{}", asset.id.0), &r);
-                            if r.changed() {
+                            let _ = r;
+                            if let Some(seconds) = seconds {
                                 *time = editing::time(seconds);
                                 changed = true;
                             }

@@ -16,6 +16,8 @@ impl ImagineApp {
                 .clone()
                 .unwrap_or_else(|| d.project.audio.clone());
             let mut changed = false;
+            // Number fields save once released, not while dragged or typed in.
+            let (mut active, mut released) = (false, false);
             ui.add_enabled_ui(enabled, |ui| {
                 let r = ui.checkbox(&mut a.use_native_audio, "Include generated audio");
                 #[cfg(feature = "ui-preview")]
@@ -49,18 +51,24 @@ impl ImagineApp {
                 ] {
                     ui.horizontal(|ui| {
                         ui.label(label);
-                        changed |= ui.add(egui::DragValue::new(value).speed(step)).changed();
+                        changed |= edited(
+                            &ui.add(egui::DragValue::new(value).speed(step)),
+                            &mut active,
+                            &mut released,
+                        );
                     });
                 }
                 ui.horizontal(|ui| {
                     ui.label("Default volume");
-                    changed |= ui
-                        .add(
+                    changed |= edited(
+                        &ui.add(
                             egui::DragValue::new(&mut a.default_volume)
                                 .range(0.0..=400.)
                                 .suffix(" %"),
-                        )
-                        .changed();
+                        ),
+                        &mut active,
+                        &mut released,
+                    );
                 });
                 for (label, value) in [
                     ("Default fade in", &mut a.default_fade_in_seconds),
@@ -68,19 +76,21 @@ impl ImagineApp {
                 ] {
                     ui.horizontal(|ui| {
                         ui.label(label);
-                        changed |= ui
-                            .add(
+                        changed |= edited(
+                            &ui.add(
                                 egui::DragValue::new(value)
                                     .range(0.0..=f64::MAX)
                                     .speed(0.05)
                                     .suffix(" s"),
-                            )
-                            .changed();
+                            ),
+                            &mut active,
+                            &mut released,
+                        );
                     });
                 }
             });
             self.timeline.audio_settings_draft = Some(a.clone());
-            if changed {
+            if (changed && !active || released) && a != d.project.audio {
                 commands.push(Edit::SetAudioSettings { settings: a });
             }
             return true;
@@ -98,6 +108,8 @@ impl ImagineApp {
             .filter(|c| c.id == id)
             .unwrap_or_else(|| original.clone());
         let mut changed = false;
+        // Number fields save once released, not while dragged or typed in.
+        let (mut active, mut released) = (false, false);
         let mut duplicated: Option<AudioClip> = None;
         let select = helto::action(
             ui,
@@ -173,26 +185,29 @@ impl ImagineApp {
             }
             ui.horizontal(|ui| {
                 ui.label("Volume");
-                changed |= ui
-                    .add(
+                changed |= edited(
+                    &ui.add(
                         egui::DragValue::new(&mut c.volume)
                             .range(0.0..=400.)
                             .suffix(" %"),
-                    )
-                    .changed();
+                    ),
+                    &mut active,
+                    &mut released,
+                );
             });
             let mut source = seconds(c.source_in);
             ui.horizontal(|ui| {
                 ui.label("Source in");
-                if ui
-                    .add(
+                if edited(
+                    &ui.add(
                         egui::DragValue::new(&mut source)
                             .range(0.0..=f64::MAX)
                             .speed(0.05)
                             .suffix(" s"),
-                    )
-                    .changed()
-                {
+                    ),
+                    &mut active,
+                    &mut released,
+                ) {
                     c.source_in = time(source);
                     changed = true;
                 }
@@ -205,15 +220,16 @@ impl ImagineApp {
             }
             if let Some(value) = c.source_out {
                 let mut value = seconds(value);
-                if ui
-                    .add(
+                if edited(
+                    &ui.add(
                         egui::DragValue::new(&mut value)
                             .range(0.0..=f64::MAX)
                             .speed(0.05)
                             .suffix(" s"),
-                    )
-                    .changed()
-                {
+                    ),
+                    &mut active,
+                    &mut released,
+                ) {
                     c.source_out = Some(time(value));
                     changed = true;
                 }
@@ -221,14 +237,16 @@ impl ImagineApp {
             for (label, value) in [("Fade in", &mut c.fade_in), ("Fade out", &mut c.fade_out)] {
                 ui.horizontal(|ui| {
                     ui.label(label);
-                    changed |= ui
-                        .add(
+                    changed |= edited(
+                        &ui.add(
                             egui::DragValue::new(value)
                                 .range(0.0..=f64::MAX)
                                 .speed(0.05)
                                 .suffix(" s"),
-                        )
-                        .changed();
+                        ),
+                        &mut active,
+                        &mut released,
+                    );
                 });
             }
             ui.separator();
@@ -376,7 +394,7 @@ impl ImagineApp {
                 });
             }
         });
-        if changed
+        if (changed && !active || released)
             && c != original
             && !commands
                 .iter()
@@ -407,4 +425,12 @@ fn purpose(p: AudioPurpose) -> &'static str {
         AudioPurpose::Continuity => "Continuity",
         AudioPurpose::Custom => "Custom",
     }
+}
+
+/// A number field's change; `active` notes one still dragged or typed in,
+/// `released` one just let go, so its value is saved once.
+fn edited(r: &egui::Response, active: &mut bool, released: &mut bool) -> bool {
+    *active |= r.dragged() || r.has_focus();
+    *released |= r.drag_stopped() || r.lost_focus();
+    r.changed()
 }

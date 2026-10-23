@@ -221,9 +221,16 @@ impl ImagineApp {
         if boundary.mode == BoundaryMode::BlendSeam {
             ui.horizontal(|ui| {
                 ui.label("Overlap frames");
-                let r =
-                    ui.add(egui::DragValue::new(&mut boundary.blend_frames).range(1..=u32::MAX));
+                let (r, value) = helto::settled(
+                    ui,
+                    ("boundary-blend", &boundary.right.0),
+                    &boundary.blend_frames,
+                    |ui, v| ui.add(egui::DragValue::new(v).range(1..=u32::MAX)),
+                );
                 control(ui, "assembly-overlap", &r);
+                if let Some(value) = value {
+                    boundary.blend_frames = value;
+                }
             });
         }
         if boundary.mode != BoundaryMode::HardCut {
@@ -238,8 +245,14 @@ impl ImagineApp {
                 });
             }
             if let Some(tail) = &mut boundary.tail_frames {
-                let response = ui.add(egui::DragValue::new(tail));
+                let (response, value) =
+                    helto::settled(ui, ("boundary-tail", &boundary.right.0), &*tail, |ui, v| {
+                        ui.add(egui::DragValue::new(v))
+                    });
                 control(ui, "boundary-tail-frames", &response);
+                if let Some(value) = value {
+                    *tail = value;
+                }
             } else {
                 ui.weak(format!(
                     "Default: 3 seconds · {} requested frames",
@@ -250,12 +263,23 @@ impl ImagineApp {
             }
             if boundary.mode == BoundaryMode::Transition {
                 ui.label("Transition prompt");
-                let response = ui.add(
-                    egui::TextEdit::multiline(&mut boundary.transition_prompt)
-                        .desired_width(f32::INFINITY)
-                        .desired_rows(3),
+                // Saved when the field loses focus, so typing keeps it.
+                let (response, value) = helto::settled(
+                    ui,
+                    ("boundary-transition", &boundary.right.0),
+                    &boundary.transition_prompt,
+                    |ui, v| {
+                        ui.add(
+                            egui::TextEdit::multiline(v)
+                                .desired_width(f32::INFINITY)
+                                .desired_rows(3),
+                        )
+                    },
                 );
                 control(ui, "boundary-transition-prompt", &response);
+                if let Some(value) = value {
+                    boundary.transition_prompt = value;
+                }
             }
             ui.checkbox(
                 &mut boundary.reuse_visual_references,
@@ -329,35 +353,43 @@ impl ImagineApp {
                 );
             ui.horizontal(|ui| {
                 ui.label("Source in");
-                let r = ui.add(
-                    egui::DragValue::new(&mut start)
-                        .speed(0.01)
-                        .range(0. ..=f64::MAX),
-                );
+                let (r, value) = helto::settled(ui, ("clip-in", &scene.id.0), &start, |ui, v| {
+                    ui.add(egui::DragValue::new(v).speed(0.01).range(0. ..=f64::MAX))
+                });
                 control(ui, "assembly-source-in", &r);
+                if let Some(value) = value {
+                    start = value;
+                }
             });
             let mut trimmed = clip.source_out.is_some();
             let r = ui.checkbox(&mut trimmed, "Source out");
             control(ui, "assembly-source-out-enabled", &r);
             if trimmed {
-                let r = ui.add(
-                    egui::DragValue::new(&mut end)
-                        .speed(0.01)
-                        .range(0. ..=f64::MAX),
-                );
+                let (r, value) = helto::settled(ui, ("clip-out", &scene.id.0), &end, |ui, v| {
+                    ui.add(egui::DragValue::new(v).speed(0.01).range(0. ..=f64::MAX))
+                });
                 control(ui, "assembly-source-out", &r);
+                if let Some(value) = value {
+                    end = value;
+                }
             }
             clip.source_in = imagine_video_contract::assembly::time(start);
             clip.source_out = trimmed.then(|| imagine_video_contract::assembly::time(end));
             ui.horizontal(|ui| {
                 ui.label("Speed");
-                let r = ui.add(
-                    egui::DragValue::new(&mut clip.speed)
-                        .speed(0.05)
-                        .range(f64::MIN_POSITIVE..=f64::MAX)
-                        .suffix("×"),
-                );
+                let (r, value) =
+                    helto::settled(ui, ("clip-speed", &scene.id.0), &clip.speed, |ui, v| {
+                        ui.add(
+                            egui::DragValue::new(v)
+                                .speed(0.05)
+                                .range(f64::MIN_POSITIVE..=f64::MAX)
+                                .suffix("×"),
+                        )
+                    });
                 control(ui, "assembly-speed", &r);
+                if let Some(value) = value {
+                    clip.speed = value;
+                }
             });
             let r = ui.checkbox(&mut clip.include_audio, "Include source audio");
             control(ui, "assembly-clip-audio", &r);
