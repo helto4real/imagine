@@ -22,8 +22,9 @@ impl ImagineApp {
         );
         let timeline_h = self.pane_size(
             chrome::Pane::Tracks,
+            // Narrow windows wrap the tool row; keep one audio lane visible.
             if bounds.width() < 850. {
-                (bounds.height() * 0.35).clamp(224., 280.)
+                (bounds.height() * 0.38).clamp(260., 300.)
             } else {
                 (bounds.height() * 0.29).clamp(160., 220.)
             },
