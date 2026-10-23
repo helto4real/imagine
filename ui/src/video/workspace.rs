@@ -100,7 +100,11 @@ impl ImagineApp {
                 }
             },
         );
-        if let Some(document) = &document {
+        if self.timeline_story_open() {
+            // The Story view takes the panes and track area; the toolbar stays.
+            let area = Rect::from_min_max(main.min, bounds.max);
+            self.timeline_story_view(ui, area);
+        } else if let Some(document) = &document {
             let right_w = if self.timeline.inspector_collapsed {
                 0.
             } else {

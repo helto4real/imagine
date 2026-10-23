@@ -9,7 +9,7 @@ pub(in crate::app) enum Reply {
     Applied,
 }
 pub(super) struct State {
-    open: bool,
+    pub(super) open: bool,
     pub(super) busy: bool,
     operation: Operation,
     brief: String,
@@ -28,7 +28,7 @@ pub(super) struct State {
     pub(super) draft: Option<Draft>,
     history: Vec<Draft>,
     pub(super) failure: Option<String>,
-    selected: usize,
+    pub(super) selected: usize,
     poll_at: Option<std::time::Instant>,
     owner_session: Option<String>,
     cast: BTreeSet<String>,
@@ -122,7 +122,7 @@ impl State {
         self.owner_session = Some(id.into());
     }
 }
-fn control(ui: &mut egui::Ui, name: &str, response: &egui::Response) {
+pub(super) fn control(ui: &mut egui::Ui, name: &str, response: &egui::Response) {
     #[cfg(feature = "ui-preview")]
     super::qa::control(ui, name.into(), response);
     let _ = (ui, name, response);
@@ -154,6 +154,284 @@ fn source_image_label(project: &VideoProject, id: &AssetId) -> String {
                     .map_or(0, |i| i + 1)
             )
         })
+}
+/// What a frame of the Story view or window asked for.
+#[derive(Default)]
+pub(super) struct Actions {
+    pub call: Option<(Reply, bool, String, Option<Value>)>,
+    pub new_proposal: bool,
+    pub close: bool,
+    pub pick_images: bool,
+    pub restore: Option<usize>,
+}
+fn authoring_stale(draft: &Draft, document: &Option<Snapshot>) -> bool {
+    document.as_ref().is_none_or(|s| {
+        s.project.id != draft.project_id
+            || s.project.project_revision != draft.request.expected_project_revision
+    })
+}
+/// Expand (or retry from the failed scene) and Apply for a reviewed draft.
+pub(super) fn authoring_draft_actions(
+    ui: &mut egui::Ui,
+    draft: &mut Draft,
+    document: &Option<Snapshot>,
+    actions: &mut Actions,
+) {
+    let stale = authoring_stale(draft, document);
+    let editable = draft.phase != Phase::Applied;
+    let mut expand = None;
+    let mut apply = false;
+    ui.horizontal_wrapped(|ui| {
+        if draft.outline.is_some() {
+            let r = helto::action(
+                ui,
+                if draft.failed_index.is_some() {
+                    crate::icons::Icon::Retry
+                } else {
+                    crate::icons::Icon::Generate
+                },
+                if draft.failed_index.is_some() {
+                    "Retry from failed scene"
+                } else {
+                    "Expand scenes"
+                },
+                true,
+                (!editable).then_some("Wait for the current proposal."),
+            );
+            control(ui, "story-expand", &r);
+            if r.clicked() {
+                expand = Some(draft.failed_index.unwrap_or(0));
+            }
+        }
+        let r = helto::action(
+            ui,
+            crate::icons::Icon::Check,
+            "Apply reviewed proposal",
+            true,
+            if stale {
+                Some("The project changed. Create a new proposal.")
+            } else {
+                (draft.phase != Phase::Review).then_some("Finish the proposal first.")
+            },
+        );
+        control(ui, "story-apply", &r);
+        apply = r.clicked();
+    });
+    if let Some(index) = expand {
+        actions.call = Some((
+            Reply::Draft,
+            true,
+            format!("/v1/video/authoring/{}/review", draft.id),
+            Some(
+                json!({"schema_version":1,"outline":draft.outline,"scenes":draft.scenes,"text":draft.text,"then_expand":index}),
+            ),
+        ));
+    }
+    if apply {
+        actions.call = Some((
+            Reply::Applied,
+            true,
+            format!("/v1/video/authoring/{}/review", draft.id),
+            Some(
+                json!({"schema_version":1,"outline":draft.outline,"scenes":(draft.request.operation==Operation::Outline).then_some(&draft.scenes),"text":draft.text,"then_apply":draft.request.expected_project_revision}),
+            ),
+        ));
+    }
+}
+/// The additional instruction and Generate for a new request.
+pub(super) fn authoring_generate(
+    ui: &mut egui::Ui,
+    state: &mut State,
+    document: &Option<Snapshot>,
+    actions: &mut Actions,
+) {
+    ui.label("Additional instruction");
+    let r = ui.add(
+        egui::TextEdit::multiline(&mut state.instruction)
+            .desired_rows(3)
+            .desired_width(f32::INFINITY),
+    );
+    control(ui, "story-instruction", &r);
+    let r = helto::action(
+        ui,
+        crate::icons::Icon::Generate,
+        if state.operation == Operation::Outline {
+            "Generate outline"
+        } else {
+            "Generate enhancement"
+        },
+        true,
+        if document.is_none() {
+            Some("Create or open a project first.")
+        } else {
+            state.busy.then_some("Wait for the current proposal.")
+        },
+    );
+    control(ui, "story-generate", &r);
+    if r.clicked()
+        && let Some(d) = document
+    {
+        actions.call = Some((
+            Reply::Draft,
+            true,
+            format!("/v1/video/projects/{}/authoring", d.project.id.0),
+            Some(json!(Request {
+                schema_version: 1,
+                expected_project_revision: d.project.project_revision,
+                provider_profile_id: state.provider_id.clone(),
+                provider: provider_transport(state),
+                prompt_profile_id: state.profile.clone(),
+                operation: state.operation,
+                scene_field: state.scene_field,
+                scene_id: state.target_scene.clone(),
+                section_id: state.target_section.clone(),
+                brief: state.brief.clone(),
+                instruction: state.instruction.clone(),
+                duration_seconds: state.duration,
+                destination: state.destination,
+                cast: if state.operation == Operation::Outline {
+                    state.cast.iter().cloned().collect()
+                } else {
+                    vec![]
+                },
+                images: if state.operation == Operation::Outline {
+                    state
+                        .images
+                        .iter()
+                        .enumerate()
+                        .map(|(i, (asset, usage))| StoryImage {
+                            pair_with: state
+                                .pairs
+                                .get(asset)
+                                .filter(|id| !id.0.is_empty())
+                                .map(|id| id.0.clone()),
+                            id: asset.0.clone(),
+                            asset: asset.clone(),
+                            label: format!("Source image {}", i + 1),
+                            usage: *usage,
+                        })
+                        .collect()
+                } else {
+                    vec![]
+                },
+                add_dialogue: state.operation == Operation::Outline && state.add_dialogue
+            })),
+        ));
+    }
+}
+/// The editable source of one outline scene and its Sections.
+pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index: usize) {
+    let Some(outline) = &mut draft.outline else {
+        return;
+    };
+    let editable = draft.phase != Phase::Applied;
+    let index = index.min(outline.scenes.len().saturating_sub(1));
+    if outline.scenes.is_empty() {
+        return;
+    }
+    if let Some(duration) = draft.planned_durations.get(index) {
+        ui.weak(format!("Planned duration: {duration:.3} s"));
+    }
+    let expanded = draft.scenes[index].is_some();
+    let source = draft.scenes[index]
+        .as_mut()
+        .unwrap_or(&mut outline.scenes[index]);
+    if !source.image_ids.is_empty() {
+        ui.weak(format!(
+            "Setting images: {}",
+            source
+                .image_ids
+                .iter()
+                .map(|id| image_label(id, &draft.request.images))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
+    ui.add_enabled_ui(!expanded, |ui| {
+        ui.horizontal(|ui| {
+            ui.label("Relative weight");
+            ui.add(egui::DragValue::new(&mut source.weight).range(0.001..=100000.));
+            egui::ComboBox::from_id_salt("story-boundary")
+                .selected_text(&source.boundary_from_previous)
+                .show_ui(ui, |ui| {
+                    for (id, label) in [
+                        ("hard_cut", "Hard cut"),
+                        ("continuous_shot", "Continuous shot"),
+                    ] {
+                        ui.selectable_value(&mut source.boundary_from_previous, id.into(), label);
+                    }
+                });
+        });
+    });
+    ui.add_enabled_ui(editable, |ui| {
+        ui.label("Title");
+        let r = ui.add(egui::TextEdit::singleline(&mut source.title).desired_width(f32::INFINITY));
+        control(ui, "story-scene-title", &r);
+        ui.label("Summary");
+        let r = ui.add(
+            egui::TextEdit::multiline(&mut source.summary)
+                .desired_rows(2)
+                .desired_width(f32::INFINITY),
+        );
+        control(ui, "story-scene-summary", &r);
+        ui.label("Description");
+        let r = ui.add(
+            egui::TextEdit::multiline(&mut source.description)
+                .desired_rows(3)
+                .desired_width(f32::INFINITY),
+        );
+        control(ui, "story-scene-description", &r);
+        ui.label("Ambient sound");
+        let r = ui.add(
+            egui::TextEdit::singleline(&mut source.ambient_sound).desired_width(f32::INFINITY),
+        );
+        control(ui, "story-scene-ambient", &r);
+        ui.label("Music");
+        let r = ui.add(
+            egui::TextEdit::singleline(&mut source.non_diegetic_music).desired_width(f32::INFINITY),
+        );
+        control(ui, "story-scene-music", &r);
+        for (i, section) in source.sections.iter_mut().enumerate() {
+            ui.horizontal(|ui| {
+                ui.label(format!("Section {}", i + 1));
+                if !expanded {
+                    ui.label("Relative weight");
+                    let r = ui.add(egui::DragValue::new(&mut section.weight).speed(0.1));
+                    control(ui, &format!("story-section-weight-{i}"), &r);
+                }
+            });
+            let r = ui.add(
+                egui::TextEdit::multiline(&mut section.prompt)
+                    .desired_rows(3)
+                    .desired_width(f32::INFINITY),
+            );
+            control(ui, &format!("story-section-{i}"), &r);
+            if !section.image_ids.is_empty()
+                || !section.first_frame_id.is_empty()
+                || !section.last_frame_id.is_empty()
+            {
+                ui.weak(format!(
+                    "Images: {} · first: {} · last: {}",
+                    section
+                        .image_ids
+                        .iter()
+                        .map(|id| image_label(id, &draft.request.images))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    image_label(&section.first_frame_id, &draft.request.images),
+                    image_label(&section.last_frame_id, &draft.request.images)
+                ));
+            }
+            if let Some(intent) = &mut section.dialogue_intent {
+                ui.weak(format!(
+                    "Dialogue: {} · at most {} turns",
+                    intent.participants.join(" / "),
+                    intent.max_turns
+                ));
+                ui.text_edit_singleline(&mut intent.purpose);
+            }
+        }
+    });
 }
 impl ImagineApp {
     pub(super) fn timeline_open_authoring(&mut self, ctx: &egui::Context, operation: Operation) {
@@ -347,10 +625,20 @@ impl ImagineApp {
             }
         }
     }
-    pub(super) fn timeline_authoring_window(&mut self, ctx: &egui::Context) {
-        if !self.timeline.authoring.open {
-            return;
-        }
+    /// The operation the open draft, or the next request, is for.
+    pub(super) fn authoring_operation(&self) -> Operation {
+        let state = &self.timeline.authoring;
+        state
+            .draft
+            .as_ref()
+            .map_or(state.operation, |d| d.request.operation)
+    }
+    /// Whether a story outline is open; it is shown as the Story view.
+    pub(super) fn timeline_story_open(&self) -> bool {
+        self.timeline.authoring.open && self.authoring_operation() == Operation::Outline
+    }
+    /// Polls a running draft and takes the state for one frame of drawing.
+    pub(super) fn authoring_begin(&mut self, ctx: &egui::Context) -> (State, Option<Snapshot>) {
         if let Some(d) = &self.timeline.authoring.draft
             && d.phase.busy()
             && !self.timeline.authoring.busy
@@ -370,11 +658,6 @@ impl ImagineApp {
         }
         ctx.request_repaint_after(Duration::from_millis(200));
         let mut state = std::mem::take(&mut self.timeline.authoring);
-        let mut open = state.open;
-        let mut call = None;
-        let mut new_proposal = false;
-        let mut close_review = false;
-        let mut pick_images = false;
         let document = self.timeline.document.clone();
         if let Some(d) = &document {
             for draft in d.view.authoring.iter().cloned() {
@@ -388,124 +671,547 @@ impl ImagineApp {
                 }
             }
         }
-        egui::Window::new("Story & Enhance").id(egui::Id::new("video-authoring")).open(&mut open).default_width(760.).default_height(580.).max_height((ctx.content_rect().height()-70.).max(200.)).vscroll(true).show(ctx,|ui|{
-            let reveal=helto::reveal_in_viewport(ui,self.prefs.privacy_mode);
-            helto::private_scope(ui,!reveal,|ui|{
-                #[cfg(feature="ui-preview")]{let r=ui.interact(ui.clip_rect(),ui.id().with("qa-story-scroll"),egui::Sense::hover());super::qa::control(ui,"story-scroll".into(),&r);}
-
-            ui.horizontal_wrapped(|ui|{ui.label("Review and edit generated source before applying. Manual authoring remains available.");let r=helto::icon_button(ui,crate::icons::Icon::Settings,"Provider settings",false);control(ui,"story-provider-settings",&r);if r.clicked(){state.provider_settings=true;}let r=helto::icon_button(ui,crate::icons::Icon::Edit,"View system prompt files and generation parameters",false);control(ui,"story-profile-settings",&r);if r.clicked(){state.show_profiles = !state.show_profiles;}});
-            if state.show_profiles && let Some(profile)=state.profiles["profiles"].as_array().and_then(|rows|rows.iter().find(|p|p["id"]==state.profile)) {
-                    ui.group(|ui| {
-                        ui.strong(format!("{} · prompt files",profile["label"].as_str().unwrap_or(&state.profile)));
-                        for file in profile["prompt_files"].as_array().into_iter().flatten() {
-                            ui.horizontal_wrapped(|ui| { ui.monospace(file["file"].as_str().unwrap_or("")); ui.weak(if file["inherited"]==true {format!("Inherited from {}",file["source_profile_id"].as_str().unwrap_or(""))}else{"Own".into()}); });
-                        }
-                        ui.collapsing("Generation parameters",|ui| {let mut text=serde_json::to_string_pretty(&profile["generation"]).unwrap_or_default();ui.add(egui::TextEdit::multiline(&mut text).code_editor().desired_width(f32::INFINITY).desired_rows(10).interactive(false));});
-                        ui.weak("System prompts use file-level inheritance. Reload prompts after editing the selected source profile files.");
-                    });
-            }
-            let (operation,field)=state.draft.as_ref().map_or((state.operation,state.scene_field),|d|(d.request.operation,d.request.scene_field));
-            if operation==Operation::EnhanceScene {ui.strong(format!("Enhance {}",field.unwrap_or_default().label()));}else if operation==Operation::EnhanceSection {ui.strong("Enhance Section prompt");}
-            ui.horizontal(|ui|{ui.weak("Project cast · image inventory · editable source and bindings");let r=helto::icon_button(ui,crate::icons::Icon::Close,"Close review",false);control(ui,"story-close",&r);close_review=r.clicked();});
-            if let Some(error)=&state.failure{ui.colored_label(helto::ERROR,error);if let Some(d)=&state.draft {let r=helto::icon_button(ui,crate::icons::Icon::Link,"Reconnect proposal",false);control(ui,"story-reconnect",&r);if r.clicked(){call=Some((Reply::Draft,false,format!("/v1/video/authoring/{}",d.id),None));}}}
-            if !state.history.is_empty()&&!state.busy {
-                let menu=egui::ComboBox::from_id_salt("recent-story-proposals").selected_text("Recent proposals").show_ui(ui,|ui|{
-                    for (i,draft) in state.history.iter().enumerate() {let r=ui.button(format!("{:?} · revision {} · {} scenes",draft.request.operation,draft.request.expected_project_revision,draft.scenes.len()));control(ui,&format!("story-history-{i}"),&r);if r.clicked(){state.draft=Some(draft.clone());}}
-                });control(ui,"story-history-menu",&menu.response);
-            }
-            if let Some(draft)=&mut state.draft {
-                let busy=state.busy||draft.phase.busy();
-                ui.horizontal_wrapped(|ui|{
-                    ui.strong(format!("{:?}",draft.phase));
-                    ui.weak(format!("{} · {}",draft.prompt_profile_id,draft.provider_snapshot["model"].as_str().unwrap_or("Provider")));
-                    if !draft.profile_warning.is_empty(){ui.label(&draft.profile_warning);}
-                    for warning in &draft.warnings{ui.colored_label(helto::ACCENT,warning);}
-                    if busy {ui.spinner();let r=helto::icon_button(ui,crate::icons::Icon::Stop,"Cancel",false);control(ui,"story-cancel",&r);if r.clicked(){call=Some((Reply::Draft,true,format!("/v1/video/authoring/{}/cancel",draft.id),Some(json!({}))));}}
-                    let r=helto::action(ui,crate::icons::Icon::Plus,"New proposal",false,busy.then_some("Wait for the current proposal."));control(ui,"story-new",&r);if r.clicked(){state.history.push(draft.clone());new_proposal=true;}
-                });
-                if state.progress["draft_id"]==draft.id {
-                    let completed=state.progress["completed"].as_u64().unwrap_or(0);let total=state.progress["total"].as_u64().unwrap_or(1).max(1);
-                    ui.add(egui::ProgressBar::new(completed as f32/total as f32).text(format!("{completed} / {total}")));
-                    let elapsed=state.progress["elapsed_seconds"].as_f64().unwrap_or(0.);ui.weak(if let Some(eta)=state.progress["eta_seconds"].as_f64(){format!("{elapsed:.1} s elapsed · about {eta:.1} s remaining")}else{format!("{elapsed:.1} s elapsed")});
-                }
-                if let Some(failure)=&draft.failure{ui.colored_label(helto::ERROR,format!("{failure} · previous completed scenes are retained"));}
-                if !busy&&draft.outline.is_none()&&matches!(draft.phase,Phase::Failed|Phase::Cancelled){let r=helto::icon_button(ui,crate::icons::Icon::Retry,"Retry proposal",false);control(ui,"story-retry",&r);if r.clicked(){call=Some((Reply::Draft,true,format!("/v1/video/authoring/{}/retry",draft.id),Some(json!({}))));}}
-                if !draft.inventory.is_empty(){let header=ui.collapsing(format!("Image inventory · {}",draft.inventory.len()),|ui|{for note in &draft.inventory{ui.strong(image_label(&note.id,&draft.request.images));ui.label(&note.note);}});control(ui,"story-inventory-open",&header.header_response);}
-                if let Some(cast)=draft.selected_cast.as_array(){ui.weak(cast.iter().filter_map(|c|c["reference_tag"].as_str()).collect::<Vec<_>>().join(" · "));}
-                let stale=document.as_ref().is_none_or(|s|s.project.id!=draft.project_id||s.project.project_revision!=draft.request.expected_project_revision);
-                if stale&&draft.phase!=Phase::Applied {ui.colored_label(helto::ERROR,"Project changed. Apply is blocked; the proposal remains editable.");}
-                let mut expand=None;let mut apply=false;
-                let editable=draft.phase!=Phase::Applied;
-                ui.add_enabled_ui(!busy,|ui|{
-                    ui.horizontal_wrapped(|ui|{
-                        if draft.outline.is_some(){let r=helto::action(ui,if draft.failed_index.is_some(){crate::icons::Icon::Retry}else{crate::icons::Icon::Generate},if draft.failed_index.is_some(){"Retry from failed scene"}else{"Expand scenes"},true,(!editable).then_some("Wait for the current proposal."));control(ui,"story-expand",&r);if r.clicked(){expand=Some(draft.failed_index.unwrap_or(0));}}
-                        let r=helto::action(ui,crate::icons::Icon::Check,"Apply reviewed proposal",true,if stale{Some("The project changed. Create a new proposal.")}else{(draft.phase!=Phase::Review).then_some("Finish the proposal first.")});control(ui,"story-apply",&r);apply=r.clicked();
-                    });
-                    ui.vertical(|ui|{
-                        if let Some(text)=&mut draft.text {
-                            if let Some(d)=&document && let Some(s)=d.project.scenes.iter().find(|s|Some(&s.id)==draft.request.scene_id.as_ref()) {
-                                ui.collapsing("Original",|ui|{ui.label(if draft.request.operation==Operation::EnhanceSection{s.sections.iter().find(|s|Some(&s.id)==draft.request.section_id.as_ref()).map(|s|s.prompt.clone()).unwrap_or_default()}else{draft.request.scene_field.unwrap_or_default().source(&d.project,s)});});
-                            }
-                            ui.label("Proposal");let r=ui.add(egui::TextEdit::multiline(text).desired_width(f32::INFINITY).desired_rows(8).interactive(editable));control(ui,"story-proposal-text",&r);
-                        }
-                        if let Some(outline)=&mut draft.outline {
-                            ui.horizontal_wrapped(|ui|{for i in 0..outline.scenes.len(){let r=ui.selectable_label(state.selected==i,format!("Scene {}",i+1));control(ui,&format!("story-scene-{i}"),&r);if r.clicked(){state.selected=i;}}});
-                            let index=state.selected.min(outline.scenes.len()-1);
-                            let ready=draft.scenes.iter().filter(|s|s.is_some()).count();ui.label(format!("{ready} / {} scenes expanded",outline.scenes.len()));
-                            if let Some(duration)=draft.planned_durations.get(index){ui.weak(format!("Planned duration: {duration:.3} s"));}
-                            let expanded=draft.scenes[index].is_some();
-                            let source=draft.scenes[index].as_mut().unwrap_or(&mut outline.scenes[index]);
-                            if !source.image_ids.is_empty(){ui.weak(format!("Setting images: {}",source.image_ids.iter().map(|id|image_label(id,&draft.request.images)).collect::<Vec<_>>().join(", ")));}
-                            ui.add_enabled_ui(!expanded,|ui|{ui.horizontal(|ui|{ui.label("Relative weight");ui.add(egui::DragValue::new(&mut source.weight).range(0.001..=100000.));egui::ComboBox::from_id_salt("story-boundary").selected_text(&source.boundary_from_previous).show_ui(ui,|ui|{for (id,label) in [("hard_cut","Hard cut"),("continuous_shot","Continuous shot")]{ui.selectable_value(&mut source.boundary_from_previous,id.into(),label);}});});});
-                            ui.add_enabled_ui(editable,|ui|{
-                            ui.label("Title");let r=ui.add(egui::TextEdit::singleline(&mut source.title).desired_width(f32::INFINITY));control(ui,"story-scene-title",&r);
-                            ui.label("Summary");let r=ui.add(egui::TextEdit::multiline(&mut source.summary).desired_rows(2).desired_width(f32::INFINITY));control(ui,"story-scene-summary",&r);
-                            ui.label("Description");let r=ui.add(egui::TextEdit::multiline(&mut source.description).desired_rows(3).desired_width(f32::INFINITY));control(ui,"story-scene-description",&r);
-                            ui.label("Ambient sound");let r=ui.add(egui::TextEdit::singleline(&mut source.ambient_sound).desired_width(f32::INFINITY));control(ui,"story-scene-ambient",&r);
-                            ui.label("Music");let r=ui.add(egui::TextEdit::singleline(&mut source.non_diegetic_music).desired_width(f32::INFINITY));control(ui,"story-scene-music",&r);
-                            for (i,section) in source.sections.iter_mut().enumerate(){ui.horizontal(|ui| { ui.label(format!("Section {}",i+1)); if !expanded { ui.label("Relative weight"); let r = ui.add(egui::DragValue::new(&mut section.weight).speed(0.1)); control(ui, &format!("story-section-weight-{i}"), &r); } });let r=ui.add(egui::TextEdit::multiline(&mut section.prompt).desired_rows(3).desired_width(f32::INFINITY));control(ui,&format!("story-section-{i}"),&r);if !section.image_ids.is_empty()||!section.first_frame_id.is_empty()||!section.last_frame_id.is_empty(){ui.weak(format!("Images: {} · first: {} · last: {}",section.image_ids.iter().map(|id|image_label(id,&draft.request.images)).collect::<Vec<_>>().join(", "),image_label(&section.first_frame_id,&draft.request.images),image_label(&section.last_frame_id,&draft.request.images)));}
-                            if let Some(intent)=&mut section.dialogue_intent{ui.weak(format!("Dialogue: {} · at most {} turns",intent.participants.join(" / "),intent.max_turns));ui.text_edit_singleline(&mut intent.purpose);}}
-                            });
-                        }
-                    });
-                });
-                if let Some(index)=expand {call=Some((Reply::Draft,true,format!("/v1/video/authoring/{}/review",draft.id),Some(json!({"schema_version":1,"outline":draft.outline,"scenes":draft.scenes,"text":draft.text,"then_expand":index}))));}
-                if apply {call=Some((Reply::Applied,true,format!("/v1/video/authoring/{}/review",draft.id),Some(json!({"schema_version":1,"outline":draft.outline,"scenes":(draft.request.operation==Operation::Outline).then_some(&draft.scenes),"text":draft.text,"then_apply":draft.request.expected_project_revision}))));}
-            } else {
-                ui.horizontal_wrapped(|ui|{
-                    let menu=egui::ComboBox::from_id_salt("authoring-profile").selected_text(&state.profile).show_ui(ui,|ui|{for p in state.profiles["profiles"].as_array().into_iter().flatten(){if let Some(id)=p["id"].as_str(){let r=ui.selectable_value(&mut state.profile,id.into(),p["label"].as_str().unwrap_or(id));control(ui,&format!("story-profile-{id}"),&r);}}});control(ui,"story-profile-menu",&menu.response);
-                    let r=helto::icon_button(ui,crate::icons::Icon::Save,"Use this prompt profile by default",self.prefs.preferred_prompt_profile.as_deref()==Some(state.profile.as_str()));control(ui,"story-profile-default",&r);if r.clicked(){self.prefs.preferred_prompt_profile=Some(state.profile.clone());self.save_preferences();}
-                    let name=state.providers.as_array().and_then(|rows|rows.iter().find(|p|p["id"]==state.provider_id)).and_then(|p|p["name"].as_str()).unwrap_or(&state.provider_id).to_owned();
-                    let menu=egui::ComboBox::from_id_salt("authoring-provider").selected_text(name).show_ui(ui,|ui|{for p in state.providers.as_array().into_iter().flatten(){if let Some(id)=p["id"].as_str(){let r=ui.selectable_value(&mut state.provider_id,id.into(),p["name"].as_str().unwrap_or(id));control(ui,&format!("story-provider-{id}"),&r);}}});control(ui,"story-provider-menu",&menu.response);
-                    ui.weak(format!("API: {}",provider_transport(&state)));
-                    let r=helto::icon_button(ui,crate::icons::Icon::Retry,"Reload prompts",false);control(ui,"story-reload",&r);if r.clicked(){call=Some((Reply::Catalog,false,"/v1/video/authoring/profiles".into(),None));}
-                });
-                ui.collapsing("Advanced transport override",|ui| {ui.checkbox(&mut state.transport_override,"Override the connection profile's Story API");if state.transport_override {egui::ComboBox::from_id_salt("authoring-transport").selected_text(&state.provider).show_ui(ui,|ui|{for id in ["koboldcpp","ollama"]{ui.selectable_value(&mut state.provider,id.into(),id);}});}});
-                if state.operation==Operation::Outline {
-                    if let Some(d)=&document {
-                        let header=ui.collapsing("Cast & source images",|ui|{
-                            let r=helto::icon_button(ui,crate::icons::Icon::Import,"Add source images…",false);control(ui,"story-pick-images",&r);pick_images=r.clicked();
-                            for (i,r)in d.project.creative.references.iter().enumerate(){let mut selected=state.cast.contains(&r.id);let response=ui.checkbox(&mut selected,format!("{} · @{}{}",r.name,r.alias,if r.enabled{""}else{" · disabled in project"}));control(ui,&format!("story-cast-{i}"),&response);if response.changed(){state.cast.remove(&r.id);if selected{state.cast.insert(r.id.clone());}}}
-                            let r=ui.checkbox(&mut state.add_dialogue,"Plan dialogue");control(ui,"story-dialogue",&r);
-                            for (i,asset)in d.project.assets.values().filter(|a|a.kind==MediaKind::Image).enumerate(){let mut selected=state.images.contains_key(&asset.id);let response=ui.checkbox(&mut selected,format!("Source image {}",i+1));control(ui,&format!("story-image-{i}"),&response);if response.changed(){state.images.remove(&asset.id);if selected{state.images.insert(asset.id.clone(),ImageUse::SettingReference);}}
-                            if let Some(usage)=state.images.get_mut(&asset.id){let menu=egui::ComboBox::from_id_salt(("story-image-use",i)).selected_text(format!("{usage:?}")).show_ui(ui,|ui|{for(value,label)in [(ImageUse::SettingReference,"Setting reference"),(ImageUse::RequiredMoment,"Required moment"),(ImageUse::StartFrame,"Directed start frame"),(ImageUse::EndFrame,"Directed end frame")]{let r=ui.selectable_value(usage,value,label);control(ui,&format!("story-image-{i}-use-{value:?}"),&r);}});control(ui,&format!("story-image-{i}-usage"),&menu.response);}}
-                            for (start,usage) in &state.images { if *usage!=ImageUse::StartFrame {continue;} let selected=state.pairs.entry(start.clone()).or_insert_with(||AssetId(String::new()));let menu=egui::ComboBox::from_id_salt(("story-pair",&start.0)).selected_text(if selected.0.is_empty(){"Choose directed end frame".to_owned()}else{source_image_label(&d.project,selected)}).show_ui(ui,|ui|{for end in state.images.keys() {let r=ui.selectable_value(selected,end.clone(),source_image_label(&d.project,end));control(ui,&format!("story-pair-{}-{}",start.0,end.0),&r);}});control(ui,&format!("story-pair-{}",start.0),&menu.response);}
-
-                        });control(ui,"story-sources-open",&header.header_response);
-                    }
-                    ui.label("Story brief");let r=ui.add(egui::TextEdit::multiline(&mut state.brief).desired_rows(5).desired_width(f32::INFINITY));control(ui,"story-brief",&r);
-                    ui.horizontal(|ui|{ui.label("Duration");ui.add(egui::DragValue::new(&mut state.duration).range(0.25..=3600.).suffix(" s"));for (d,label) in [(Destination::Append,"Append"),(Destination::Replace,"Replace scenes"),(Destination::Continue,"Continue")]{let name=serde_json::to_value(d).unwrap().as_str().unwrap().to_owned();let r=ui.selectable_value(&mut state.destination,d,label);control(ui,&format!("story-destination-{name}"),&r);}});
-                }
-                ui.label("Additional instruction");let r=ui.add(egui::TextEdit::multiline(&mut state.instruction).desired_rows(3).desired_width(f32::INFINITY));control(ui,"story-instruction",&r);
-                let r=helto::action(ui,crate::icons::Icon::Generate,if state.operation==Operation::Outline{"Generate outline"}else{"Generate enhancement"},true,if document.is_none(){Some("Create or open a project first.")}else{state.busy.then_some("Wait for the current proposal.")});control(ui,"story-generate",&r);
-                if r.clicked()&&let Some(d)=&document{call=Some((Reply::Draft,true,format!("/v1/video/projects/{}/authoring",d.project.id.0),Some(json!(Request{schema_version:1,expected_project_revision:d.project.project_revision,provider_profile_id:state.provider_id.clone(),provider:provider_transport(&state),prompt_profile_id:state.profile.clone(),operation:state.operation,scene_field:state.scene_field,scene_id:state.target_scene.clone(),section_id:state.target_section.clone(),brief:state.brief.clone(),instruction:state.instruction.clone(),duration_seconds:state.duration,destination:state.destination,cast:if state.operation==Operation::Outline{state.cast.iter().cloned().collect()}else{vec![]},images:if state.operation==Operation::Outline{state.images.iter().enumerate().map(|(i,(asset,usage))|StoryImage{pair_with:state.pairs.get(asset).filter(|id|!id.0.is_empty()).map(|id|id.0.clone()),id:asset.0.clone(),asset:asset.clone(),label:format!("Source image {}",i+1),usage:*usage}).collect()}else{vec![]},add_dialogue:state.operation==Operation::Outline&&state.add_dialogue}))));}
-            }
-            });
-        });
-        if new_proposal {
-            state.draft = None;
+        (state, document)
+    }
+    /// The floating window for scene and Section enhancement.
+    pub(super) fn timeline_authoring_window(&mut self, ctx: &egui::Context) {
+        if !self.timeline.authoring.open || self.timeline_story_open() {
+            return;
         }
-        state.open = open && !close_review;
+        let (mut state, document) = self.authoring_begin(ctx);
+        let mut actions = Actions::default();
+        let mut open = state.open;
+        egui::Window::new("Story & Enhance")
+            .id(egui::Id::new("video-authoring"))
+            .open(&mut open)
+            .default_width(760.)
+            .default_height(580.)
+            .max_height((ctx.content_rect().height() - 70.).max(200.))
+            .vscroll(true)
+            .show(ctx, |ui| {
+                let reveal = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+                helto::private_scope(ui, !reveal, |ui| {
+                    #[cfg(feature = "ui-preview")]
+                    {
+                        let r = ui.interact(
+                            ui.clip_rect(),
+                            ui.id().with("qa-story-scroll"),
+                            egui::Sense::hover(),
+                        );
+                        super::qa::control(ui, "story-scroll".into(), &r);
+                    }
+                    self.authoring_header(ui, &mut state, &mut actions);
+                    let (operation, field) = state
+                        .draft
+                        .as_ref()
+                        .map_or((state.operation, state.scene_field), |d| {
+                            (d.request.operation, d.request.scene_field)
+                        });
+                    if operation == Operation::EnhanceScene {
+                        ui.strong(format!("Enhance {}", field.unwrap_or_default().label()));
+                    } else if operation == Operation::EnhanceSection {
+                        ui.strong("Enhance Section prompt");
+                    }
+                    ui.horizontal(|ui| {
+                        let r = helto::icon_button(
+                            ui,
+                            crate::icons::Icon::Close,
+                            "Close review",
+                            false,
+                        );
+                        control(ui, "story-close", &r);
+                        actions.close = r.clicked();
+                    });
+                    self.authoring_failure(ui, &mut state, &mut actions);
+                    if state.draft.is_some() {
+                        self.authoring_draft_status(ui, &mut state, &document, &mut actions);
+                        let busy =
+                            state.busy || state.draft.as_ref().is_some_and(|d| d.phase.busy());
+                        let draft = state.draft.as_mut().unwrap();
+                        ui.add_enabled_ui(!busy, |ui| {
+                            authoring_draft_actions(ui, draft, &document, &mut actions);
+                            if let Some(text) = &mut draft.text {
+                                if let Some(d) = &document
+                                    && let Some(s) =
+                                        d.project.scenes.iter().find(|s| {
+                                            Some(&s.id) == draft.request.scene_id.as_ref()
+                                        })
+                                {
+                                    ui.collapsing("Original", |ui| {
+                                        ui.label(
+                                            if draft.request.operation == Operation::EnhanceSection
+                                            {
+                                                s.sections
+                                                    .iter()
+                                                    .find(|s| {
+                                                        Some(&s.id)
+                                                            == draft.request.section_id.as_ref()
+                                                    })
+                                                    .map(|s| s.prompt.clone())
+                                                    .unwrap_or_default()
+                                            } else {
+                                                draft
+                                                    .request
+                                                    .scene_field
+                                                    .unwrap_or_default()
+                                                    .source(&d.project, s)
+                                            },
+                                        );
+                                    });
+                                }
+                                let editable = draft.phase != Phase::Applied;
+                                ui.label("Proposal");
+                                let r = ui.add(
+                                    egui::TextEdit::multiline(text)
+                                        .desired_width(f32::INFINITY)
+                                        .desired_rows(8)
+                                        .interactive(editable),
+                                );
+                                control(ui, "story-proposal-text", &r);
+                            }
+                        });
+                    } else {
+                        self.authoring_sources(ui, &mut state, &mut actions);
+                        authoring_generate(ui, &mut state, &document, &mut actions);
+                    }
+                });
+            });
+        state.open = open;
+        self.authoring_finish(ctx, state, actions);
+    }
+    /// Provider and prompt profile settings, and the profile's prompt files.
+    pub(super) fn authoring_header(
+        &mut self,
+        ui: &mut egui::Ui,
+        state: &mut State,
+        actions: &mut Actions,
+    ) {
+        ui.horizontal_wrapped(|ui| {
+            let r =
+                helto::icon_button(ui, crate::icons::Icon::Settings, "Provider settings", false);
+            control(ui, "story-provider-settings", &r);
+            if r.clicked() {
+                state.provider_settings = true;
+            }
+            let r = helto::icon_button(
+                ui,
+                crate::icons::Icon::Edit,
+                "View system prompt files and generation parameters",
+                false,
+            );
+            control(ui, "story-profile-settings", &r);
+            if r.clicked() {
+                state.show_profiles = !state.show_profiles;
+            }
+            if !state.history.is_empty() && !state.busy {
+                let menu = egui::ComboBox::from_id_salt("recent-story-proposals")
+                    .selected_text("Recent proposals")
+                    .show_ui(ui, |ui| {
+                        for (i, draft) in state.history.iter().enumerate() {
+                            let r = ui.button(format!(
+                                "{:?} · revision {} · {} scenes",
+                                draft.request.operation,
+                                draft.request.expected_project_revision,
+                                draft.scenes.len()
+                            ));
+                            control(ui, &format!("story-history-{i}"), &r);
+                            if r.clicked() {
+                                actions.restore = Some(i);
+                            }
+                        }
+                    });
+                control(ui, "story-history-menu", &menu.response);
+            }
+        });
+        if state.show_profiles
+            && let Some(profile) = state.profiles["profiles"]
+                .as_array()
+                .and_then(|rows| rows.iter().find(|p| p["id"] == state.profile))
+        {
+            ui.group(|ui| {
+                ui.strong(format!("{} · prompt files",profile["label"].as_str().unwrap_or(&state.profile)));
+                for file in profile["prompt_files"].as_array().into_iter().flatten() {
+                    ui.horizontal_wrapped(|ui| { ui.monospace(file["file"].as_str().unwrap_or("")); ui.weak(if file["inherited"]==true {format!("Inherited from {}",file["source_profile_id"].as_str().unwrap_or(""))}else{"Own".into()}); });
+                }
+                ui.collapsing("Generation parameters",|ui| {let mut text=serde_json::to_string_pretty(&profile["generation"]).unwrap_or_default();ui.add(egui::TextEdit::multiline(&mut text).code_editor().desired_width(f32::INFINITY).desired_rows(10).interactive(false));});
+                ui.weak("System prompts use file-level inheritance. Reload prompts after editing the selected source profile files.");
+            });
+        }
+    }
+    pub(super) fn authoring_failure(
+        &mut self,
+        ui: &mut egui::Ui,
+        state: &mut State,
+        actions: &mut Actions,
+    ) {
+        if let Some(error) = &state.failure {
+            ui.colored_label(helto::ERROR, error);
+            if let Some(d) = &state.draft {
+                let r =
+                    helto::icon_button(ui, crate::icons::Icon::Link, "Reconnect proposal", false);
+                control(ui, "story-reconnect", &r);
+                if r.clicked() {
+                    actions.call = Some((
+                        Reply::Draft,
+                        false,
+                        format!("/v1/video/authoring/{}", d.id),
+                        None,
+                    ));
+                }
+            }
+        }
+    }
+    /// The draft's phase, provider, warnings, progress and failure, with Cancel,
+    /// New proposal and Retry.
+    pub(super) fn authoring_draft_status(
+        &mut self,
+        ui: &mut egui::Ui,
+        state: &mut State,
+        document: &Option<Snapshot>,
+        actions: &mut Actions,
+    ) {
+        let progress = state.progress.clone();
+        let busy_flag = state.busy;
+        let Some(draft) = &mut state.draft else {
+            return;
+        };
+        let busy = busy_flag || draft.phase.busy();
+        ui.horizontal_wrapped(|ui| {
+            ui.strong(format!("{:?}", draft.phase));
+            ui.weak(format!(
+                "{} · {}",
+                draft.prompt_profile_id,
+                draft.provider_snapshot["model"]
+                    .as_str()
+                    .unwrap_or("Provider")
+            ));
+            if !draft.profile_warning.is_empty() {
+                ui.label(&draft.profile_warning);
+            }
+            for warning in &draft.warnings {
+                ui.colored_label(helto::ACCENT, warning);
+            }
+            if busy {
+                ui.spinner();
+                let r = helto::icon_button(ui, crate::icons::Icon::Stop, "Cancel", false);
+                control(ui, "story-cancel", &r);
+                if r.clicked() {
+                    actions.call = Some((
+                        Reply::Draft,
+                        true,
+                        format!("/v1/video/authoring/{}/cancel", draft.id),
+                        Some(json!({})),
+                    ));
+                }
+            }
+            let r = helto::action(
+                ui,
+                crate::icons::Icon::Plus,
+                "New proposal",
+                false,
+                busy.then_some("Wait for the current proposal."),
+            );
+            control(ui, "story-new", &r);
+            if r.clicked() {
+                actions.new_proposal = true;
+            }
+        });
+        if progress["draft_id"] == draft.id {
+            let completed = progress["completed"].as_u64().unwrap_or(0);
+            let total = progress["total"].as_u64().unwrap_or(1).max(1);
+            ui.add(
+                egui::ProgressBar::new(completed as f32 / total as f32)
+                    .text(format!("{completed} / {total}")),
+            );
+            let elapsed = progress["elapsed_seconds"].as_f64().unwrap_or(0.);
+            ui.weak(if let Some(eta) = progress["eta_seconds"].as_f64() {
+                format!("{elapsed:.1} s elapsed · about {eta:.1} s remaining")
+            } else {
+                format!("{elapsed:.1} s elapsed")
+            });
+        }
+        if let Some(failure) = &draft.failure {
+            ui.colored_label(
+                helto::ERROR,
+                format!("{failure} · previous completed scenes are retained"),
+            );
+        }
+        if !busy
+            && draft.outline.is_none()
+            && matches!(draft.phase, Phase::Failed | Phase::Cancelled)
+        {
+            let r = helto::icon_button(ui, crate::icons::Icon::Retry, "Retry proposal", false);
+            control(ui, "story-retry", &r);
+            if r.clicked() {
+                actions.call = Some((
+                    Reply::Draft,
+                    true,
+                    format!("/v1/video/authoring/{}/retry", draft.id),
+                    Some(json!({})),
+                ));
+            }
+        }
+        if !draft.inventory.is_empty() {
+            let header = ui.collapsing(
+                format!("Image inventory · {}", draft.inventory.len()),
+                |ui| {
+                    for note in &draft.inventory {
+                        ui.strong(image_label(&note.id, &draft.request.images));
+                        ui.label(&note.note);
+                    }
+                },
+            );
+            control(ui, "story-inventory-open", &header.header_response);
+        }
+        if let Some(cast) = draft.selected_cast.as_array() {
+            ui.weak(
+                cast.iter()
+                    .filter_map(|c| c["reference_tag"].as_str())
+                    .collect::<Vec<_>>()
+                    .join(" · "),
+            );
+        }
+        if authoring_stale(draft, document) && draft.phase != Phase::Applied {
+            ui.colored_label(
+                helto::ERROR,
+                "Project changed. Apply is blocked; the proposal remains editable.",
+            );
+        }
+    }
+    /// Prompt profile and provider for a new request.
+    pub(super) fn authoring_sources(
+        &mut self,
+        ui: &mut egui::Ui,
+        state: &mut State,
+        actions: &mut Actions,
+    ) {
+        ui.horizontal_wrapped(|ui| {
+            let menu = egui::ComboBox::from_id_salt("authoring-profile")
+                .selected_text(&state.profile)
+                .show_ui(ui, |ui| {
+                    for p in state.profiles["profiles"].as_array().into_iter().flatten() {
+                        if let Some(id) = p["id"].as_str() {
+                            let r = ui.selectable_value(
+                                &mut state.profile,
+                                id.into(),
+                                p["label"].as_str().unwrap_or(id),
+                            );
+                            control(ui, &format!("story-profile-{id}"), &r);
+                        }
+                    }
+                });
+            control(ui, "story-profile-menu", &menu.response);
+            let r = helto::icon_button(
+                ui,
+                crate::icons::Icon::Save,
+                "Use this prompt profile by default",
+                self.prefs.preferred_prompt_profile.as_deref() == Some(state.profile.as_str()),
+            );
+            control(ui, "story-profile-default", &r);
+            if r.clicked() {
+                self.prefs.preferred_prompt_profile = Some(state.profile.clone());
+                self.save_preferences();
+            }
+            let name = state
+                .providers
+                .as_array()
+                .and_then(|rows| rows.iter().find(|p| p["id"] == state.provider_id))
+                .and_then(|p| p["name"].as_str())
+                .unwrap_or(&state.provider_id)
+                .to_owned();
+            let menu = egui::ComboBox::from_id_salt("authoring-provider")
+                .selected_text(name)
+                .show_ui(ui, |ui| {
+                    for p in state.providers.as_array().into_iter().flatten() {
+                        if let Some(id) = p["id"].as_str() {
+                            let r = ui.selectable_value(
+                                &mut state.provider_id,
+                                id.into(),
+                                p["name"].as_str().unwrap_or(id),
+                            );
+                            control(ui, &format!("story-provider-{id}"), &r);
+                        }
+                    }
+                });
+            control(ui, "story-provider-menu", &menu.response);
+            ui.weak(format!("API: {}", provider_transport(state)));
+            let r = helto::icon_button(ui, crate::icons::Icon::Retry, "Reload prompts", false);
+            control(ui, "story-reload", &r);
+            if r.clicked() {
+                actions.call = Some((
+                    Reply::Catalog,
+                    false,
+                    "/v1/video/authoring/profiles".into(),
+                    None,
+                ));
+            }
+        });
+        ui.collapsing("Advanced transport override", |ui| {
+            ui.checkbox(
+                &mut state.transport_override,
+                "Override the connection profile's Story API",
+            );
+            if state.transport_override {
+                egui::ComboBox::from_id_salt("authoring-transport")
+                    .selected_text(&state.provider)
+                    .show_ui(ui, |ui| {
+                        for id in ["koboldcpp", "ollama"] {
+                            ui.selectable_value(&mut state.provider, id.into(), id);
+                        }
+                    });
+            }
+        });
+    }
+    /// Cast, source images, brief, duration and destination of a story outline.
+    pub(super) fn authoring_story_inputs(
+        ui: &mut egui::Ui,
+        state: &mut State,
+        document: &Option<Snapshot>,
+        actions: &mut Actions,
+    ) {
+        if let Some(d) = document {
+            let header = ui.collapsing("Cast & source images", |ui| {
+                let r =
+                    helto::icon_button(ui, crate::icons::Icon::Import, "Add source images…", false);
+                control(ui, "story-pick-images", &r);
+                actions.pick_images = r.clicked();
+                for (i, r) in d.project.creative.references.iter().enumerate() {
+                    let mut selected = state.cast.contains(&r.id);
+                    let response = ui.checkbox(
+                        &mut selected,
+                        format!(
+                            "{} · @{}{}",
+                            r.name,
+                            r.alias,
+                            if r.enabled {
+                                ""
+                            } else {
+                                " · disabled in project"
+                            }
+                        ),
+                    );
+                    control(ui, &format!("story-cast-{i}"), &response);
+                    if response.changed() {
+                        state.cast.remove(&r.id);
+                        if selected {
+                            state.cast.insert(r.id.clone());
+                        }
+                    }
+                }
+                let r = ui.checkbox(&mut state.add_dialogue, "Plan dialogue");
+                control(ui, "story-dialogue", &r);
+                for (i, asset) in d
+                    .project
+                    .assets
+                    .values()
+                    .filter(|a| a.kind == MediaKind::Image)
+                    .enumerate()
+                {
+                    let mut selected = state.images.contains_key(&asset.id);
+                    let response = ui.checkbox(&mut selected, format!("Source image {}", i + 1));
+                    control(ui, &format!("story-image-{i}"), &response);
+                    if response.changed() {
+                        state.images.remove(&asset.id);
+                        if selected {
+                            state
+                                .images
+                                .insert(asset.id.clone(), ImageUse::SettingReference);
+                        }
+                    }
+                    if let Some(usage) = state.images.get_mut(&asset.id) {
+                        let menu = egui::ComboBox::from_id_salt(("story-image-use", i))
+                            .selected_text(format!("{usage:?}"))
+                            .show_ui(ui, |ui| {
+                                for (value, label) in [
+                                    (ImageUse::SettingReference, "Setting reference"),
+                                    (ImageUse::RequiredMoment, "Required moment"),
+                                    (ImageUse::StartFrame, "Directed start frame"),
+                                    (ImageUse::EndFrame, "Directed end frame"),
+                                ] {
+                                    let r = ui.selectable_value(usage, value, label);
+                                    control(ui, &format!("story-image-{i}-use-{value:?}"), &r);
+                                }
+                            });
+                        control(ui, &format!("story-image-{i}-usage"), &menu.response);
+                    }
+                }
+                for (start, usage) in &state.images {
+                    if *usage != ImageUse::StartFrame {
+                        continue;
+                    }
+                    let selected = state
+                        .pairs
+                        .entry(start.clone())
+                        .or_insert_with(|| AssetId(String::new()));
+                    let menu = egui::ComboBox::from_id_salt(("story-pair", &start.0))
+                        .selected_text(if selected.0.is_empty() {
+                            "Choose directed end frame".to_owned()
+                        } else {
+                            source_image_label(&d.project, selected)
+                        })
+                        .show_ui(ui, |ui| {
+                            for end in state.images.keys() {
+                                let r = ui.selectable_value(
+                                    selected,
+                                    end.clone(),
+                                    source_image_label(&d.project, end),
+                                );
+                                control(ui, &format!("story-pair-{}-{}", start.0, end.0), &r);
+                            }
+                        });
+                    control(ui, &format!("story-pair-{}", start.0), &menu.response);
+                }
+            });
+            control(ui, "story-sources-open", &header.header_response);
+        }
+        ui.label("Story brief");
+        let r = ui.add(
+            egui::TextEdit::multiline(&mut state.brief)
+                .desired_rows(5)
+                .desired_width(f32::INFINITY),
+        );
+        control(ui, "story-brief", &r);
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Duration");
+            ui.add(
+                egui::DragValue::new(&mut state.duration)
+                    .range(0.25..=3600.)
+                    .suffix(" s"),
+            );
+            for (d, label) in [
+                (Destination::Append, "Append"),
+                (Destination::Replace, "Replace scenes"),
+                (Destination::Continue, "Continue"),
+            ] {
+                let name = serde_json::to_value(d)
+                    .unwrap()
+                    .as_str()
+                    .unwrap()
+                    .to_owned();
+                let r = ui.selectable_value(&mut state.destination, d, label);
+                control(ui, &format!("story-destination-{name}"), &r);
+            }
+        });
+    }
+    /// Hands back the state and runs what this frame asked for.
+    pub(super) fn authoring_finish(
+        &mut self,
+        ctx: &egui::Context,
+        mut state: State,
+        actions: Actions,
+    ) {
+        if let Some(i) = actions.restore
+            && i < state.history.len()
+        {
+            state.draft = Some(state.history[i].clone());
+        }
+        if actions.new_proposal
+            && let Some(draft) = state.draft.take()
+        {
+            state.history.push(draft);
+        }
+        state.open = state.open && !actions.close;
+        let mut call = actions.call;
         if state.provider_settings {
             let mut settings_open = true;
             egui::Window::new("Story provider settings")
@@ -534,7 +1240,7 @@ impl ImagineApp {
             }
         }
         self.timeline.authoring = state;
-        if pick_images {
+        if actions.pick_images {
             self.timeline_pick_media(media_picker::Target::StoryImage);
         }
         if let Some((kind, post, path, mut body)) = call {
