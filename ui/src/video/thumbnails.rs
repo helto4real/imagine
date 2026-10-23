@@ -21,6 +21,14 @@ impl State {
         self.versions.get(id) == Some(&revision)
     }
 }
+#[cfg(test)]
+impl State {
+    /// A loaded thumbnail, as a finished request would leave it.
+    pub(super) fn insert(&mut self, key: Key, revision: u64, texture: egui::TextureHandle) {
+        self.versions.insert(key.clone(), revision);
+        self.values.insert(key, Ok(texture));
+    }
+}
 impl ImagineApp {
     pub(super) fn timeline_thumbnail(&mut self, ui: &mut egui::Ui, d: &Snapshot, asset: &Asset) {
         if asset.kind != MediaKind::Image {
@@ -38,8 +46,6 @@ impl ImagineApp {
         asset: &Asset,
         path: Option<String>,
     ) {
-        let state = &mut self.timeline.thumbnails;
-        let key = (project.clone(), asset.id.clone());
         let (rect, _) = ui.allocate_exact_size(egui::vec2(112., 80.), egui::Sense::hover());
         if !helto::reveal_in_viewport(ui, self.prefs.privacy_mode) {
             ui.painter().rect_filled(rect, 4., helto::FIELD);
@@ -55,41 +61,54 @@ impl ImagineApp {
         if !ui.is_rect_visible(rect) {
             return;
         }
+        match self.timeline_thumbnail_texture(ui.ctx(), project, asset, path) {
+            Some(Ok(texture)) => {
+                let size = texture.size_vec2();
+                let scale = (rect.width() / size.x).min(rect.height() / size.y);
+                let dst = egui::Rect::from_center_size(rect.center(), size * scale);
+                ui.painter().image(
+                    texture.id(),
+                    dst,
+                    egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1., 1.)),
+                    egui::Color32::WHITE,
+                );
+            }
+            Some(Err(message)) => {
+                ui.painter().text(
+                    rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    "Preview unavailable",
+                    egui::FontId::proportional(11.),
+                    helto::DIM,
+                );
+                ui.interact(rect, ui.id().with(&asset.id.0), egui::Sense::hover())
+                    .on_hover_text(message);
+            }
+            None => {}
+        }
+    }
+    /// The cached thumbnail of `asset`, loading it from `path` when absent.
+    /// Callers check Hide previews first; hidden images are never requested.
+    pub(super) fn timeline_thumbnail_texture(
+        &mut self,
+        ctx: &egui::Context,
+        project: &ProjectId,
+        asset: &Asset,
+        path: Option<String>,
+    ) -> Option<Result<egui::TextureHandle, String>> {
+        let state = &mut self.timeline.thumbnails;
+        let key = (project.clone(), asset.id.clone());
         state.expect(&key, asset.revision);
         if let Some(value) = state.values.get(&key) {
-            match value {
-                Ok(texture) => {
-                    let size = texture.size_vec2();
-                    let scale = (rect.width() / size.x).min(rect.height() / size.y);
-                    let dst = egui::Rect::from_center_size(rect.center(), size * scale);
-                    ui.painter().image(
-                        texture.id(),
-                        dst,
-                        egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1., 1.)),
-                        egui::Color32::WHITE,
-                    );
-                }
-                Err(message) => {
-                    ui.painter().text(
-                        rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "Preview unavailable",
-                        egui::FontId::proportional(11.),
-                        helto::DIM,
-                    );
-                    ui.interact(rect, ui.id().with(&asset.id.0), egui::Sense::hover())
-                        .on_hover_text(message);
-                }
-            }
-            return;
+            return Some(value.clone());
         }
         if state.loading.contains_key(&key) || state.loading.len() >= 4 {
-            return;
+            return None;
         }
         let (Some(client), Some(session), Some(path)) =
             (self.client.clone(), self.timeline.session.clone(), path)
         else {
-            return;
+            return None;
         };
         state.loading.insert(key, asset.revision);
         let revision = asset.revision;
@@ -97,7 +116,7 @@ impl ImagineApp {
         let id = asset.id.clone();
         let project = project.clone();
         let tx = self.tx.clone();
-        let ctx = ui.ctx().clone();
+        let ctx = ctx.clone();
         std::thread::spawn(move || {
             let result = runtime()
                 .block_on(client.timeline_bytes_path(&session, &path))
@@ -115,6 +134,7 @@ impl ImagineApp {
                 }),
             );
         });
+        None
     }
     pub(super) fn timeline_thumbnail_reply(
         &mut self,

@@ -78,20 +78,12 @@ impl State {
         let (mut start, mut end) = self.view.unwrap_or((0., whole));
         let before = (start, end);
         ui.horizontal(|ui| {
-            ui.label("View");
-            let a = ui.add(egui::DragValue::new(&mut start).speed(1.).suffix(" s"));
-            #[cfg(feature = "ui-preview")]
-            super::qa::control(ui, "timeline-range-start".into(), &a);
-            ui.label("–");
-            let b = ui.add(egui::DragValue::new(&mut end).speed(1.).suffix(" s"));
-            #[cfg(feature = "ui-preview")]
-            super::qa::control(ui, "timeline-range-end".into(), &b);
-            let _ = (a, b);
+            // Director's overview bar: the gold segment is the visible range.
             let (rect, _) = ui.allocate_exact_size(
-                egui::vec2(ui.available_width().max(40.), 18.),
+                egui::vec2(ui.available_width().max(40.), 16.),
                 egui::Sense::hover(),
             );
-            ui.painter().rect_filled(rect, 3, helto::FIELD);
+            ui.painter().rect_filled(rect, 8, helto::FIELD);
             let background = ui.interact(
                 rect,
                 ui.id().with("timeline-range-background"),
@@ -124,7 +116,7 @@ impl State {
                     egui::pos2(x(start), rect.top() + 3.),
                     egui::pos2(x(end), rect.bottom() - 3.),
                 ),
-                2,
+                6,
                 helto::ACCENT_TOP,
             );
             for right in [false, true] {
@@ -149,7 +141,7 @@ impl State {
                     ),
                     &r,
                 );
-                ui.painter().rect_filled(handle, 2, helto::DIM);
+                ui.painter().rect_filled(handle, 3, helto::ACCENT);
                 if r.dragged()
                     && let Some(p) = r.interact_pointer_pos()
                 {

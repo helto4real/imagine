@@ -16,7 +16,9 @@ impl ImagineApp {
                 let bar = Rect::from_min_size(
                     egui::pos2(
                         canvas.left() + seconds(c.start) as f32 * self.timeline.zoom,
-                        canvas.top() + 87. + (offset + c.lane) as f32 * 28.,
+                        canvas.top()
+                            + crate::app::timeline::tracks::AUDIO_TOP
+                            + (offset + c.lane) as f32 * 28.,
                     ),
                     egui::vec2(
                         (seconds(c.duration) as f32 * self.timeline.zoom).max(12.),

@@ -43,6 +43,7 @@ mod reference_cache;
 mod review;
 mod runs;
 mod scene_commands;
+mod section_block;
 mod section_commands;
 mod seed;
 mod selection;
@@ -362,15 +363,6 @@ impl SceneState {
             Self::Accepted => "Accepted Take",
             Self::Outdated => "Accepted Take is outdated",
             Self::Generating => "Generating",
-        }
-    }
-    pub(super) fn color(self) -> Option<egui::Color32> {
-        match self {
-            Self::Empty => None,
-            Self::Candidates => Some(helto::DIM),
-            Self::Accepted => Some(helto::OK),
-            Self::Outdated => Some(helto::ERROR),
-            Self::Generating => Some(helto::FOCUS),
         }
     }
 }

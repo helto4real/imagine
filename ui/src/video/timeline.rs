@@ -3,6 +3,13 @@ use super::editing::{Mode, Snap, resize_scene, seconds};
 use super::*;
 use crate::app::workspace as chrome;
 use egui::{Rect, Sense, Stroke};
+/// Director track rows, from the canvas top: the ruler, Scene bands, Section
+/// blocks, then one 28-point lane per audio overlap level.
+const BAND_TOP: f32 = 20.;
+const BAND_H: f32 = 20.;
+const SECTION_TOP: f32 = 44.;
+const SECTION_H: f32 = 72.;
+pub(super) const AUDIO_TOP: f32 = 122.;
 #[derive(Clone)]
 pub(super) struct Drag {
     id: egui::Id,
@@ -105,6 +112,148 @@ pub(super) fn move_gesture(
         return None;
     }
     gesture(timeline, response, project)
+}
+/// How a Section block's role chip is coloured.
+#[derive(Clone, Copy, PartialEq)]
+enum Tone {
+    Plain,
+    Inherited,
+    Waiting,
+}
+/// The role of the media a Section block shows, or where its first frame comes from.
+pub(super) struct Chip {
+    text: String,
+    tone: Tone,
+}
+impl Chip {
+    pub(super) fn plain(text: &str) -> Self {
+        Self {
+            text: text.into(),
+            tone: Tone::Plain,
+        }
+    }
+    pub(super) fn inherited(text: String) -> Self {
+        Self {
+            text,
+            tone: Tone::Inherited,
+        }
+    }
+    pub(super) fn waiting(text: String) -> Self {
+        Self {
+            text,
+            tone: Tone::Waiting,
+        }
+    }
+    /// Whether it names bound media rather than another Scene.
+    pub(super) fn is_media(&self) -> bool {
+        self.tone == Tone::Plain
+    }
+}
+/// The Scene band's take count, coloured by the Scene's take state, at its right end.
+fn take_badge(ui: &egui::Ui, bar: Rect, state: SceneState, takes: usize) -> Rect {
+    let (text, fill, color) = match state {
+        SceneState::Generating => ("…".to_owned(), helto::FIELD, helto::FOCUS),
+        SceneState::Accepted => (format!("T{takes}"), helto::ACCENT, helto::SURFACE),
+        SceneState::Outdated => (format!("T{takes}"), helto::WARN, helto::SURFACE),
+        _ => (format!("T{takes}"), helto::RAISED, helto::DIM),
+    };
+    let galley = ui
+        .painter()
+        .layout_no_wrap(text, egui::FontId::proportional(10.), color);
+    let size = egui::vec2(galley.size().x + 10., 14.);
+    let badge = Rect::from_min_size(
+        egui::pos2(bar.right() - size.x - 3., bar.center().y - size.y / 2.),
+        size,
+    );
+    if bar.width() > size.x + 24. {
+        ui.painter().rect_filled(badge, 7, fill);
+        ui.painter()
+            .galley(badge.center() - galley.size() / 2., galley, color);
+        badge
+    } else {
+        Rect::from_min_size(bar.right_top(), egui::Vec2::ZERO)
+    }
+}
+/// A Section block's label at the top, and its role chip and length at the bottom.
+fn section_text(
+    ui: &egui::Ui,
+    r: Rect,
+    label: &str,
+    chip: Option<Chip>,
+    duration: f64,
+    selected: bool,
+) {
+    let painter = ui
+        .painter()
+        .with_clip_rect(r.shrink(2.).intersect(ui.clip_rect()));
+    let galley = painter.layout(
+        label.to_owned(),
+        egui::FontId::proportional(12.),
+        if selected {
+            helto::ACCENT_TEXT
+        } else {
+            helto::TEXT
+        },
+        (r.width() - 12.).max(8.),
+    );
+    painter.galley(r.left_top() + egui::vec2(6., 5.), galley, helto::TEXT);
+    let length = painter.layout_no_wrap(
+        format!("{duration:.1} s"),
+        egui::FontId::proportional(11.),
+        helto::DIM,
+    );
+    let length_at = egui::pos2(
+        r.right() - length.size().x - 6.,
+        r.bottom() - length.size().y - 5.,
+    );
+    if r.width() > length.size().x + 16. {
+        painter.galley(length_at, length, helto::DIM);
+    }
+    let Some(chip) = chip else {
+        return;
+    };
+    let color = match chip.tone {
+        Tone::Plain => helto::TEXT,
+        Tone::Inherited => helto::ACCENT_TEXT,
+        Tone::Waiting => helto::FOCUS,
+    };
+    let text = painter.layout_no_wrap(chip.text, egui::FontId::proportional(11.), color);
+    let pill = Rect::from_min_size(
+        egui::pos2(r.left() + 5., r.bottom() - 21.),
+        egui::vec2(text.size().x + 12., 17.),
+    );
+    if pill.right() > length_at.x - 4. && r.width() < pill.width() + 10. {
+        return;
+    }
+    painter.rect_filled(pill, 8, egui::Color32::from_black_alpha(190));
+    if chip.tone != Tone::Plain {
+        painter.rect_stroke(
+            pill,
+            8,
+            Stroke::new(
+                1.,
+                if chip.tone == Tone::Inherited {
+                    helto::ACCENT_BORDER
+                } else {
+                    helto::FOCUS
+                },
+            ),
+            egui::StrokeKind::Inside,
+        );
+    }
+    painter.galley(pill.center() - text.size() / 2., text, color);
+}
+impl Timeline {
+    /// Takes attached to the Scene, accepted or not.
+    fn scene_takes(&self, scene: &SceneId) -> usize {
+        self.document.as_ref().map_or(0, |d| {
+            d.view
+                .takes
+                .iter()
+                .filter(|t| &t.scene_id == scene && review::attached(d, t))
+                .count()
+        })
+    }
 }
 impl ImagineApp {
     pub(super) fn timeline_tracks(
@@ -337,7 +486,7 @@ impl ImagineApp {
             let scroll = area.show(ui, |ui| {
                 let size = egui::vec2(
                     (end as f32 * self.timeline.zoom).max(ui.available_width()),
-                    90. + audio_lanes as f32 * 28.,
+                    AUDIO_TOP + 3. + audio_lanes as f32 * 28.,
                 );
                 let (canvas, _) = ui.allocate_exact_size(size, Sense::hover());
                 let ruler = ui.interact(
@@ -396,8 +545,8 @@ impl ImagineApp {
                     let x = canvas.left() + seconds(scene.start) as f32 * self.timeline.zoom;
                     let w = seconds(scene.duration) as f32 * self.timeline.zoom;
                     let bar = Rect::from_min_size(
-                        egui::pos2(x, canvas.top() + 19.),
-                        egui::vec2(w.max(12.), 28.),
+                        egui::pos2(x + 1., canvas.top() + BAND_TOP),
+                        egui::vec2((w - 2.).max(12.), BAND_H),
                     );
                     let active = self
                         .timeline
@@ -416,24 +565,20 @@ impl ImagineApp {
                     );
                     ui.painter().rect_filled(
                         bar,
-                        3,
+                        10,
                         if active {
                             helto::ACCENT_TOP
                         } else {
                             helto::FIELD
                         },
                     );
-                    if let Some(color) = state.color() {
-                        ui.painter().rect_filled(
-                            Rect::from_min_max(egui::pos2(bar.left(), bar.bottom() - 3.), bar.max),
-                            egui::CornerRadius {
-                                sw: 3,
-                                se: 3,
-                                ..Default::default()
-                            },
-                            color,
-                        );
-                    }
+                    ui.painter().rect_stroke(
+                        bar,
+                        10,
+                        Stroke::new(1., if active { helto::ACCENT } else { helto::RAISED }),
+                        egui::StrokeKind::Inside,
+                    );
+                    let badge = take_badge(ui, bar, state, self.timeline.scene_takes(&scene.id));
                     if enabled {
                         drop_target(ui, &response, bar, &mut self.timeline.drop, &scene.id, None);
                     }
@@ -450,10 +595,12 @@ impl ImagineApp {
                         seconds(scene.duration),
                         state.label()
                     ));
+                    let title_area =
+                        Rect::from_min_max(bar.min, egui::pos2(badge.left() - 4., bar.bottom()));
                     ui.painter()
-                        .with_clip_rect(bar.intersect(ui.clip_rect()))
+                        .with_clip_rect(title_area.intersect(ui.clip_rect()))
                         .text(
-                            bar.left_center() + egui::vec2(8., 0.),
+                            bar.left_center() + egui::vec2(9., 0.),
                             egui::Align2::LEFT_CENTER,
                             if title.is_empty() || !titles_revealed {
                                 format!("{:02} · {:.2} s", index + 1, seconds(scene.duration))
@@ -558,100 +705,21 @@ impl ImagineApp {
                             self.timeline.mode,
                         ));
                     }
-                    if index > 0 {
-                        let marker = Rect::from_center_size(
-                            egui::pos2(x, bar.center().y),
-                            egui::vec2(11., 18.),
-                        );
-                        let mode = super::assembly::boundary_for(
-                            project,
-                            &project.scenes[index - 1].id,
-                            &scene.id,
-                        )
-                        .mode;
-                        let response = ui
-                            .interact(
-                                marker,
-                                ui.id().with(("boundary", &scene.id.0)),
-                                if enabled {
-                                    Sense::click()
-                                } else {
-                                    Sense::hover()
-                                },
-                            )
-                            .on_hover_text(format!(
-                                "Boundary before Scene {} · {}",
-                                index + 1,
-                                boundary_label(&mode)
-                            ));
-                        ui.painter().rect_filled(
-                            marker,
-                            3,
-                            if self.timeline.boundary && active {
-                                helto::ACCENT_TOP
-                            } else {
-                                helto::SURFACE
-                            },
-                        );
-                        ui.painter().rect_stroke(
-                            marker,
-                            3,
-                            Stroke::new(
-                                1.,
-                                if response.has_focus() {
-                                    helto::FOCUS
-                                } else {
-                                    helto::FIELD
-                                },
-                            ),
-                            egui::StrokeKind::Inside,
-                        );
-                        ui.painter().text(
-                            marker.center(),
-                            egui::Align2::CENTER_CENTER,
-                            boundary_glyph(&mode),
-                            egui::FontId::proportional(10.),
-                            helto::DIM,
-                        );
-                        #[cfg(feature = "ui-preview")]
-                        super::qa::control(ui, format!("boundary-{index}"), &response);
-                        if response.clicked() {
-                            commands.extend(self.timeline.draft_edits());
-                            self.timeline.clear_audio_selection();
-                            self.timeline.clear_preview();
-                            self.timeline.selected_take = None;
-                            self.timeline.selected = BTreeSet::from([scene.id.clone()]);
-                            self.timeline.section = None;
-                            self.timeline.boundary = true;
-                            self.timeline.sync_draft();
-                        }
-                    }
                     for section in &scene.sections {
                         let a = x + seconds(section.start) as f32 * self.timeline.zoom;
                         let r = Rect::from_min_size(
-                            egui::pos2(a, canvas.top() + 53.),
+                            egui::pos2(a + 1., canvas.top() + SECTION_TOP),
                             egui::vec2(
-                                (seconds(section.duration) as f32 * self.timeline.zoom).max(8.),
-                                22.,
+                                (seconds(section.duration) as f32 * self.timeline.zoom - 2.)
+                                    .max(8.),
+                                SECTION_H,
                             ),
                         );
                         let selected = self.timeline.section_selection.contains(&section.id)
                             || self.timeline.section.as_ref() == Some(&section.id);
-                        ui.painter().rect_filled(
-                            r,
-                            3,
-                            if selected {
-                                helto::ACCENT_TOP
-                            } else {
-                                helto::SURFACE
-                            },
-                        );
-                        ui.painter().rect_stroke(
-                            r,
-                            3,
-                            Stroke::new(1., helto::FIELD),
-                            egui::StrokeKind::Inside,
-                        );
+                        let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+                        let chip =
+                            self.timeline_section_block(ui, project, scene, section, r, revealed);
                         let response = ui.interact(
                             r,
                             ui.id().with(&section.id.0),
@@ -878,7 +946,7 @@ impl ImagineApp {
                                 }
                             }
                         }
-                        let label = if helto::reveal_in_viewport(ui, self.prefs.privacy_mode) {
+                        let label = if revealed {
                             navigation::section_label(
                                 project,
                                 section,
@@ -888,25 +956,87 @@ impl ImagineApp {
                         } else {
                             "Section".into()
                         };
-                        ui.painter()
-                            .with_clip_rect(r.shrink(2.).intersect(ui.clip_rect()))
-                            .text(
-                                egui::pos2(r.left() + 4., r.center().y),
-                                egui::Align2::LEFT_CENTER,
-                                label,
-                                egui::FontId::proportional(10.),
-                                if selected {
-                                    helto::ACCENT_TEXT
+                        section_text(ui, r, &label, chip, seconds(section.duration), selected);
+                    }
+                    if index > 0 {
+                        // On the cut itself, as in Director.
+                        let marker = Rect::from_center_size(
+                            egui::pos2(x, canvas.top() + SECTION_TOP - 1.),
+                            egui::vec2(24., 20.),
+                        );
+                        let mode = super::assembly::boundary_for(
+                            project,
+                            &project.scenes[index - 1].id,
+                            &scene.id,
+                        )
+                        .mode;
+                        let response = ui
+                            .interact(
+                                marker,
+                                ui.id().with(("boundary", &scene.id.0)),
+                                if enabled {
+                                    Sense::click()
                                 } else {
-                                    helto::DIM
+                                    Sense::hover()
                                 },
+                            )
+                            .on_hover_text(format!(
+                                "Boundary before Scene {} · {}",
+                                index + 1,
+                                boundary_label(&mode)
+                            ));
+                        let on = self.timeline.boundary && active;
+                        if on {
+                            helto::gradient(
+                                ui.painter(),
+                                marker,
+                                5.,
+                                helto::ACCENT_TOP,
+                                helto::ACCENT_BOTTOM,
                             );
+                        } else {
+                            helto::gradient(ui.painter(), marker, 5., helto::RAISED, helto::FIELD);
+                        }
+                        ui.painter().rect_stroke(
+                            marker,
+                            3,
+                            Stroke::new(
+                                1.,
+                                if response.has_focus() {
+                                    helto::FOCUS
+                                } else if on {
+                                    helto::ACCENT
+                                } else {
+                                    helto::RAISED
+                                },
+                            ),
+                            egui::StrokeKind::Inside,
+                        );
+                        ui.painter().text(
+                            marker.center(),
+                            egui::Align2::CENTER_CENTER,
+                            boundary_glyph(&mode),
+                            egui::FontId::proportional(12.),
+                            if on { helto::ACCENT_TEXT } else { helto::TEXT },
+                        );
+                        #[cfg(feature = "ui-preview")]
+                        super::qa::control(ui, format!("boundary-{index}"), &response);
+                        if response.clicked() {
+                            commands.extend(self.timeline.draft_edits());
+                            self.timeline.clear_audio_selection();
+                            self.timeline.clear_preview();
+                            self.timeline.selected_take = None;
+                            self.timeline.selected = BTreeSet::from([scene.id.clone()]);
+                            self.timeline.section = None;
+                            self.timeline.boundary = true;
+                            self.timeline.sync_draft();
+                        }
                     }
                 }
                 self.timeline_audio_tracks(ui, canvas, project, enabled, commands);
                 if project.audio_tracks.is_empty() {
                     ui.painter().text(
-                        egui::pos2(canvas.left() + 4., canvas.top() + 84.),
+                        egui::pos2(canvas.left() + 4., canvas.top() + AUDIO_TOP + 6.),
                         egui::Align2::LEFT_TOP,
                         "Audio",
                         egui::FontId::proportional(10.),

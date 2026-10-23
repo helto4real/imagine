@@ -149,6 +149,7 @@ pub const ACCENT_HOVER_BOTTOM: Color32 = Color32::from_rgb(0x49, 0x36, 0x26);
 pub const FOCUS: Color32 = Color32::from_rgb(0x89, 0xb4, 0xfa);
 pub const ERROR: Color32 = Color32::from_rgb(0xf3, 0x8b, 0xa8);
 pub const OK: Color32 = Color32::from_rgb(0xa6, 0xe3, 0xa1);
+pub const WARN: Color32 = Color32::from_rgb(0xf9, 0xe2, 0xaf);
 
 pub fn install(ctx: &egui::Context) {
     let mut style = egui::Style {

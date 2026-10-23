@@ -33,9 +33,9 @@ impl ImagineApp {
             chrome::Pane::Tracks,
             // Narrow windows wrap the tool row; keep one audio lane visible.
             if bounds.width() < 850. {
-                (bounds.height() * 0.38).clamp(260., 300.)
+                (bounds.height() * 0.4).clamp(290., 330.)
             } else {
-                (bounds.height() * 0.3).clamp(200., 280.)
+                (bounds.height() * 0.32).clamp(250., 300.)
             },
             140.0..=(bounds.height() * 0.6),
         );
