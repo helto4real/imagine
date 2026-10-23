@@ -28,12 +28,27 @@ pub struct Artifact {
     pub bytes: Vec<u8>,
 }
 pub enum Generated {
-    Images(Vec<Artifact>),
-    Video(Vec<u8>),
+    Delivery {
+        bytes: Arc<Vec<u8>>,
+        plan: Box<crate::video::assembly::Plan>,
+        pending: Box<crate::video::output::Pending>,
+    },
+    Images {
+        artifacts: Vec<Artifact>,
+        pending: Vec<crate::video::output::Pending>,
+    },
+    Video {
+        bytes: Vec<u8>,
+        take_artifacts: Vec<crate::video::artifacts::Produced>,
+        pending: Box<crate::video::output::Pending>,
+    },
 }
 impl From<Vec<Artifact>> for Generated {
     fn from(v: Vec<Artifact>) -> Self {
-        Self::Images(v)
+        Self::Images {
+            artifacts: v,
+            pending: Vec::new(),
+        }
     }
 }
 enum Task<'a> {
@@ -63,22 +78,63 @@ pub async fn generate(
     store: &Store,
 ) -> Result<Generated> {
     if request.model == "minimax-h3" {
-        let input = crate::video::job::request(request).map_err(crate::engine::EngineError)?;
+        let mut input = crate::video::job::request(request).map_err(crate::engine::EngineError)?;
+        let pending = store
+            .videos
+            .destination()
+            .and_then(|d| {
+                d.reserve(
+                    &request.client_metadata["video_destination"],
+                    input.shape.raw_bytes() + 64 * 1024 * 1024,
+                )
+            })
+            .map_err(crate::engine::EngineError)?;
+        if let Some(id) = &request.inputs.start_image {
+            let asset = store
+                .asset(id, owner)
+                .await?
+                .ok_or(crate::engine::EngineError("asset_not_found"))?;
+            crate::video::image::validate_asset(&asset).map_err(crate::engine::EngineError)?;
+            let bytes = store.read_asset(id, owner).await?;
+            anyhow::ensure!(
+                crate::storage::hash(&bytes) == asset["sha256"].as_str().unwrap_or(""),
+                crate::engine::EngineError("invalid_h3_start_image")
+            );
+            let (descriptor, rgb) =
+                tokio::task::spawn_blocking(move || crate::video::image::decode(&bytes)).await??;
+            input.image = Some(descriptor);
+            input.image_rgb = rgb;
+        }
         let av = engine.generate_video(&input).await?;
         anyhow::ensure!(
             av.shape == input.shape,
             crate::engine::EngineError("h3_invalid_output")
         );
         engine.stage(Some("encoding_video"));
-        let bytes = tokio::task::spawn_blocking(move || crate::short_av::encode(av))
-            .await?
-            .map_err(crate::engine::EngineError)?;
-        Ok(Generated::Video(bytes))
+        let bytes = encode_video(av).await?;
+        Ok(Generated::Video {
+            bytes,
+            take_artifacts: vec![],
+            pending: Box::new(pending),
+        })
     } else {
-        generate_images(engine, request, owner, store)
-            .await
-            .map(Generated::Images)
+        let pending = store.reserve_images(request, owner).await?;
+        let artifacts = generate_images(engine, request, owner, store).await?;
+        Ok(Generated::Images { artifacts, pending })
     }
+}
+pub(crate) async fn encode_video(av: crate::short_av::Av) -> Result<Vec<u8>> {
+    struct EncodingGuard(Arc<std::sync::atomic::AtomicBool>);
+    impl Drop for EncodingGuard {
+        fn drop(&mut self) {
+            self.0.store(true, std::sync::atomic::Ordering::Release);
+        }
+    }
+    let guard = EncodingGuard(Arc::default());
+    let cancelled = guard.0.clone();
+    tokio::task::spawn_blocking(move || crate::short_av::encode_cancellable(av, &cancelled))
+        .await?
+        .map_err(|code| crate::engine::EngineError(code).into())
 }
 async fn generate_images(
     engine: &mut dyn Backend,
@@ -175,6 +231,11 @@ pub async fn reference_metadata(
             .asset(id, owner)
             .await?
             .ok_or(Fault::new(404, "asset_not_found"))?;
+        if request.model == "minimax-h3" {
+            crate::video::image::validate_asset(&asset).map_err(|e| Fault::new(422, e))?;
+            result.push(serde_json::json!({"asset_id":id,"sha256":asset["sha256"],"source_width":asset["width"],"source_height":asset["height"],"width":request.width,"height":request.height,"preprocessing":"h3_pillow_lanczos_stretch_v1"}));
+            continue;
+        }
         let w = asset["width"].as_u64().unwrap() as u32;
         let h = asset["height"].as_u64().unwrap() as u32;
         let (_, _, width, height) = crate::workflow_image::dimensions(

@@ -12,12 +12,19 @@ use std::{collections::BTreeMap, os::unix::fs::PermissionsExt, path::Path, time:
 use tokio::sync::watch;
 fn input(prompt: &str) -> h3::Request {
     h3::Request {
+        references: Default::default(),
+        capture_continuation: false,
+        continuation: None,
+        continuation_bytes: vec![],
+        sampling: None,
         protocol: h3::VERSION,
         kind: h3::RequestKind::GenerateVideo,
         id: "fixture-42".into(),
         profile: h3::Profile::ShortAvNoReferenceV1,
         prompt: prompt.into(),
         shape: Default::default(),
+        image: None,
+        image_rgb: Vec::new(),
         seed: 42,
     }
 }
@@ -56,7 +63,12 @@ while True:
     };
     std::fs::write(&video,format!("{prefix}\nd=json.loads(os.environ['IMAGINE_H3_DEPLOYMENT'])\n{bad}\n{}",r#"
 emit(dict(type='ready',deployment=d))
-q=json.loads(read());body=read();assert not body
+q=json.loads(read());body=read()
+if q['profile']=='h3-fl2va-i2va-v1':
+ import hashlib
+ im=q['image'];assert len(body)==im['width']*im['height']*3
+ assert hashlib.sha256(body).hexdigest()==im['sha256']
+else: assert not body
 assert q['kind']=='generate_video' and q['seed']==42
 if q['prompt']=='hang':time.sleep(60)
 if q['prompt']=='failure':
@@ -68,7 +80,7 @@ if q['prompt']=='unknown':
  emit(dict(type='error',id=q['id'],code='generation_failed',message='PRIVATE SYNTHETIC ERROR'));sys.exit(0)
 for phase in ['loading_text','encoding_text','loading_dit','sampling','loading_video_vae','decoding_video','loading_audio_vae','decoding_audio']:
  emit(dict(type='phase',id=q['id'],phase=phase))
-for i in range(1,5):emit(dict(type='progress',id=q['id'],completed=i,total=4,elapsed_seconds=i/10))
+for i in range(1,21):emit(dict(type='progress',id=q['id'],completed=i,total=20,elapsed_seconds=i/10))
 shape=q['shape']; count=shape['frames']; samples=(count*4000+1)//3
 for i in range(count):emit(dict(type='video_frame',id=q['id'],index=i),bytes([i%256])*shape['width']*shape['height']*3)
 if q['prompt']=='partial':sys.exit(0)
@@ -94,8 +106,7 @@ time.sleep(60)
         ("IMAGINE_PILLOW_LIBRARY", dep.clone()),
         ("IMAGINE_TRITON_COMPILER_PROFILE", dep.clone()),
     ]);
-    let mut h3environment = environment.clone();
-    h3environment.remove("IMAGINE_PILLOW_LIBRARY");
+    let h3environment = environment.clone();
     let identity = h3::Deployment {
         protocol: h3::VERSION,
         profile: h3::Profile::ShortAvNoReferenceV1,
@@ -108,7 +119,7 @@ time.sleep(60)
     std::fs::write(&dependency_map, serde_json::to_vec_pretty(&deps).unwrap()).unwrap();
     let manifest = dir.path().join("runtime.json");
     std::fs::write(&manifest,serde_json::to_vec(&json!({"schema":1,"reference_revision":"446ef4e005fc7134d53ce6869ebd77d2134cd39c",
-        "binary":image,"environment":environment,"files":files,"h3":{"binary":video,"model_root":dir.path().join("models"),
+        "binary":image,"environment":environment,"files":files,"h3":{"profile_checkpoints":h3::profile_checkpoints(),"binary":video,"model_root":dir.path().join("models"),
         "identity":identity,"dependency_map":dependency_map,"files":h3files,"environment":h3environment}})).unwrap()).unwrap();
     let (tx, rx) = watch::channel(EngineState {
         backend: "rust".into(),
@@ -207,4 +218,75 @@ async fn nondefault_shape_survives_the_real_pipe_boundary() {
     assert!(av.valid());
     assert_eq!(av.frames[21][0], 21);
     assert!(state.borrow().pid.is_none());
+}
+
+#[tokio::test]
+async fn i2v_rgb_is_private_and_profile_switch_reaps_each_worker() {
+    let (_dir, mut engine, state) = fake(false);
+    let mut r = input("synthetic");
+    r.profile = h3::Profile::ImageToAvV1;
+    r.shape = h3::Shape {
+        width: 64,
+        height: 64,
+        frames: 5,
+        fps: 24,
+    };
+    r.image_rgb = [20, 30, 40].repeat(4);
+    r.image = Some(h3::ImageInput {
+        width: 2,
+        height: 2,
+        sha256: hash(&r.image_rgb),
+    });
+    let mut invalid = r.clone();
+    invalid.image_rgb[0] = 99;
+    assert!(engine.generate_video(&invalid).await.is_err());
+    assert!(state.borrow().pid.is_none());
+    assert!(engine.generate_video(&r).await.unwrap().valid());
+    assert!(state.borrow().pid.is_none());
+    let mut text = input("synthetic");
+    text.profile = h3::Profile::AvNoReferenceV2;
+    text.shape = r.shape;
+    assert!(engine.generate_video(&text).await.unwrap().valid());
+    assert!(state.borrow().pid.is_none());
+    engine.generate(&image()).await.unwrap();
+    engine.stop().await.unwrap();
+    assert!(state.borrow().pid.is_none());
+}
+
+#[test]
+fn observer_output_is_declared_only_in_the_h3_runtime_contract() {
+    let (dir, _engine, _) = fake(false);
+    let path = dir.path().join("runtime.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    manifest["h3"]["environment"]["IMAGINE_REFERENCE_PROBE_OUTPUT"] =
+        json!(dir.path().join("own-observer"));
+    std::fs::write(&path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+    assert!(imagine_server::rust_runtime::Runtime::load(&path).is_ok());
+    manifest["environment"]["IMAGINE_REFERENCE_PROBE_OUTPUT"] =
+        json!("not-an-image-runtime-option");
+    std::fs::write(&path, serde_json::to_vec(&manifest).unwrap()).unwrap();
+    assert!(imagine_server::rust_runtime::Runtime::load(&path).is_err());
+}
+
+#[test]
+fn profile_checkpoint_or_pillow_manifest_drift_rejects_before_worker() {
+    let (dir, _engine, state) = fake(false);
+    let path = dir.path().join("runtime.json");
+    let original: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    for pillow in [false, true] {
+        let mut changed = original.clone();
+        if pillow {
+            changed["h3"]["environment"]
+                .as_object_mut()
+                .unwrap()
+                .remove("IMAGINE_PILLOW_LIBRARY");
+        } else {
+            changed["h3"]["profile_checkpoints"]["h3-fl2va-i2va-v1"] = "0".repeat(64).into();
+        }
+        std::fs::write(&path, serde_json::to_vec(&changed).unwrap()).unwrap();
+        assert!(imagine_server::rust_runtime::Runtime::load(&path).is_err());
+        assert!(state.borrow().pid.is_none());
+    }
 }

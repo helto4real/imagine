@@ -12,13 +12,17 @@ fn key(key: egui::Key, modifiers: egui::Modifiers, repeat: bool) -> egui::Event 
 }
 
 fn ctrl(desk: &mut Desk, key_code: egui::Key) {
-    desk.frame(vec![key(key_code, egui::Modifiers::CTRL, false)]);
+    press(desk, key_code, egui::Modifiers::CTRL);
+}
+
+fn press(desk: &mut Desk, key_code: egui::Key, modifiers: egui::Modifiers) {
+    desk.frame(vec![key(key_code, modifiers, false)]);
     desk.frame(vec![egui::Event::Key {
         key: key_code,
         physical_key: None,
         pressed: false,
         repeat: false,
-        modifiers: egui::Modifiers::CTRL,
+        modifiers,
     }]);
 }
 
@@ -26,10 +30,10 @@ fn ctrl(desk: &mut Desk, key_code: egui::Key) {
 fn shortcuts_toggle_zoom_and_persist_privacy_without_taking_button_focus() {
     let mut desk = Desk::new();
     desk.click("Fit image");
-    ctrl(&mut desk, egui::Key::Z);
+    press(&mut desk, egui::Key::Z, egui::Modifiers::NONE);
     assert!(desk.app.image.actual_pixels);
     desk.app.image.image_pan = egui::vec2(40., 20.);
-    ctrl(&mut desk, egui::Key::Z);
+    press(&mut desk, egui::Key::Z, egui::Modifiers::NONE);
     assert!(!desk.app.image.actual_pixels);
     assert_eq!(desk.app.image.image_pan, egui::Vec2::ZERO);
 
@@ -41,18 +45,20 @@ fn shortcuts_toggle_zoom_and_persist_privacy_without_taking_button_focus() {
             hidden
         );
     }
-    desk.frame(vec![key(egui::Key::Z, egui::Modifiers::CTRL, false)]);
+    desk.frame(vec![key(egui::Key::Z, egui::Modifiers::NONE, false)]);
     assert!(desk.app.image.actual_pixels);
-    desk.frame(vec![key(egui::Key::Z, egui::Modifiers::CTRL, true)]);
+    desk.frame(vec![key(egui::Key::Z, egui::Modifiers::NONE, true)]);
     assert!(desk.app.image.actual_pixels);
     desk.frame(vec![egui::Event::Key {
         key: egui::Key::Z,
         physical_key: None,
         pressed: false,
         repeat: false,
-        modifiers: egui::Modifiers::CTRL,
+        modifiers: egui::Modifiers::NONE,
     }]);
+    press(&mut desk, egui::Key::Z, egui::Modifiers::NONE);
     ctrl(&mut desk, egui::Key::Z);
+    assert!(!desk.app.image.actual_pixels);
     desk.frame(vec![key(
         egui::Key::Z,
         egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
@@ -79,6 +85,9 @@ fn shortcuts_focus_the_active_prompt_and_leave_text_editing_alone() {
     for key_code in [egui::Key::Z, egui::Key::Space, egui::Key::Enter] {
         ctrl(&mut desk, key_code);
     }
+    press(&mut desk, egui::Key::Z, egui::Modifiers::NONE);
+    desk.frame(vec![egui::Event::Text("z".into())]);
+    assert!(desk.app.image.prompt.ends_with('z'));
     assert!(!desk.app.image.actual_pixels);
     assert!(!desk.app.prefs.privacy_mode);
     assert!(desk.app.image.error.is_none());
@@ -251,7 +260,7 @@ fn shortcuts_generate_uses_button_validation_and_respects_disabled_states() {
     }
     desk.click("Video");
     ctrl(&mut desk, egui::Key::Enter);
-    ctrl(&mut desk, egui::Key::Z);
+    press(&mut desk, egui::Key::Z, egui::Modifiers::NONE);
     ctrl(&mut desk, egui::Key::P);
     assert!(desk.app.image.error.is_none());
     assert!(!desk.app.image.actual_pixels);

@@ -1,6 +1,8 @@
 //! Synthetic job events and egui frames only; no installed service or user data.
 use super::*;
 use queue::{Completion, Event};
+#[path = "../tests/support/destination.rs"]
+mod destination;
 
 fn stage(desk: &mut Desk, prompts: &[&str]) -> Vec<String> {
     desk.app.metadata = Some(imagine_server::contract::model(client::MODEL).unwrap());
@@ -525,16 +527,23 @@ async fn ui_retries_uncertain_batch_admission_and_failed_retrieval_without_dupli
         polls: Arc<AtomicUsize>,
         failed_poll: Arc<AtomicBool>,
         bytes: Arc<Vec<u8>>,
+        folder: PathBuf,
+        proof: Value,
     }
     let mut bytes = std::io::Cursor::new(Vec::new());
     image::RgbaImage::from_pixel(24, 16, image::Rgba([20, 40, 60, 255]))
         .write_to(&mut bytes, image::ImageFormat::Png)
         .unwrap();
+    let mut desk = Desk::new();
+    let folder = desk.app.prefs.output_folder.clone();
     let state = Fake {
         bytes: Arc::new(bytes.into_inner()),
+        proof: destination::proof(&folder),
+        folder,
         ..Default::default()
     };
     let router=Router::new()
+        .route("/v1/media-destination",get(|State(state):State<Fake>|async move { Json(state.proof) }))
         .route("/v1/jobs/batch",post(|State(state):State<Fake>,headers:HeaderMap,Json(body):Json<Value>|async move {
             let mut admissions=state.admissions.lock().unwrap();
             admissions.push((headers["Idempotency-Key"].to_str().unwrap().into(),body));
@@ -548,7 +557,9 @@ async fn ui_retries_uncertain_batch_admission_and_failed_retrieval_without_dupli
             if id=="job_a" && !state.failed_poll.swap(true,Ordering::SeqCst) {
                 return (StatusCode::SERVICE_UNAVAILABLE,Json(serde_json::json!({"error":{"code":"temporarily_unavailable"}})));
             }
-            (StatusCode::OK,Json(serde_json::json!({"status":"succeeded","output":{"assets":[{"id":format!("asset_{id}"),"role":"image"}]},"effective":{"seed":99}})))
+            let path=state.folder.join(format!("image_{id}.png"));
+            std::fs::write(&path,state.bytes.as_ref()).unwrap();
+            (StatusCode::OK,Json(serde_json::json!({"status":"succeeded","output":{"persistent":true,"assets":[{"id":format!("asset_{id}"),"role":"image","persistent":true,"saved_path":path}]},"effective":{"seed":99}})))
         }))
         .route("/v1/assets/{id}",get(|State(state):State<Fake>|async move { ([("content-type","image/png")],state.bytes.as_ref().clone()).into_response() }))
         .with_state(state.clone());
@@ -557,7 +568,6 @@ async fn ui_retries_uncertain_batch_admission_and_failed_retrieval_without_dupli
     let server = tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();
     });
-    let mut desk = Desk::new();
     desk.app.image.references.clear();
     desk.app.metadata = Some(imagine_server::contract::model(client::MODEL).unwrap());
     desk.app.client = Some(Client::connect(&Connection { url }).unwrap());

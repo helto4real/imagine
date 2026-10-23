@@ -1,7 +1,48 @@
 # Video support design — Imagine
 
-Status: **Timeline-UI, modelloberoende videoarkitektur, projektlagring och första leveransens omfattning inklusive avancerad H3 är låsta. O01–O05 är avgjorda. P01 och P02:s isolerade projekt-/bibliotekslagring är implementerade; P02-integration och övriga paket återstår.**
-Senast uppdaterat: 2026-10-20.
+Status: **Full implementation enligt P01–P09 godkänd av Tomas 2026-10-20 för isolerat nattarbete. Timeline, modellneutral arkitektur, projektlagring och avancerad H3 enligt D10 gäller. P01 och P02:s lagringsgrund finns; ett senare integrerat enscens-H3/I2V-flöde finns också. Detta är inte full Timeline-/Director-paritet. Återstående integration och acceptans spåras per funktion.**
+Senast uppdaterat: 2026-10-21.
+
+**CHECKPOINT-23:** Texttolkningen följer nu Directors Python 3.12 även för
+Unicode-ordgränser, alla Python-blanksteg, radbrytningar och skiftlägesokänsliga
+ASCII-uttrycks fyra extra Unicode-tecken; 2 964 rena källorakelfall passerar.
+Castbilder och röster har bildbidrag, relationsmål/-notering och individuella
+röstinställningar samt globalt referensval. Hela deras Reference-manifest matchar
+Director i 64 fall, inklusive relationskedjor/cykler, ordning och summeringar.
+Native UI har verifierat redigering, kompilerad källa, avstängning, sparning,
+kall återöppning och återaktivering i 81 + 32 åtgärder. Workspace: 359 gröna tester.
+Det slutaccepterar inte Section/video/timeline-audio-/boundary-projektionen
+eller faktisk medietransport och GPU-konditionering. Dessa, full Story, P08,
+minnesparitet och det nekade Exp-provet är fortsatt separata öppna krav.
+
+**CHECKPOINT-22:** H3:s Reference/I2V-promptkompilering och dialogmarkörer,
+Enhance-referensskydd och dess promptbyggare matchar 421 faktiska Director-fall;
+32 I2V-textreferensprojektioner matchar också. Native Plan Review visar samma
+kompilerade källa som fryses för jobbet, effektiva mått/tid och konkreta ännu
+saknade runtimebindningar. Scen-summary/ambience/musik är separata redigerbara
+källfält. Faktisk bild-/röstkonditionering är inte bevisad genom detta.
+P07 har sedan CP21 Directors EXIF/RGB/1280/Lanczos och optimized
+JPEG90 för providerbilder; 28 egna bildfall matchar både RGB och JPEG byteexakt.
+Gemensamt tokenbaserat referensaliasval matchar Director i 64 fall. Native
+biblioteks-UI har explicit Create/Open/Refresh, Save/Replace och självständiga
+projekt-/castkopior. Tidigare cast, inventering, bildplacering och dialogavsikt
+genom Outline/expansion, review, Apply och Save/Open behålls.
+Detta är inte full P07-paritet: full Story-promptbyggare, återstående lexikala
+detaljer/diagnostik, hela Reference-manifestprojektionen och workertransporten,
+flera H3-bild-/röstroller samt bibliotekssemantik/acceptans kvarstår.
+P08:s verifierade CP19-resultat behålls; genererade transitions, större källor
+och montageleveransers bibliotek/projektkopior återstår till acceptans.
+Detaljer och kvarvarande prov finns i `design/video-contract/assembly.md` och
+nattrotens `evidence/CHECKPOINT-22.md`. Återstående P07- och bild/ljudruntime,
+återstående avancerad H3 och slutacceptans kvarstår. Efter färdigt UI är en
+separat kodreview mot Director obligatorisk för **alla** kontroller i UI,
+backend, profiler, runtime och export: fri modell-/textencoderväljning, inga
+omotiverade tillåtelselistor eller binärhashspärrar. Testbevis hålls separata
+från produktkontroller. Exp-trestegsdiagnostik är fortsatt nekad/väntande.
+Funktionell **och algoritmisk** ComfyUI-paritet är krav, inklusive exekverings-
+och minnespolicy. Separata H3-gap för ägarlivstid, unload, budgetar och
+prefetch/synkronisering kvarstår enligt `design/video-contract/parity-deviations.md`;
+liknande eller identiska bild-/ljudresultat slutaccepterar inte dessa gap.
 
 ## 1. Beslutat och antaget
 
@@ -11,7 +52,7 @@ Senast uppdaterat: 2026-10-20.
 | D02 | Målet är funktionell paritet med ComfyUI Helto Director, inklusive dess kreativa arbetsflöden och UI-funktioner. | Begärt av Tomas |
 | D03 | ComfyUI-inferensen portas till Rust i en annan tråd. Designen får anta att den kommer stödja MiniMax H3. | Angiven förutsättning |
 | D04 | `stable-diffusion.cpp` ska inte styra denna design; den ersätts av Rust-porten. | Angiven avgränsning |
-| D05 | Designbesluten dokumenteras här. Tomas har därefter godkänt P01 och den isolerade projekt-/bibliotekslagringen i P02. API-/medieinkoppling och övriga implementationspaket är fortsatt planering. | P01 godkänt 2026-10-19; avgränsad P02 godkänd 2026-10-20 |
+| D05 | Tomas har godkänt hela implementationen enligt denna plan och låst prototyp, i egen server/UI-instans med separata data och bibehållen GPU-samordning. Befintliga ändringar bevaras. | Fullt implementationsmandat 2026-10-20; tidigare P01/P02-godkännanden kvarstår |
 | D06 | Prototypvarianten **Timeline** är valt och låst UI för Video: befintlig Imagine/Helto-chrome, referenser till vänster, viewer och Takes i mitten, kontextuell inspector till höger, Scene/Section-/ljudtidslinje nedanför och Queue & results längst ned. | Godkänt av Tomas 2026-10-19; UI-VAL-01 |
 | D07 | **MiniMax H3 är första implementationen av det gemensamma videogränssnittet.** Projekt, editor, jobb, Takes och montage är modellneutrala. Modelladaptrar äger modellens stöd, planering och inferensöversättning. Projektet har modellstandard och varje scen kan överstyra den; modellbyte bevarar författad avsikt och kräver explicit kompatibilitetsvalidering. UI-VAL-01 behålls. | Godkänt av Tomas 2026-10-19; ARK-VID-01, konkretiserat i avsnitt 5 |
 | D08 | **Explicit första Save, därefter autosparning i vald projektmapp.** Projektet äger kopior av sina referenser, färdiga tagningar och nödvändiga kontinuitetsartefakter. Återanvändbart bibliotek sparas separat och uttryckligen. Vanliga filer utan nytt krypterings-/inloggningssystem; ingen beständig jobbhistorik eller automatisk återstart av jobb. | Godkänt av Tomas 2026-10-19; LAGR-VID-01, konkretiserat i avsnitt 6; O03 avslutad |
@@ -19,7 +60,7 @@ Senast uppdaterat: 2026-10-20.
 | D10 | **Avancerad H3 ingår från första leveransen:** single-stage och two-stage med Continue latent, Last Frame FirstFrame, Combo, Influence, Motion Context, Motion Context Exp, Re-noise video prediction och tränad latent upscaling. MiniMaxSparseAttension och H3 RTX VSR Refine för vald Take/slutsekvens kommer senare. Vanlig slutmontering/export ingår från början. Experimentstatus och variantspecifika begränsningar behålls; saknat runtime-stöd för en obligatorisk funktion är en leveranslucka, inte skäl att tyst skjuta upp den eller använda en annan metod. | Godkänt av Tomas 2026-10-19; H3-VID-01; O05 avslutad |
 | D11 | **Ingen import av Director-projekt/bibliotek och ingen kompatibilitet med Directors externa bridge.** Detta stöd är bortvalt, inte uppskjutet. Imagine får ett eget integrationsgränssnitt utifrån sin modellneutrala domänmodell; Dreamchat-integrationen skrivs om senare mot det. Vanlig medieimport och beslutade lokala arbetsflöden ingår fortfarande. | Godkänt av Tomas 2026-10-19; INT-VID-01; O04 avslutad |
 
-Alla formuleringar nedan om hur Imagine *ska* fungera är förslag tills de har accepterats och förts in i beslutstabellen. H3-stöd antas, men stöd för varje Director-specifik tilläggsfunktion är en separat integrationsfråga. Inget uppdrag har skickats till inferenstråden.
+D01–D11 styr omfattningen. De tekniska kontraktsförslagen nedan är nu implementationsunderlag; reversibla detaljval kan göras inom mandatet. Varje obligatorisk Director-specifik H3-funktion kräver verifierat runtime-stöd och får inte ersättas med tyst fallback.
 
 ## 2. Underlag och nuläge
 
@@ -508,6 +549,36 @@ De obligatoriska förmågorna exponeras genom H3-adaptern i befintliga avancerad
 
 O04 är avslutat genom D11: Director-import och extern bridge-kompatibilitet ingår inte och planeras inte som senare paritetskrav. Funktionell paritet avser de beslutade kreativa arbetsflödena; Imagine får ett eget integrationsgränssnitt. Uppskjutna funktioner enligt D09/D10 ska vara synliga paritetsluckor, och bortvald kompatibilitet redovisas som avsiktlig avgränsning.
 
+### Pågående implementation 2026-10-20
+
+Den äldre nulägesinventeringen föregår den integrerade H3/I2V-vägen i
+`src/video/{job,image,output,http}`, `src/comfy_engine/h3.rs`,
+`shared/{h3_protocol,h3_geometry,short_av}.rs` och
+`ui/src/{video_client,video_ui}.rs`. Den vägen delar bildjobbens kö, har
+verifierad FP16-gräns före VAE-encode och explicit krypterad mediedestination.
+Den är en enscensväg och ska kopplas till projektmodellen; den ersätter inte
+P02–P09 eller avancerad H3 enligt D10. De borttagna automatiska runtime-/modellhashspärrarna
+ska inte återinföras. D-05-arbetet i inferensporten förblir separat.
+
+Prompt Studio ska kopiera **alla fem** källprofiler 1:1: `normal`, `creative`,
+`nsfw`, `nsfw_prism`, `nsfw_qwen_next`. Manifester och samtliga tillhörande
+promptfiler ska vara byteidentiska med Directors källägda profiler. Normal-arv,
+operation-/providerspecifik prioritet, reasoning-budgetar, promptfilernas
+fallback, revisionsberäkning och frysta jobbsnapshots ska verifieras mot
+Directors resolver. Detta gäller dess aktuella v3-profiler, inte import av gamla
+Director-projekt eller privat providerkonfiguration.
+
+Visningsexporten ändras till Helto Save Video Advanceds standardprofil:
+MP4/libx264, yuv420p, CRF 19, BT.709 med tv-range och AAC med dess standardvärden.
+Ingen förlustfri mellanfil, ny godtycklig AAC-bitrate eller konvertering av
+befintliga användarfiler ingår. Direktkodningens sluttid ska motsvara hela
+videospåret och verifieras tillsammans med ljudet, inklusive codec-padding.
+
+Nattens egen instans och testartefakter ligger under
+`/run/media/veracrypt1/imagine/.codex-video-night-20261020-a6428d9e/`.
+Funktionsmatris och verifieringsrapporter lagras där i `evidence/`, separat
+från skarpa data och från denna frysta prototyps källfiler.
+
 ### P01: implementerad domängrund
 
 P01 finns i [src/video](src/video/mod.rs), med en sessionslokal `ProjectService` för Create/Read/Edit, strikt typade kommandon, atomiska revisionskontroller, rationell timing och kanoniska scenfingerprints. Modellval/inställningar och Accepted-identitet bevaras vid modellbyte; okända adapters/schemas bevaras men blockerar körning. Registrering och stödvalidering prövas med två syntetiska adaptrar. H3-inställningarna har ett inledande authoringschema; full H3-planering och verifiering av kontinuitetsartefakter ligger kvar i P05. Ingen riktig modelladapter annonseras.
@@ -516,15 +587,135 @@ P01 finns i [src/video](src/video/mod.rs), med en sessionslokal `ProjectService`
 
 Verifierat 2026-10-19: 17 P01-tester och produktworkspacens 207 tester passerade; två befintliga tester ignorerades. Clippy med `-D warnings` och formateringskontroll passerade. Temporära syntetiska loopbackservrar krävde utökad testbehörighet. Ingen manuell UI- eller modellacceptans ingick; den separata inferensworkspacen byggdes inte.
 
-### P02: implementerad projekt- och bibliotekslagring; integration återstår
+### P02: projekt-/media-/biblioteks-API verifierat; UI-integration återstår
 
 Tomas godkände 2026-10-20 att projekt-/bibliotekslagringen görs avskilt från porteringen. [Lagringsgrunden](design/video-storage/README.md) finns i `src/video/{persistence,library,bundle}`: explicit första Save, synkron autosparning efter redigering, Open/Save as, projektägda resurskopior, historiska referenser, färdiga Takes och versionsbundna kontinuitetsresurser. Separat bibliotek sparas uttryckligen; projekt-/karaktärskopior blir självständiga sessionskopior med ursprungs-ID/revision. Inga jobb, runs eller köregister serialiseras.
 
 Sparningen använder rotidentitet, skrivarens förväntade manifesthash, lås, verifierade immutabla resurser och atomiskt manifestbyte. Sparfel behåller sessionens ändringar och senaste bekräftat sparade revision. Ett synkfel efter utfört atomiskt byte rapporteras separat som osäker durabilitet; en giltig ny version kan då redan finnas och får inte beskrivas som ett garanterat återställt gammalt manifest. Tester använder temporära rötter, syntetiska resurser och injicerade skrivfel.
 
-**Hela P02 är ännu inte klar:** strömmad HTTP-media, formatinspektion, byte ranges, API:s location-ID:n, registrering av nya sessionsasset-ID:n vid Open och UI-inkoppling återstår. H3-artefakter lagras och integritetskontrolleras som opaka versionsbundna resurser; inferenskompatibiliteten avgörs i P05. Denna implementation ändrar inte `src/storage.rs`, `src/api.rs`, scheduler, workerbrygga, inferensport eller UI-prototyp. Befintliga sessionsrensningen är oförändrad; framtida inkoppling måste hålla beständiga rötter utanför sessionsytan.
+Nattens nästa del implementerar `src/video/{api,service,media}` och binder befintlig projektlagring till `src/api.rs`/`src/storage.rs`. API:t kräver aktuell session, använder uttryckligen valda location-ID:n och erbjuder Create/Read/Edit, referensimport, första Save, autosave, Open och Save as. Bild/video/ljud laddas upp strömmat till direkt avlänkade filer på verifierad outputdestination; avbruten upload registrerar ingen asset. Sessionsmedier levereras med oberoende filhandtag och byte ranges. Open verifierar samtliga referenser före atomisk sessionsregistrering och ger nya runtime-ID:n utan att skriva dem till projektmanifestet. Save as skapar en självständig projektkopia med ny identitet; originalets sessionshandle behålls för pågående jobb och andra vyer.
+
+CPU-inspektion läser typ, geometri, fps, ljudkanaler/sample rate och rationell längd. MP4 använder strömlängder som tar hänsyn till edit lists/padding. Matroska/MP3 inspekteras via paketens tidsstämplar: FFprobe kan annars kopiera en felaktig bitrateuppskattning till både container- och strömlängd. Ingen automatisk omskrivning eller konvertering av importerade filer sker.
+
+Bibliotekets API använder samma uttryckliga location-gräns: Create/Open/Read, revisionsbundet spara/uppdatera projekt och karaktärer samt självständiga projekt- och karaktärskopior. Ingen katalogskanning eller implicit liveuppdatering införs. Karaktärskopian är ett granskningsbart sessionsresultat med ursprung och nya runtime-medier; inkoppling till projektets författarverktyg återstår till P07. Uppdatering bevarar karaktärens identitet och får inte byta en biblioteksentries innehållstyp.
+
+**Hela P02 är ännu inte klar:** Check Media/Relink-flöden och UI-inkoppling återstår. P03 återöppnar även sparad Take-video med nya sessions-ID:n; continuation-resurser är fortfarande opaka och inferenskompatibiliteten avgörs i P05. Workerbrygga, inferensport och UI-prototyp ändras inte av denna API-etapp. Beständiga projektlocationer avvisas om de ligger i sessionsrensningens rot eller är dess förälder.
 
 Verifierat 2026-10-20: 14 nya lagringstester, produktworkspacens 221 tester och två syntetiska binär-/integritetstester passerade; två befintliga workspacetester ignorerades. Clippy, formatering och serverbygge passerade. Testbehörigheten utökades för temporära loopbackservrar; ingen verklig modell, kodek eller fysisk full-disk-/strömavbrottsprovning ingick.
+
+Nattens P02-API-regressioner: fem integrationstester passerar med enbart egna syntetiska PNG/MP4/WAV/MKV-fixtures på krypterad testdestination. De täcker sessionskrav/revisionskonflikter, Save/autosave/Open efter sessionsrensning, självständig Save as efter originalborttagning, strömmad och avbruten upload, storleksgräns, parallella byte ranges, atomisk Open vid en senare ogiltig resurs, ändrad rotidentitet, bibehållet osparat utkast vid autosavefel samt MKV utan korrekt Duration. Sammanhållen aktuell workspace-/kvalitetsevidens redovisas i nattkatalogens `evidence/CHECKPOINT-2.md`; full video-/Timelineacceptans är ännu inte genomförd.
+
+### P03: gemensam scenkö och Take-publicering syntetiskt verifierade
+
+`kind: video_scene` på `/v1/jobs` kräver aktuell session och idempotensnyckel. Servern fryser scen-/modell-/inställningsproveniens, inputfingerprint, prompt och självständiga referenskopior vid admission. `Control` och API:t delar en projektservice; inga projektregister dupliceras i inferensmotorn. Scenjobben använder samma FIFO, worker och koordinatorbiljetter som bildjobben. Requests och SSE-status innehåller endast den frysta planens offentliga sammanfattning; promptar och råa referenser serialiseras inte dit.
+
+En komplett Candidate/Outdated Take och dess resurskopior förbereds innan outputtransaktionen får publicera jobbsuccess. Samma projektlås hålls över SQL-commit och den därefter ofelbara sessionsväxlingen; autosave följer efteråt. Ett fel före output-commit lämnar ingen Take. Ett projektsparfel efter success behåller den kompletta Take-kopian i sessionen med `not_saved` för nytt sparförsök. Detta är inte ett löfte om en gemensam kraschatomisk transaktion mellan RAM-jobbregister och filsystem; ingen beständig jobbhistorik införs. Open/Save as och bibliotekskopior återregistrerar spelbar Take-video utan beroende av den ursprungliga exportfilen.
+
+Sex nya syntetiska köprov täcker blandad bild/scen-FIFO, redigering efter admission, lost-response-replay/dubbletter/nyckelkonflikt, queued/active cancel, explicit retry efter workerfel, cancel/result-race, injicerat output-SQL-fel, projektsparfel efter success, sessionsbyte/återöppning, shutdown/koordinatorbortfall samt avslag före admission för ännu ej stödd seed/two-stage. Take-media förblir spelbar från en egen resurskopia även om exportfilen tas bort under samma session. Biblioteks-API:t har ett ytterligare integrerat kopierings-/revisionsprov. Aktuell workspace-evidens är 292 godkända tester, inga fel och tre ignorerade; kvalitetskontroller och separat nattdiff finns i `evidence/CHECKPOINT-3.md`.
+
+**Avgränsning av denna checkpoint:** exekveringsbindningen är den redan befintliga grundläggande H3-/I2V-profilen med seed 42 och 20 res_multistep/simple-steg. Andra seeds, full Director-promptkompilering, avancerade referenser, two-stage och D10-kontinuitet är fortfarande P05-luckor och blockeras uttryckligen. Ingen full H3-paritet eller verklig GPU-/Timelineacceptans påstås. P06:s run-selektion, review/approval och accept/reject/A-B återstår. Nästa större steg är P04:s låsta Timeline med en gemensam ren kontraktsgräns mot servern.
+
+### P04: första native-checkpoint — delvis implementerad, inte slutaccepterad
+
+Gemensamma rena projekt-/edit-/planeringstyper ligger nu i `crates/video-contract`; UI och server delar validering och revisioner. Den native Timeline-vyn använder prototypens vänstra mediahylla, mittviewer med transport/Take-strip, högerinspector och Scene/Section-band. New/Open/Save/Save as, mediaimport, scen-/Section-redigering, snap, gruppflytt, trim/ripple och authoring-Undo/Redo är inkopplade mot projekt-API:t. Befintligt Single clip-flöde finns kvar separat. Uppspelning av egna sessionsmedier använder CPU-preview och pausar när privacy/fokus döljer vyn.
+
+`evidence/CHECKPOINT-4.md` i nattens krypterade testrot redovisar 297 godkända workspace-tester, inga fel och tre ignorerade, fmt, Clippy med och utan QA-feature samt separat build. En faktisk egen Glow/native-instans mot en egen CPU-fixtureserver passerade 38 steg: Open, Take-preview, Play, privacy-paus, Add Scene, Undo/Redo, dubbelklick på Generate och exakt en ny Candidate. Fem egna renderade bilder har granskats. Detta verifierar kontroller/API och renderingen, inte H3-kvalitet eller mänskligt verifierad ljuduppspelning. Kompositorn behöll fönsterstorleken efter resize-request; liten fönsterstorlek är därför inte verifierad.
+
+**P04 återstår:** full queue-/cancel-/retry-presentation för scenjobb, komplett modell-/LoRA-/projektinspector och capabilities, ljudspårens domän/UI, projekt-/karaktärsbibliotekets UI, full tangent-/drag-/reopen-/felacceptans och Take-review/A-B. P05–P09 inklusive D10 är fortsatt obligatoriskt arbete. De fem Director-profilernas byteparitet och resolver är verifierade sedan P01, men Story/Enhance-beteendet är ännu inte inkopplat.
+
+**Rättelse av tidigare aktiveringsstatus:** repoets standard-Cargo-mål överlappade nästa manuella produktstarts server/UI-filer. Nattbyggen ersatte därför dessa filer trots att inga skarpa processer startades eller startades om. Originalfilerna återställdes byteidentiskt mot den oförändrade startkonfigurationen; evidens och exakta checksummor finns i `evidence/ACTIVATION-ERRATUM.md` och `activation-recovery.json`. FP16-worker/startval är orörda. Alla fortsatta Cargo-kommandon som bygger eller kontrollerar använder uttryckligen `CARGO_TARGET_DIR=/home/thhel/ChatGPT/imagine/comfyui/h3-video-night-20261021/target`. Den nya Timeline-kandidaten är inte produktaktiverad.
+
+### P04: gemensam scenkö och byggisolering verifierade (checkpoint 5)
+
+Timeline-scenjobb visas nu i samma Queue & results-yta som bildjobb, med gemensamma progressetiketter, aktiva/väntande räknare, Cancel, Retry och exakt Take-resultat. Förlorad statusobservation behåller jobb-ID och erbjuder Reconnect; förlorat admissionssvar behåller request/idempotensnyckel och erbjuder Retrieve submission. Retry skapar en ny nyckel för samma frysta request och kräver oförändrad projektrevision. Byte av workspace avbryter inte scenjobbet. Resultatöppning kontrollerar Take-projektidentiteten. Feltext följer privacy och upptar en egen rad i stället för att överlappa ljudspåret.
+
+Faktisk egen native-QA verifierade Cancel/Retry/navigation/resultat i 28 steg (q06) och därefter workerfel/privacy/retry i 26, statusförlust/återanslutning i 19 samt admissionsförlust/idempotent återhämtning i 18 steg (slutliga q10–q12). Tidigare misslyckade q04/q05 är sparade och deras orsaker rättade: egui-låsning i QA-instrumentering respektive UI-fältet `result` i stället för offentliga `output.take`. Evidens, exakta testtal och separat nattdiff finns i `evidence/CHECKPOINT-5.md` på nattens krypterade rot. Hela P04 och P05–P09 är fortfarande inte klara.
+
+Permanent lokal byggseparation: `.cargo/config.toml` pekar nu på `comfyui/h3-video-night-20261021/target`; `tools/video-night-cargo.py` låser destinationen även på kommandoraden och avvisar target-/manifest-/config-overrides. `tools/build-video-night.py` producerar nya unika kandidatpaket under nattkatalogens `packages/` utan att ändra startval. Verklig Cargo-metadata och separata byggprov verifierar destinationen; återställda produktbinärer kontrolleras igen mot originalens checksummor. `build-product.sh` är en separat avsiktlig produktoperation och används inte i nattflödet. Inga skyddsrättigheter eller mountinställningar har ändrats.
+
+### P04: ljud-UI inkopplad, partiell native-acceptans (checkpoint 7)
+
+Det tidigare granskningsavslaget för `ui/src/video/audio.rs` löstes genom exakt ett nytt försök via samma vanliga granskningsväg med det senare användarmandatet som ny evidens. `evidence/APPROVAL-RESOLVED.json` dokumenterar detta; historiska CHECKPOINT-6 är bevarad. Ingen ytterligare användarbekräftelse behövs för fortsatt arbete inom nattmandatet.
+
+Ljudkontraktet och UI:t skiljer genereringsreferens från slutmix. Audio Clip-inspector, Project Audio-inspector, källval/preview, namn, volym/fades/source range, routing/purpose/strength, enabled/locked, drag/trim och duplicate/remove är inkopplade mot revisionsbundna edits/autosave/authoring-undo. Rena gester och vyer har separata moduler under `ui/src/video/audio/`. Directors defaults, lane-stacking och trimresultat jämförs mot rena källfunktioner; ingen ansluten ComfyUI-runtime lästes.
+
+Eget native-prov q13 passerade 47 steg: skapa ljudklipp från syntetisk WAV, namn/autosparning, source preview/play med Mute av, privacy-paus, separat routing, Undo/Redo och projektljud. Senare q16 återöppnade en kopia av samma sparade projekt i en ny instans och passerade 39 steg, inklusive flytt, låsning med bibehållen position, Undo/Redo, båda trimkanterna och duplicering. Det slutade med timeout när QA väntade på `audio-remove`; Remove/Undo och den efterföljande negativa H3-admissionassertionen återstår i det provet. Nästa minsta prov är explicit scroll till Remove efter duplicering i en ny egen instans, med samma oförsvagade assertions. Det är inte en bevisad produktbugg i Remove. Tidigare q14/q15 och deras diagnostik är bevarade; q14:s för tidiga assertion efter dragrelease rättades i QA-barriären, och q16 inväntade stabil scroll.
+
+Sammanhållen full Rust-regression efter ljud-UI gav 304 pass, 0 fel, 3 ignorerade. Berörda UI-tester kördes igen efter redigeringsutökningen. Clippy med och utan QA-feature är gröna efter rättad cfg-betingad indexvarning; formattering är kontrollerad. Detta verifierar inte faktisk ljudmix/normalisering/waveform eller full H3-ljudreferensbindning. Dessa, komplett modell-/LoRA-/biblioteksinspector och resterande P04–P09/D10 är fortfarande obligatoriskt arbete. Exakt evidens, kandidatpath och nattdiff finns i `evidence/CHECKPOINT-7.md` på den krypterade nattroten. Alla egna processer är avslutade; ingen GPU-reservation eller produktaktivering gjordes.
+
+### P04/P06: Remove/Undo och manuell Take-granskning verifierade (checkpoint 8)
+
+q18 passerade hela det oförsvagade ljudredigeringsprovet i 55 steg efter att QA-scroll riktats mot inspektorn i stället för dess nästlade textyta. Samma oförändrade kandidat verifierade Remove, Undo till två klipp och explicit blockerad H3-generering med ännu obunden ljudreferens. Ingen produktändring i Remove krävdes.
+
+Manuell Take-granskning har ett gemensamt typat kontrakt och en sessions-/revisionsbunden API-operation. Accept, Reject och Candidate sparar atomiskt dokumentvalet; Takes och deras ursprungliga inferensproveniens/media behålls. Byte eller borttagning av accepterad kontinuitetskälla, eller ändrad kontinuitetsmetod, markerar beroende Takes Outdated och upphäver berörda val transitivt. Vanliga prompt-, modell-, kvalitets- och slutmixändringar behåller Accepted enligt V29. Detta är den nuvarande kontraktsmodellens beroenden; kompletta Director-boundaries och Runs är fortfarande återstående arbete.
+
+Fem rena regressioner och ett syntetiskt HTTP-prov verifierar bland annat transitiva beroenden, revisionskonflikt, felaktig scen/Take, media/proveniensbevarande och sparning/återöppning. Native q21 passerade 31 steg med granskning, autosparning och authoring-Undo utan att återställa Take-val. q22 passerade 22 steg i en ny egen instans med återöppnat Accepted-val, verklig avkodning/uppspelning och upprepad granskning. Den visuella kontrollen rättade en saknad statusglyf till läsbar text. q19/q20 avbröts på felaktiga testfixture-förväntningar innan några granskningsåtgärder; deras evidens är sparad.
+
+Sammanhållen workspace-regression samt formattering och Clippy med/utan QA-feature är gröna; exakta tal, kandidatpath och nattdiff finns i den krypterade nattrotens `evidence/CHECKPOINT-8.md`. A/B, Runs/autoaccept, fulla gränsinställningar, H3/D10-runtimebindning, Story/Enhance, slutmix/montage och sammanhållen GPU-acceptans är inte levererade genom denna checkpoint. Nästa huvudsteg är P05:s faktiska H3-kontrakt/runtimebindning och dess modellacceptans, inte ytterligare enbart UI-scaffolding. Ingen produktaktivering eller skarp tjänsteändring har gjorts; alla egna UI/server-processer är avslutade.
+
+### P05: faktisk H3-kedja och tvåstegshandoff verifierade (checkpoint 9)
+
+Produktens privata H3-protokoll v5 bär typade single/two-stage-inställningar, separata sampler/scheduler-val, base schedule/prefix, denoise, manuella FP32-sigmas och en sammanhängande progressräkning. Den nya H3-adaptern validerar exakt variant/profil och separat Stage 2-modell. Workern kör båda stegen, med DisableNoise i Stage 2, korrekt AV-latentformat och antingen Continue latent eller Re-noise video prediction. Schemainterpolation och zero-interval re-noise är byteexakta mot Directors källfunktioner i CPU-prov. Den gamla korta kontrollprofilen förblir låst.
+
+Tre sekventiella verkliga GPU-prov i en separat egen standardserver, via gemensam GPU-koordinator och med vår egen tidigare porträttbild, passerade till slutlig MP4: single-stage 20 steg samt två varianter med 4 steg ur ett 20-stegsschema följt av 16 steg, Continue latent respektive Re-noise video prediction. Samma I2V-profil och seed42 användes. Alla gav 124 frames vid24fps, H.264/yuv420p, BT.709/tv, AAC stereo32kHz, exakt165333 avkodade samples/kanal och containerduration5.166667s. Seeking verifierades; avkodad PCM var finit och RMS blev0.015646/0.021446/0.018766. Detta är funktionell runtime-acceptans för dessa exakta konfigurationer, inte ett påstående om full numerisk Python-paritet för tvåstegsgenerering eller om hela D10.
+
+Det verkliga I2V-provet hittade och rättade ett fel i vår nya scenkörningsväg: staging lämnade första bildens filposition vid EOF. Positionsoberoende, storleksbegränsad läsning används nu; en syntetisk API-regression kontrollerar faktiska RGB-pixlar hela vägen till backend. Tidigare misslyckade egna prov och deras avslut är dokumenterade. Native-byggning använder en egen frozen-base-overlay, source/target/Cargo-cache och unika kandidatpaket, helt separerade från nästa-start-binärerna och D-05.
+
+Fulla visuella/ljudreferenser, first/last-varianter utöver nuvarande I2V-first-frame, versionerade kontinuitetsartefakter, Motion Context/Exp, tränad latent upscaling och avancerade UI-kontroller återstår. Den tränade upscalerns modellfil och källkod finns faktiskt tillgängliga; återstående arbete är portning/bindning, inte en påvisad saknad viktfil. Runs/A-B, Story/Enhance och slutmix/montage är också fortsatt obligatoriska. Exakta kontroller, kandidat-/artefaktvägar och kvarvarande stöd redovisas i nattrotens `evidence/CHECKPOINT-9.md`. Ingen kandidat är aktiverad, alla egna processer är avslutade och ingen egen GPU-reservation hålls.
+
+### P05/P06: Last Frame FirstFrame genom hela kedjan verifierad (checkpoint 10)
+
+Varje ny scen-Take publicerar nu en versionsbunden H3-slutbild atomiskt tillsammans med videon. Bilden hämtas direkt från sista råa RGB-bildrutan före H.264-kodning. Last Frame FirstFrame fryser uttryckligen accepterad käll-Take, resurs-ID, SHA-256, modell, geometri och formatversion före köläggning. Målscenen måste ha en uttrycklig I2V-profil; befintlig First Frame-bindning, saknad/tvetydig slutbild eller inkompatibel version blockerar utan ersättningsmetod. Äldre Takes får inte en påhittad slutbild genom omavkodning av videon.
+
+Klickbar scengräns öppnar Boundary-inspectorn med källval och Last Frame FirstFrame. Explicit byte till I2V kräver en användaråtgärd. Byte av källa/metod gör berörda mål-Takes Outdated; Undo återställer författaravsikten men godkänner inte gamla resultat automatiskt. Native UI med egna syntetiska data verifierade hela genererings-/granskningsflödet, ogiltigförklaring, Undo och kall återöppning. Riktigt GPU-prov i separat standardserver verifierade två scener: vår egen porträttbild till käll-Take, Accept och fryst rå slutbild till målscenens I2V. Båda gav 124 frames, H.264/BT.709/yuv420p och AAC stereo32kHz med 165333 samples/kanal och containerduration5.166667s. Den sparade källreferensen och mål-Takens proveniens matchar exakt.
+
+Detta sluter den vertikala Last Frame FirstFrame-bindningen för dessa genererade fullängds-Takes, inte hela V33/V34 eller D10. Combo, Influence, Motion Context/Exp, tränad latent upscaling, full referens-/ljudbindning, Runs/A-B, Story/Enhance och slutmix/montage återstår. Dessa andra kontinuitetsmetoder syns som ej inkopplade och ersätts inte tyst. Workspace har318 passerade tester,0fel,3ignorerade; formattering, Clippy med/utan QA och separata syntetiska binärlivscykeltester passerar. Checkpointens käll-/paketattest och detaljer finns i nattrotens `evidence/CHECKPOINT-10.md`. Kandidaten är inte aktiverad; egna testprocesser är avslutade och GPU-reservationen släppt.
+
+### P05/P06: latentartefakter och Motion Context/Exp — checkpoint 11, runtime-acceptans återstår
+
+Privat H3-protokoll v6 transporterar versionsbundna fysiska FP32-latenttails, exakt7videosteg och37audiosteg. Käll-Take, innehållshash, modell och synlig/samplad geometri valideras och fryses; felaktig version, längd, hash, endpoint eller icke-finita värden avvisas före native-init. En beställd men saknad tail kan inte publicera Complete/Take. Native-bindningen implementerar Motion Contexts guide och34frames head-trim respektive Exps prefixmask och21/13trim, båda med modellokalt16+16 attention-fönster och explicit ljud-opt-in. Rå tail, prefixmask och attention-utdata är byteexakta mot Directors källfunktioner i fyra modellfria CPU-fall.
+
+Boundary-UI stöder nu båda metoderna, explicit Reference-profil och ljudkontinuitet.62 native UI-åtgärder och15 separata kallöppnings-/uppspelningskontroller passerade med egna syntetiska data.321 workspace-tester och14 fristående CPU-transporttester passerar, liksom formattering och Clippy. Granskningsblockeringen för UI löstes genom Tomas direkta godkännande i denna tråd; inget avslag kringgicks.
+
+Faktiskt GPU-prov verifierade källans nya latentcapture och byteidentisk MP4 mot föregående kontroll. Första Motion Context-målet fick efter koordinatorväntan GPU-grant och körde20/20steg samt videoavkodning, men misslyckades i audiofasen med `h3_generation_failed`. Ingen mål-Take publicerades; egenworker/server avslutades. Därför är Motion Context/Exp ännu inte GPU-slutaccepterade och de övriga tre målvarianterna kördes inte. Nästa steg är avgränsad diagnostik och omprov av det egna målets audiogräns med återanvändning av vår sparade käll-Take/tail; ingen ny källgenerering behövs. Tränad upscaling, övriga referenser, Runs, Story och slutmix/montage kvarstår. Exakt evidens och återstående acceptanskriterier finns i nattrotens `evidence/CHECKPOINT-11.md`. Ingen kandidat är aktiverad.
+
+### P05/P06: rättad audio-trim, verkliga Motion/Exp-mål och kvarvarande Exp-kvalitetsfel — checkpoint 12
+
+Det tidigare audiofasfelet är belagt och rättat: native avkodade ljud för158sampladeframes men anropade `fit_audio` med124synligaframes. Den giltiga263-cellsbufferten nekades därför av längdkontraktet. Ny gemensam trimfunktion anpassar först till samplad geometri och väljer därefter synligt stereointervall. CPU-regressionen reproducerar den gamla felkontrollen; båda metodernas nya rå-PCM är byteidentiska med Directors trim (165333samples/kanal, Motion-padding266samples, Exp0). Normal scen utan head-trim behåller samma resultat.
+
+Fyra riktiga20stegs-mål kördes sekventiellt från en verifierad ny kopia av vår tidigare egna accepterade käll-Take/tail. Alla fyra publicerade giltig Take, latenttail, proveniens och direkt MP4/H.264/BT709/yuv420p/AAC32000stereo med124frames,5.166667s och fungerande seek. Tre klarade den i förväg satta ljudnivågränsen; Exp med ljudkontinuitet låg på RMS0.0000156168,−96.128dBFS och underkändes. Gränsen sänktes inte. Kontaktkartan visar dessutom tillfälliga färgfält i båda Exp-varianterna. Exp är därför inte kvalitetsaccepterat. Detta är ännu inte bevisat som ett Rust-specifikt modellfel; samma maskade mål har inte jämförts mot faktisk Python-inferens.
+
+Ett utökat modellfritt CPU-prov visar byteidentiska denoise-maskvillkor och AV-injektion mot ComfyUI vid sigma1,0.5,0.01,0, med/utan audioprefix. Tidigare tail/prefix/attention-paritet kvarstår.55 native UI-kontroller återöppnade de riktiga fyra mål-Takesen och verifierade preview/play/pause samt egen ljudprocess; det bevisar inte hörbar nivå eller perceptuell paritet. Egna GPU-/UI-servrar och workers avslutades; ingen reservation eller aktivering kvarstår.
+
+Nästa isolering är ett identiskt första maskat DiT-steg Rust/Python med vår sparade källa och explicit samma brus, conditioning och sigman. Därefter kvarstår Exp inklusive tränad upscaling, övriga D10-referenser/Combo/Influence, Runs, Story och slutmix/montage. Helheten är fortfarande ofärdig. Fulla värden, käll-/paketattest, visuella bevis och separat diff finns i nattrotens `evidence/CHECKPOINT-12.md`.
+
+### P05/P06: första maskade Exp-steget byteexakt — checkpoint 13
+
+Separat diagnostikbinär och direkt isolerad Python-worker körde exakt ett första maskat steg med Exp+ljudprefix, samma Reference-checkpoint/BF16 och20stegsschemats första sigma. Python fick Rusts faktiska råa context/tags, fysiska prefixlatenter, explicita brus, mask och samtliga sigman.20mätgränser är byteexakta, inklusive faktiska modellindata/maskvillkor, packed embedding, tidsbas, RoPE, första transformerblock och callbackens x/denoised. Video och audio denoised har MAE/RMSE/max0. Detta bevisar första stegets paritet, inte senare steg eller slutlig Exp-kvalitet. Ingen numerisk produktfix är därför motiverad av detta utfall.
+
+Det första Python-testet gav felaktigt en redan packad mask till API:t och är ogiltigt som paritybevis. Harnessen rättades till nästlad video/audiomask; endast Python-steget kördes om med de sparade Rust-indata. Båda försöken och avslutade reservationer är bevarade. Exakt körd diagnostikkälla arkiverades och kopplades från ordinarie kandidatkälla; framtida diagnostikkälla har separat sökväg. Ingen skarp binär eller tjänst berördes.
+
+Automatisk granskning nekade en patch för utökning till tre steg med motiveringen att enstegsgränsen skulle överskridas. Patchen utfördes inte och inget flerstegsprov startades. Vid checkpointen är samtliga egna GPU-workers avslutade och reservationerna släppta. Ytterligare GPU-prov väntar både uttryckligt klartecken för den avgränsade utökningen och samordning efter den separata minnestrådens GPU-fönster. Runs, Story och montage kan fortsätta CPU-only. Exp-kvalitet, tränad upscaling och hela övriga matrisen återstår enligt checkpoint12. Evidens och exakta värden finns i nattrotens `evidence/CHECKPOINT-13.md`.
+
+### P06: sessionsägda Runs med faktisk CPU-/UI-acceptans — checkpoint 14
+
+Run-API, serverkoordinator och native Runs-meny/status stöder Missing Only, All Same Seeds, All Fresh Seeds och Selected + Dependent Scenes inom nuvarande explicita kontinuitetsgraf. Seeds och författaravsikt fryses; först efter komplett Take-publicering och skyddad autoaccept kan nästa mål gå genom samma FIFO som bildjobb. Stop after current, Cancel current, idempotent återhämtning av samma request och felstopp finns. Sena indata-/Take-val får inte skrivas över. En versionskompatibel valfri `locked_takes`-index bevarar vald seedkälla genom Outdated och Save/Open; äldre dokument läses utan att gissa saknad historik.
+
+CPU-regressioner verifierar bildjobb mellan Run-scener, verklig LFF-resursbindning efter autoaccept, seedåteranvändning, ändrad aktuell/nästa scen, manuellt Take-val, jobbfel, sessionsskydd och upprepade requests även efter completion.39 faktiska native UI-åtgärder verifierade stop/cancel, generering vid byte till Image och tillbaka samt resultatpreview. Ytterligare17 kallöppningsåtgärder verifierade noll återupptagna Runs, exakt samma sparade seeds och noll nya jobb för en komplett Missing Only-sekvens. Båda egna instanserna använde CPU-fixtures, privat syntetisk kö och begärd programvarurendering; ingen kanonisk GPU-reservation togs. Alla egna processer är avslutade.
+
+Detta sluter det avgränsade vertikala Run-flödet för nuvarande genererade scener, inte hela P06 eller Director-pariteten. Full Imported-intent/filtering, äldre modell-/gränspolicyvarianter, explicit Plan Review approval, A/B och övriga P04–P09-luckor återstår. Story/Enhance och montage/slutmix är nästa oberoende CPU-arbete. Exp-kvalitet och nekad trestegsutökning är oförändrade; inga nya GPU-prov startades. Detaljer, aktuella tester, paket och separat diff finns i nattrotens `evidence/CHECKPOINT-14.md`; API-kontraktet beskrivs i `design/video-contract/runs.md`.
+
+### P07: revisionsbundna Story/Enhance-utkast — checkpoint 15
+
+Text-only Outline, sekventiell expansion, redigerbar granskning, retry från en felande scen samt Scene/Section Enhance är inkopplade till projekt-API och native UI. Samma valda Director-profil används genom kedjan med frysta systempromptar, resolverparametrar och providerinställningar; senare Reload/inställningsändring påverkar inte befintliga utkast. Apply publicerar granskad källtext och profilsnapshot/proveniens i en enda revisionskontrollerad dokumentändring. Gamla utkast behålls när Apply blockeras, och Close behåller den lokala granskningen. Append/Replace/Continue använder deterministisk relativ timing med Directors vanliga 15-sekunderspolicy. Slutlig evidens och aktuellt kandidatpaket redovisas separat i nattrotens `evidence/CHECKPOINT-15.md`.
+
+Detta är inte full P07-/Director-paritet. Cast/bibliotek, bildinventering/bildbindningar, dialogplanering, Animate-authoring, fler Enhance-fält, promptkatalogeditor/IntelliSense/Phrase Composer, full providerbudget/ETA och liveacceptans återstår. Bildbunden Enhance blockeras uttryckligt i stället för att behandlas som text-only. Replace med befintliga lagrade Takes blockeras av dokumentintegriteten; automatisk radering ingår inte i utkastflödet. Ingen extern provider eller privat credential används i CPU-testerna. A/B och montage/slutmix återstår. API och kända gränser beskrivs i `design/video-contract/authoring.md`.
+
+### P06: synkroniserad A/B-granskning — checkpoint 16
+
+Två valda Takes i samma scen kan jämföras i Timeline-viewern med en gemensam klocka, seek, loopintervall och Director-regeln att den kortare filmen bestämmer durationen. Båda panelerna begränsas till samma sista avkodade bildruta även när containerdurationen är avrundad. Muted/Audio A/Audio B äger högst ett ljudbarn; seek, källa och loop byter dess exakta PCM-fönster. Fokusförlust, döljning, workspacebyte och stängning pausar/stoppar ljudet. Metadatagranskning och retry finns även vid mediafel. Detta ändrar inte projektets författade innehåll eller accepterar en Take automatiskt.
+
+Egna native CPU-prov verifierar transport, ljudprocessval, slutbild, loop, metadata, cold-open och tillfälligt HTTP-mediafel/retry; exakt evidens och separat diff finns i nattrotens `evidence/CHECKPOINT-16.md`. Ingen GPU- eller minnesoptimering ingår. Full P06/V28 är fortfarande ofärdig, bland annat Take-radering och bredare acceptans. Montage/slutmix har källkartlagts men är ännu inte implementerat. Det är nästa CPU-arbete, följt av kvarvarande P07/D10 och sammanhållen acceptans. Kontraktets gränser finns i `design/video-contract/take-comparison.md`.
 
 ### Konkret implementationsplan (förslag)
 
@@ -583,7 +774,7 @@ Den här dokumentomgången utför inga av dessa framtida acceptanstester.
 
 ## 8. Beslutsstatus
 
-Samtliga ursprungliga öppna beslut O01–O05 är avgjorda. Ett konkret API-kontraktsförslag finns i avsnitt 5 och en implementationsplan P01–P09 i avsnitt 7, framtagna på Tomas uppdrag. Tomas har därefter godkänt P01 och den isolerade projekt-/bibliotekslagringen i P02, som nu är implementerade. P02:s API-/medieinkoppling och P03–P09 återstår. HTTP-routes och runtimebindning i API-förslaget är fortsatt framtida arbete.
+Samtliga ursprungliga öppna beslut O01–O05 är avgjorda. Tomas har 2026-10-20 godkänt full implementation av P01–P09 i isolerad instans. P01, P02:s lagringsgrund och ett senare enscens-H3/I2V-flöde finns redan. P02:s fulla API-/medieinkoppling och P03–P09 ska nu färdigställas och verifieras; de räknas inte som klara genom detta mandat. Aktuell status redovisas i funktionsmatrisen.
 
 **O01 är avgjort genom D09:** första leveransen omfattar H3 och gemensamma lokala Director-arbetsflöden; LTX/WAN senare. **O02 är avgjort genom D06:** Video använder Timeline-arbetsytan med Scene/Section-redigering. **O03 är avgjort genom D08:** explicit första Save, därefter projektlokal autosparning, projektägda medier/Takes och separat bibliotek utan beständig jobbhistorik. **O05 är avgjort genom D10:** latent kontinuitet, Re-noise video prediction och tränad latent upscaling ingår från början; sparse attention och RTX VSR Refine senare. **O04 är avgjort genom D11:** ingen Director-import eller bridge-kompatibilitet; Imagine får ett eget gränssnitt som Dreamchat-integrationen senare anpassas till.
 
@@ -604,6 +795,139 @@ Samtliga ursprungliga öppna beslut O01–O05 är avgjorda. Ett konkret API-kont
 | 2026-10-20 | Tomas godkände den isolerade lagringsdelen av P02 parallellt med inferensporten. Projekt-/biblioteksmanifest, egna verifierade resurskopior, Take-/referenshistorik, explicit Save/Open/Save as och autosparning implementerades i nya videomoduler. Skrivar-/rot-/integritetsskydd och syntetiska sparfelstester tillkom. P02:s API-/medie-/UI-inkoppling kvarstår; delade backend-/schedulerfiler ändrades inte. |
 
 Kommande överenskommelser ska uppdatera både relevant designavsnitt och beslutstabellen. Inaktuell förslagstext ska ersättas så dokumentet beskriver den aktuella överenskommelsen.
+
+### P05/P07: verklig castbild och röst till H3 — checkpoint 24
+
+Reference-arbetsflödet fryser nu projektägda bild-/röstresurser vid admission,
+transporterar RGB och stereo-FP32 i protokoll v7 och kodar dem genom befintliga
+video-/audio-VAE-vägar till H3:s referensblock och konditionering. Senare edits
+ändrar inte köade bytes. Directors bildgeometri/Lanczos/replicate-padding och
+44,1 kHz ljudgräns följd av ComfyUI:s sinc/Hann-resampling till32kHz matchar
+byteexakt i nio fokuserade CPU-komponentfall. Videoencode normaliserarRGB*2-1
+och använder vald FP16-gräns; ljudencode använderFP32.
+
+Två verkliga sekventiella egna Reference-GPU-prov, standardworker och separat
+godkänd testobserver, passerade20steg vid416x224/124frames/24fps till direkt
+MP4 H.264/yuv420p ochAACstereo32kHz, duration5,166667s. Observern belägger
+en bildlatent, en röstlatent och två referensblock; förberedda RGB/PCM matchar
+Python-komponentgränserna exakt och avkodad slutbild/PCM är byteidentiska mellan
+de två Rust-workervarianterna. Detta är inte ny Python-DiT-paritet eller bevis
+för upplevd identitet/röstlikhet. Vanlig worker skriver inga latentdumpar.
+
+361workspace-tester,15nativeCPU-wiretester, formattering och normal/QA/native
+Clippy är gröna. Ny kall native UI-kontroll q82 passerar17åtgärder och visar
+referenserna utan de tidigare transportfelen. Allt använder egna krypterade
+testdata och isolerade paket; egna processer är avslutade, GPU-leases släppta,
+ingen produktaktivering gjord. Exakta bevis finns i nattrotens CHECKPOINT-24.
+
+Section/video/timeline-audio/boundary-manifestparitet, bredare referensacceptans,
+återstående Story/catalog/provider-/biblioteksfunktioner, tränad upscaling,
+P08:s öppna acceptansfall, Exp-undantaget och minnes-/exekveringsparitet kvarstår.
+Hela P01–P09 eller V01–V43 slutaccepteras inte genom denna vertikala delacceptans.
+Separat all-code-review mot Director med minimala kontroller återstår efter UI.
+
+### P05/P07: Section-bild och tidslinjeljud genom UI och worker — checkpoint 25
+
+Scenlokala ljudreferenser använder nu Directors överlapp/beskärning, source-in,
+explicit source-out, sortering och kopieringsmarkörer. Genereringsreferens och
+slutmix hålls separata; volym/fades ändrar markörtexten men inte referensens PCM.
+Fingerprints inkluderar manifestpåverkande slutmixändringar. H3:s standard är
+Timeline Audio References; Disabled finns i source/API och som scenkontroll.
+Audio-inspectorn har ett valfritt karaktärsmål. Befintlig v7-transport och VAE-
+konditionering återanvänds; ingen ny observer eller native algoritm tillkom.
+
+Tretton fokuserade jämförelser mot faktisk Director-kod matchar hela manifest,
+prompt och metadata, inklusive Section First/Last/Influence. Verklig native UI
+startade ett20-stegsprov med egen Section-bild och beskuret tidslinjeljud till
+MP4 H.264/AAC med124frames/24fps/5,166667s. Ny egen kall server/UI öppnade en
+kopia av det faktiska resultatet och verifierade preview, play med ljudprocess,
+pause, Review och Save. Återöppning av samma sparmapp i samma server rättades
+efter ett bevisat project_already_open-fel; den aktuella sessionsbilden återanvänds.
+
+Proven etablerar denna vertikala väg, inte full Python-modellparitet eller alla
+Section/video/boundary-varianter. Referensvideo med parat ljud och full gräns-
+projektion är nästa runtimearbete. Övriga P07/P08/D10-, minnesparitets- och
+all-code-reviewkrav kvarstår. Inga skarpa tjänster/data eller startval ändrades.
+Exakta testtal, processer, paket och separat diff finns i CHECKPOINT-25 i nattroten.
+
+### P05/P07: referensvideo och parat ljud — checkpoint 26
+
+Section- och scenbindningar kan nu bära referensvideo med roll, eget rollnamn,
+källintervall och soundtrackval Ignore/Reference/Final mix/Both. Protokoll v8
+förmedlar bildrutor, ursprunglig fps och parat PCM till standardworkern. Native
+följer Directors FPS-urval och ComfyUI:s canvas/Lanczos, 17k+5-beskärning,
+Qwen-urval vid 2 fps och FP16 BCTHW till video-VAE. Parat ljud kodas före
+fristående ljud och binds till samma VideoAudio-referensblock. Ingen ny
+GPU-observer eller latentdump användes.
+
+22 actual-source-fall matchar Director för manifest, prompt, metadata och
+videoljudets mixplan. Två dekodningar och sex tensorfall matchar byteexakt,
+inklusive PCM, strides och FP16-värden. Ett verkligt native UI-prov valde Both
+och genererade 124 bilder/24 fps till H.264/AAC-stereo med 5,166667 s duration.
+Ny kall UI-instans verifierade återöppning, preview, play med ljud, pause,
+Review och Save. Detta är standardworker-acceptans; full Python-DiT-paritet
+eller upplevd rörelse-/röstlikhet är inte belagd av detta prov.
+
+Final mix/Both är inkopplat till montageplanens ljudkällor, men full rå PCM-
+och UI-acceptans av den nya videoljudsmixen återstår. Combo/Influence-gränser,
+övriga Section-varianter, P07/P08/D10-, minnesparitets- och all-code-reviewkrav
+är öppna. Produkten är inte aktiverad. Exakta bevis och återupptagning finns i
+nattrotens CHECKPOINT-26.
+
+### P08: referensvideons slutmix accepterad inom avgränsade fall — checkpoint 27
+
+Den nya Final mix/Both-vägen har nu rå- och UI-acceptans. Fyra nya kompletta
+procedurprojekt jämförs mot faktisk Director-dekodning, ljudplan, tidmappning
+och mixkod: Final mix/Timeline ger byteidentisk PCM; Both/Combined har maxfel
+2,98e−8. Reference och Ignore tillför ingen videoljudskälla till slutmixen.
+RGB är byteidentisk i alla fyra. Direkt MP4 har rätt bildantal, längd och AAC.
+
+Verkliga egna UI-flöden q91/q92 väljer Final mix respektive Both, accepterar
+Take, fryser/renderar Timeline-mixen, väljer faktisk Delivery, spelar med aktiv
+ljudprocess, pausar och sparar. Båda passerar39 åtgärder och exporterar
+124frames/24fps/5,166667s H264/AAC44,1kHz. Tidiga test-timeouter rättades genom
+scroll före Render och genom att ta bort ett extra Close-klick efter att
+Delivery-valet redan stängt dialogen; inga produktändringar behövdes för detta.
+
+För återstående Combo/Influence har en fristående nativekomponent för
+Directors16+16-referenstail-attention implementerats och jämförts byteexakt i
+12 CPU-fall. Den begränsar första video+parat ljud men lämnar Picture och andra
+referenser tillgängliga. Den är ännu INTE runtimekopplad. Source Take-transport,
+korrekt tail-ljudintervall, frame0/soft picture och full boundary-manifest/UI
+är nästa sammanhängande uppgift. Inga GPUjobb eller reservationer startades i
+CP27; normal koordinatorreservation ska bekräftas före nästa GPUprov.
+
+Hela P08 och totalplanen är fortsatt öppna för kvarvarande fall; minnes-/Python-
+paritet, Exp-behörighetsfrågan och separat all-code-review kvarstår. Den nekade
+loggoperationen återförsöktes inte. Se CHECKPOINT-27 i den egna krypterade roten.
+
+### Produktövergång före bred review — checkpoint 28
+
+Tomas ändrade leveransordningen2026-10-21 kl16:24 UTC: välj kandidaten som
+skarp version först så att han kan testa medan separat all-code-review pågår.
+Full acceptans, Python-/minnesparitet och Exp är därför inte villkor för detta
+reversibla startvalsbyte; kraven är fortsatt öppna och har inte accepterats bort.
+
+Produktpaket `comfyui/products/20261021T162857Z-b1ee7679` är valt i
+`comfyui/active-product.sh` för nästa manuella server/UI-start. Normal UI utan
+QA-feature, H3worker/protokoll8, inga observervariabler. Bildworkerns befintliga
+deployment är bevarad. Ny och fristående rollback-server startkontrollerades
+med tom egen state och syntetisk referensupload; normal UI startades i egen
+kortlivad process. Bild-/UI-regressioner passerar. Inga skarpa användardata
+lästes/migrerades och inga skarpa processer avslutades eller startades om.
+
+`build-product.sh` publicerar framöver fristående paket med rollback och atomiskt
+nästa-start-val; H3-overlayn omfattar nu även referensvideo-/ljudmodulerna.
+Kontrollerna är byggproveniens och samtidighetsskydd för startval, inga nya
+modell- eller binärhashspärrar i produkten. `tools/publish-video-product.py`
+kan återställa den bevarade rollback-versionen utan att röra användarprocesser.
+
+Combo/Influence är fortsatt ej runtimekopplat; endast12 byteexakta CPU-
+attentionfall är verifierade. Tränad upscaling/D10, full Story/catalog/provider-
+acceptans, återstående P08, Exp och exekverings-/minnesparitet är öppna. Review
+ska göras i separat tråd efter produktvalet och omfatta all kod/UI och minsta
+nödvändiga kontrollnivå. Exakta artefakter, snabbprov och rollback finns i
+nattrotens evidence/PRODUCTION-ACTIVATION.md och CHECKPOINT-28.json.
 
 ## 10. Källkarta
 

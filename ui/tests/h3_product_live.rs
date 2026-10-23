@@ -11,14 +11,13 @@ use imagine_server::{
 };
 use imagine_ui::{
     client::{Client, Submission, video_request},
-    settings::{Connection, save_video},
+    settings::Connection,
 };
 use std::{path::PathBuf, sync::Arc, time::Duration};
 use tokio::sync::{Semaphore, watch};
 #[tokio::test]
 #[ignore = "requires explicit GPU authorization and an own prepared H3 runtime"]
-async fn own_prompt_uses_product_queue_publishes_complete_av_and_saves_only_explicitly()
--> Result<()> {
+async fn own_prompt_uses_product_queue_and_persists_av() -> Result<()> {
     let manifest = PathBuf::from(
         std::env::var_os("IMAGINE_H3_TEST_RUNTIME").context("own H3 test manifest required")?,
     );
@@ -61,6 +60,7 @@ async fn own_prompt_uses_product_queue_publishes_complete_av_and_saves_only_expl
     )
     .await?;
     let router = api::router(App {
+        video: control.video.clone(),
         store: store.clone(),
         control: control.clone(),
         engine: state_rx,
@@ -84,13 +84,10 @@ async fn own_prompt_uses_product_queue_publishes_complete_av_and_saves_only_expl
         ensure!(submitted.len()==1,"must keep one admitted job identity");
         let job_id=submitted.iter().next().unwrap();
         let job=store.job(job_id,"local").await?.context("own job missing")?;
-        ensure!(job["status"]=="succeeded" && job["output"]["format"]=="mkv");
-        ensure!(completed.av.valid());ensure!(!folder.exists(),"generation must not save to output folder");
-        let blocked=dir.path().join("own-blocked-destination");std::fs::write(&blocked,b"own fixture")?;
-        ensure!(save_video(&blocked,&completed.bytes).is_err());
-        let path=save_video(&folder,&completed.bytes)?;ensure!(std::fs::read(&path)?==*completed.bytes);
+        ensure!(job["status"]=="succeeded" && job["output"]["format"]=="mp4");
+        ensure!(completed.av.valid());ensure!(completed.saved.starts_with(&folder));ensure!(completed.saved.is_file());
         ensure!(completed.av.frames.len()==39 && completed.av.pcm.len()==52000*8);
-        println!("Product H3 PASS: UI client -> API -> canonical Ticket/FIFO -> real worker -> atomic AV -> explicit Save; 39 frames / 52000 stereo samples; one GPU job.");
+        println!("Product H3 PASS: UI client -> API -> canonical Ticket/FIFO -> real worker -> persistent AV; 39 frames / 52000 stereo samples; one GPU job.");
         Ok::<_,anyhow::Error>(())
     }.await;
     // Always finish scheduler cleanup before propagating a failed check.

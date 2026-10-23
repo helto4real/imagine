@@ -15,6 +15,7 @@ pub struct Config {
     pub model_root: PathBuf,
     pub kitchen: PathBuf,
     pub aimdo: PathBuf,
+    pub pillow: PathBuf,
     pub deployment: Deployment,
 }
 pub fn sha(path: &Path) -> Result<String, ErrorCode> {
@@ -31,6 +32,54 @@ pub fn sha(path: &Path) -> Result<String, ErrorCode> {
         hash.update(&buffer[..n]);
     }
     Ok(format!("{:x}", hash.finalize()))
+}
+/// Check readable safetensors structure without reading or hashing tensor payloads.
+pub fn checkpoint(path: &Path) -> Result<(), ErrorCode> {
+    let invalid = || ErrorCode::ModelIdentityMismatch;
+    if !absolute(path) {
+        return Err(invalid());
+    }
+    let mut file = File::open(path).map_err(|_| invalid())?;
+    let metadata = file.metadata().map_err(|_| invalid())?;
+    if !metadata.is_file() {
+        return Err(invalid());
+    }
+    let mut length = [0; 8];
+    file.read_exact(&mut length).map_err(|_| invalid())?;
+    let length = u64::from_le_bytes(length);
+    if length == 0 || length > 64 * 1024 * 1024 || length + 8 > metadata.len() {
+        return Err(invalid());
+    }
+    let mut header = vec![0; length as usize];
+    file.read_exact(&mut header).map_err(|_| invalid())?;
+    let header: serde_json::Value = serde_json::from_slice(&header).map_err(|_| invalid())?;
+    let header = header.as_object().ok_or_else(invalid)?;
+    let mut count = 0;
+    for (key, tensor) in header {
+        if key == "__metadata__" {
+            continue;
+        }
+        let offsets = tensor["data_offsets"]
+            .as_array()
+            .filter(|v| v.len() == 2)
+            .ok_or_else(invalid)?;
+        let start = offsets[0].as_u64().ok_or_else(invalid)?;
+        let end = offsets[1].as_u64().ok_or_else(invalid)?;
+        if start > end
+            || end > metadata.len() - length - 8
+            || tensor["dtype"].as_str().is_none_or(str::is_empty)
+            || tensor["shape"]
+                .as_array()
+                .is_none_or(|v| v.iter().any(|d| d.as_u64().is_none()))
+        {
+            return Err(invalid());
+        }
+        count += 1;
+    }
+    if count == 0 {
+        return Err(invalid());
+    }
+    Ok(())
 }
 fn absolute(path: &Path) -> bool {
     path.is_absolute()
@@ -81,6 +130,43 @@ pub fn identity(
         dependencies_sha256: format!("{:x}", Sha256::digest(map)),
     })
 }
+/// Startup validates declared protocol/dependencies and file accessibility only.
+/// Full-file SHA256 remains available through identity() for explicit build audits.
+pub fn declaration(
+    executable: &Path,
+    dependencies: &BTreeMap<String, String>,
+    declared: Deployment,
+    forbidden: &[PathBuf],
+) -> Result<Deployment, ErrorCode> {
+    if !declared.valid()
+        || !absolute(executable)
+        || !executable.is_file()
+        || dependencies.is_empty()
+    {
+        return Err(ErrorCode::DeploymentMismatch);
+    }
+    for (name, digest) in dependencies {
+        let path = Path::new(name);
+        if !absolute(path)
+            || path == executable
+            || forbidden.iter().any(|p| p == path)
+            || matches!(
+                path.extension().and_then(|s| s.to_str()),
+                Some("safetensors" | "gguf" | "pt" | "pth")
+            )
+            || !p::is_sha256(digest)
+            || !path.is_file()
+            || File::open(path).is_err()
+        {
+            return Err(ErrorCode::DeploymentMismatch);
+        }
+    }
+    let map = serde_json::to_vec(dependencies).map_err(|_| ErrorCode::DeploymentMismatch)?;
+    if format!("{:x}", Sha256::digest(map)) != declared.dependencies_sha256 {
+        return Err(ErrorCode::DeploymentMismatch);
+    }
+    Ok(declared)
+}
 impl Config {
     pub fn environment() -> Result<Self, ErrorCode> {
         let path = |name| {
@@ -105,16 +191,30 @@ impl Config {
         }
         let dependencies: BTreeMap<String, String> =
             serde_json::from_reader(file).map_err(|_| ErrorCode::DeploymentMismatch)?;
-        let aimdo_digest = dependencies
-            .get(aimdo.to_str().ok_or(ErrorCode::DeploymentMismatch)?)
-            .ok_or(ErrorCode::DeploymentMismatch)?;
-        let deployment = identity(
-            &executable,
-            &dependencies,
-            &[(&kitchen, BRIDGE_SHA256), (&aimdo, aimdo_digest)],
-            &[map_path],
-        )?;
+        if dependencies
+            .get(kitchen.to_str().ok_or(ErrorCode::DeploymentMismatch)?)
+            .map(String::as_str)
+            != Some(BRIDGE_SHA256)
+            || !dependencies.contains_key(aimdo.to_str().ok_or(ErrorCode::DeploymentMismatch)?)
+        {
+            return Err(ErrorCode::DeploymentMismatch);
+        }
+        let declared: Deployment = serde_json::from_str(
+            &std::env::var("IMAGINE_H3_DEPLOYMENT").map_err(|_| ErrorCode::DeploymentMismatch)?,
+        )
+        .map_err(|_| ErrorCode::DeploymentMismatch)?;
+        let deployment = declaration(&executable, &dependencies, declared, &[map_path])?;
+        let pillow = path("IMAGINE_PILLOW_LIBRARY")?;
+        {
+            let p = &pillow;
+            if !absolute(p)
+                || !dependencies.contains_key(p.to_str().ok_or(ErrorCode::DeploymentMismatch)?)
+            {
+                return Err(ErrorCode::DeploymentMismatch);
+            }
+        }
         Ok(Self {
+            pillow,
             model_root,
             kitchen,
             aimdo,

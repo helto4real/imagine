@@ -34,7 +34,7 @@ pub(super) fn panel(ui: &Ui, rect: Rect, media: bool) {
     );
 }
 
-fn consume_ctrl_key(ctx: &egui::Context, key: egui::Key) -> bool {
+fn consume_key(ctx: &egui::Context, key: egui::Key, ctrl: bool) -> bool {
     ctx.input_mut(|input| {
         let mut pressed = false;
         input.events.retain(|event| {
@@ -46,7 +46,7 @@ fn consume_ctrl_key(ctx: &egui::Context, key: egui::Key) -> bool {
                 ..
             } = event
                 && *event_key == key
-                && modifiers.ctrl
+                && modifiers.ctrl == ctrl
                 && !modifiers.shift
                 && !modifiers.alt
                 && !modifiers.mac_cmd
@@ -64,11 +64,22 @@ fn focus_prompt_shortcut(response: egui::Response) {
     let ctx = &response.ctx;
     if ctx.input(|input| input.focused)
         && !ctx.text_edit_focused()
-        && consume_ctrl_key(ctx, egui::Key::P)
+        && consume_key(ctx, egui::Key::P, true)
     {
         helto::focus_and_reveal_textarea(&response);
         response.scroll_to_me(Some(Align::Center));
     }
+}
+
+fn settings_number(ui: &mut Ui, value: egui::DragValue<'_>) -> egui::Response {
+    let size = egui::vec2(ui.available_width().max(120.), 32.);
+    ui.allocate_ui_with_layout(size, Layout::left_to_right(Align::Center), |ui| {
+        ui.spacing_mut().interact_size = size;
+        let text_height = ui.text_style_height(&ui.style().drag_value_text_style);
+        ui.spacing_mut().button_padding.y = (size.y - text_height) / 2.;
+        ui.add(value.suffix(egui::Atom::grow()))
+    })
+    .inner
 }
 
 fn sampling_setting(
@@ -191,6 +202,7 @@ impl ImagineApp {
         self.receive(ui.ctx());
         if self.workspace != Workspace::Video {
             self.pause_video();
+            self.pause_timeline();
         }
         self.keyboard_shortcuts(ui.ctx());
         if self.busy()
@@ -249,7 +261,7 @@ impl ImagineApp {
         if !ctx.input(|input| input.focused) || ctx.text_edit_focused() {
             return;
         }
-        if consume_ctrl_key(ctx, egui::Key::Space) {
+        if consume_key(ctx, egui::Key::Space, true) {
             self.prefs.privacy_mode = !self.prefs.privacy_mode;
             self.save_preferences();
         }
@@ -259,12 +271,12 @@ impl ImagineApp {
         if self.workspace == Workspace::Video {
             return;
         }
-        if consume_ctrl_key(ctx, egui::Key::Z) && self.desk().result.is_some() {
+        if consume_key(ctx, egui::Key::Z, false) && self.desk().result.is_some() {
             let desk = self.desk_mut();
             desk.actual_pixels = !desk.actual_pixels;
             desk.image_pan = Vec2::ZERO;
         }
-        if consume_ctrl_key(ctx, egui::Key::Enter)
+        if consume_key(ctx, egui::Key::Enter, true)
             && self.editable()
             && self.client.is_some()
             && !self.picking_folder
@@ -312,14 +324,15 @@ impl ImagineApp {
         let tabs = Rect::from_center_size(rect.center(), egui::vec2(110., 32.));
         region(ui, "tabs", tabs, |ui| {
             ui.horizontal(|ui| {
-                if helto::icon_button(
+                let image_tab = helto::icon_button(
                     ui,
                     Icon::Image,
                     "Image",
                     matches!(self.workspace, Workspace::Image | Workspace::ImageEdit),
-                )
-                .clicked()
-                {
+                );
+                #[cfg(feature = "ui-preview")]
+                crate::app::timeline::qa::control(ui, "workspace-image".into(), &image_tab);
+                if image_tab.clicked() {
                     self.workspace = if self.edit.open {
                         Workspace::ImageEdit
                     } else {
@@ -336,9 +349,15 @@ impl ImagineApp {
                 {
                     self.workspace = Workspace::CharacterSheet;
                 }
-                if helto::icon_button(ui, Icon::Video, "Video", self.workspace == Workspace::Video)
-                    .clicked()
-                {
+                let video_tab = helto::icon_button(
+                    ui,
+                    Icon::Video,
+                    "Video",
+                    self.workspace == Workspace::Video,
+                );
+                #[cfg(feature = "ui-preview")]
+                crate::app::timeline::qa::control(ui, "workspace-video".into(), &video_tab);
+                if video_tab.clicked() {
                     self.workspace = Workspace::Video;
                 }
             });
@@ -957,6 +976,16 @@ impl ImagineApp {
                     {
                         self.start_editing();
                     }
+                    if self.workspace == Workspace::Image
+                        && ui
+                            .add_enabled_ui(self.can_animate_image(), |ui| {
+                                helto::select_button(ui, "Animate", false)
+                            })
+                            .inner
+                            .clicked()
+                    {
+                        self.start_animating();
+                    }
                     ui.add_enabled_ui(self.desk().result.is_some(), |ui| {
                         if helto::icon_button(
                             ui,
@@ -1239,9 +1268,9 @@ impl ImagineApp {
             egui::ViewportId::from_hash_of("imagine-settings"),
             egui::ViewportBuilder::default()
                 .with_title("Imagine · Settings")
-                .with_inner_size([360., 680.])
-                .with_min_inner_size([360., 680.])
-                .with_max_inner_size([360., 680.])
+                .with_inner_size([480., 680.])
+                .with_min_inner_size([480., 680.])
+                .with_max_inner_size([480., 680.])
                 .with_resizable(false)
                 .with_app_id("imagine-settings")
                 .with_window_type(egui::X11WindowType::Dialog)
@@ -1309,8 +1338,19 @@ impl ImagineApp {
         region(ui, "settings-body", body, |ui| {
             egui::ScrollArea::vertical()
                 .id_salt("settings-scroll")
+                // Keep the existing floating scrollbar style, with room for its
+                // expanded thumb and a visible gap beside every control.
+                .content_margin(egui::Margin {
+                    right: 28,
+                    ..Default::default()
+                })
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
+                    let text_height = ui
+                        .text_style_height(&egui::TextStyle::Button)
+                        .max(ui.spacing().icon_width);
+                    ui.spacing_mut().button_padding.y = (32. - text_height) / 2.;
+                    ui.spacing_mut().interact_size.y = 32.;
                     self.model_settings(ui);
                     ui.add_space(18.);
                     ui.label(
@@ -1328,16 +1368,16 @@ impl ImagineApp {
                             .spacing([18., 10.])
                             .show(ui, |ui| {
                                 let label = ui.label("Steps");
-                                ui.add_sized(
-                                    [ui.available_width().max(120.), 28.],
+                                settings_number(
+                                    ui,
                                     egui::DragValue::new(&mut self.prefs.generation.steps)
                                         .range(1..=100),
                                 )
                                 .labelled_by(label.id);
                                 ui.end_row();
                                 let label = ui.label("CFG");
-                                ui.add_sized(
-                                    [ui.available_width().max(120.), 28.],
+                                settings_number(
+                                    ui,
                                     egui::DragValue::new(&mut self.prefs.generation.cfg_scale)
                                         .range(0.0..=20.0)
                                         .speed(0.1),
@@ -1362,21 +1402,20 @@ impl ImagineApp {
                                 let mut megapixels =
                                     f64::from(self.prefs.generation.reference_max_pixels_per_image)
                                         / 1_000_000.;
-                                if ui
-                                    .add_sized(
-                                        [ui.available_width().max(120.), 28.],
-                                        egui::DragValue::new(&mut megapixels)
-                                            .range(0.262144..=4.0)
-                                            .speed(0.1)
-                                            .min_decimals(1)
-                                            .max_decimals(6)
-                                            .suffix(" MP"),
-                                    )
-                                    .labelled_by(label.id)
-                                    .on_hover_text(
-                                        "Maximum megapixels per reference image during generation.",
-                                    )
-                                    .changed()
+                                if settings_number(
+                                    ui,
+                                    egui::DragValue::new(&mut megapixels)
+                                        .range(0.262144..=4.0)
+                                        .speed(0.1)
+                                        .min_decimals(1)
+                                        .max_decimals(6)
+                                        .suffix(" MP"),
+                                )
+                                .labelled_by(label.id)
+                                .on_hover_text(
+                                    "Maximum megapixels per reference image during generation.",
+                                )
+                                .changed()
                                 {
                                     self.prefs.generation.reference_max_pixels_per_image =
                                         (megapixels * 1_000_000.).round() as u32;
@@ -1419,7 +1458,8 @@ impl ImagineApp {
                     ui.add_space(12.);
                     ui.label("Save to");
                     ui.horizontal(|ui| {
-                        let width = (ui.available_width() - 40.).max(80.);
+                        let width =
+                            (ui.available_width() - 32. - ui.spacing().item_spacing.x).max(80.);
                         let text = self.prefs.output_folder.display().to_string();
                         egui::Frame::new()
                             .fill(helto::FIELD)

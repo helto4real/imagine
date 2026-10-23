@@ -1,12 +1,19 @@
 use imagine_server::h3_protocol::*;
 fn request() -> Request {
     Request {
+        capture_continuation: false,
+        continuation: None,
+        continuation_bytes: vec![],
+        references: Default::default(),
+        sampling: None,
         protocol: VERSION,
         kind: RequestKind::GenerateVideo,
         id: "synthetic-42".into(),
         profile: Profile::ShortAvNoReferenceV1,
         prompt: "Synthetic rotating cube".into(),
         shape: Default::default(),
+        image: None,
+        image_rgb: Vec::new(),
         seed: 42,
     }
 }
@@ -17,7 +24,7 @@ fn request_has_no_model_paths_overrides_or_silent_versions() {
     let mut v = serde_json::to_value(&r).unwrap();
     v["model_path"] = serde_json::json!("/private/model");
     assert!(serde_json::from_value::<Request>(v).is_err());
-    for (version, seed) in [(VERSION + 1, 42), (VERSION, 43)] {
+    for (version, seed) in [(VERSION - 1, 42), (VERSION + 1, 42), (VERSION, 43)] {
         let mut r = request();
         r.protocol = version;
         r.seed = seed;
@@ -129,11 +136,14 @@ fn stream_rejects_partial_misordered_nonfinite_and_late_results() {
 }
 
 #[test]
-fn escaped_prompt_must_also_fit_the_encoded_header() {
+fn escaped_prompt_fits_the_explicit_stage_header_budget_but_raw_prompt_limit_remains() {
     let mut r = request();
     r.prompt = "\u{0001}".repeat(MAX_PROMPT_BYTES);
     assert!(r.prompt.len() <= MAX_PROMPT_BYTES);
-    assert!(serde_json::to_vec(&r).unwrap().len() > MAX_HEADER);
+    assert!(serde_json::to_vec(&r).unwrap().len() > 64 * 1024);
+    assert!(serde_json::to_vec(&r).unwrap().len() <= MAX_HEADER);
+    assert!(r.valid());
+    r.prompt.push('x');
     assert!(!r.valid());
     r.prompt = "\u{0001}".repeat(10_000);
     assert!(r.valid());

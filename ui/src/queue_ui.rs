@@ -36,15 +36,17 @@ impl ImagineApp {
                     self.video.working
                         && matches!(self.video.status.as_str(), "Queued" | "Submitting"),
                 );
-                let pending = pending + video_pending;
-                let active = active + usize::from(self.video.working) - video_pending;
+                let (scene_pending, scene_active) = self.timeline_queue_counts();
+                let pending = pending + video_pending + scene_pending;
+                let active =
+                    active + usize::from(self.video.working) - video_pending + scene_active;
                 ui.label(
                     RichText::new(format!("{active} active · {pending} waiting"))
                         .small()
                         .color(helto::DIM),
                 );
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if helto::icon_button(
+                    let response = helto::icon_button(
                         ui,
                         if self.queue.collapsed {
                             Icon::Up
@@ -57,9 +59,10 @@ impl ImagineApp {
                             "Collapse queue"
                         },
                         false,
-                    )
-                    .clicked()
-                    {
+                    );
+                    #[cfg(feature = "ui-preview")]
+                    crate::app::timeline::qa::control(ui, "queue-toggle".into(), &response);
+                    if response.clicked() {
                         self.queue.collapsed = !self.queue.collapsed;
                     }
                 });
@@ -105,6 +108,7 @@ impl ImagineApp {
                             }
                         });
                     }
+                    self.timeline_queue_rows(ui, revealed);
                     for (index, job) in self
                         .queue
                         .jobs
@@ -211,6 +215,9 @@ impl ImagineApp {
                         .jobs
                         .iter()
                         .any(|j| j.working || j.error.is_some())
+                        && !self.video.working
+                        && self.timeline_queue_counts() == (0, 0)
+                        && !self.timeline_has_job_errors()
                     {
                         ui.label(RichText::new("Queue empty").color(helto::DIM));
                     }
@@ -222,9 +229,12 @@ impl ImagineApp {
         region(ui, "queue-results", results_rect, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
-                    RichText::new(format!("Results · {}", self.queue.gallery.len()))
-                        .small()
-                        .color(helto::DIM),
+                    RichText::new(format!(
+                        "Results · {}",
+                        self.queue.gallery.len() + self.timeline_result_count()
+                    ))
+                    .small()
+                    .color(helto::DIM),
                 );
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if ui
@@ -243,6 +253,7 @@ impl ImagineApp {
                 .auto_shrink([false, false])
                 .show(ui, |ui| {
                     ui.horizontal(|ui| {
+                        self.timeline_result_rows(ui, revealed);
                         for (index, item) in self.queue.gallery.iter().enumerate() {
                             let Some(asset) = item.result.assets.first() else {
                                 continue;
@@ -338,7 +349,7 @@ impl ImagineApp {
                                 });
                             });
                         }
-                        if self.queue.gallery.is_empty() {
+                        if self.queue.gallery.is_empty() && self.timeline_result_count() == 0 {
                             ui.label(RichText::new("No results yet").color(helto::DIM));
                         }
                     });

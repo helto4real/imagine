@@ -5,7 +5,7 @@ use crate::{
     logging::log,
     references::{self, Reference},
 };
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use axum::{
     Router,
     body::Body,
@@ -137,7 +137,13 @@ impl Mcp {
         );
         let input = PathBuf::from(&config.mcp_input_dir);
         let input = std::fs::canonicalize(&input).unwrap_or(input);
-        let storage = crate::mcp_storage::Storage::open(&root, &input)?;
+        let proof = client
+            .json(reqwest::Method::GET, "/v1/media-destination", None, None)
+            .await
+            .context("MCP needs a reachable Imagine with a verified encrypted media destination")?;
+        let proof: crate::media_destination::Proof = serde_json::from_value(proof)?;
+        let media_root = proof.config.root.clone();
+        let storage = crate::mcp_storage::Storage::open(&root, &input, proof)?;
         let root = storage.root.clone();
         let mut key = [0u8; 32];
         use std::io::Read;
@@ -148,7 +154,7 @@ impl Mcp {
                 config,
                 client,
                 root: root.clone(),
-                roots: vec![input, root],
+                roots: vec![input, media_root],
                 references: Default::default(),
                 jobs: Default::default(),
                 key,
@@ -221,6 +227,7 @@ impl Mcp {
         if self.inner.stop.is_cancelled() {
             anyhow::bail!("MCP stopped");
         }
+        self.inner.storage.preflight(0)?;
         let current = self.client.session().await.ok();
         let changed = *self.inner.session.lock().unwrap() != current;
         if changed || current.is_none() {
@@ -234,14 +241,8 @@ impl Mcp {
     }
     pub async fn call(&self, name: &str, args: &Value) -> Value {
         let guard = self.inner.gate.lock().await;
-        if self.refresh_session().await.is_err() {
-            return tool_result(error(
-                Fault::new(
-                    "privacy",
-                    "Imagine is unavailable; start the Imagine server",
-                ),
-                None,
-            ));
+        if let Err(failure) = self.refresh_session().await {
+            return tool_result(error(Fault::new("privacy", failure.to_string()), None));
         }
         let id = args["job_id"].as_str();
         let active = Self {
@@ -345,6 +346,10 @@ impl Mcp {
                     "saved_path must be an absolute local file path outside MCP output storage, without ..",
                 ));
             }
+            self.inner
+                .storage
+                .validate_saved_path(&saved.saved_path)
+                .map_err(validation)?;
             let found = items.iter().enumerate().find_map(|(item_index, item)| {
                 if item["status"] != "succeeded" {
                     return None;
@@ -396,12 +401,11 @@ impl Mcp {
                 let image = &mut item["images"][image_index];
                 if image["storage"] != "saved" {
                     // One output per Imagine item. Derive the filename on the server.
-                    if references::remove_result(
-                        &self.inner.root,
-                        &job.directory,
-                        &format!("{item_index}.png"),
-                    )
-                    .is_err()
+                    if self
+                        .inner
+                        .storage
+                        .remove(&job.directory, &format!("{item_index}.png"))
+                        .is_err()
                     {
                         failure = Some(Fault::new(
                             "storage",
@@ -455,7 +459,6 @@ impl Mcp {
             .ok_or_else(|| validation("image path must be absolute"))?;
         let path = PathBuf::from(path);
         let roots = self.inner.roots.clone();
-        let root = self.inner.root.clone();
         let inner = self.inner.clone();
         let epoch = inner.epoch.load(std::sync::atomic::Ordering::SeqCst);
         let prepared = tokio::task::spawn_blocking(move || {
@@ -465,7 +468,7 @@ impl Mcp {
             if epoch != inner.epoch.load(std::sync::atomic::Ordering::SeqCst) {
                 anyhow::bail!("session ended");
             }
-            let (path, digest) = references::store_preview(&root, &data)?;
+            let (path, digest) = references::store_preview(&inner.storage, &data)?;
             Ok::<_, anyhow::Error>((data, width, height, path, digest))
         })
         .await
@@ -631,8 +634,8 @@ impl Mcp {
                         validation("reference ID is unknown for this profile; register it again")
                     })?;
                 let verify = image.clone();
-                let root = self.inner.root.clone();
-                tokio::task::spawn_blocking(move || verify.verify(&root))
+                let inner = self.inner.clone();
+                tokio::task::spawn_blocking(move || verify.verify(&inner.storage))
                     .await
                     .map_err(|_| {
                         validation("registered reference is unavailable; register it again")
@@ -696,15 +699,9 @@ impl Mcp {
                 let (tx, _) = watch::channel(result);
                 let directory = self
                     .inner
-                    .root
-                    .join(format!("job-{}", uuid::Uuid::new_v4().simple()));
-                use std::os::unix::fs::DirBuilderExt;
-                std::fs::DirBuilder::new()
-                    .mode(0o700)
-                    .create(&directory)
-                    .map_err(|_| {
-                        Fault::new("storage", "could not create temporary job directory")
-                    })?;
+                    .storage
+                    .directory(&format!("job-{}", uuid::Uuid::new_v4().simple()))
+                    .map_err(|e| Fault::new("storage", e))?;
                 let this = self.clone();
                 let job_id = id.to_string();
                 let sender = tx.clone();
@@ -968,11 +965,11 @@ impl Mcp {
                             if epoch != inner.epoch.load(std::sync::atomic::Ordering::SeqCst) {
                                 anyhow::bail!("session ended");
                             }
-                            references::save_result(&directory, index, &bytes)
+                            references::save_result(&inner.storage, &directory, index, &bytes)
                         })
                         .await
                         .map_err(|_| Fault::new("result", "image job failed during result"))?
-                        .map_err(|_| Fault::new("result", "image job failed during result"))?;
+                        .map_err(|e| Fault::new("result", e))?;
                         return Ok(images);
                     }
                     Some("failed" | "cancelled" | "interrupted") => {
@@ -1346,9 +1343,20 @@ mod profile_tests {
     async fn offline_imagine_clears_history_and_rejects_recovery() {
         let dir = tempfile::tempdir().unwrap();
 
+        let proof = test_destination(dir.path());
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let router = Router::new().route(
+            "/v1/media-destination",
+            axum::routing::get(move || {
+                let p = proof.clone();
+                async move { axum::Json(p) }
+            }),
+        );
+        let mock = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
         let mcp = Mcp::new(Config {
             coordinator_socket: Some(dir.path().join("gpu.sock").to_string_lossy().into()),
-            imagine_url: "http://127.0.0.1:1".into(),
+            imagine_url: url,
 
             mcp_input_dir: dir.path().to_string_lossy().into(),
             mcp_output_dir: Some(dir.path().join("output").to_string_lossy().into()),
@@ -1356,6 +1364,8 @@ mod profile_tests {
         })
         .await
         .unwrap();
+        mock.abort();
+        let _ = mock.await;
         let args = json!({"job_id":"retry","profile":"qwen","parameters":{"prompt":"synthetic"}});
         let expected = json!({"job_id":"retry","status":"succeeded","parameters":{"seed":42},"images":[],"error":null});
         let (result, _) = watch::channel(expected.clone());
@@ -1380,3 +1390,20 @@ mod profile_tests {
 #[cfg(test)]
 #[path = "mcp_delivery_tests.rs"]
 mod delivery_tests;
+
+#[cfg(test)]
+fn test_destination(root: &std::path::Path) -> Value {
+    use crate::media_destination as d;
+    assert!(
+        root.to_string_lossy()
+            .starts_with("/run/media/veracrypt1/imagine/.codex-")
+    );
+    let config = d::Config {
+        root: root.into(),
+        mount: "/run/media/veracrypt1".into(),
+        source: "/dev/mapper/veracrypt1".into(),
+        filesystem: "ext3".into(),
+        fsid: d::fsid(&d::directory(root).unwrap()).unwrap(),
+    };
+    json!(d::inspect(&config, &d::System).unwrap().0)
+}

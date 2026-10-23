@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""Freeze own component evidence and an explicit finite remaining-work ledger."""
+import hashlib,json,os,subprocess
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[1]
+OWN=Path('/run/media/veracrypt1/imagine/.codex-video-night-20261020-a6428d9e/ui-groups-01')
+GROUPS=[
+ (1,[],['Wrong-type and missing-source feedback in each contextual picker','OS chooser cancel and late reply after navigation','Library picker binding at image/video/voice/Section/Story targets']),
+ (2,[],['Default/preview image behavior after add/remove/reorder','Crop, guidance and each H3 image-anchor role through actual conditioning','Reference global/per-reference/per-image switches and Undo in final UI']),
+ (3,[],['Catalog reload and malformed/missing catalog errors','Snippet/Phrase Composer save/reload/error and insertion targets','Completion/Copy/Insert/Enhance in all supported prompt contexts, including long Unicode values']),
+ (4,[],['Story editor save-error presentation without draft loss','Older prompt-profile formats and rollback compatibility','Normal/small Story provider/profile/progress/phase visual and keyboard acceptance']),
+ (5,[],['Character/library editor save-error and missing-media/storage-error flows','Older rich library formats and rollback compatibility','Projects/Characters/Assets sorting, thumbnails and character image/voice retention in final visual acceptance']),
+ (6,['Dynamic native text owner for larger Standard references (cross-cutting Generate blocker)'],['Director/Rust Reference preprocessing pixel comparison and large-reference GPU/Python acceptance','Native model/encoder/VAE chooser cancel/failure without name restrictions','Mixed-FPS source and model/Scene/default interactions in final acceptance']),
+ (7,['Finish LoRA catalog/filter/info workflow and format/error cases where missing'],['All exposed runtime samplers/schedulers and explicit SIGMAS through H3','Stage2/re-noise/handoff and high-resolution path against Python','LoRA effective weights, clean Stage2 and trained upscale end-to-end in final acceptance; component proofs already exist']),
+ (8,['Add Scene insertion parity: selected Scene/gap and Director1s default instead of current append5s','Mixed Scene/Section/audio ordered toggle/range and remaining context coverage','Section image-preview context shortcut'],['All Scene/Section/audio keyboard/context commands including Backspace and text-focus protection','Mixed typed-binding label order','Normal/small popup/tooltip/focus/scroll final acceptance; Add Section/global trim/ripple are already native verified']),
+ (9,['Complete Combo and Influence variant/image/audio dependency paths','Finish Exp prefix/continuation transport and real masked runtime behavior','Generated-transition runtime binding and assembly use','Change new Blend Seam default6 to Director3, preserve user-edited overlap'],['Actual normal Motion/LastFrame regression and continuity invalidation after source changes','Full Exp/Combo/Influence/transition GPU/Python parity; specifically denied Exp3step diagnostic remains prohibited']),
+ (10,[],['Reviewed plan late-compile/network/reconnect/obsolete-response flows','Exact reviewed seed and unchanged free ordinary Generate in common final acceptance']),
+ (11,['Sampling preview worker transport and actual runtime image/video production','User-selected update cadence and bounded RAM lifetime','Hide/reveal protection for sampling frames'],['Actual sampling preview at multiple cadences, cancel/repeat/navigation and privacy in normal/small UI']),
+ (12,['A/B reasonable automatic default pair and swap','Per-side Accept/Reject','Manual Attach as Take and Captures','Cleanup/removal with provenance and external-original protection'],['Synced transport with one audio source after pair/swap/decision','Attach/capture/reopen/removal/cancel/error UI flows using own fixtures']),
+ (13,['Use actual generated transition Take in Final (shared with9)'],['Broader/larger/mixed-FPS source end-to-end Final','Named delivery compatibility with older reader/export copy','Final generation/acceptance rules, cancel/retry/save-error/reopen and actual GPU/native acceptance','Director concatenate timing is source/CPU verified; no invented black-padding requirement']),
+ (14,[],['Final keyboard/icon/tooltip/normal-small visual acceptance','Larger-reference full Generate/cache regression after text-owner fix; small image/audio/video miss-hit-off raw equality already passes']),
+ (15,['OS replacement picker and cancel path where not connected','Remove fixed >2GiB ingress rejection via bounded streaming/processing'],['Broader valid source formats and large-source CheckMedia/Relink','Relink stable asset-ID/revision/affected-bindings, cancel/error/reopen with final UI; existing-project native slice already passes']),
+]
+def main():
+    mount=json.loads(subprocess.check_output(['findmnt','-J','-T',str(OWN)]))['filesystems'][0]
+    assert(mount['target'],mount['source'],mount['fstype'])==('/run/media/veracrypt1','/dev/mapper/veracrypt1','ext3')and not os.statvfs(OWN).f_flag&os.ST_RDONLY
+    evidence=OWN/'evidence';cases=[]
+    for name in ['textoom01','textoom02','textoom03','textoom04']:
+        d=json.loads((OWN/name/'evidence/result.json').read_text());assert d['own_children_reaped']and d['reservation_closed'];workers=[]
+        for worker in d['workers']:
+            r=worker.get('result',{});trace=r.get('trace',[])
+            error=r.get('error','');allocation='500 MiB'if '500.00 MiB' in error else None
+            # Never republish upstream CUDA process accounting in a report.
+            workers.append({'worker':worker['worker'],'exit':worker['exit'],'seconds':worker['seconds'],'passed':r.get('passed'),'actual_dynamic':r.get('actual_dynamic'),'error_type':r.get('error_type')or('OutOfMemoryError'if allocation else None),'failed_allocation':allocation,'test_only_hostbuf_init_error':'hostbuf_allocate'in error,'last_stage':trace[-1]['stage']if trace else None,'initial_cuda':trace[0]['cuda_memory_free_total_active_reserved']if trace else None,'model_loaded_cuda':next((t['cuda_memory_free_total_active_reserved']for t in trace if t['stage']=='model.loaded'),None),'min_observed_driver_free':min((t['cuda_memory_free_total_active_reserved'][0]for t in trace),default=None),'max_observed_torch_active':max((t['cuda_memory_free_total_active_reserved'][2]for t in trace),default=None)})
+        cases.append({'case':name,'result':str(OWN/name/'evidence/result.json'),'input_sha256':hashlib.sha256((OWN/name/'input.safetensors').read_bytes()).hexdigest(),'geometry':d['geometry'],'workers':workers})
+    assert len({c['input_sha256']for c in cases})==1
+    assert cases[0]['workers'][0]['passed']is False and cases[0]['workers'][1]['passed']is False
+    assert cases[-1]['workers'][0]['passed']is True and cases[-1]['workers'][0]['actual_dynamic']is True
+    groups=[{'group':n,'remaining_implementation':i,'remaining_acceptance':a,'blocker':('Native dynamic text lifecycle missing'if n==6 else 'Denied Exp diagnostic is still prohibited; implementable transport and other tests are not permission-blocked'if n==9 else 'Remaining implementation'if i else 'Explicit remaining acceptance')}for n,i,a in GROUPS]
+    report={'checkpoint':23,'complete_plan':False,'published':False,'storage_stage_started':False,'last_verified_product_package':str(ROOT/'comfyui/ui-groups-20261021/packages/checks-f13095e3'),'product_tests_last_verified':305,'product_policy_changed':False,'component_cases':cases,'causal_scope':'Same image/model/prompt; static Rust/Python fail, normal bootstrapped dynamic Python passes. Static02/dynamic04 starting free memory differ15.1MiB. Dynamic native text path is missing, not a proven preprocessing or cache error. No universal threshold/eviction chronology claim.','measurement_limit':'Torch allocator counters omit AIMDO weight allocations; driver free memory and total are reported separately, not continuous peak measurement.','groups':groups,'other_open_requirements':['BUG003 larger-reference normal Generate through worker/sampling/export after actual root fix; historical user error remains unknown','Full Python functional/algorithmic and memory owner/unload/VAE-budget/dynamic-prefetch parity','Whole UI visual acceptance at normal/small size: alignment, labels, fields, wrapping, icons/tooltips, keyboard/focus, Hide, long and empty values','Reversible full publication only after accepted UI/fixes; no user process restart','Separate approved original-link/RAM-thumbnail storage stage only after publication'],'prohibited_operations_retried':False,'runtime_console_logs_read':False,'user_data_read':False,'own_processes_reaped':True,'gpu_reservations_released':True,'next':'Native dynamic AIMDO text owner and cast/gather/release binding, conditioning comparison against saved normal Python output, then larger own Generate regression. Continue independent finite UI closures.'}
+    with(evidence/'UI-GROUPS-CHECKPOINT-23.json').open('x')as f:json.dump(report,f,indent=2)
+    plan=(ROOT/'design/ui-group-implementation.md').read_text();body=plan[plan.index('## Checkpoint 23:'):]
+    lines=['# Exact remaining UI work after CP23','', 'Implementation gaps and uncompleted acceptance are separate; untested does not mean unimplemented. No whole group is silently finally accepted.','']
+    for g in groups:
+        lines.extend([f"## Group {g['group']}",'','Remaining implementation:'])
+        lines.extend(['- '+item for item in g['remaining_implementation']]or['- No additional implementation gap established in CP22; acceptance below remains.'])
+        lines.extend(['','Remaining acceptance:']);lines.extend('- '+item for item in g['remaining_acceptance']);lines.extend(['', 'Closure blocker: '+g['blocker']+'.',''])
+    lines.extend(['## Cross-cutting delivery requirements','']);lines.extend('- '+item for item in report['other_open_requirements'])
+    with(evidence/'UI-GROUPS-OPEN-23.md').open('x')as f:f.write('\n'.join(lines)+'\n')
+    with(evidence/'UI-GROUPS-CHECKPOINT-23.md').open('x')as f:f.write('# UI checkpoint23 — large-reference memory isolation\n\nExact remaining requirements: `UI-GROUPS-OPEN-23.md`. Structured metrics: `UI-GROUPS-CHECKPOINT-23.json`.\n\n'+body)
+    print(json.dumps({'report':str(evidence/'UI-GROUPS-CHECKPOINT-23.md'),'remaining':str(evidence/'UI-GROUPS-OPEN-23.md'),'static_rust_python_oom':True,'normal_dynamic_python_passed':True,'product_fix':False,'own_processes_reaped':True,'gpu_released':True}))
+if __name__=='__main__':main()

@@ -61,23 +61,32 @@ pub async fn download(store: &Store, id: &str, headers: &HeaderMap) -> Result<Re
     let (start, end) = selected.unwrap_or((0, size.saturating_sub(1)));
     let count = if size == 0 { 0 } else { end - start + 1 };
     // Database ownership check above is the only path source; no supplied file paths.
-    let mut file = tokio::fs::File::open(store.media.join(id))
-        .await
-        .map_err(|_| Fault::new(500, "storage_error"))?;
-    file.seek(SeekFrom::Start(start))
-        .await
-        .map_err(|_| Fault::new(500, "storage_error"))?;
-    let stream = async_stream::stream! {
-        let mut remaining=count;
-        while remaining>0 {
-            let mut bytes=vec![0u8;remaining.min(64*1024) as usize];
-            match file.read_exact(&mut bytes).await {
-                Ok(_)=>{remaining-=bytes.len() as u64;yield Ok::<_,std::io::Error>(axum::body::Bytes::from(bytes));}
-                Err(error)=>{yield Err(error);break;}
+    let body = if let Some(file) = store.open_media(id)? {
+        let mut file = tokio::fs::File::from_std(file);
+        file.seek(SeekFrom::Start(start))
+            .await
+            .map_err(|_| Fault::new(500, "storage_error"))?;
+        let stream = async_stream::stream! {
+            let mut remaining=count;
+            while remaining>0 {
+                let mut bytes=vec![0u8;remaining.min(64*1024) as usize];
+                match file.read_exact(&mut bytes).await {
+                    Ok(_)=>{remaining-=bytes.len() as u64;yield Ok::<_,std::io::Error>(axum::body::Bytes::from(bytes));}
+                    Err(error)=>{yield Err(error);break;}
+                }
             }
-        }
+        };
+        Body::from_stream(stream)
+    } else {
+        let bytes = store
+            .upload_bytes(id)?
+            .ok_or(Fault::new(404, "asset_not_found"))?;
+        let bytes = bytes
+            .get(start as usize..(start + count) as usize)
+            .ok_or(Fault::new(500, "storage_error"))?;
+        Body::from(bytes.to_vec())
     };
-    let mut response = Response::new(Body::from_stream(stream));
+    let mut response = Response::new(body);
     *response.status_mut() = if selected.is_some() {
         StatusCode::PARTIAL_CONTENT
     } else {

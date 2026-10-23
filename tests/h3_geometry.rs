@@ -86,7 +86,7 @@ fn temporal_grid_and_audio_export_match_native_latent_rate_without_changing_defa
     assert_eq!(shape.native_audio_samples(), h3::AUDIO_SAMPLES);
 }
 #[test]
-fn nondefault_geometry_survives_lossless_container_and_rejects_wrong_size() {
+fn nondefault_geometry_survives_mp4_and_rejects_wrong_size() {
     let shape = Shape {
         width: 64,
         height: 96,
@@ -94,6 +94,7 @@ fn nondefault_geometry_survives_lossless_container_and_rejects_wrong_size() {
         fps: 24,
     };
     let av = imagine_server::short_av::Av {
+        continuation: None,
         shape,
         frames: vec![vec![91; shape.frame_bytes()]; shape.frames as usize],
         pcm: vec![0; shape.audio_samples() as usize * 8],

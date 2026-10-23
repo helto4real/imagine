@@ -1,4 +1,6 @@
-//! Synthetic HTTP responses; no inference, model imports or desktop UI.
+#[path = "support/destination.rs"]
+mod destination;
+// Synthetic HTTP responses; no inference, model imports or desktop UI.
 use axum::{
     Json, Router,
     http::StatusCode,
@@ -23,6 +25,8 @@ async fn comfy_errors_survive_submission_and_job_polling_without_raw_details() {
         "unexpected_output_dimensions",
     ] {
         for rejected_submission in [false, true] {
+            let directory = tempfile::tempdir().unwrap();
+            let proof = destination::proof(directory.path());
             let router = Router::new().route("/v1/jobs", post(move || async move {
                 if rejected_submission {
                     (StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error":{"code":code,"details":"synthetic private sentinel"}})))
@@ -32,6 +36,13 @@ async fn comfy_errors_survive_submission_and_job_polling_without_raw_details() {
             })).route("/v1/jobs/{id}", get(move || async move {
                 Json(json!({"id":"job_synthetic","status":"failed","error":{"code":code,"details":"synthetic private sentinel"}}))
             }));
+            let router = router.route(
+                "/v1/media-destination",
+                get(move || {
+                    let proof = proof.clone();
+                    async move { Json(proof) }
+                }),
+            );
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let client = Client::connect(&Connection {
                 url: format!("http://{}", listener.local_addr().unwrap()),
@@ -40,7 +51,6 @@ async fn comfy_errors_survive_submission_and_job_polling_without_raw_details() {
             let server = tokio::spawn(async move {
                 axum::serve(listener, router).await.unwrap();
             });
-            let directory = tempfile::tempdir().unwrap();
             let result = client
                 .generate(
                     Submission {
@@ -103,6 +113,8 @@ async fn component_errors_show_the_role_selected_path_and_reason_but_ignore_raw_
         let error = json!({"code":"model_component_load_failed","component":component,"file":file,"reason":reason,
             "tensor":"layers.0.weight","details":"synthetic private sentinel"});
         let failure_body = error.clone();
+        let directory = tempfile::tempdir().unwrap();
+        let proof = destination::proof(directory.path());
         let router = Router::new()
             .route(
                 "/v1/jobs",
@@ -115,6 +127,13 @@ async fn component_errors_show_the_role_selected_path_and_reason_but_ignore_raw_
                     async move { Json(json!({"status":"failed","error":error})) }
                 }),
             );
+        let router = router.route(
+            "/v1/media-destination",
+            get(move || {
+                let proof = proof.clone();
+                async move { Json(proof) }
+            }),
+        );
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let client = Client::connect(&Connection {
             url: format!("http://{}", listener.local_addr().unwrap()),
@@ -123,7 +142,6 @@ async fn component_errors_show_the_role_selected_path_and_reason_but_ignore_raw_
         let server = tokio::spawn(async move {
             axum::serve(listener, router).await.unwrap();
         });
-        let directory = tempfile::tempdir().unwrap();
         let result = client
             .generate(
                 Submission {

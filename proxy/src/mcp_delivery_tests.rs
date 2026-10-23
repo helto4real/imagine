@@ -6,10 +6,19 @@ async fn setup() -> (tempfile::TempDir, Mcp) {
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
-    let router = Router::new().route(
-        "/v1/session",
-        axum::routing::get(|| async { axum::Json(json!({"id":"synthetic-session"})) }),
-    );
+    let proof = test_destination(dir.path());
+    let router = Router::new()
+        .route(
+            "/v1/media-destination",
+            axum::routing::get(move || {
+                let p = proof.clone();
+                async move { axum::Json(p) }
+            }),
+        )
+        .route(
+            "/v1/session",
+            axum::routing::get(|| async { axum::Json(json!({"id":"synthetic-session"})) }),
+        );
     tokio::spawn(async move {
         axum::serve(listener, router).await.unwrap();
     });
@@ -26,11 +35,10 @@ async fn setup() -> (tempfile::TempDir, Mcp) {
     (dir, mcp)
 }
 fn job(mcp: &Mcp, id: &str, count: usize, batch: bool) -> Value {
-    let directory = mcp.inner.root.join(format!("job-{id}"));
-    references::private_dir(&directory).unwrap();
+    let directory = mcp.inner.storage.directory(&format!("job-{id}")).unwrap();
     let items: Vec<_> = (0..count).map(|index| {
         let bytes = format!("synthetic file bytes {id} {index}");
-        json!({"index":index,"status":"succeeded","images":references::save_result(&directory,index,bytes.as_bytes()).unwrap(),"error":null})
+        json!({"index":index,"status":"succeeded","images":references::save_result(&mcp.inner.storage,&directory,index,bytes.as_bytes()).unwrap(),"error":null})
     }).collect();
     let mut snapshot = if batch {
         json!({"items":items})

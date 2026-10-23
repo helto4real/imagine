@@ -32,12 +32,19 @@ impl Drop for Own {
 }
 fn request(prompt: &str) -> Request {
     Request {
+        capture_continuation: false,
+        continuation: None,
+        continuation_bytes: vec![],
+        references: Default::default(),
+        sampling: None,
         protocol: p::VERSION,
         kind: p::RequestKind::GenerateVideo,
         id: "cpu-request".into(),
         profile: p::Profile::ShortAvNoReferenceV1,
         prompt: prompt.into(),
         shape: Default::default(),
+        image: None,
+        image_rgb: Vec::new(),
         seed: 42,
     }
 }
@@ -48,6 +55,61 @@ fn frame(header: &[u8], body: &[u8]) -> Vec<u8> {
     v.extend_from_slice(&(body.len() as u32).to_be_bytes());
     v.extend_from_slice(body);
     v
+}
+
+#[test]
+fn reference_rgb_and_pcm_reach_worker_in_manifest_order() {
+    let mut r = request("Own Picture 1 and Audio 1 reference");
+    r.profile = p::Profile::AvNoReferenceV2;
+    r.references.manifest = serde_json::json!({"images":[{"prompt_label":"<Picture 1>"}],"audios":[{"prompt_label":"<Audio 1>"}]});
+    r.references.images.push(p::references::Image {
+        width: 2,
+        height: 1,
+        rgb: vec![3, 17, 91, 201, 8, 66],
+    });
+    let pcm = [0.1f32, -0.2, 0.3, -0.4]
+        .into_iter()
+        .flat_map(f32::to_le_bytes)
+        .collect::<Vec<_>>();
+    r.references.audios.push(p::references::Audio {
+        sample_rate: 44100,
+        samples: 2,
+        pcm: pcm.clone(),
+    });
+    let video_pcm = [0.9f32, -0.8]
+        .into_iter()
+        .flat_map(f32::to_le_bytes)
+        .collect::<Vec<_>>();
+    r.references.videos.push(p::references::Video {
+        width: 2,
+        height: 1,
+        frames: 5,
+        source_fps: 24.,
+        tail_frames: None,
+        rgb: [19, 21, 14, 99, 180, 70].repeat(5),
+        audio: Some(p::references::Audio {
+            sample_rate: 44100,
+            samples: 1,
+            pcm: video_pcm.clone(),
+        }),
+    });
+    let header = serde_json::to_vec(&r).unwrap();
+    let mut body = r.references.images[0].rgb.clone();
+    body.extend_from_slice(&r.references.videos[0].rgb);
+    body.extend_from_slice(&video_pcm);
+    body.extend_from_slice(&pcm);
+    let parsed = wire::request(&mut std::io::Cursor::new(frame(&header, &body))).unwrap();
+    assert_eq!(parsed.references.images[0].rgb, r.references.images[0].rgb);
+    assert_eq!(parsed.references.videos[0].rgb, r.references.videos[0].rgb);
+    assert_eq!(
+        parsed.references.videos[0].audio.as_ref().unwrap().pcm,
+        video_pcm
+    );
+    assert_eq!(parsed.references.audios[0].pcm, pcm);
+    assert_eq!(parsed.references.manifest, r.references.manifest);
+    assert!(parsed.references.valid_payload());
+    body.pop();
+    assert!(wire::request(&mut std::io::Cursor::new(frame(&header, &body))).is_err());
 }
 fn encoded(r: &Request) -> Vec<u8> {
     frame(&serde_json::to_vec(r).unwrap(), &[])
@@ -113,7 +175,7 @@ fn invalid_request_rejects_before_factory_or_native_initialization() {
     ]);
     let mut long = request(&"a".repeat(p::MAX_PROMPT_BYTES + 1));
     cases.push(encoded(&long));
-    long.prompt = "\0".repeat(p::MAX_PROMPT_BYTES);
+    long.prompt = "\0".repeat(p::MAX_PROMPT_BYTES + 1);
     cases.push(encoded(&long));
     for input in cases {
         let mut called = false;
@@ -139,6 +201,69 @@ fn invalid_request_rejects_before_factory_or_native_initialization() {
                 .windows(b"SYNTHETIC_PRIVATE_CANARY".len())
                 .any(|v| v == b"SYNTHETIC_PRIVATE_CANARY")
         );
+    }
+}
+#[test]
+fn bounded_stage_header_accepts_escaped_prompt_without_constructing_native_runtime() {
+    let request = request(&"\0".repeat(p::MAX_PROMPT_BYTES));
+    let header = serde_json::to_vec(&request).unwrap();
+    assert!(header.len() > 64 * 1024 && header.len() <= p::MAX_HEADER);
+    let bytes = frame(&header, &[]);
+    let parsed = wire::request(&mut bytes.as_slice()).unwrap();
+    assert_eq!(parsed.prompt, request.prompt);
+    assert!(parsed.valid());
+}
+#[test]
+fn latent_tail_transport_validates_version_geometry_length_hash_and_finiteness_before_factory() {
+    use sha2::Digest;
+    let own = Own::new();
+    let mut r = request("own motion fixture");
+    r.profile = p::Profile::AvNoReferenceV2;
+    let descriptor = p::continuation::Descriptor {
+        schema_version: 1,
+        shape: r.shape,
+        sampled_frames: r.shape.frames,
+        visible_end_frame: r.shape.frames,
+        selected_end_frame: r.shape.frames,
+    };
+    let body = vec![0; descriptor.bytes()];
+    r.continuation = Some(p::continuation::Input {
+        method: p::continuation::Method::MotionContextExp,
+        include_audio: true,
+        descriptor,
+        sha256: format!("{:x}", sha2::Sha256::digest(&body)),
+    });
+    let header = serde_json::to_vec(&r).unwrap();
+    let parsed = wire::request(&mut frame(&header, &body).as_slice()).unwrap();
+    assert_eq!(parsed.continuation_bytes, body);
+    for mutation in ["version", "geometry", "length", "hash", "nan"] {
+        let mut header = serde_json::to_value(&r).unwrap();
+        let mut bytes = body.clone();
+        match mutation {
+            "version" => header["continuation"]["descriptor"]["schema_version"] = 2.into(),
+            "geometry" => header["continuation"]["descriptor"]["shape"]["width"] = 416.into(),
+            "length" => {
+                bytes.pop();
+            }
+            "hash" => header["continuation"]["sha256"] = "b".repeat(64).into(),
+            "nan" => {
+                bytes[..4].copy_from_slice(&f32::NAN.to_le_bytes());
+                header["continuation"]["sha256"] =
+                    format!("{:x}", sha2::Sha256::digest(&bytes)).into();
+            }
+            _ => unreachable!(),
+        }
+        let bytes = frame(&serde_json::to_vec(&header).unwrap(), &bytes);
+        let mut called = false;
+        assert_eq!(
+            wire::serve(&mut bytes.as_slice(), &mut vec![], ready(&own), |_| {
+                called = true;
+                Ok(Never)
+            }),
+            Err(ErrorCode::InvalidRequest),
+            "{mutation}"
+        );
+        assert!(!called, "{mutation}");
     }
 }
 #[test]
@@ -317,6 +442,28 @@ fn real_cpu_child_streams_complete_av_with_private_prompt_only_on_stdin() {
     assert!(own.0.join("admitted").exists());
 }
 #[test]
+fn missing_required_tail_never_publishes_complete_even_after_full_av() {
+    let own = Own::new();
+    let mut child = spawn(&own);
+    let mut input = child.stdin.take().unwrap();
+    let mut output = child.stdout.take().unwrap();
+    assert!(matches!(event(&mut output).0, Event::Ready { .. }));
+    let mut r = request("own missing tail fixture");
+    r.profile = p::Profile::AvNoReferenceV2;
+    r.capture_continuation = true;
+    input.write_all(&encoded(&r)).unwrap();
+    drop(input);
+    loop {
+        let (event, _) = event(&mut output);
+        assert!(!matches!(event, Event::Complete { .. }));
+        if let Event::Error { code, .. } = event {
+            assert_eq!(code, ErrorCode::GenerationFailed);
+            break;
+        }
+    }
+    assert!(!wait(&mut child).success());
+}
+#[test]
 fn cpu_child_partial_error_and_private_panic_never_publish_complete() {
     for prompt in [
         "SYNTHETIC_PARTIAL_FAILURE",
@@ -379,3 +526,105 @@ fn cpu_child_cancel_is_killed_and_reaped_without_any_gpu_or_ticket() {
     assert!(child.try_wait().unwrap().is_some());
 }
 use sha2::Digest;
+
+#[test]
+fn i2v_body_requires_exact_rgb_dimensions_hash_and_profile_before_factory() {
+    let own = Own::new();
+    let mut r = request("synthetic i2v");
+    r.profile = p::Profile::ImageToAvV1;
+    r.image_rgb = vec![1, 2, 3, 4, 5, 6];
+    r.image = Some(p::ImageInput {
+        width: 2,
+        height: 1,
+        sha256: format!("{:x}", sha2::Sha256::digest(&r.image_rgb)),
+    });
+    let head = serde_json::to_vec(&r).unwrap();
+    let good = frame(&head, &r.image_rgb);
+    let decoded =
+        wire::request(&mut good.as_slice()).unwrap_or_else(|_| panic!("valid i2v rejected"));
+    assert_eq!(decoded.image_rgb, r.image_rgb);
+    assert_eq!(decoded.profile, p::Profile::ImageToAvV1);
+    let mut cases = vec![
+        frame(&head, &[]),
+        frame(&head, &[0; 6]),
+        frame(&head, &[1; 7]),
+    ];
+    let mut bad = r.clone();
+    bad.image.as_mut().unwrap().width = u32::MAX;
+    cases.push(frame(&serde_json::to_vec(&bad).unwrap(), &[]));
+    bad = r.clone();
+    bad.image = None;
+    cases.push(frame(&serde_json::to_vec(&bad).unwrap(), &[]));
+    bad = r.clone();
+    bad.profile = p::Profile::AvNoReferenceV2;
+    let reference_frame0 =
+        wire::request(&mut frame(&serde_json::to_vec(&bad).unwrap(), &r.image_rgb).as_slice())
+            .unwrap();
+    assert_eq!(reference_frame0.profile, p::Profile::AvNoReferenceV2);
+    assert_eq!(reference_frame0.image_rgb, r.image_rgb);
+    bad.profile = p::Profile::ShortAvNoReferenceV1;
+    cases.push(frame(&serde_json::to_vec(&bad).unwrap(), &r.image_rgb));
+    for input in cases {
+        let mut called = false;
+        let mut output = Vec::new();
+        assert_eq!(
+            wire::serve(&mut input.as_slice(), &mut output, ready(&own), |_| {
+                called = true;
+                Ok(Never)
+            }),
+            Err(ErrorCode::InvalidRequest)
+        );
+        assert!(!called);
+    }
+}
+
+#[test]
+fn startup_declaration_accepts_rebuild_but_rejects_missing_file_and_protocol_drift() {
+    let own = Own::new();
+    let exe = std::env::current_exe().unwrap();
+    let lib = own.0.join("cpu-dependency.txt");
+    let map = BTreeMap::from([(lib.to_str().unwrap().into(), deployment::sha(&lib).unwrap())]);
+    let identity = deployment::identity(&exe, &map, &[], &[]).unwrap();
+    std::fs::write(&lib, b"recompiled compatible dependency").unwrap();
+    assert!(deployment::declaration(&exe, &map, identity.clone(), &[]).is_ok());
+    let mut bad = identity.clone();
+    bad.protocol += 1;
+    assert!(deployment::declaration(&exe, &map, bad, &[]).is_err());
+    std::fs::remove_file(&lib).unwrap();
+    assert!(deployment::declaration(&exe, &map, identity, &[]).is_err());
+}
+
+#[test]
+fn checkpoint_header_accepts_changed_weights_without_digest_and_rejects_bad_structure() {
+    let own = Own::new();
+    let path = own.0.join("own-model.safetensors");
+    let header = serde_json::to_vec(
+        &serde_json::json!({"weight":{"dtype":"F32","shape":[2],"data_offsets":[0,8]}}),
+    )
+    .unwrap();
+    let mut file = std::fs::File::create(&path).unwrap();
+    file.write_all(&(header.len() as u64).to_le_bytes())
+        .unwrap();
+    file.write_all(&header).unwrap();
+    file.write_all(&[0; 8]).unwrap();
+    drop(file);
+    assert!(deployment::checkpoint(&path).is_ok());
+    use std::io::{Seek, SeekFrom};
+    let mut file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+    file.seek(SeekFrom::End(-8)).unwrap();
+    file.write_all(&[255; 8]).unwrap();
+    drop(file);
+    assert!(deployment::checkpoint(&path).is_ok());
+    // A changed payload size or metadata does not require a lock digest update.
+    let mut file = std::fs::OpenOptions::new()
+        .append(true)
+        .open(&path)
+        .unwrap();
+    file.write_all(&[42; 16]).unwrap();
+    drop(file);
+    assert!(deployment::checkpoint(&path).is_ok());
+    std::fs::write(&path, b"invalid header").unwrap();
+    assert!(deployment::checkpoint(&path).is_err());
+    assert!(deployment::checkpoint(&own.0).is_err());
+    assert!(deployment::checkpoint(&own.0.join("missing.safetensors")).is_err());
+}

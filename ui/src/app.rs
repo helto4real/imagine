@@ -21,6 +21,7 @@ struct ReferenceView {
     texture: egui::TextureHandle,
 }
 enum Message {
+    Timeline(timeline::Event),
     Video(video_ui::Event),
     Queue(queue::Event),
     Enhancement(enhancement::Event),
@@ -131,6 +132,8 @@ impl GenerationDesk {
     }
 }
 pub struct ImagineApp {
+    #[cfg(feature = "ui-preview")]
+    qa: Option<timeline::qa::Runner>,
     clipboard: Option<crate::clipboard::Clipboard>,
     project: PathBuf,
     connection: Connection,
@@ -140,6 +143,7 @@ pub struct ImagineApp {
     models: models::ModelUi,
     enhancement: enhancement::EnhancementUi,
     video: video_ui::VideoDesk,
+    timeline: timeline::Timeline,
     image: GenerationDesk,
     edit: editing::EditSession,
     sheet: GenerationDesk,
@@ -172,6 +176,8 @@ impl ImagineApp {
     fn empty(project: PathBuf, connection: Connection, prefs: Preferences) -> Self {
         let (tx, rx) = mpsc::channel();
         Self {
+            #[cfg(feature = "ui-preview")]
+            qa: None,
             clipboard: None,
             project,
             connection,
@@ -181,6 +187,7 @@ impl ImagineApp {
             models: Default::default(),
             enhancement: Default::default(),
             video: Default::default(),
+            timeline: Default::default(),
             image: GenerationDesk::default(),
             edit: editing::EditSession::default(),
             sheet: GenerationDesk {
@@ -271,6 +278,7 @@ impl ImagineApp {
         while let Ok(message) = self.rx.try_recv() {
             match message {
                 Message::Video(event) => self.video_message(ctx, event),
+                Message::Timeline(event) => self.timeline_message(ctx, event),
                 Message::Queue(event) => self.queue_message(ctx, event),
                 Message::Enhancement(event) => self.enhancement_message(ctx, event),
                 Message::Library(result) => {
@@ -868,6 +876,8 @@ fn texture(ctx: &egui::Context, preview: &Preview, id: &str) -> egui::TextureHan
 }
 impl eframe::App for ImagineApp {
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        self.pause_timeline();
+        self.pause_video();
         if self.models.dirty {
             self.save_preferences();
         }
@@ -877,9 +887,17 @@ impl eframe::App for ImagineApp {
     }
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.receive(ctx);
+        #[cfg(feature = "ui-preview")]
+        self.qa_tick(ctx);
     }
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.content(ui);
+    }
+    #[cfg(feature = "ui-preview")]
+    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw: &mut egui::RawInput) {
+        if let Some(qa) = &mut self.qa {
+            qa.input(raw);
+        }
     }
 }
 
@@ -893,5 +911,7 @@ mod models;
 #[path = "enhancement.rs"]
 mod enhancement;
 
+#[path = "video/mod.rs"]
+mod timeline;
 #[path = "video_ui.rs"]
 mod video_ui;

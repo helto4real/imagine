@@ -26,6 +26,8 @@ pub enum Icon {
     Stop,
     Folder,
     Close,
+    Undo,
+    Redo,
 }
 
 pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
@@ -48,6 +50,14 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
         );
     };
     match icon {
+        Icon::Undo => {
+            line(&[[9., 4.], [4., 9.], [9., 14.]]);
+            line(&[[4., 9.], [14., 9.], [19., 13.], [19., 20.]]);
+        }
+        Icon::Redo => {
+            line(&[[15., 4.], [20., 9.], [15., 14.]]);
+            line(&[[20., 9.], [10., 9.], [5., 13.], [5., 20.]]);
+        }
         Icon::Enhance => {
             line(&[[4., 20.], [16., 8.], [19., 11.], [7., 23.], [4., 20.]]);
             line(&[[5., 3.], [5., 9.]]);

@@ -3,7 +3,23 @@ use super::*;
 use crate::{h3_protocol as wire, short_av::Av};
 impl PipeBackend {
     pub(super) async fn run_video(&mut self, request: &wire::Request) -> Result<Av> {
-        if !request.valid() {
+        if !request.valid()
+            || !request.references.valid_payload()
+            || !request
+                .image
+                .as_ref()
+                .map_or(request.image_rgb.is_empty(), |v| {
+                    v.bytes() == request.image_rgb.len()
+                        && crate::storage::hash(&request.image_rgb) == v.sha256
+                })
+            || !request
+                .continuation
+                .as_ref()
+                .map_or(request.continuation_bytes.is_empty(), |v| {
+                    v.descriptor.valid_bytes(&request.continuation_bytes)
+                        && crate::storage::hash(&request.continuation_bytes) == v.sha256
+                })
+        {
             bail!(EngineError("invalid_h3_request"));
         }
         let runtime = self
@@ -44,18 +60,40 @@ impl PipeBackend {
             bail!(EngineError("h3_deployment_mismatch"));
         }
         self.state.send_modify(|s| {
-            s.requested_steps = wire::STEPS;
+            s.requested_steps = request.total_steps();
             s.progress = None;
         });
         let header = serde_json::to_vec(request)?;
         let input = self.input.as_mut().unwrap();
         input.write_u32(header.len() as u32).await?;
         input.write_all(&header).await?;
-        input.write_u32(0).await?;
+        input
+            .write_u32(
+                (request.image_rgb.len()
+                    + request.continuation_bytes.len()
+                    + request.references.bytes()) as u32,
+            )
+            .await?;
+        input.write_all(&request.image_rgb).await?;
+        input.write_all(&request.continuation_bytes).await?;
+        for image in &request.references.images {
+            input.write_all(&image.rgb).await?;
+        }
+        for video in &request.references.videos {
+            input.write_all(&video.rgb).await?;
+            if let Some(audio) = &video.audio {
+                input.write_all(&audio.pcm).await?;
+            }
+        }
+        for audio in &request.references.audios {
+            input.write_all(&audio.pcm).await?;
+        }
         input.flush().await?;
-        let mut stream = wire::Stream::with_shape(request.id.clone(), request.shape)
-            .ok_or(EngineError("invalid_h3_request"))?;
+        let mut stream =
+            wire::Stream::with_steps(request.id.clone(), request.shape, request.total_steps())
+                .ok_or(EngineError("invalid_h3_request"))?;
         let mut result = Av {
+            continuation: None,
             shape: request.shape,
             frames: Vec::with_capacity(request.shape.frames as usize),
             pcm: Vec::new(),
@@ -91,7 +129,21 @@ impl PipeBackend {
                 }),
                 wire::Event::VideoFrame { .. } => result.frames.push(payload),
                 wire::Event::AudioChunk { .. } => result.pcm.extend(payload),
+                wire::Event::Continuation { descriptor, .. } => {
+                    anyhow::ensure!(
+                        request.capture_continuation,
+                        EngineError("h3_protocol_error")
+                    );
+                    result.continuation = Some(wire::continuation::Artifact {
+                        descriptor,
+                        bytes: payload,
+                    });
+                }
                 wire::Event::Complete { .. } => {
+                    anyhow::ensure!(
+                        !request.capture_continuation || result.continuation.is_some(),
+                        EngineError("h3_protocol_error")
+                    );
                     // Release all trained state and confirm exit while Ticket is still held.
                     self.stop().await?;
                     return Ok(result);

@@ -187,6 +187,23 @@
       "checked_at": "2026-10-10",
       "notes": "Publisher usage specifies temperature 1, top_k 20, top_p 0.95 and medium reasoning. Other sampling values inherit Bonsai recommendations as a project choice. No level is forced. Frequency penalty 0 is a neutral project default. Mode-specific defaults require an explicit, unambiguous thinking control. No reasoning level, budget or output limit is set.",
       "installed_revision": "19c22d6733f7dbed6c818173ce9bdef22ac6cab3"
+    },
+    {
+      "id": "ministral-3-8b-reasoning-uncensored-heretic-6bpw",
+      "models": [
+        "tabbyapi/Ministral-3-8B-Reasoning-UNCENSORED-heretic-EXL3-6bpw-H16"
+      ],
+      "defaults": {
+        "temperature": 0.7,
+        "top_p": 0.95
+      },
+      "sources": [
+        "https://huggingface.co/xtools-at/Ministral-3-8B-Reasoning-UNCENSORED-heretic/blob/36a5764fa73e03e4b0d8cf9061969e1f7728d237/README.md",
+        "https://huggingface.co/mistralai/Ministral-3-8B-Reasoning-2512#recommended-settings"
+      ],
+      "checked_at": "2026-10-21",
+      "notes": "Publisher recommends temperature 0.7; its usage examples use top_p 0.95. The original template uses [THINK]/[/THINK] and has no native reasoning_effort or enable_thinking control. Tabby supports explicit reasoning_budget_tokens; no default budget or output limit is imposed. Model-local Tabby settings select 65536 context/cache and 8-bit KV cache as a local VRAM choice.",
+      "installed_revision": "36a5764fa73e03e4b0d8cf9061969e1f7728d237"
     }
   ]
 }

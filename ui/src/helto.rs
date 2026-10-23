@@ -2,6 +2,11 @@
 use crate::icons::{self, Icon};
 use eframe::egui::{self, Color32, Stroke};
 
+pub fn reveal_in_viewport(ui: &egui::Ui, privacy_mode: bool) -> bool {
+    // Content coordinates move with scrolling; hover belongs to the visible viewport.
+    !privacy_mode || ui.input(|i| i.focused) && ui.rect_contains_pointer(ui.clip_rect())
+}
+
 pub const BG: Color32 = Color32::from_rgb(0x18, 0x18, 0x25);
 pub const SURFACE: Color32 = Color32::from_rgb(0x1e, 0x1e, 0x2e);
 pub const FIELD: Color32 = Color32::from_rgb(0x31, 0x32, 0x44);
@@ -435,6 +440,121 @@ fn redact_text_accessibility(ctx: &egui::Context, id: egui::Id) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn viewport_privacy_still_hides_on_leave_and_lost_focus() {
+        for (privacy, focused, inside, expected) in [
+            (true, true, true, true),
+            (true, true, false, false),
+            (true, false, true, false),
+            (false, false, false, true),
+        ] {
+            let ctx = egui::Context::default();
+            let mut actual = false;
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(900., 700.),
+                    )),
+                    focused,
+                    events: vec![egui::Event::PointerMoved(if inside {
+                        egui::pos2(100., 100.)
+                    } else {
+                        egui::pos2(950., 750.)
+                    })],
+                    ..Default::default()
+                },
+                |ui| {
+                    actual = super::reveal_in_viewport(ui, privacy);
+                },
+            );
+            output.textures_delta.clear();
+            assert_eq!(
+                actual, expected,
+                "privacy={privacy}, focused={focused}, inside={inside}"
+            );
+        }
+    }
+    #[test]
+    fn moving_pointer_inside_scrolled_viewport_does_not_hide_or_reset_content() {
+        let ctx = egui::Context::default();
+        let mut viewport = egui::Rect::NOTHING;
+        let mut shown = false;
+        let mut top = 0.;
+        let mut frame = |pos: egui::Pos2, wheel: f32| {
+            let mut events = vec![egui::Event::PointerMoved(pos)];
+            if wheel != 0. {
+                events.push(egui::Event::MouseWheel {
+                    phase: egui::TouchPhase::Move,
+                    unit: egui::MouseWheelUnit::Point,
+                    delta: egui::vec2(0., wheel),
+                    modifiers: egui::Modifiers::NONE,
+                });
+            }
+            shown = false;
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(900., 700.),
+                    )),
+                    focused: true,
+                    events,
+                    ..Default::default()
+                },
+                |ui| {
+                    egui::Window::new("Synthetic references")
+                        .fixed_pos(egui::pos2(30., 30.))
+                        .fixed_size(egui::vec2(500., 320.))
+                        .vscroll(true)
+                        .show(ui.ctx(), |ui| {
+                            viewport = ui.clip_rect();
+                            if !super::reveal_in_viewport(ui, true) {
+                                ui.label("Hidden");
+                                return;
+                            }
+                            shown = true;
+                            top = ui.cursor().min.y;
+                            for i in 0..80 {
+                                ui.checkbox(&mut false, format!("Synthetic image {i}"));
+                            }
+                        });
+                },
+            );
+            output.textures_delta.clear();
+            (shown, top, viewport)
+        };
+        for _ in 0..4 {
+            frame(egui::pos2(150., 100.), 0.);
+        }
+        let (_, initial, rect) = frame(egui::pos2(150., 100.), 0.);
+        let position = egui::pos2(rect.center().x, rect.bottom() - 20.);
+        frame(position, -750.);
+        let mut last = 0.;
+        for _ in 0..60 {
+            let (visible, y, _) = frame(position, 0.);
+            assert!(
+                visible,
+                "Scrolled content hid while the pointer was inside its viewport"
+            );
+            last = y;
+        }
+        assert!(
+            last < initial - 200.,
+            "Test did not scroll far enough: {initial} -> {last}"
+        );
+        for x in [rect.left() + 20., rect.center().x, rect.right() - 20.] {
+            let (visible, y, _) = frame(egui::pos2(x, position.y), 0.);
+            assert!(
+                visible,
+                "Moving the pointer inside the dialog hid its content"
+            );
+            assert!(
+                (y - last).abs() < 2.,
+                "Pointer motion reset scroll: {last} -> {y}"
+            );
+        }
+    }
     use super::*;
     #[test]
     fn private_text_hides_on_leave_even_with_focus_and_selection() {

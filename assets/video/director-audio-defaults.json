@@ -1,0 +1,65 @@
+{
+  "project": {
+    "use_native_audio": false,
+    "normalization_mode": "Integrated LUFS",
+    "target_lufs": -16,
+    "true_peak_limit_db": -1,
+    "default_volume": 100,
+    "default_fade_in_seconds": 0,
+    "default_fade_out_seconds": 0
+  },
+  "clip": {
+    "audio": null,
+    "start_time": 0,
+    "end_time": 1,
+    "source_in": 0,
+    "source_out": null,
+    "volume": 100,
+    "normalization": {},
+    "fade_in": 0,
+    "fade_out": 0,
+    "enabled": true,
+    "locked": false,
+    "name": "",
+    "lane": 0,
+    "usage": {
+      "generation_reference": false,
+      "final_mix": true
+    },
+    "reference": {
+      "purpose": "ambience_sfx",
+      "target_reference_id": null,
+      "relationship": "reference",
+      "description": "",
+      "strength": 1
+    }
+  },
+  "stacking": [
+    {
+      "start": 0,
+      "end": 1,
+      "lane": 0
+    },
+    {
+      "start": 1,
+      "end": 3,
+      "lane": 0
+    },
+    {
+      "start": 0,
+      "end": 2,
+      "lane": 1
+    },
+    {
+      "start": 2,
+      "end": 3,
+      "lane": 1
+    }
+  ],
+  "trim": {
+    "start": 2,
+    "end": 5,
+    "source_in": 1,
+    "source_out": 4
+  }
+}

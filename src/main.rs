@@ -157,6 +157,7 @@ async fn main() -> Result<()> {
     )
     .await?;
     let app = App {
+        video: control.video.clone(),
         enhancement: imagine_server::enhancement::Service::open(
             config.data.join("enhancement-profiles.json"),
         )?,

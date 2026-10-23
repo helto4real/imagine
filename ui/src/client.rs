@@ -1,7 +1,4 @@
-use crate::settings::{
-    Connection, GenerationSettings, UpscaleTarget, check_output_folder, save_image, save_sheet,
-    save_upscaled,
-};
+use crate::settings::{Connection, GenerationSettings, UpscaleTarget};
 use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
 use std::{
@@ -13,6 +10,9 @@ use std::{
 pub const MODEL: &str = "qwen-image-2.1-int8";
 #[path = "enhancement_client.rs"]
 mod enhancement;
+#[path = "timeline_client.rs"]
+mod timeline;
+pub use timeline::TimelineFailure;
 #[derive(Clone)]
 pub struct Client {
     http: reqwest::Client,
@@ -39,7 +39,7 @@ impl Failure {
 }
 #[derive(Clone)]
 pub struct Submission {
-    /// Local naming context only; never included in the API request.
+    /// Original UI result context. Server derives trusted upscale naming from the owned asset.
     pub upscale_source: Option<PathBuf>,
     pub request: Value,
     pub key: String,
@@ -111,7 +111,7 @@ impl SamplingProgress {
             .checked_add(Duration::from_secs_f64(self.remaining_seconds))
     }
 }
-fn job_progress(value: &Value) -> Progress {
+pub(crate) fn job_progress(value: &Value) -> Progress {
     let status = value["status"].as_str().unwrap_or("");
     let sampling = if matches!(status, "running" | "cancelling") {
         serde_json::from_value::<SamplingProgress>(value["progress"].clone())
@@ -161,6 +161,41 @@ fn job_progress(value: &Value) -> Progress {
     }
 }
 impl Client {
+    async fn prepare_destination(
+        &self,
+        submission: &mut Submission,
+    ) -> std::result::Result<(), Failure> {
+        if submission.job.is_none() {
+            let proof: crate::video_destination::Proof = serde_json::from_value(
+                Self::json(self.get("/v1/media-destination").send().await).await?,
+            )
+            .map_err(|_| Failure::terminal("Media destination is not configured on the server."))?;
+            if proof.config.root != submission.folder {
+                return Err(Failure::terminal(
+                    "The UI output folder differs from the server's verified media destination. Configure the same mounted destination before generating.",
+                ));
+            }
+            let (local,fd)=crate::video_destination::inspect(&proof.config,&crate::video_destination::System).map_err(|_|Failure::terminal("The verified media volume is unavailable locally. Remote media storage cannot be verified."))?;
+            if local != proof {
+                return Err(Failure::terminal(
+                    "UI and server do not share the same host and mounted media destination.",
+                ));
+            }
+            crate::video_destination::writable(&fd, 0)
+                .map_err(|_| Failure::terminal("The media destination is not writable."))?;
+            let value = serde_json::to_value(proof).unwrap();
+            if let Some(existing) = submission.request["client_metadata"].get("video_destination")
+                && existing != &value
+            {
+                return Err(Failure::terminal(
+                    "Media destination changed. Start a new request.",
+                ));
+            }
+            submission.request["client_metadata"]["video_destination"] = value;
+        }
+        Ok(())
+    }
+
     /// Admit the whole series before watching individual jobs. Retrying admission
     /// with the same key recovers the original jobs after a lost response.
     pub async fn submit_batch(
@@ -168,13 +203,14 @@ impl Client {
         submissions: &[Submission],
         key: &str,
     ) -> std::result::Result<Vec<String>, Failure> {
-        for submission in submissions {
-            check_output_folder(&submission.folder).map_err(|e| Failure::retry(e.to_string()))?;
+        let mut prepared = submissions.to_vec();
+        for submission in &mut prepared {
+            self.prepare_destination(submission).await?;
         }
         let body = Self::json(
             self.post("/v1/jobs/batch")
                 .header("Idempotency-Key", key)
-                .json(&json!({"jobs": submissions.iter().map(|s| &s.request).collect::<Vec<_>>()}))
+                .json(&json!({"jobs": prepared.iter().map(|s| &s.request).collect::<Vec<_>>()}))
                 .send()
                 .await,
         )
@@ -319,22 +355,10 @@ impl Client {
         mut submission: Submission,
         mut progress: impl FnMut(Progress),
     ) -> std::result::Result<Completed, Failure> {
-        let destination = submission
-            .upscale_source
-            .as_deref()
-            .and_then(Path::parent)
-            .unwrap_or(&submission.folder);
-        check_output_folder(destination).map_err(|e| {
-            Failure::retry(if submission.upscale_source.is_some() {
-                "Cannot write beside the original image. Restore access to that folder and retry."
-                    .into()
-            } else {
-                e.to_string()
-            })
-        })?;
+        self.prepare_destination(&mut submission).await?;
         let result = self.wait_for_job(&mut submission, &mut progress).await?;
         progress(Progress::Status {
-            label: "Saving".into(),
+            label: "Loading saved preview".into(),
             sampling: None,
         });
         let roles: &[OutputRole] = if submission.request["operation"] == "character_sheet" {
@@ -343,7 +367,7 @@ impl Client {
             &[OutputRole::Image]
         };
         let ids = result_assets(&result, roles)?;
-        // Download and decode the complete set before touching the output folder.
+        // Preview bytes stay in memory; publication and naming already completed on the server.
         let mut downloads = Vec::new();
         for (role, asset) in ids {
             let response = self
@@ -367,22 +391,11 @@ impl Client {
             })?;
             downloads.push((role, bytes, preview, asset));
         }
-        let files = if roles == [OutputRole::Image] {
-            match &submission.upscale_source {
-                Some(source) => save_upscaled(source, &downloads[0].1),
-                None => save_image(&submission.folder, &downloads[0].1),
-            }
-            .map(|file| vec![file])
-        } else {
-            save_sheet(
-                &submission.folder,
-                &downloads
-                    .iter()
-                    .map(|(role, bytes, _, _)| (role.name(), bytes.as_ref()))
-                    .collect::<Vec<_>>(),
-            )
-        }
-        .map_err(|e| Failure::retry(e.to_string()))?;
+        let files = saved_image_paths(
+            &result,
+            &downloads.iter().map(|v| v.3.as_str()).collect::<Vec<_>>(),
+            &submission.folder,
+        )?;
         Ok(Completed {
             assets: downloads
                 .into_iter()
@@ -398,6 +411,49 @@ impl Client {
         })
     }
 }
+fn saved_image_paths(
+    result: &Value,
+    ids: &[&str],
+    root: &Path,
+) -> std::result::Result<Vec<PathBuf>, Failure> {
+    if result["output"]["persistent"] != true {
+        return Err(Failure::terminal(
+            "The server did not confirm persistent image storage.",
+        ));
+    }
+    let assets = result["output"]["assets"]
+        .as_array()
+        .ok_or_else(|| Failure::terminal("Missing saved image paths."))?;
+    ids.iter()
+        .map(|id| {
+            let asset = assets
+                .iter()
+                .find(|a| a["id"].as_str() == Some(id))
+                .ok_or_else(|| Failure::terminal("Missing saved image path."))?;
+            let path = asset["saved_path"]
+                .as_str()
+                .map(PathBuf::from)
+                .filter(|p| {
+                    p.is_absolute()
+                        && p.starts_with(root)
+                        && p.components().all(|c| {
+                            matches!(
+                                c,
+                                std::path::Component::RootDir | std::path::Component::Normal(_)
+                            )
+                        })
+                })
+                .ok_or_else(|| {
+                    Failure::terminal("The saved image is outside the verified destination.")
+                })?;
+            if asset["persistent"] != true {
+                return Err(Failure::terminal("The image was not saved persistently."));
+            }
+            Ok(path)
+        })
+        .collect()
+}
+
 fn result_assets(
     result: &Value,
     roles: &[OutputRole],
@@ -745,6 +801,24 @@ pub fn error_message(code: &str) -> String {
         return message.into();
     }
     match code {
+        "output_save_failed"=>"The result could not be saved. Restore the destination and retry. A completed montage is retained in this server session for saving again.",
+        "h3_section_reference_unavailable"=>"The section image bindings are retained, but this H3 worker cannot apply these roles yet. Review the bindings or use a runtime that supports them.",
+        "story_dialogue_cast_required"=>"Select at least two project characters to plan dialogue.",
+        "story_image_pair_incomplete"=>"Choose a directed start frame and its end frame in order.",
+        "story_image_missing"|"cast_reference_missing"=>"A selected Story source is no longer in the project. Select its current reference or image.",
+        "assembly_scene_without_take"=>"Choose an Accepted Take or imported video for each scene before assembling.",
+        "assembly_transition_take_required"=>"This boundary needs a generated transition Take. Transition assembly is not connected to this runtime yet; choose another boundary to export now.",
+        "assembly_blend_exceeds_clip"=>"The blend overlap exceeds a neighbouring clip. Shorten the overlap or lengthen the clips.",
+        "assembly_empty_source_range"=>"The selected source trim contains no video frames. Adjust Source in / out and freeze a new plan.",
+        "assembly_decode_memory_limit"|"assembly_audio_memory_limit"=>"The montage exceeds the processor's resident memory buffer. Use shorter clips or a smaller delivery canvas.",
+        "assembly_plan_not_found"=>"This frozen plan belonged to an earlier server session. Freeze the current montage again.",
+        "media_decode_failed"=>"The selected media could not be decoded. Check the source file and its codec.",
+        "video_destination_unconfigured" => "Media storage is not configured on the server. Configure the encrypted destination before generating.",
+        "video_volume_not_mounted" | "video_volume_mismatch" | "video_destination_unavailable" => "The configured media volume is unavailable or does not match. Mount the expected encrypted volume before generating.",
+        "video_destination_mismatch" | "video_destination_invalid" => "The UI and server must use the same verified media destination on this computer. Check the output folder.",
+        "video_destination_read_only" | "video_destination_not_writable" => "The media destination is read-only or not writable. Check the mounted volume before generating.",
+        "video_destination_full" => "The encrypted media destination has insufficient free space. Free space there before retrying.",
+        "video_destination_write_failed" => "The output could not be saved on the encrypted destination. No fallback folder was used.",
         "model_component_load_failed" => "A model component could not be loaded. Restart the updated backend and check the selected encoder and VAE files.",
         "model_library_update_failed" => "Could not save the model folder or assignments. Check the folder, compatibility and server write permissions.",
         "model_library_scan_failed" => "Could not scan the model folder. Check permissions and folder depth, then refresh.",
@@ -1052,4 +1126,40 @@ mod tests {
 
 #[path = "video_client.rs"]
 mod video;
-pub use video::{VideoCompleted, video_request, video_request_with_selection};
+pub use video::{VideoCompleted, i2v_request, video_request, video_request_with_selection};
+
+#[cfg(test)]
+mod persistent_image_tests {
+    use super::*;
+    #[test]
+    fn persistent_paths_are_returned_without_copying_or_renaming_on_retry() {
+        let result = json!({"output":{"persistent":true,"assets":[{"id":"own_asset","persistent":true,"saved_path":"/synthetic/mounted/2026-10-20/image_0001.png"}]}});
+        let a =
+            saved_image_paths(&result, &["own_asset"], Path::new("/synthetic/mounted")).unwrap();
+        let b =
+            saved_image_paths(&result, &["own_asset"], Path::new("/synthetic/mounted")).unwrap();
+        assert_eq!(a, b);
+        assert!(
+            saved_image_paths(
+                &result,
+                &["other_owner_asset"],
+                Path::new("/synthetic/mounted")
+            )
+            .is_err()
+        );
+        let mut bad = result.clone();
+        bad["output"]["persistent"] = false.into();
+        assert!(saved_image_paths(&bad, &["own_asset"], Path::new("/synthetic/mounted")).is_err());
+        for path in [
+            "/tmp/output.png",
+            "/synthetic/mounted/../outside.png",
+            "relative.png",
+        ] {
+            let mut bad = result.clone();
+            bad["output"]["assets"][0]["saved_path"] = path.into();
+            assert!(
+                saved_image_paths(&bad, &["own_asset"], Path::new("/synthetic/mounted")).is_err()
+            );
+        }
+    }
+}

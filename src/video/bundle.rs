@@ -238,6 +238,13 @@ pub(crate) struct Store<T> {
     pub(crate) fail_commit: bool,
 }
 impl<T: Bundle> Store<T> {
+    pub(crate) fn is_at(&self, path: &Path) -> Result<bool, StorageError> {
+        if self.root.path != path {
+            return Ok(false);
+        }
+        self.root.check()?;
+        Ok(true)
+    }
     pub(crate) fn select(path: &Path, manifest: &'static str) -> Result<Self, StorageError> {
         Ok(Self {
             root: Directory::select(path)?,

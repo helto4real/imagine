@@ -1,5 +1,5 @@
 //! H3's typed two-stream binding to the common AV schedule, parameterization,
-//! condition aggregation, KSAMPLER inpaint wrapper and Euler solver.
+//! condition aggregation, KSAMPLER inpaint wrapper and shared solvers.
 //! The named CFG=1 entry is the selected probe profile; the common sampler and
 //! guidance registries retain their wider independent contracts.
 use super::{dit, flow, layout::PackedLayout, streams::NestedTensor};
@@ -340,6 +340,29 @@ pub unsafe fn sample_euler_cfg1<E: TextEncoderExecution>(
     request: EulerRequest<'_>,
     exec: &mut E,
 ) -> Result<NestedTensor, Error> {
+    unsafe { sample_cfg1(rt, model, schedule, request, exec, false) }
+}
+/// Director-compatible deterministic res_multistep: eta=0, s_noise=1, CFG++ off.
+/// Uses the same AV parameterization and positive-only CFG1 conditions as Euler.
+/// # Safety
+/// Selected H3 parameters, two-stream geometry and callbacks satisfy the ABI.
+pub unsafe fn sample_res_multistep_cfg1<E: TextEncoderExecution>(
+    rt: &Runtime,
+    model: &dit::Denoiser,
+    schedule: &ModelSampling,
+    request: EulerRequest<'_>,
+    exec: &mut E,
+) -> Result<NestedTensor, Error> {
+    unsafe { sample_cfg1(rt, model, schedule, request, exec, true) }
+}
+unsafe fn sample_cfg1<E: TextEncoderExecution>(
+    rt: &Runtime,
+    model: &dit::Denoiser,
+    schedule: &ModelSampling,
+    request: EulerRequest<'_>,
+    exec: &mut E,
+    multistep: bool,
+) -> Result<NestedTensor, Error> {
     let (latent, shapes) = request.latent.pack()?;
     let (noise, _) = request.noise.pack()?;
     let scale = schedule.audio_scale()?;
@@ -399,6 +422,9 @@ pub unsafe fn sample_euler_cfg1<E: TextEncoderExecution>(
             mask_function: None,
         },
         |e, x, s| {
+            if multistep {
+                return solvers::res_multistep(e, x, s, parameterization(schedule), 0., 1., false);
+            }
             solvers::churn(
                 e,
                 x,

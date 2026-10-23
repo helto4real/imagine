@@ -1,0 +1,78 @@
+{
+  "schema_version": 3,
+  "id": "nsfw_qwen_next",
+  "label": "NSFW-Qwen-Next",
+  "default": false,
+  "order": 18,
+  "generation": {
+    "defaults": {
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "top_k": 20,
+      "repeat_penalty": 1,
+      "max_tokens": 4500
+    },
+    "operations": {
+      "text_enhancement": {},
+      "image_analysis": {
+        "temperature": 1.0
+      },
+      "story_generation": {
+        "temperature": 1.0,
+        "max_tokens": 10000
+      },
+      "story_outline": {
+        "temperature": 1.0,
+        "max_tokens": 10000
+      },
+      "story_scene_expansion": {
+        "temperature": 1.0,
+        "max_tokens": 10000
+      }
+    },
+    "providers": {
+      "koboldcpp": {
+        "defaults": {
+          "min_p": 0,
+          "reasoning": {
+            "include": true,
+            "effort": "medium",
+            "enable_thinking": true,
+            "budget_tokens": 3000
+          }
+        },
+        "operations": {
+          "animate_image": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 20,
+            "repeat_penalty": 1.0,
+            "max_tokens": 10000,
+            "min_p": 0.0,
+            "reasoning": {
+              "include": true,
+              "effort": "medium",
+              "enable_thinking": true,
+              "budget_tokens": 3000
+            }
+          }
+        }
+      },
+      "ollama": {
+        "defaults": {
+          "context_tokens": 0
+        },
+        "operations": {
+          "animate_image": {
+            "temperature": 1.0,
+            "top_p": 0.95,
+            "top_k": 20,
+            "repeat_penalty": 1.0,
+            "max_tokens": 10000,
+            "context_tokens": 0
+          }
+        }
+      }
+    }
+  }
+}

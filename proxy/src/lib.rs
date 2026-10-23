@@ -32,3 +32,6 @@ pub mod connection_limit;
 mod mcp_storage;
 
 mod coordinator_socket;
+
+#[path = "../../shared/video_destination.rs"]
+pub mod media_destination;

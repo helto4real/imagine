@@ -2012,7 +2012,9 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "fs2",
+ "futures-util",
  "image",
+ "imagine-video-contract",
  "libc",
  "reqwest",
  "schemars",
@@ -2040,6 +2042,7 @@ dependencies = [
  "eframe",
  "image",
  "imagine-server",
+ "imagine-video-contract",
  "libc",
  "reqwest",
  "rfd",
@@ -2048,6 +2051,18 @@ dependencies = [
  "st-proxy",
  "tempfile",
  "tokio",
+ "tokio-util",
+ "uuid",
+]
+
+[[package]]
+name = "imagine-video-contract"
+version = "0.1.0"
+dependencies = [
+ "schemars",
+ "serde",
+ "serde_json",
+ "sha2",
  "uuid",
 ]
 

@@ -1,3 +1,5 @@
+#[path = "support/destination.rs"]
+mod destination;
 use axum::{
     Json, Router,
     extract::State,
@@ -56,8 +58,17 @@ async fn download(State(p): State<Arc<Probe>>) -> (StatusCode, Vec<u8>) {
 }
 #[tokio::test]
 async fn ambiguous_submission_and_poll_failures_recover_same_job() {
+    let dir = tempfile::tempdir().unwrap();
+    let proof = destination::proof(dir.path());
     let p = Arc::new(Probe::default());
     let router = Router::new()
+        .route(
+            "/v1/media-destination",
+            get(move || {
+                let p = proof.clone();
+                async move { Json(p) }
+            }),
+        )
         .route(
             "/v1/session",
             get(|| async { Json(json!({"id":"synthetic-session"})) }),
@@ -83,7 +94,6 @@ async fn ambiguous_submission_and_poll_failures_recover_same_job() {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
-    let dir = tempfile::tempdir().unwrap();
     let mcp = Mcp::new(Config {
         imagine_url: url,
         coordinator_socket: Some(dir.path().join("gpu.sock").to_string_lossy().into()),
@@ -176,4 +186,78 @@ async fn ambiguous_submission_and_poll_failures_recover_same_job() {
         .await;
     assert_eq!(stale["structuredContent"]["error"]["category"], "privacy");
     mcp.close().await;
+}
+
+#[tokio::test]
+async fn register_upload_uses_only_verified_cache_and_session_owned_asset() {
+    let dir = tempfile::tempdir().unwrap();
+    let proof = destination::proof(dir.path());
+    let source = dir.path().join("own-source.png");
+    let mut png = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::new_rgb8(8, 8)
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+    std::fs::write(&source, png.get_ref()).unwrap();
+    let uploaded = Arc::new(AtomicBool::new(false));
+    let flag = uploaded.clone();
+    let router = Router::new()
+        .route(
+            "/v1/media-destination",
+            get(move || {
+                let p = proof.clone();
+                async move { Json(p) }
+            }),
+        )
+        .route(
+            "/v1/session",
+            get(|| async { Json(json!({"id":"synthetic-session"})) }),
+        )
+        .route(
+            "/v1/profiles/i2v",
+            get(|| async { Json(json!({"version":1,"references":{"min":1,"max":1}})) }),
+        )
+        .route(
+            "/v1/assets",
+            post(move |headers: HeaderMap, bytes: axum::body::Bytes| {
+                let flag = flag.clone();
+                async move {
+                    assert_eq!(headers["X-Imagine-Session"], "synthetic-session");
+                    assert!(bytes.starts_with(&[137, 80, 78, 71]));
+                    flag.store(true, Ordering::SeqCst);
+                    Json(json!({"id":"own-upload"}))
+                }
+            }),
+        );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+    let mcp = Mcp::new(Config {
+        imagine_url: url,
+        coordinator_socket: Some(dir.path().join("gpu.sock").to_string_lossy().into()),
+        mcp_output_dir: Some(dir.path().join("output").to_string_lossy().into()),
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+    let result = mcp
+        .call("register_image", &json!({"profile":"i2v","path":source}))
+        .await;
+    assert_eq!(result["isError"], false, "{result}");
+    assert!(uploaded.load(Ordering::SeqCst));
+    let preview = std::path::PathBuf::from(
+        result["structuredContent"]["preview_path"]
+            .as_str()
+            .unwrap(),
+    );
+    assert!(preview.starts_with(dir.path().join("output")));
+    assert!(preview.exists());
+    assert_eq!(
+        st_proxy::references::hash(&std::fs::read(&preview).unwrap()),
+        preview.file_stem().unwrap().to_str().unwrap()
+    );
+    mcp.close().await;
+    assert!(!preview.exists());
+    assert!(source.exists());
+    server.abort();
+    let _ = server.await;
 }

@@ -23,6 +23,7 @@ use tokio::sync::{Semaphore, watch};
 
 #[derive(Clone)]
 pub struct App {
+    pub video: Arc<tokio::sync::Mutex<crate::video::service::Service>>,
     pub enhancement: Arc<crate::enhancement::Service>,
     pub library: Arc<std::sync::Mutex<crate::model_library::Library>>,
     pub profiles: Arc<crate::profiles::Catalog>,
@@ -44,7 +45,10 @@ impl IntoResponse for Fault {
 }
 pub fn router(app: App) -> Router {
     Router::new()
+        .merge(crate::video::api::routes())
         .route("/v1/session", get(session))
+        .route("/v1/video-destination", get(video_destination))
+        .route("/v1/media-destination", get(video_destination))
         .route("/v1/profiles", get(profiles))
         .route("/v1/profiles/{id}", get(profile))
         .route("/v1/jobs/validate", post(validate_job))
@@ -74,7 +78,11 @@ pub fn router(app: App) -> Router {
         .layer(middleware::from_fn_with_state(app.clone(), session_guard))
 }
 async fn session_guard(State(app): State<App>, request: Request, next: Next) -> Response {
-    let mut response = if request
+    let mut response = if request.uri().path().starts_with("/v1/video/")
+        && request.headers().get("X-Imagine-Session").is_none()
+    {
+        Fault::new(401, "session_required").into_response()
+    } else if request
         .headers()
         .get("X-Imagine-Session")
         .is_some_and(|id| id.as_bytes() != app.store.session.id.as_bytes())
@@ -90,6 +98,15 @@ async fn session_guard(State(app): State<App>, request: Request, next: Next) -> 
         .headers_mut()
         .insert(header::X_CONTENT_TYPE_OPTIONS, "nosniff".parse().unwrap());
     response
+}
+async fn video_destination(State(app): State<App>) -> Result<Json<Value>, Fault> {
+    let proof = app
+        .store
+        .videos
+        .destination()
+        .and_then(|d| d.proof())
+        .map_err(|e| Fault::new(422, e))?;
+    Ok(Json(json!(proof)))
 }
 async fn session(State(app): State<App>) -> Json<Value> {
     // Preserve the response shape for clients that inspect the storage mode.
@@ -133,10 +150,13 @@ fn model_capability(app: &App, mut value: Value) -> Value {
         } else {
             json!("h3_runtime_unavailable")
         };
-        value["operations"] = json!(["text_to_video"]);
+        value["operations"] = json!(["text_to_video", "image_to_video"]);
+        value["profiles"] = json!([{ "id":crate::video::job::PROFILE,"operation":"text_to_video","audio":true },{"id":crate::video::job::I2V_PROFILE,"operation":"image_to_video","start_images":1,"audio":true,"gpu_acceptance":"pending"}]);
         value["profile"] = json!(crate::video::job::PROFILE);
         value["geometry_selectable"] = json!(true);
-        value["gpu_validated_default"] = json!({"width":384,"height":256,"frames":39,"fps":24});
+        value["sampling"] = json!({"steps":crate::h3_protocol::STEPS,"sampler":crate::h3_protocol::SAMPLER,"scheduler":crate::h3_protocol::SCHEDULER,"cfg_scale":1.,"guidance":"positive_only","denoise":1.,"video_shift":12.,"audio_shift":3.,"audio_gain":1.,"gpu_acceptance":"pending"});
+        value["previous_gpu_validated_geometry"] =
+            json!({"width":384,"height":256,"frames":39,"fps":24,"steps":4,"sampler":"euler"});
         value["video"] =
             json!({"width":384,"height":256,"frames":39,"fps":24,"audio":true,"seed":42});
     }
@@ -214,15 +234,25 @@ async fn submit(
         .map(|v| v.to_str().map(str::to_owned))
         .transpose()
         .map_err(|_| Fault::new(400, "invalid_idempotency_key"))?;
-    let request = resolve_request(&app, request).await?;
-    let mut result = app
-        .control
-        .call(Action::Submit {
+    let action = if request["kind"] == "video_scene" {
+        if headers.get("X-Imagine-Session").is_none() {
+            return Err(Fault::new(401, "session_required"));
+        }
+        Action::SubmitScene {
+            owner: LOCAL_OWNER.into(),
+            request: serde_json::from_value(request)
+                .map_err(|_| Fault::new(422, "invalid_request"))?,
+            key,
+        }
+    } else {
+        let request = resolve_request(&app, request).await?;
+        Action::Submit {
             owner: LOCAL_OWNER.into(),
             request: Box::new(request),
             key,
-        })
-        .await?;
+        }
+    };
+    let mut result = app.control.call(action).await?;
     let id = result["id"].as_str().unwrap().to_owned();
     result["status_url"] = json!(format!("/v1/jobs/{id}"));
     result["events_url"] = json!(format!("/v1/jobs/{id}/events"));

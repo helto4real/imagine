@@ -28,7 +28,7 @@ class Server:
         env = dict(os.environ)
         env.pop('IMAGINE_COORDINATOR_SOCKET', None)
         env['HELTO_PRIVACY_SESSION_DIR'] = str(project / 'unused-helto-session')
-        binary = str(ROOT / 'target/debug/imagine-server')
+        binary = os.environ.get('IMAGINE_TEST_SERVER', str(ROOT / 'target/debug/imagine-server'))
         self.process = subprocess.Popen(
             [binary, '--project', str(project), '--bind', f'127.0.0.1:{self.port}', '--backend', 'native', *args],
             env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -95,7 +95,11 @@ class Tests(unittest.TestCase):
             self.assertEqual(json.load(response)['id'], session['id'])
         asset = server.request('/v1/assets', png())
         path = self.root / '.imagine/media' / session['id'] / asset['id']
-        self.assertEqual(path.read_bytes(), png())
+        # Uploads are session-owned RAM data; only explicit project Save persists media.
+        self.assertFalse(path.exists())
+        with urllib.request.urlopen(f'http://127.0.0.1:{server.port}/v1/assets/' + asset['id'], timeout=3) as response:
+            self.assertEqual(response.headers['Cache-Control'], 'no-store')
+            self.assertEqual(response.read(), png())
         self.assertEqual(server.stop(), 0)
         self.assertFalse(path.exists())
         restarted = self.start()

@@ -472,7 +472,7 @@ fn settings_controls_save_and_report_write_failures() {
 fn headless_reference_desk_and_settings() {
     let root = tempfile::tempdir().unwrap();
     for (width, height, name) in [
-        (1680, 850, "reference-desk"),
+        (1800, 850, "reference-desk"),
         (640, 1000, "reference-desk-compact"),
     ] {
         let ctx = egui::Context::default();
@@ -499,7 +499,7 @@ fn headless_reference_desk_and_settings() {
                         ui.scope_builder(
                             egui::UiBuilder::new().max_rect(egui::Rect::from_min_size(
                                 egui::pos2(1310., 8.),
-                                egui::vec2(360., 680.),
+                                egui::vec2(480., 680.),
                             )),
                             |ui| app.settings_content(ui, false),
                         );

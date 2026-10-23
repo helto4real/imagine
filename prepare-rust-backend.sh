@@ -10,6 +10,7 @@ for artifact in "$parity_root/kitchen-manylinux/libimagine_kitchen.so" "$parity_
 done
 export CARGO_HOME="$parity_root/cargo" CARGO_TARGET_DIR="$parity_root/target"
 export LIBTORCH="$reference_site/torch" LIBTORCH_CXX11_ABI=1 CXX=clang++ CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0
+export IMAGINE_CUDA_INCLUDE="$parity_root/cuda13/nvidia/cu13/include"
 unset LIBTORCH_USE_PYTORCH LIBTORCH_BYPASS_VERSION_CHECK
 cargo build --manifest-path "$project_root/inference/Cargo.toml" --locked --offline --bin imagine-worker
 # The server writes the manifest without loading the worker or CUDA.

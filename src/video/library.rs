@@ -216,6 +216,9 @@ impl LibrarySession {
             if existing.revision != expected {
                 return Err(StorageError::new("revision_conflict"));
             }
+            if std::mem::discriminant(&existing.content) != std::mem::discriminant(&content) {
+                return Err(StorageError::new("entry_kind_mismatch"));
+            }
             (
                 id.to_owned(),
                 expected

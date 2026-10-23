@@ -35,13 +35,69 @@ pub fn request(input: &mut impl Read) -> Result<Request, ErrorCode> {
     input
         .read_exact(&mut header)
         .map_err(|_| ErrorCode::InvalidRequest)?;
-    // Request payload is empty: reject its length before allocating any body.
-    if length(input)? != 0 {
-        return Err(ErrorCode::InvalidRequest);
-    }
-    let request: Request =
+    let size = length(input)?;
+    let mut request: Request =
         serde_json::from_slice(&header).map_err(|_| ErrorCode::InvalidRequest)?;
     if !request.valid() {
+        return Err(ErrorCode::InvalidRequest);
+    }
+    let image_size = request.image.as_ref().map_or(0, |v| v.bytes());
+    let context_size = request
+        .continuation
+        .as_ref()
+        .map_or(0, |v| v.descriptor.bytes());
+    if size != image_size + context_size + request.references.bytes()
+        || size > p::MAX_INPUT_IMAGE + p::MAX_PAYLOAD + p::references::MAX_BYTES
+    {
+        return Err(ErrorCode::InvalidRequest);
+    }
+    request.image_rgb = vec![0; image_size];
+    input
+        .read_exact(&mut request.image_rgb)
+        .map_err(|_| ErrorCode::InvalidRequest)?;
+    if let Some(image) = &request.image {
+        use sha2::{Digest, Sha256};
+        if format!("{:x}", Sha256::digest(&request.image_rgb)) != image.sha256 {
+            return Err(ErrorCode::InvalidRequest);
+        }
+    }
+    request.continuation_bytes = vec![0; context_size];
+    input
+        .read_exact(&mut request.continuation_bytes)
+        .map_err(|_| ErrorCode::InvalidRequest)?;
+    if let Some(context) = &request.continuation {
+        use sha2::{Digest, Sha256};
+        if !context.descriptor.valid_bytes(&request.continuation_bytes)
+            || format!("{:x}", Sha256::digest(&request.continuation_bytes)) != context.sha256
+        {
+            return Err(ErrorCode::InvalidRequest);
+        }
+    }
+    for image in &mut request.references.images {
+        image.rgb = vec![0; image.bytes()];
+        input
+            .read_exact(&mut image.rgb)
+            .map_err(|_| ErrorCode::InvalidRequest)?;
+    }
+    for video in &mut request.references.videos {
+        video.rgb = vec![0; video.rgb_bytes()];
+        input
+            .read_exact(&mut video.rgb)
+            .map_err(|_| ErrorCode::InvalidRequest)?;
+        if let Some(audio) = &mut video.audio {
+            audio.pcm = vec![0; audio.bytes()];
+            input
+                .read_exact(&mut audio.pcm)
+                .map_err(|_| ErrorCode::InvalidRequest)?;
+        }
+    }
+    for audio in &mut request.references.audios {
+        audio.pcm = vec![0; audio.bytes()];
+        input
+            .read_exact(&mut audio.pcm)
+            .map_err(|_| ErrorCode::InvalidRequest)?;
+    }
+    if !request.references.valid_payload() {
         return Err(ErrorCode::InvalidRequest);
     }
     Ok(request)
@@ -66,8 +122,8 @@ pub fn serve<G: Generator>(
         }
     };
     let id = request.id.clone();
-    let mut stream =
-        Stream::with_shape(id.clone(), request.shape).ok_or(ErrorCode::InvalidRequest)?;
+    let mut stream = Stream::with_steps(id.clone(), request.shape, request.total_steps())
+        .ok_or(ErrorCode::InvalidRequest)?;
     let result = catch_unwind(AssertUnwindSafe(|| {
         let mut generator = factory(&request)?;
         let mut emit = |event: &Event, payload: &[u8]| {
@@ -92,7 +148,9 @@ pub fn serve<G: Generator>(
                 frames: request.shape.frames,
                 audio_samples: request.shape.audio_samples(),
             };
-            if stream.accept(&complete, &[]).is_ok() {
+            if (!request.capture_continuation || stream.captured_continuation())
+                && stream.accept(&complete, &[]).is_ok()
+            {
                 return write(output, &complete, &[]);
             }
             let code = ErrorCode::GenerationFailed;

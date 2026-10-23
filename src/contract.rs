@@ -412,12 +412,18 @@ impl JobRequest {
             .reference_images
             .iter()
             .chain(self.inputs.pose_guide.iter())
+            .chain(self.inputs.start_image.iter())
     }
     pub fn effective(&self) -> Value {
         let mut v = serde_json::to_value(self).expect("serializable request");
         if self.model == "minimax-h3" {
             v.as_object_mut().unwrap().remove("model_options");
-            v["profile_revision"] = json!(crate::video::job::PROFILE);
+            v["profile_revision"] = json!(
+                self.video
+                    .as_ref()
+                    .and_then(|v| v.profile.as_deref())
+                    .unwrap_or(crate::video::job::PROFILE)
+            );
             v["api_revision"] = json!(API_REVISION);
             return v;
         }

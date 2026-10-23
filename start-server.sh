@@ -16,10 +16,12 @@ for ((index=0; index<${#arguments[@]}; index++)); do
 done
 if [[ -f "$ROOT/comfyui/active-product.sh" ]]; then
     source "$ROOT/comfyui/active-product.sh"
-    sha256sum --check --status <<< "$IMAGINE_PRODUCT_SERVER_SHA256  $IMAGINE_PRODUCT_SERVER"
+    if [[ "${IMAGINE_PRIVATE_STORAGE:-0}" == 1 ]]; then
+        [[ "${XDG_RUNTIME_DIR:-}" == /* ]] || { echo "Runtime directory unavailable" >&2; exit 2; }
+        export IMAGINE_COORDINATOR_SOCKET="$XDG_RUNTIME_DIR/imagine/gpu.sock"
+    fi
     runtime_args=()
     if [[ $backend == rust && $custom_runtime == false ]]; then
-        sha256sum --check --status <<< "$IMAGINE_PRODUCT_RUNTIME_SHA256  $IMAGINE_PRODUCT_RUNTIME"
         runtime_args=(--rust-runtime "$IMAGINE_PRODUCT_RUNTIME")
     fi
     exec "$IMAGINE_PRODUCT_SERVER" --project "$ROOT" "${runtime_args[@]}" "$@"

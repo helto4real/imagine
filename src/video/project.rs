@@ -1,174 +1,37 @@
 use super::contract::*;
-use std::collections::{BTreeMap, BTreeSet};
+pub use imagine_video_contract::project::check;
+use std::collections::BTreeMap;
 
-pub fn check(condition: bool, code: &str, field: &str) -> Result<(), Issue> {
-    if condition {
-        Ok(())
-    } else {
-        Err(Issue::new(code, field))
-    }
-}
-fn name(value: &str) -> bool {
-    !value.trim().is_empty()
-}
-fn model(value: &ModelSelection) -> bool {
-    [
-        &value.adapter,
-        &value.model,
-        &value.variant,
-        &value.profile,
-        &value.profile_revision,
-    ]
-    .into_iter()
-    .all(|s| name(s))
-}
-impl VideoProject {
-    pub fn create(request: CreateProject) -> Result<Self, Issue> {
-        let project = Self {
-            schema_version: request.schema_version,
-            id: ProjectId(format!("project_{}", uuid::Uuid::new_v4().simple())),
-            project_revision: 0,
-            default_model: request.default_model,
-            delivery: request.delivery,
-            global_prompt: String::new(),
-            assets: BTreeMap::new(),
-            scenes: vec![],
-        };
-        project.validate()?;
-        Ok(project)
-    }
-    pub fn effective_model<'a>(&'a self, scene: &'a Scene) -> &'a ModelSelection {
-        match &scene.model {
-            ModelChoice::ProjectDefault => &self.default_model,
-            ModelChoice::Override(m) => m,
-        }
-    }
-    pub fn scene(&self, id: &SceneId) -> Result<&Scene, Issue> {
-        self.scenes
-            .iter()
-            .find(|s| &s.id == id)
-            .ok_or_else(|| Issue::new("scene_not_found", "scene_id"))
-    }
-    pub fn validate(&self) -> Result<(), Issue> {
-        check(
-            self.schema_version == SCHEMA_VERSION,
-            "unsupported_schema",
-            "schema_version",
-        )?;
-        check(name(&self.id.0), "invalid_id", "id")?;
-        check(
-            self.project_revision <= MAX_INTEGER,
-            "invalid_revision",
-            "project_revision",
-        )?;
-        check(model(&self.default_model), "invalid_model", "default_model")?;
-        check(
-            self.delivery.fps.positive() && self.delivery.width > 0 && self.delivery.height > 0,
-            "invalid_delivery",
-            "delivery",
-        )?;
-        for (id, asset) in &self.assets {
-            check(
-                id == &asset.id && name(&id.0) && asset.revision <= MAX_INTEGER,
-                "invalid_asset",
-                "assets",
-            )?;
-        }
-        let mut ids = BTreeSet::new();
-        let mut sections = BTreeSet::new();
-        let mut bindings = BTreeSet::new();
-        for scene in &self.scenes {
-            check(
-                name(&scene.id.0) && ids.insert(&scene.id),
-                "duplicate_or_invalid_id",
-                "scenes.id",
-            )?;
-            check(
-                scene.start.valid() && scene.duration.positive(),
-                "invalid_time",
-                "scenes.time",
-            )?;
-            check(
-                model(self.effective_model(scene)),
-                "invalid_model",
-                "scenes.model",
-            )?;
-            let mut slots = BTreeSet::new();
-            for slot in &scene.settings {
-                check(
-                    model(&slot.model)
-                        && slot.schema_version > 0
-                        && slot.values.is_object()
-                        && slots.insert(&slot.model),
-                    "invalid_settings_slot",
-                    "scenes.settings",
-                )?;
-            }
-            for section in &scene.sections {
-                check(
-                    name(&section.id.0) && sections.insert(&section.id),
-                    "duplicate_or_invalid_id",
-                    "sections.id",
-                )?;
-                check(
-                    section.start.valid()
-                        && section.duration.positive()
-                        && section.start.fits(section.duration, scene.duration),
-                    "invalid_time",
-                    "sections.time",
-                )?;
-            }
-            for binding in &scene.bindings {
-                check(
-                    name(&binding.id.0) && bindings.insert(&binding.id),
-                    "duplicate_or_invalid_id",
-                    "bindings.id",
-                )?;
-                check(
-                    self.assets.contains_key(&binding.asset),
-                    "asset_not_found",
-                    "bindings.asset",
-                )?;
-            }
-            if let Some(take) = &scene.accepted_take {
-                check(
-                    name(&take.id.0) && model(&take.model) && name(&take.source_fingerprint),
-                    "invalid_take",
-                    "accepted_take",
-                )?;
-            }
-        }
-        // Continuity sources must precede their target in sequence order: no cycles.
-        let mut previous = BTreeSet::new();
-        for scene in &self.scenes {
-            if let Some(c) = &scene.continuity {
-                check(
-                    previous.contains(&c.source_scene),
-                    "invalid_continuity_source",
-                    "continuity.source_scene",
-                )?;
-            }
-            previous.insert(scene.id.clone());
-        }
-        Ok(())
-    }
-}
-
-/// Session-owned document collection. HTTP, idempotency and persistence come later.
+/// Session-owned document collection; each handle owns its persistence boundary.
 #[derive(Default)]
 pub struct ProjectService {
-    projects: BTreeMap<ProjectId, VideoProject>,
+    projects: BTreeMap<ProjectId, super::persistence::ProjectSession>,
 }
 impl ProjectService {
+    pub(crate) fn at_location(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<Option<ProjectId>, super::persistence::StorageError> {
+        for (id, project) in &self.projects {
+            if project.is_at(path)? {
+                return Ok(Some(id.clone()));
+            }
+        }
+        Ok(None)
+    }
     pub fn create(&mut self, request: CreateProject) -> Result<VideoProject, Issue> {
         let project = VideoProject::create(request)?;
-        self.projects.insert(project.id.clone(), project.clone());
+        self.projects.insert(
+            project.id.clone(),
+            super::persistence::ProjectSession::new(project.clone())
+                .map_err(|e| Issue::new(&e.code, "project"))?,
+        );
         Ok(project)
     }
     pub fn read(&self, id: &ProjectId) -> Result<VideoProject, Issue> {
         self.projects
             .get(id)
-            .cloned()
+            .map(|p| p.document().project.clone())
             .ok_or_else(|| Issue::new("project_not_found", "project_id"))
     }
     pub fn edit(
@@ -180,7 +43,35 @@ impl ProjectService {
             .projects
             .get_mut(id)
             .ok_or_else(|| Issue::new("project_not_found", "project_id"))?;
-        super::editing::apply(project, request)?;
-        Ok(project.clone())
+        project
+            .edit(request)
+            .map_err(|e| Issue::new(&e.code, "project"))?;
+        Ok(project.document().project.clone())
+    }
+    pub fn session(&self, id: &ProjectId) -> Result<&super::persistence::ProjectSession, Issue> {
+        self.projects
+            .get(id)
+            .ok_or_else(|| Issue::new("project_not_found", "project_id"))
+    }
+    pub fn session_mut(
+        &mut self,
+        id: &ProjectId,
+    ) -> Result<&mut super::persistence::ProjectSession, Issue> {
+        self.projects
+            .get_mut(id)
+            .ok_or_else(|| Issue::new("project_not_found", "project_id"))
+    }
+    pub fn insert(
+        &mut self,
+        project: super::persistence::ProjectSession,
+    ) -> Result<ProjectId, Issue> {
+        let id = project.document().project.id.clone();
+        check(
+            !self.projects.contains_key(&id),
+            "project_already_open",
+            "project_id",
+        )?;
+        self.projects.insert(id.clone(), project);
+        Ok(id)
     }
 }

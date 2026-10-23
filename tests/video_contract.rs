@@ -178,6 +178,7 @@ fn voice(p: &mut VideoProject) {
                     asset: AssetId("voice".into()),
                     role: InputRole::VoiceReference,
                     enabled: true,
+                    video: None,
                 }],
             },
         ],
@@ -303,6 +304,75 @@ fn changing_project_default_only_changes_inheriting_scenes() {
     assert_eq!(before, input_revision(&p, &SceneId("b".into())).unwrap());
 }
 #[test]
+fn cast_fingerprint_uses_complete_case_insensitive_director_tokens() {
+    use imagine_video_contract::creative::VisualReference;
+    let mut p = project();
+    let id = p.scenes[0].id.clone();
+    p.creative.references = ["keeper", "keeper_long"]
+        .into_iter()
+        .map(|alias| VisualReference {
+            id: alias.into(),
+            name: alias.into(),
+            alias: alias.into(),
+            kind: "character".into(),
+            description: "Original".into(),
+            tags: vec![],
+            enabled: true,
+            strength: 1.,
+            retention: String::new(),
+            relationship: None,
+            images: vec![],
+            voice: None,
+            origin: None,
+        })
+        .collect();
+    p.scenes[0].sections[0].prompt = "@KEEPER_LONG[ @keeper ] walks.".into();
+    let before = input_revision(&p, &id).unwrap();
+    p.creative.references[0].description = "Unreferenced prefix edit".into();
+    assert_eq!(before, input_revision(&p, &id).unwrap());
+    p.creative.references[1].description = "Referenced identity edit".into();
+    assert_ne!(before, input_revision(&p, &id).unwrap());
+}
+#[test]
+fn scene_source_copy_remove_and_fingerprint_distinguish_title_from_model_inputs() {
+    use imagine_video_contract::creative::ScenePrompt;
+    let mut p = project();
+    let id = p.scenes[0].id.clone();
+    let before = input_revision(&p, &id).unwrap();
+    p.creative.scene_prompts.insert(
+        id.clone(),
+        ScenePrompt {
+            title: "Display title".into(),
+            ..Default::default()
+        },
+    );
+    assert_eq!(before, input_revision(&p, &id).unwrap());
+    p.creative.scene_prompts.get_mut(&id).unwrap().summary = "Actual model context".into();
+    assert_ne!(before, input_revision(&p, &id).unwrap());
+    edit(
+        &mut p,
+        vec![Edit::DuplicateScene {
+            scene_id: id.clone(),
+            new_scene_id: SceneId("copy_source".into()),
+            start: time(5),
+        }],
+    )
+    .unwrap();
+    assert_eq!(
+        p.creative.scene_prompts.get(&id),
+        p.creative.scene_prompts.get(&SceneId("copy_source".into()))
+    );
+    edit(
+        &mut p,
+        vec![Edit::RemoveScene {
+            scene_id: SceneId("copy_source".into()),
+        }],
+    )
+    .unwrap();
+    assert_eq!(p.creative.scene_prompts.len(), 1);
+    p.validate().unwrap();
+}
+#[test]
 fn fingerprint_tracks_only_effective_scene_inputs() {
     let mut p = project();
     let id = SceneId("a".into());
@@ -339,6 +409,44 @@ fn fingerprint_tracks_only_effective_scene_inputs() {
         }],
     )
     .unwrap();
+    assert_ne!(before, input_revision(&p, &id).unwrap());
+}
+
+#[test]
+fn section_video_asset_revision_invalidates_generation_without_unrelated_assets() {
+    let mut p = project();
+    let id = p.scenes[0].id.clone();
+    let section = p.scenes[0].sections[0].id.clone();
+    for name in ["movie", "unused"] {
+        let asset = AssetId(name.into());
+        p.assets.insert(
+            asset.clone(),
+            Asset {
+                id: asset,
+                kind: MediaKind::Video,
+                revision: 1,
+            },
+        );
+    }
+    p.creative
+        .sections
+        .entry(section)
+        .or_default()
+        .videos
+        .push(Binding {
+            id: BindingId("movie-binding".into()),
+            asset: AssetId("movie".into()),
+            role: InputRole::VideoReference,
+            enabled: true,
+            video: None,
+        });
+    let before = input_revision(&p, &id).unwrap();
+    p.assets
+        .get_mut(&AssetId("unused".into()))
+        .unwrap()
+        .revision += 1;
+    assert_eq!(before, input_revision(&p, &id).unwrap());
+    p.assets.get_mut(&AssetId("movie".into())).unwrap().revision += 1;
     assert_ne!(before, input_revision(&p, &id).unwrap());
 }
 #[test]
@@ -402,6 +510,7 @@ fn role_type_and_combination_constraints_block_without_deleting_inputs() {
         asset: AssetId("image".into()),
         role: InputRole::FirstFrame,
         enabled: true,
+        video: None,
     });
     assert!(codes(&p, &registry(true)).contains(&"input_combination_unsupported".into()));
     p.scenes[0].bindings[0].enabled = false;
@@ -415,6 +524,7 @@ fn continuity_is_source_bound_and_latent_compatibility_fails_closed() {
     let mut p = project();
     let mut b = scene("b");
     b.continuity = Some(Continuity {
+        include_audio: false,
         source_scene: SceneId("a".into()),
         method: ContinuityMethod::MotionContextExp,
     });
@@ -649,4 +759,55 @@ fn checked_in_schemas_and_examples_follow_rust_types() {
     let mut p = VideoProject::create(request()).unwrap();
     apply(&mut p, example).unwrap();
     assert_eq!(p.scenes.len(), 1);
+}
+
+#[test]
+fn reference_transfer_targets_and_enable_options_affect_frozen_inputs() {
+    use imagine_video_contract::creative::{ReferenceRelationship, VisualReference};
+    let mut p = project();
+    let scene = p.scenes[0].id.clone();
+    p.creative.references = ["keeper", "coat", "unused"]
+        .into_iter()
+        .map(|alias| VisualReference {
+            id: alias.into(),
+            name: alias.into(),
+            alias: alias.into(),
+            kind: "character".into(),
+            description: format!("Original {alias}"),
+            tags: vec![],
+            enabled: true,
+            strength: 1.,
+            retention: String::new(),
+            relationship: None,
+            images: vec![],
+            voice: None,
+            origin: None,
+        })
+        .collect();
+    p.scenes[0].sections[0].prompt = "@keeper walks.".into();
+    p.creative.references[0].relationship = Some(ReferenceRelationship {
+        marker: "attribute_transfer".into(),
+        target_reference_id: Some("coat".into()),
+        note: "Use the coat".into(),
+    });
+    let before = input_revision(&p, &scene).unwrap();
+    p.creative.references[2].description = "Unreferenced edit".into();
+    assert_eq!(before, input_revision(&p, &scene).unwrap());
+    p.creative.references[1].description = "Changed target coat".into();
+    assert_ne!(before, input_revision(&p, &scene).unwrap());
+    p.creative.references[1].relationship = Some(ReferenceRelationship {
+        marker: "attribute_transfer".into(),
+        target_reference_id: Some("keeper".into()),
+        note: String::new(),
+    });
+    assert!(
+        input_revision(&p, &scene).is_ok(),
+        "A transfer cycle must terminate, not reject the source"
+    );
+    p.creative.visual_references_enabled = Some(false);
+    let disabled = input_revision(&p, &scene).unwrap();
+    p.creative.references[0].description = "Disabled source edit".into();
+    assert_eq!(disabled, input_revision(&p, &scene).unwrap());
+    p.creative.visual_references_enabled = Some(true);
+    assert_ne!(disabled, input_revision(&p, &scene).unwrap());
 }

@@ -75,6 +75,7 @@ fn model_and_lora_settings_survive_restart_empty_lists_and_group_switches() {
     desk.app.accept_library(catalog(desk._root.path()));
     assert!(desk.app.model_selection().unwrap().loras.is_empty());
 }
+
 #[test]
 fn escape_cancels_component_search_before_closing_settings() {
     let mut desk = Desk::new();
@@ -389,7 +390,7 @@ fn headless_model_library_and_lora_layouts() {
         (640, 900, "models-compact"),
         (520, 420, "loras"),
         (420, 300, "loras-compact"),
-        (360, 680, "model-settings"),
+        (480, 680, "model-settings"),
     ] {
         let root = tempfile::tempdir().unwrap();
         let ctx = egui::Context::default();
@@ -525,6 +526,197 @@ fn model_settings_keep_controls_visible_with_long_paths_and_many_scan_warnings()
             .unwrap();
     } else {
         output.textures_delta.clear();
+    }
+}
+
+#[test]
+fn settings_scrollbar_leaves_the_privacy_toggle_visible_and_clickable() {
+    for width in [360, 480] {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        ctx.global_style_mut(|style| style.animation_time = 0.);
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.accept_library(catalog(root.path()));
+        let frame = |app: &mut ImagineApp, events| {
+            ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(width as f32, 680.),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ui| app.settings_content(ui, false),
+            )
+        };
+        let mut output = egui::FullOutput::default();
+        for _ in 0..3 {
+            output.append(frame(&mut app, vec![]));
+        }
+        let nodes = &output
+            .platform_output
+            .accesskit_update
+            .as_ref()
+            .unwrap()
+            .nodes;
+        let scrollbar = nodes
+            .iter()
+            .map(|(_, n)| n)
+            .find(|n| n.role() == egui::accesskit::Role::ScrollBar)
+            .unwrap()
+            .bounds()
+            .unwrap();
+        let mut first: Option<(f64, f64)> = None;
+        let mut text_left: Option<f32> = None;
+        for (name, value) in [
+            ("Steps", "40"),
+            ("CFG", "2.5"),
+            ("Sampler", "er_sde"),
+            ("Scheduler", "beta"),
+            ("Reference size", "1.0"),
+            ("Upscale target", "2K"),
+        ] {
+            let bounds = nodes
+                .iter()
+                .map(|(_, n)| n)
+                .find(|n| {
+                    n.labelled_by().iter().any(|label_id| {
+                        nodes.iter().any(|(id, label)| {
+                            label_id == id
+                                && (label.label() == Some(name) || label.value() == Some(name))
+                        })
+                    })
+                })
+                .unwrap_or_else(|| panic!("Missing {name}"))
+                .bounds()
+                .unwrap();
+            assert!(
+                bounds.x1 + 16. <= scrollbar.x0,
+                "{name}: {bounds:?}, {scrollbar:?}"
+            );
+            assert!((bounds.height() - 32.).abs() < 1., "{name}: {bounds:?}");
+            if let Some((left, right)) = first {
+                assert!(
+                    (bounds.x0 - left).abs() < 1. && (bounds.x1 - right).abs() < 1.,
+                    "{name}: {bounds:?}"
+                );
+            } else {
+                first = Some((bounds.x0, bounds.x1));
+            }
+            let text = output
+                .shapes
+                .iter()
+                .find_map(|shape| match &shape.shape {
+                    egui::Shape::Text(t) if t.galley.text().trim() == value => Some(t),
+                    _ => None,
+                })
+                .unwrap_or_else(|| panic!("Missing rendered value: {value}"));
+            if let Some(left) = text_left {
+                assert!((text.pos.x - left).abs() < 1., "{name}: {:?}", text.pos);
+            } else {
+                text_left = Some(text.pos.x);
+            }
+            assert!(
+                (f64::from(text.pos.y + text.galley.size().y / 2.) - (bounds.y0 + bounds.y1) / 2.)
+                    .abs()
+                    < 1.,
+                "{name}: text {:?}, {bounds:?}",
+                text.pos
+            );
+        }
+        if width == 480
+            && let Some(dir) = std::env::var_os("IMAGINE_UI_PREVIEW_DIR")
+        {
+            std::fs::create_dir_all(&dir).unwrap();
+            render(&ctx, output.clone(), width, 680)
+                .save(PathBuf::from(dir).join("settings-sampling.png"))
+                .unwrap();
+        }
+        for _ in 0..3 {
+            output.append(frame(
+                &mut app,
+                vec![
+                    egui::Event::PointerMoved(egui::pos2(200., 450.)),
+                    egui::Event::MouseWheel {
+                        unit: egui::MouseWheelUnit::Point,
+                        delta: egui::vec2(0., -1000.),
+                        phase: egui::TouchPhase::Move,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+            ));
+        }
+        let nodes = &output
+            .platform_output
+            .accesskit_update
+            .as_ref()
+            .unwrap()
+            .nodes;
+        let toggle = nodes
+            .iter()
+            .map(|(_, n)| n)
+            .find(|n| {
+                n.role() == egui::accesskit::Role::CheckBox && n.label() == Some("Hide previews")
+            })
+            .unwrap()
+            .bounds()
+            .unwrap();
+        let scrollbar = nodes
+            .iter()
+            .map(|(_, n)| n)
+            .find(|n| n.role() == egui::accesskit::Role::ScrollBar)
+            .unwrap()
+            .bounds()
+            .unwrap();
+        let folder = nodes
+            .iter()
+            .map(|(_, n)| n)
+            .find(|n| n.label() == Some("Choose output folder"))
+            .unwrap()
+            .bounds()
+            .unwrap();
+        let right = first.unwrap().1;
+        assert!(
+            (toggle.x1 - right).abs() < 1. && (folder.x1 - right).abs() < 1.,
+            "Mismatched right edges: {toggle:?}, {folder:?}, {right}"
+        );
+        assert!(
+            toggle.x1 + 16. <= scrollbar.x0,
+            "{width}: {toggle:?} overlaps {scrollbar:?}"
+        );
+        assert!(toggle.y0 >= 80. && toggle.y1 <= 632., "{toggle:?}");
+        let pos = egui::pos2(toggle.x1 as f32 - 1., (toggle.y0 + toggle.y1) as f32 / 2.);
+        let before = app.prefs.privacy_mode;
+        for pressed in [true, false] {
+            output.append(frame(
+                &mut app,
+                vec![
+                    egui::Event::PointerMoved(pos),
+                    egui::Event::PointerButton {
+                        pos,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+            ));
+        }
+        assert_eq!(app.prefs.privacy_mode, !before);
+        assert_eq!(
+            Preferences::load(root.path()).unwrap().privacy_mode,
+            !before
+        );
+        if width == 480
+            && let Some(dir) = std::env::var_os("IMAGINE_UI_PREVIEW_DIR")
+        {
+            render(&ctx, output, width, 680)
+                .save(PathBuf::from(dir).join("settings-privacy-scrolled.png"))
+                .unwrap();
+        } else {
+            output.textures_delta.clear();
+        }
     }
 }
 

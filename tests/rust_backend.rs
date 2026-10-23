@@ -158,17 +158,19 @@ async fn rust_component_errors_are_not_replaced_with_generic_generation_failure(
     engine.stop().await.unwrap();
 }
 #[tokio::test]
-async fn unsupported_sampler_fails_before_launch_and_changed_runtime_is_rejected() {
+async fn unsupported_sampler_and_missing_runtime_reject_but_rebuild_needs_no_new_hash() {
     let (dir, mut engine, state) = fake();
     let mut r = request();
     r.sampling.sampler = "res_multistep".into();
     assert!(engine.generate(&r).await.is_err());
     assert!(state.borrow().pid.is_none());
     std::fs::write(dir.path().join("worker"), b"replaced binary").unwrap();
+    assert!(imagine_server::rust_runtime::Runtime::load(&dir.path().join("runtime.json")).is_ok());
+    std::fs::remove_file(dir.path().join("worker")).unwrap();
     assert!(imagine_server::rust_runtime::Runtime::load(&dir.path().join("runtime.json")).is_err());
     r.sampling.sampler = "euler".into();
     let changed = engine.generate(&r).await.unwrap_err();
-    assert!(format!("{changed:#}").contains("runtime artifact changed"));
+    assert!(format!("{changed:#}").contains("runtime artifact missing"));
     assert!(state.borrow().pid.is_none());
     tokio::time::timeout(Duration::from_secs(2), engine.stop())
         .await

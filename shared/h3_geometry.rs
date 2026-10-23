@@ -100,16 +100,26 @@ impl Default for Selection {
 }
 impl Selection {
     pub fn resolve(&self) -> Result<Shape, &'static str> {
+        self.resolve_with_source(None)
+    }
+    pub fn resolve_with_source(&self, source: Option<(u32, u32)>) -> Result<Shape, &'static str> {
         if !self.seconds.is_finite() || self.seconds < 0.25 || self.seconds > 3600. {
             return Err("invalid_h3_duration");
         }
         let ratios = [(16., 9.), (4., 3.), (3., 2.), (21., 9.), (1., 1.)];
-        let i = RATIOS
-            .iter()
-            .position(|r| *r == self.ratio)
-            .ok_or("invalid_h3_ratio")?;
-        let (mut w, mut h) = ratios[i];
-        if self.portrait && w > h {
+        let (mut w, mut h) = if self.ratio == "Source" {
+            let (w, h) = source
+                .filter(|(w, h)| *w > 0 && *h > 0 && *w <= 8192 && *h <= 8192)
+                .ok_or("invalid_h3_source_ratio")?;
+            (f64::from(w), f64::from(h))
+        } else {
+            let i = RATIOS
+                .iter()
+                .position(|r| *r == self.ratio)
+                .ok_or("invalid_h3_ratio")?;
+            ratios[i]
+        };
+        if self.ratio != "Source" && self.portrait && w > h {
             std::mem::swap(&mut w, &mut h);
         }
         let q = QUALITIES

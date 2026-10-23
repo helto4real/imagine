@@ -1,3 +1,5 @@
+#[path = "support/video_output.rs"]
+mod video_output;
 use axum::{
     Router,
     body::{Body, to_bytes},
@@ -30,6 +32,7 @@ struct Probe {
     component_failure:
         std::sync::Mutex<Option<imagine_server::component_error::ComponentLoadError>>,
     video_calls: AtomicUsize,
+    video_inputs: std::sync::Mutex<Vec<imagine_server::h3_protocol::Request>>,
     video_prompts: std::sync::Mutex<Vec<String>>,
     calls: AtomicUsize,
     stops: AtomicUsize,
@@ -82,9 +85,11 @@ impl Backend for Fake {
                 .lock()
                 .unwrap()
                 .push(input.prompt.clone());
+            self.0.video_inputs.lock().unwrap().push(input.clone());
             self.0.video_calls.fetch_add(1, Ordering::SeqCst);
             self.0.release.notified().await;
             Ok(imagine_server::short_av::Av {
+                continuation: None,
                 shape: input.shape,
                 frames: (0..input.shape.frames)
                     .map(|i| vec![i as u8; input.shape.frame_bytes()])
@@ -121,7 +126,8 @@ async fn setup() -> Harness {
 }
 async fn setup_inner(coordinated: bool) -> Harness {
     let dir = tempfile::tempdir().unwrap();
-    let store = Store::open(dir.path()).await.unwrap();
+    let mut store = Store::open(dir.path()).await.unwrap();
+    store.videos.destination = Some(video_output::destination(dir.path()));
     let probe = Arc::new(Probe::default());
     let socket = dir.path().join("own-broker.sock");
     let broker = if coordinated {
@@ -181,6 +187,7 @@ async fn setup_inner(coordinated: bool) -> Harness {
         .unwrap();
     }
     let router = api::router(App {
+        video: control.video.clone(),
         enhancement: imagine_server::enhancement::Service::open(
             dir.path().join("enhancement-profiles.json"),
         )
@@ -343,6 +350,31 @@ async fn req(
     value: Option<Value>,
     key: Option<&str>,
 ) -> (u16, Value) {
+    let mut value = value;
+    if let Some(v) = &mut value
+        && url.starts_with("/v1/jobs")
+        && v["client_metadata"]["video_destination"].is_null()
+    {
+        let response = router
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/v1/video-destination")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let proof: Value =
+            serde_json::from_slice(&to_bytes(response.into_body(), 8192).await.unwrap()).unwrap();
+        if let Some(jobs) = v.get_mut("jobs").and_then(Value::as_array_mut) {
+            for job in jobs {
+                job["client_metadata"]["video_destination"] = proof.clone();
+            }
+        } else {
+            v["client_metadata"]["video_destination"] = proof;
+        }
+    }
     let mut builder = Request::builder().method(method).uri(url);
     if let Some(key) = key {
         builder = builder.header("Idempotency-Key", key);
@@ -1103,20 +1135,15 @@ async fn profile_reference_sizing_and_missing_assets() {
 }
 
 #[tokio::test]
-async fn session_assets_are_plain_owned_and_removed_on_close() {
+async fn uploaded_assets_are_ram_only_owned_and_removed_on_close() {
     let dir = tempfile::tempdir().unwrap();
     let bytes = png();
     let store = Store::open(dir.path()).await.unwrap();
     let asset = store.save_asset("local", bytes.clone()).await.unwrap();
     let id = asset["id"].as_str().unwrap();
     let path = store.media.join(id);
-    let disk = std::fs::read(&path).unwrap();
-    assert_eq!(disk, bytes);
-    use std::os::unix::fs::PermissionsExt;
-    assert_eq!(
-        std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
-        0o600
-    );
+    assert!(!path.exists());
+    assert_eq!(std::fs::read_dir(&store.media).unwrap().count(), 0);
     assert_eq!(store.read_asset(id, "local").await.unwrap(), bytes);
     assert!(store.read_asset(id, "other").await.is_err());
     store.close().await.unwrap();
@@ -1402,7 +1429,10 @@ async fn character_sheet_cancel_or_second_pass_failure_never_publishes_partial_r
 #[tokio::test]
 async fn output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid() {
     let dir = tempfile::tempdir().unwrap();
-    let store = Store::open(dir.path()).await.unwrap();
+    let mut store = Store::open(dir.path()).await.unwrap();
+    store.videos.destination = Some(video_output::destination(dir.path()));
+    let destination = store.videos.destination().unwrap();
+    let proof = serde_json::to_value(destination.proof().unwrap()).unwrap();
     sqlx::query("INSERT INTO jobs(id,owner,status,request,request_hash,created) VALUES ('job_test','local','running','{}','test',0)").execute(&store.db).await.unwrap();
     let artifacts = vec![
         imagine_server::generation::Artifact {
@@ -1416,7 +1446,17 @@ async fn output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid
     ];
     assert!(
         store
-            .publish_output("job_test", "local", artifacts)
+            .publish_output(
+                "job_test",
+                "local",
+                imagine_server::generation::Generated::Images {
+                    artifacts,
+                    pending: vec![
+                        destination.reserve_image(&proof, 1024, None).unwrap(),
+                        destination.reserve_image(&proof, 1024, None).unwrap()
+                    ]
+                }
+            )
             .await
             .is_err()
     );
@@ -1438,10 +1478,13 @@ async fn output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid
             .publish_output(
                 "job_test",
                 "other",
-                vec![imagine_server::generation::Artifact {
-                    role: "image",
-                    bytes: png()
-                }]
+                imagine_server::generation::Generated::Images {
+                    artifacts: vec![imagine_server::generation::Artifact {
+                        role: "image",
+                        bytes: png()
+                    }],
+                    pending: vec![destination.reserve_image(&proof, 1024, None).unwrap()]
+                }
             )
             .await
             .is_err()
@@ -1622,8 +1665,8 @@ async fn rust_admission_exposes_its_own_capabilities_and_rejects_unsupported_sam
 
 fn h3_request() -> Value {
     json!({"model":"minimax-h3","operation":"text_to_video","prompt":"  SYNTHETIC h3 åäö\n  ","width":384,"height":256,"seed":42,
-    "sampling":{"steps":4,"cfg_scale":1.,"sampler":"euler","scheduler":"simple"},
-    "output":{"format":"mkv","count":1},"video":{"profile":"h3-short-av-noref-v1","frames":39,"fps":24,"audio":true}})
+    "sampling":{"steps":20,"cfg_scale":1.,"sampler":"res_multistep","scheduler":"simple"},
+    "output":{"format":"mp4","count":1},"video":{"profile":"h3-short-av-noref-v1","frames":39,"fps":24,"audio":true}})
 }
 #[tokio::test]
 async fn h3_fixed_requests_require_deployment_and_reject_profile_expansion() {
@@ -1638,6 +1681,9 @@ async fn h3_fixed_requests_require_deployment_and_reject_profile_expansion() {
     let (_, metadata) = req(&h.router, "GET", "/v1/models/minimax-h3", None, None).await;
     assert_eq!(metadata["available"], true);
     assert_eq!(metadata["experimental"], true);
+    assert_eq!(metadata["sampling"]["steps"], 20);
+    assert_eq!(metadata["sampling"]["sampler"], "res_multistep");
+    assert_eq!(metadata["sampling"]["gpu_acceptance"], "pending");
     for (field, value) in [
         ("seed", json!(43)),
         ("width", json!(512)),
@@ -1682,9 +1728,16 @@ async fn h3_and_images_share_fifo_atomic_publication_ranges_and_cancellation() {
     assert!(before["output"].is_null());
     h.probe.release.notify_one();
     let video = wait_status(&h.store, first, "local", "succeeded").await;
-    assert_eq!(video["effective"]["profile_revision"], "h3-av-noref-v2");
+    assert_eq!(
+        video["effective"]["profile_revision"],
+        "h3-short-av-noref-v1"
+    );
     assert_eq!(video["effective"]["prompt"], h3_request()["prompt"]);
-    assert_eq!(video["output"]["format"], "mkv");
+    assert_eq!(video["output"]["format"], "mp4");
+    assert_eq!(video["output"]["persistent"], true);
+    let saved_path = std::path::PathBuf::from(video["output"]["saved_path"].as_str().unwrap());
+    assert!(saved_path.exists());
+    assert_eq!(std::fs::read_dir(&h.store.media).unwrap().count(), 0);
     assert_eq!(video["output"]["assets"][0]["role"], "video");
     assert_eq!(
         h.probe.video_prompts.lock().unwrap()[0],
@@ -1693,7 +1746,7 @@ async fn h3_and_images_share_fifo_atomic_publication_ranges_and_cancellation() {
     let asset = video["output"]["assets"][0]["id"].as_str().unwrap();
     let data = h.store.read_asset(asset, "local").await.unwrap();
     let decoded = imagine_server::short_av::decode(&data).unwrap();
-    assert_eq!(decoded.frames[38][0], 38);
+    assert!(decoded.frames[38][0].abs_diff(38) <= 3);
     let response = h
         .router
         .clone()
@@ -1812,5 +1865,222 @@ async fn h3_selected_geometry_reaches_queue_and_output_metadata() {
         );
     }
     assert_eq!(h.probe.video_calls.load(Ordering::SeqCst), 1);
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn h3_i2v_owns_start_image_preserves_queue_source_and_switches_profiles() {
+    let h = setup_inner(true).await;
+    h.engine_state.send_modify(|s| {
+        s.backend = "rust".into();
+        s.h3_available = true;
+    });
+    // Synthetic image generation uses Fake only; no service/model/GPU.
+    let (_, image) = req(&h.router, "POST", "/v1/jobs", Some(request()), None).await;
+    let image_id = image["id"].as_str().unwrap();
+    wait_calls(&h.probe, 1).await;
+    h.probe.release.notify_one();
+    let image = wait_status(&h.store, image_id, "local", "succeeded").await;
+    let asset = image["output"]["assets"][0]["id"].as_str().unwrap();
+    let mut input = h3_request();
+    input["operation"] = "image_to_video".into();
+    input["video"]["profile"] = "h3-fl2va-i2va-v1".into();
+    input["inputs"] = json!({"start_image":asset});
+    input["width"] = 64.into();
+    input["height"] = 64.into();
+    input["video"]["frames"] = 5.into();
+    let foreign = h.store.save_asset("other", png()).await.unwrap();
+    for id in ["asset_missing", foreign["id"].as_str().unwrap()] {
+        let mut bad = input.clone();
+        bad["inputs"]["start_image"] = id.into();
+        assert_eq!(
+            req(&h.router, "POST", "/v1/jobs", Some(bad), None).await.0,
+            404
+        );
+    }
+    let stale = h
+        .router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/jobs")
+                .header("Content-Type", "application/json")
+                .header("X-Imagine-Session", "stale")
+                .body(Body::from(serde_json::to_vec(&input).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(stale.status(), 409);
+    let (status, job) = req(&h.router, "POST", "/v1/jobs", Some(input), None).await;
+    assert_eq!(status, 202, "{job}");
+    let id = job["id"].as_str().unwrap();
+    wait_status(&h.store, id, "local", "running").await;
+    for _ in 0..100 {
+        if h.probe.video_calls.load(Ordering::SeqCst) == 1 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    let seen = h.probe.video_inputs.lock().unwrap()[0].clone();
+    assert_eq!(
+        seen.profile,
+        imagine_server::h3_protocol::Profile::ImageToAvV1
+    );
+    assert!(seen.valid());
+    assert_eq!(seen.image.as_ref().unwrap().width, 2);
+    assert_eq!(seen.image_rgb, [42, 50, 60].repeat(4));
+    // Subsequent work cannot change the admitted source or overlap worker ownership.
+    let mut text = h3_request();
+    text["width"] = 64.into();
+    text["height"] = 64.into();
+    text["video"]["frames"] = 5.into();
+    text["video"]["profile"] = "h3-av-noref-v2".into();
+    let (_, queued) = req(&h.router, "POST", "/v1/jobs", Some(text), None).await;
+    assert_eq!(h.probe.video_calls.load(Ordering::SeqCst), 1);
+    h.probe.release.notify_one();
+    let done = wait_status(&h.store, id, "local", "succeeded").await;
+    assert_eq!(done["effective"]["profile_revision"], "h3-fl2va-i2va-v1");
+    let permanent = std::path::PathBuf::from(done["output"]["saved_path"].as_str().unwrap());
+    assert_eq!(done["effective"]["inputs"]["start_image"], asset);
+    assert_eq!(h.store.read_asset(asset, "local").await.unwrap(), png());
+    let text_id = queued["id"].as_str().unwrap();
+    wait_status(&h.store, text_id, "local", "running").await;
+    h.probe.release.notify_one();
+    wait_status(&h.store, text_id, "local", "succeeded").await;
+    assert!(h.probe.video_inputs.lock().unwrap()[1].image.is_none());
+    let (_, last) = req(&h.router, "POST", "/v1/jobs", Some(request()), None).await;
+    wait_calls(&h.probe, 2).await;
+    h.probe.release.notify_one();
+    wait_status(&h.store, last["id"].as_str().unwrap(), "local", "succeeded").await;
+    h.control.call(Action::Shutdown).await.unwrap();
+    h.task.await.unwrap().unwrap();
+    h.store.close().await.unwrap();
+    assert!(permanent.exists());
+    if let Some(broker) = h.broker {
+        broker.abort();
+        let _ = broker.await;
+    }
+}
+
+#[tokio::test]
+async fn h3_destination_proof_rejected_before_engine_admission() {
+    let h = setup_inner(true).await;
+    h.engine_state.send_modify(|s| {
+        s.backend = "rust".into();
+        s.h3_available = true;
+    });
+    for proof in [Value::Null, json!({"host":"wrong-host"})] {
+        let mut input = h3_request();
+        input["client_metadata"] = json!({"video_destination":proof});
+        let error = h
+            .control
+            .call(Action::Submit {
+                owner: "local".into(),
+                request: Box::new(serde_json::from_value(input).unwrap()),
+                key: None,
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, "video_destination_mismatch");
+    }
+    assert_eq!(h.probe.video_calls.load(Ordering::SeqCst), 0);
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn images_persist_without_session_copies_keep_owned_identity_and_upscale_naming() {
+    let h = setup().await;
+    let (status, job) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs",
+        Some(json!({"profile":"qwen","prompt":"synthetic persistent fixture"})),
+        Some("persistent-image"),
+    )
+    .await;
+    assert_eq!(status, 202, "{job}");
+    let id = job["id"].as_str().unwrap();
+    h.probe.release.notify_one();
+    wait_status(&h.store, id, "local", "succeeded").await;
+    let job = h.store.job(id, "local").await.unwrap().unwrap();
+    assert_eq!(job["output"]["persistent"], true);
+    let asset = &job["output"]["assets"][0];
+    let asset_id = asset["id"].as_str().unwrap();
+    let path = std::path::PathBuf::from(asset["saved_path"].as_str().unwrap());
+    assert_eq!(std::fs::read(&path).unwrap(), png());
+    assert_eq!(std::fs::read_dir(&h.store.media).unwrap().count(), 0);
+    assert_eq!(h.store.read_asset(asset_id, "local").await.unwrap(), png());
+    assert!(h.store.read_asset(asset_id, "other").await.is_err());
+    let source = h
+        .store
+        .videos
+        .published
+        .lock()
+        .unwrap()
+        .get(asset_id)
+        .cloned()
+        .unwrap();
+    let destination = h.store.videos.destination().unwrap();
+    let proof = serde_json::to_value(destination.proof().unwrap()).unwrap();
+    let mut pending = destination
+        .reserve_image(&proof, 1024, Some(&source))
+        .unwrap();
+    let variant = pending
+        .publish_image(&png(), "image", "image/png", None)
+        .unwrap();
+    assert_eq!(variant.path, path.with_file_name("image_0001_upscaled.png"));
+    pending.commit();
+    std::fs::write(&path, b"own externally changed fixture").unwrap();
+    assert!(h.store.read_asset(asset_id, "local").await.is_err());
+    h.control.call(Action::Shutdown).await.unwrap();
+    h.task.await.unwrap().unwrap();
+    h.store.close().await.unwrap();
+    assert!(path.exists());
+    assert!(variant.path.exists());
+}
+#[tokio::test]
+async fn images_fail_closed_before_engine_when_destination_missing_or_proof_wrong() {
+    let h = setup().await;
+    let proof =
+        serde_json::to_value(h.store.videos.destination().unwrap().proof().unwrap()).unwrap();
+    let mut request: imagine_server::contract::JobRequest = serde_json::from_value(json!({"model":"qwen-image-2.1-int8","operation":"text_to_image","prompt":"synthetic","width":1600,"height":896,"seed":42,"client_metadata":{"video_destination":proof}})).unwrap();
+    request.client_metadata["video_destination"]["host"] = "wrong-host".into();
+    let error = h
+        .control
+        .call(Action::Submit {
+            owner: "local".into(),
+            request: Box::new(request.clone()),
+            key: Some("invalid-destination".into()),
+        })
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, "video_destination_mismatch");
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
+    request
+        .client_metadata
+        .insert("video_destination".into(), proof.clone());
+    let root = std::path::PathBuf::from(proof["config"]["root"].as_str().unwrap());
+    let hidden = root.with_file_name("own-temporarily-unavailable");
+    std::fs::rename(&root, &hidden).unwrap();
+    let error = h
+        .control
+        .call(Action::Submit {
+            owner: "local".into(),
+            request: Box::new(request),
+            key: Some("missing-destination".into()),
+        })
+        .await
+        .unwrap_err();
+    assert!(
+        error.code.starts_with("video_destination_"),
+        "{}",
+        error.code
+    );
+    assert!(!root.exists());
+    assert_eq!(h.probe.calls.load(Ordering::SeqCst), 0);
+    std::fs::rename(&hidden, &root).unwrap();
     stop(h).await;
 }

@@ -66,14 +66,13 @@ impl Runtime {
         Ok(runtime)
     }
     pub fn verify(&self) -> Result<()> {
+        // Runtime hashes are build provenance, not a startup/reload gate.
+        // Recompilation may replace compatible executables without rewriting the manifest.
         for (path, expected) in &self.files {
-            if !path.is_absolute()
-                || crate::storage::hash(
-                    &std::fs::read(path).context("Rust runtime artifact missing")?,
-                ) != *expected
-            {
-                bail!("Rust runtime artifact changed; rerun ./prepare-rust-backend.sh")
+            if !path.is_absolute() || !crate::h3_protocol::is_sha256(expected) || !path.is_file() {
+                bail!("Rust runtime artifact missing or invalid")
             }
+            std::fs::File::open(path).context("Rust runtime artifact is not readable")?;
         }
         Ok(())
     }
@@ -138,6 +137,7 @@ pub fn prepare(root: &Path, site: &Path, output: &Path) -> Result<()> {
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct H3 {
+    pub profile_checkpoints: BTreeMap<String, String>,
     pub dependency_map: PathBuf,
     pub identity: crate::h3_protocol::Deployment,
     pub binary: PathBuf,
@@ -151,12 +151,16 @@ impl H3 {
             "LD_LIBRARY_PATH",
             "IMAGINE_KITCHEN_LIBRARY",
             "IMAGINE_AIMDO_LIBRARY",
+            "IMAGINE_PILLOW_LIBRARY",
             "IMAGINE_TRITON_COMPILER_PROFILE",
             "IMAGINE_TRITON_DRIVER_LIBRARY",
             "IMAGINE_TRITON_FRONTEND_CUBINS",
             "OMP_NUM_THREADS",
+            // Opt-in observer worker used by the isolated Reference acceptance test.
+            "IMAGINE_REFERENCE_PROBE_OUTPUT",
         ];
-        if !self.identity.valid()
+        if self.profile_checkpoints != crate::h3_protocol::profile_checkpoints()
+            || !self.identity.valid()
             || !self.binary.is_absolute()
             || !self.model_root.is_absolute()
             || self.files.get(&self.binary) != Some(&self.identity.worker_sha256)
@@ -180,10 +184,11 @@ impl H3 {
                     Some("safetensors" | "gguf" | "pt" | "pth")
                 )
                 || !crate::h3_protocol::is_sha256(expected)
-                || hash_file(path)? != *expected
+                || !path.is_file()
             {
                 bail!("h3_deployment_mismatch");
             }
+            std::fs::File::open(path).context("H3 dependency is not readable")?;
         }
         let dependencies: BTreeMap<_, _> = self
             .files
@@ -210,7 +215,11 @@ impl H3 {
         if supplied != expected {
             bail!("h3_deployment_mismatch");
         }
-        for key in ["IMAGINE_KITCHEN_LIBRARY", "IMAGINE_AIMDO_LIBRARY"] {
+        for key in [
+            "IMAGINE_KITCHEN_LIBRARY",
+            "IMAGINE_AIMDO_LIBRARY",
+            "IMAGINE_PILLOW_LIBRARY",
+        ] {
             let path = self
                 .environment
                 .get(key)
@@ -221,22 +230,6 @@ impl H3 {
         }
         Ok(())
     }
-}
-
-fn hash_file(path: &Path) -> Result<String> {
-    use sha2::{Digest, Sha256};
-    use std::io::Read;
-    let mut file = std::fs::File::open(path).context("H3 dependency missing")?;
-    let mut buffer = [0u8; 65536];
-    let mut hash = Sha256::new();
-    loop {
-        let n = file.read(&mut buffer)?;
-        if n == 0 {
-            break;
-        }
-        hash.update(&buffer[..n]);
-    }
-    Ok(format!("{:x}", hash.finalize()))
 }
 
 /// Explicit CPU-only assembly; never selects a deployment or changes a running service.

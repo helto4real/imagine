@@ -41,7 +41,100 @@ pub struct Service {
     http: reqwest::Client,
     slots: Arc<Semaphore>,
 }
+/// Captured configuration and key; the key is never part of public draft state.
+#[derive(Clone)]
+pub(crate) struct ProviderSnapshot {
+    pub profile: Profile,
+    key: Option<String>,
+}
+#[derive(Clone)]
+pub(crate) struct ProviderImage {
+    pub mime: String,
+    pub base64: String,
+}
 impl Service {
+    pub(crate) fn snapshot(&self, id: &str) -> std::result::Result<ProviderSnapshot, Fault> {
+        let state = self.state.lock().unwrap();
+        let profile = state
+            .saved
+            .profiles
+            .iter()
+            .find(|p| p.id == id)
+            .cloned()
+            .ok_or(Fault::new(404, "enhancement_profile_not_found"))?;
+        Ok(ProviderSnapshot {
+            profile,
+            key: state.saved.secrets.get(id).cloned(),
+        })
+    }
+    pub(crate) async fn authoring_complete(
+        &self,
+        snapshot: &ProviderSnapshot,
+        provider: &str,
+        system: &str,
+        prompt: &str,
+        parameters: &serde_json::Map<String, Value>,
+        images: &[ProviderImage],
+    ) -> std::result::Result<String, &'static str> {
+        let p = &snapshot.profile;
+        let (url, body) = if provider == "ollama" {
+            let mut options = json!({"temperature":parameters["temperature"],"top_p":parameters["top_p"],"top_k":parameters["top_k"],"repeat_penalty":parameters["repeat_penalty"],"num_predict":parameters["max_tokens"]});
+            if parameters["context_tokens"].as_u64().is_some_and(|n| n > 0) {
+                options["num_ctx"] = parameters["context_tokens"].clone();
+            }
+            (
+                format!("{}/api/generate", p.base_url.trim_end_matches('/')),
+                {
+                    let mut body = json!({"model":p.model,"system":system,"prompt":prompt,"stream":false,"keep_alive":0,"options":options});
+                    if !images.is_empty() {
+                        body["images"] =
+                            json!(images.iter().map(|i| &i.base64).collect::<Vec<_>>());
+                    }
+                    body
+                },
+            )
+        } else if provider == "koboldcpp" {
+            let reasoning = &parameters["reasoning"];
+            let mut body = json!({"model":p.model,"messages":[{"role":"system","content":system},{"role":"user","content":prompt}],"temperature":parameters["temperature"],"top_p":parameters["top_p"],"top_k":parameters["top_k"],"min_p":parameters["min_p"],"repetition_penalty":parameters["repeat_penalty"],"max_tokens":parameters["max_tokens"],"include_reasoning":reasoning["include"],"chat_template_kwargs":{"enable_thinking":reasoning["enable_thinking"]},"stream":false,"genkey":format!("imagine-{}",uuid::Uuid::new_v4().simple())});
+            if !images.is_empty() {
+                let mut content = vec![json!({"type":"text","text":prompt})];
+                content.extend(images.iter().map(|i|json!({"type":"image_url","image_url":{"url":format!("data:{};base64,{}",i.mime,i.base64)}})));
+                body["messages"][1]["content"] = json!(content);
+            }
+            if reasoning["effort"].as_str().is_some_and(|s| !s.is_empty()) {
+                body["reasoning_effort"] = reasoning["effort"].clone();
+            }
+            if !reasoning["budget_tokens"].is_null() {
+                body["reasoning_budget_tokens"] = reasoning["budget_tokens"].clone();
+            }
+            (
+                format!("{}/chat/completions", p.base_url.trim_end_matches('/')),
+                body,
+            )
+        } else {
+            return Err("unsupported_authoring_provider");
+        };
+        let mut request = self.http.post(url).json(&body);
+        if let Some(key) = &snapshot.key {
+            request = request.bearer_auth(key);
+        }
+        let value = self.receive(request).await?;
+        if provider == "ollama" {
+            if value["done"] != true {
+                return Err("enhancement_invalid_response");
+            }
+            if value["done_reason"] == "length" {
+                return Err("enhancement_truncated");
+            }
+            value["response"]
+                .as_str()
+                .filter(|s| !s.trim().is_empty())
+                .map(|s| s.trim().to_owned())
+                .ok_or("enhancement_empty_response")
+        } else {
+            completion_text(&value)
+        }
+    }
     pub fn open(path: PathBuf) -> Result<Arc<Self>> {
         let saved: Saved = match std::fs::read(&path) {
             Ok(bytes) => serde_json::from_slice(&bytes).context("Invalid enhancement profiles")?,
@@ -318,6 +411,13 @@ impl Service {
         if let Some(key) = key {
             request = request.bearer_auth(key);
         }
+        let value = self.receive(request).await?;
+        completion_text(&value)
+    }
+    async fn receive(
+        &self,
+        request: reqwest::RequestBuilder,
+    ) -> std::result::Result<Value, &'static str> {
         let mut response = request.send().await.map_err(|e| {
             if e.is_timeout() {
                 "enhancement_timeout"
@@ -344,28 +444,29 @@ impl Service {
             }
             bytes.extend_from_slice(&chunk);
         }
-        let value: Value =
-            serde_json::from_slice(&bytes).map_err(|_| "enhancement_invalid_response")?;
-        let choice = &value["choices"][0];
-        if choice["finish_reason"] == "length" {
-            return Err("enhancement_truncated");
-        }
-        if choice["message"]["refusal"]
-            .as_str()
-            .is_some_and(|s| !s.is_empty())
-            || choice["finish_reason"] == "content_filter"
-        {
-            return Err("enhancement_refused");
-        }
-        if choice["finish_reason"] != "stop" {
-            return Err("enhancement_invalid_response");
-        }
-        let text = choice["message"]["content"]
-            .as_str()
-            .filter(|s| !s.trim().is_empty())
-            .ok_or("enhancement_empty_response")?;
-        Ok(text.trim().to_owned())
+        serde_json::from_slice(&bytes).map_err(|_| "enhancement_invalid_response")
     }
+}
+fn completion_text(value: &Value) -> std::result::Result<String, &'static str> {
+    let choice = &value["choices"][0];
+    if choice["finish_reason"] == "length" {
+        return Err("enhancement_truncated");
+    }
+    if choice["message"]["refusal"]
+        .as_str()
+        .is_some_and(|s| !s.is_empty())
+        || choice["finish_reason"] == "content_filter"
+    {
+        return Err("enhancement_refused");
+    }
+    if choice["finish_reason"] != "stop" {
+        return Err("enhancement_invalid_response");
+    }
+    let text = choice["message"]["content"]
+        .as_str()
+        .filter(|s| !s.trim().is_empty())
+        .ok_or("enhancement_empty_response")?;
+    Ok(text.trim().to_owned())
 }
 fn public_profiles(saved: &Saved) -> Vec<Profile> {
     saved

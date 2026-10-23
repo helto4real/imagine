@@ -65,6 +65,17 @@ pub enum ResourceKind {
     TakeAudio {
         take_id: TakeId,
     },
+    H3Endpoint {
+        take_id: TakeId,
+        schema_version: u32,
+        model: ModelSelection,
+        shape: crate::h3_protocol::Shape,
+    },
+    H3Motion {
+        take_id: TakeId,
+        model: ModelSelection,
+        descriptor: crate::h3_protocol::continuation::Descriptor,
+    },
     /// Opaque data, but version and compatibility identity are explicit; runtime verifies contents.
     Continuation {
         take_id: TakeId,
@@ -89,7 +100,9 @@ impl Resource {
             bucket: match self.kind {
                 ResourceKind::Reference { .. } => Bucket::Media,
                 ResourceKind::TakeVideo { .. } | ResourceKind::TakeAudio { .. } => Bucket::Takes,
-                ResourceKind::Continuation { .. } => Bucket::Continuity,
+                ResourceKind::Continuation { .. }
+                | ResourceKind::H3Endpoint { .. }
+                | ResourceKind::H3Motion { .. } => Bucket::Continuity,
             },
             sha256: self.sha256.clone(),
         }
@@ -117,6 +130,18 @@ impl Resource {
             return Err(StorageError::new("invalid_resource"));
         }
         match &self.kind {
+            ResourceKind::H3Motion { descriptor, .. }
+                if !descriptor.valid() || self.bytes != descriptor.bytes() as u64 =>
+            {
+                return Err(StorageError::new("invalid_continuation"));
+            }
+            ResourceKind::H3Endpoint {
+                schema_version,
+                shape,
+                ..
+            } if *schema_version == 0 || !shape.valid() => {
+                return Err(StorageError::new("invalid_endpoint"));
+            }
             ResourceKind::Reference { asset_id, revision }
                 if asset_id.0.trim().is_empty() || *revision > MAX_INTEGER =>
             {
@@ -164,6 +189,21 @@ pub struct TakeProvenance {
     pub settings: SettingsSlot,
     pub references: Vec<AssetVersion>,
     pub source_take: Option<TakeId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continuity: Option<EndpointSource>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EndpointSource {
+    pub scene_id: SceneId,
+    pub take_id: TakeId,
+    pub resource_id: String,
+    pub sha256: String,
+    pub schema_version: u32,
+    pub shape: crate::h3_protocol::Shape,
+    pub method: ContinuityMethod,
+    #[serde(default)]
+    pub include_audio: bool,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -188,6 +228,19 @@ pub struct ProjectDocument {
     pub resources: Vec<Resource>,
     pub takes: Vec<StoredTake>,
     pub origin: Option<LibraryOrigin>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub locked_takes: BTreeMap<SceneId, TakeId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub authoring: Vec<imagine_video_contract::authoring::Draft>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deliveries: Vec<StoredDelivery>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StoredDelivery {
+    pub id: String,
+    pub asset_id: AssetId,
+    pub plan: imagine_video_contract::assembly::Plan,
 }
 impl ProjectDocument {
     pub fn new(project: VideoProject) -> Self {
@@ -197,6 +250,9 @@ impl ProjectDocument {
             resources: vec![],
             takes: vec![],
             origin: None,
+            locked_takes: BTreeMap::new(),
+            authoring: vec![],
+            deliveries: vec![],
         }
     }
 }
@@ -232,6 +288,15 @@ impl Bundle for ProjectDocument {
             return Err(StorageError::new("unsupported_storage_schema"));
         }
         self.project.validate()?;
+        for (scene, id) in &self.locked_takes {
+            if !self.takes.iter().any(|take| {
+                &take.id == id
+                    && &take.scene_id == scene
+                    && matches!(take.status, TakeStatus::Accepted | TakeStatus::Outdated)
+            }) {
+                return Err(StorageError::new("locked_take_mismatch"));
+            }
+        }
         validate_resources(&self.resources)?;
         let reference = |asset: &AssetId, revision: u64| {
             self.resources.iter().any(|r|matches!(&r.kind,ResourceKind::Reference{asset_id,revision:v} if asset_id==asset&&*v==revision))
@@ -239,6 +304,18 @@ impl Bundle for ProjectDocument {
         for asset in self.project.assets.values() {
             if !reference(&asset.id, asset.revision) {
                 return Err(StorageError::new("reference_resource_missing"));
+            }
+        }
+        let mut delivery_ids = BTreeSet::new();
+        for delivery in &self.deliveries {
+            if !delivery_ids.insert(&delivery.id)
+                || self
+                    .project
+                    .assets
+                    .get(&delivery.asset_id)
+                    .is_none_or(|a| a.kind != MediaKind::Video)
+            {
+                return Err(StorageError::new("invalid_delivery_resource"));
             }
         }
         let mut take_ids = BTreeSet::new();
@@ -268,6 +345,11 @@ impl Bundle for ProjectDocument {
             {
                 return Err(StorageError::new("source_take_missing"));
             }
+            if let Some(source) = &take.provenance.continuity
+                && (take.provenance.source_take.as_ref() != Some(&source.take_id)
+                    || !self.takes.iter().any(|take| take.id == source.take_id && take.scene_id == source.scene_id)
+                    || !self.resources.iter().any(|resource| resource.id == source.resource_id && resource.sha256 == source.sha256 && (matches!(&resource.kind, ResourceKind::H3Endpoint { take_id, schema_version, shape, .. } if source.method==ContinuityMethod::LastFrameFirstFrame && take_id == &source.take_id && *schema_version == source.schema_version && shape == &source.shape) || matches!(&resource.kind, ResourceKind::H3Motion {take_id,descriptor,..} if matches!(source.method,ContinuityMethod::MotionContext|ContinuityMethod::MotionContextExp) && take_id==&source.take_id && descriptor.schema_version==source.schema_version && descriptor.shape==source.shape))))
+                { return Err(StorageError::new("continuity_source_mismatch")); }
         }
         for scene in &self.project.scenes {
             let accepted: Vec<_> = self
@@ -299,10 +381,21 @@ impl Bundle for ProjectDocument {
                 ResourceKind::Reference { .. } => continue,
                 ResourceKind::TakeVideo { take_id }
                 | ResourceKind::TakeAudio { take_id }
+                | ResourceKind::H3Endpoint { take_id, .. }
+                | ResourceKind::H3Motion { take_id, .. }
                 | ResourceKind::Continuation { take_id, .. } => take_id,
             };
             if !take_ids.contains(take_id) {
                 return Err(StorageError::new("resource_take_missing"));
+            }
+            if let ResourceKind::H3Endpoint { model, take_id, .. }
+            | ResourceKind::H3Motion { model, take_id, .. } = &resource.kind
+                && !self
+                    .takes
+                    .iter()
+                    .any(|take| &take.id == take_id && &take.provenance.model == model)
+            {
+                return Err(StorageError::new("endpoint_model_mismatch"));
             }
         }
         Ok(())
@@ -324,15 +417,19 @@ impl SessionStaging {
         bundle::copy(source, &mut target)?;
         Ok(target)
     }
+    pub(crate) fn temporary(&self) -> Result<File, StorageError> {
+        self.root.temporary()
+    }
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SaveState {
     SessionOnly,
     Saving,
     Saved,
     NotSaved,
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct PersistenceStatus {
     pub state: SaveState,
     pub saved_revision: Option<u64>,
@@ -345,6 +442,10 @@ pub struct ProjectSession {
     sources: BTreeMap<BlobKey, File>,
     store: Option<Store<ProjectDocument>>,
     status: PersistenceStatus,
+}
+pub(crate) struct PreparedUpdate {
+    document: ProjectDocument,
+    sources: BTreeMap<BlobKey, File>,
 }
 impl ProjectSession {
     pub fn new(project: VideoProject) -> Result<Self, StorageError> {
@@ -362,6 +463,11 @@ impl ProjectSession {
     }
     pub fn document(&self) -> &ProjectDocument {
         &self.document
+    }
+    pub(crate) fn is_at(&self, path: &Path) -> Result<bool, StorageError> {
+        self.store
+            .as_ref()
+            .map_or(Ok(false), |store| store.is_at(path))
     }
     /// Stream a verified resource to a caller-owned destination; no internal path escapes.
     pub fn copy_resource(
@@ -390,15 +496,45 @@ impl ProjectSession {
     pub fn status(&self) -> &PersistenceStatus {
         &self.status
     }
+    pub fn resource_file(&self, id: &str) -> Result<File, StorageError> {
+        use std::os::fd::AsRawFd;
+        let resource = self
+            .document
+            .resources
+            .iter()
+            .find(|r| r.id == id)
+            .ok_or_else(|| StorageError::new("resource_missing"))?;
+        let source = self
+            .sources
+            .get(&resource.key())
+            .ok_or_else(|| StorageError::new("resource_missing"))?;
+        let mut file = File::open(format!("/proc/self/fd/{}", source.as_raw_fd()))
+            .map_err(|_| StorageError::new("storage_io_failed"))?;
+        if bundle::digest(&mut file)? != (resource.sha256.clone(), resource.bytes) {
+            return Err(StorageError::new("resource_integrity_failed"));
+        }
+        Ok(file)
+    }
     /// Stage independent copies before changing the document. Existing sources are retained
     /// only while referenced by the new document, including historical Take references.
     pub fn update(
         &mut self,
         expected_revision: u64,
-        mut document: ProjectDocument,
+        document: ProjectDocument,
         inputs: BTreeMap<BlobKey, File>,
         staging: &SessionStaging,
     ) -> Result<(), StorageError> {
+        let prepared = self.prepare_update(expected_revision, document, inputs, staging)?;
+        self.commit_prepared(prepared);
+        self.autosave()
+    }
+    pub(crate) fn prepare_update(
+        &self,
+        expected_revision: u64,
+        mut document: ProjectDocument,
+        inputs: BTreeMap<BlobKey, File>,
+        staging: &SessionStaging,
+    ) -> Result<PreparedUpdate, StorageError> {
         if expected_revision != self.document.project.project_revision {
             return Err(StorageError::new("revision_conflict"));
         }
@@ -424,8 +560,13 @@ impl ProjectSession {
         }
         let keys: BTreeSet<_> = document.resources.iter().map(Resource::key).collect();
         sources.retain(|key, _| keys.contains(key));
-        self.document = document;
-        self.sources = sources;
+        Ok(PreparedUpdate { document, sources })
+    }
+    pub(crate) fn commit_prepared(&mut self, prepared: PreparedUpdate) {
+        self.document = prepared.document;
+        self.sources = prepared.sources;
+    }
+    pub(crate) fn autosave(&mut self) -> Result<(), StorageError> {
         if self.store.is_some() {
             self.save()
         } else {
@@ -435,6 +576,7 @@ impl ProjectSession {
     pub fn edit(&mut self, request: EditRequest) -> Result<(), StorageError> {
         let mut candidate = self.document.clone();
         editing::apply(&mut candidate.project, request)?;
+        super::review::invalidate_changed(&self.document.project, &mut candidate)?;
         candidate.validate()?;
         self.document = candidate;
         if self.store.is_some() {
@@ -442,6 +584,33 @@ impl ProjectSession {
         } else {
             Ok(())
         }
+    }
+    /// Publish reviewed source and its immutable provider/profile provenance in one revision.
+    pub fn apply_authoring(
+        &mut self,
+        request: EditRequest,
+        mut draft: imagine_video_contract::authoring::Draft,
+    ) -> Result<(), StorageError> {
+        let mut candidate = self.document.clone();
+        editing::apply(&mut candidate.project, request)?;
+        super::review::invalidate_changed(&self.document.project, &mut candidate)?;
+        if candidate.authoring.len() >= 64 || candidate.authoring.iter().any(|d| d.id == draft.id) {
+            return Err(StorageError::new("authoring_record_limit_or_duplicate"));
+        }
+        draft.phase = imagine_video_contract::authoring::Phase::Applied;
+        candidate.authoring.push(draft);
+        candidate.validate()?;
+        let previous = std::mem::replace(&mut self.document, candidate);
+        if let Err(error) = self.autosave() {
+            self.document = previous;
+            return Err(error);
+        }
+        Ok(())
+    }
+    pub fn review(&mut self, request: super::review::ReviewRequest) -> Result<(), StorageError> {
+        let candidate = super::review::apply(&self.document, request)?;
+        self.document = candidate;
+        self.autosave()
     }
     /// Explicit first Save. The directory must exist and be empty.
     pub fn save_to(&mut self, path: &Path) -> Result<(), StorageError> {

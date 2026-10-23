@@ -12,7 +12,9 @@ async-stream = "0.3"
 axum = "0.8"
 base64 = "0.22"
 fs2 = "0.4"
+futures-util = "0.3"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+imagine-video-contract = { path = "crates/video-contract" }
 libc = "0.2"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 schemars = "1"
@@ -30,6 +32,6 @@ tempfile = "3"
 tower = { version = "0.5", features = ["util"] }
 
 [workspace]
-members = ["ui", "proxy"]
+members = ["ui", "proxy", "crates/video-contract"]
 default-members = ["."]
 resolver = "3"

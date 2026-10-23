@@ -138,6 +138,84 @@
             "properties": {
               "operation": {
                 "type": "string",
+                "const": "set_creative"
+              },
+              "creative": {
+                "$ref": "#/$defs/Creative"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "creative"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_assembly"
+              },
+              "intent": {
+                "$ref": "#/$defs/Intent"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "intent"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_clip_instance"
+              },
+              "scene_id": {
+                "type": "string"
+              },
+              "clip": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ClipInstance"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_id"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_assembly_boundary"
+              },
+              "boundary": {
+                "$ref": "#/$defs/Boundary"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "boundary"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
                 "const": "set_default_model"
               },
               "model": {
@@ -182,6 +260,98 @@
             "required": [
               "operation",
               "prompt"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_audio_settings"
+              },
+              "settings": {
+                "$ref": "#/$defs/AudioSettings"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "settings"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_audio_tracks"
+              },
+              "tracks": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/AudioTrack"
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "tracks"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "add_audio_clip"
+              },
+              "track_id": {
+                "type": "string"
+              },
+              "clip": {
+                "$ref": "#/$defs/AudioClip"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "track_id",
+              "clip"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "update_audio_clip"
+              },
+              "clip": {
+                "$ref": "#/$defs/AudioClip"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "clip"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "remove_audio_clip"
+              },
+              "clip_id": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "clip_id"
             ]
           },
           {
@@ -254,6 +424,26 @@
               "operation",
               "scene_id",
               "start"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set_scene_order"
+              },
+              "scene_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "scene_ids"
             ]
           },
           {
@@ -481,6 +671,587 @@
           }
         ]
       },
+      "Creative": {
+        "type": "object",
+        "properties": {
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/VisualReference"
+            }
+          },
+          "sections": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/SectionSource"
+            }
+          },
+          "scene_prompts": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/ScenePrompt"
+            }
+          },
+          "visual_references_enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "global_prompt": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/GlobalPromptOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "references",
+          "sections"
+        ]
+      },
+      "VisualReference": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "alias": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "strength": {
+            "type": "number",
+            "format": "double"
+          },
+          "retention": {
+            "type": "string"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ReferenceRelationship"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ReferenceImage"
+            }
+          },
+          "voice": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Voice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Origin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "alias",
+          "kind",
+          "description",
+          "enabled",
+          "strength",
+          "retention",
+          "images"
+        ]
+      },
+      "ReferenceRelationship": {
+        "type": "object",
+        "properties": {
+          "marker": {
+            "type": "string",
+            "default": ""
+          },
+          "note": {
+            "type": "string",
+            "default": ""
+          },
+          "target_reference_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReferenceImage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "preview": {
+            "type": "boolean"
+          },
+          "contribution": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "asset",
+          "enabled",
+          "preview"
+        ]
+      },
+      "Voice": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reference_settings": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/VoiceReferenceSettings"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "language",
+          "description",
+          "assets"
+        ]
+      },
+      "VoiceReferenceSettings": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "voice_description": {
+            "type": "string",
+            "default": ""
+          },
+          "contribution": {
+            "type": "string",
+            "default": ""
+          },
+          "strength": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "default": null
+          },
+          "relationship": {
+            "type": "string",
+            "default": "reference"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Origin": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string"
+          },
+          "entry_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "library_id",
+          "entry_id",
+          "revision"
+        ]
+      },
+      "SectionSource": {
+        "type": "object",
+        "properties": {
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ImageBinding"
+            }
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "dialogue_intent": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DialogueIntent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "images"
+        ]
+      },
+      "ImageBinding": {
+        "type": "object",
+        "properties": {
+          "image_id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/$defs/InputRole"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "image_id",
+          "asset",
+          "role"
+        ]
+      },
+      "InputRole": {
+        "type": "string",
+        "enum": [
+          "first_frame",
+          "last_frame",
+          "visual_reference",
+          "video_reference",
+          "voice_reference",
+          "audio_reference"
+        ]
+      },
+      "Binding": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/$defs/InputRole"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "video": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/VideoReferenceSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "asset",
+          "role",
+          "enabled"
+        ]
+      },
+      "VideoReferenceSettings": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "default": ""
+          },
+          "custom_role": {
+            "type": "string",
+            "default": ""
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ReferenceRelationship"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "source_in": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "source_out": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "soundtrack_usage": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "additionalProperties": false
+      },
+      "Time": {
+        "description": "Exact, nonnegative timeline time. Validation belongs to the document boundary.",
+        "type": "object",
+        "properties": {
+          "num": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "den": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "num",
+          "den"
+        ]
+      },
+      "DialogueIntent": {
+        "type": "object",
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "max_turns": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "participants",
+          "purpose"
+        ]
+      },
+      "ScenePrompt": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "default": ""
+          },
+          "summary": {
+            "type": "string",
+            "default": ""
+          },
+          "ambient_sound": {
+            "type": "string",
+            "default": ""
+          },
+          "non_diegetic_music": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "additionalProperties": false
+      },
+      "GlobalPromptOptions": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "position"
+        ]
+      },
+      "Intent": {
+        "type": "object",
+        "properties": {
+          "clips": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/ClipInstance"
+            },
+            "default": {}
+          },
+          "boundaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Boundary"
+            },
+            "default": []
+          }
+        },
+        "additionalProperties": false
+      },
+      "ClipInstance": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string"
+          },
+          "source_in": {
+            "$ref": "#/$defs/Time"
+          },
+          "source_out": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "speed": {
+            "type": "number",
+            "format": "double"
+          },
+          "include_audio": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "asset",
+          "source_in",
+          "speed"
+        ]
+      },
+      "Boundary": {
+        "type": "object",
+        "properties": {
+          "left": {
+            "type": "string"
+          },
+          "right": {
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/$defs/BoundaryMode"
+          },
+          "blend_frames": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "left",
+          "right",
+          "mode",
+          "blend_frames"
+        ]
+      },
+      "BoundaryMode": {
+        "type": "string",
+        "enum": [
+          "hard_cut",
+          "continuous_shot",
+          "blend_seam",
+          "transition"
+        ]
+      },
       "ModelSelection": {
         "type": "object",
         "properties": {
@@ -533,27 +1304,252 @@
           "height"
         ]
       },
-      "Time": {
-        "description": "Exact, nonnegative timeline time. Validation belongs to the document boundary.",
+      "AudioSettings": {
         "type": "object",
         "properties": {
-          "num": {
-            "type": "integer",
-            "format": "uint64",
-            "minimum": 0,
-            "maximum": 9007199254740991
+          "use_native_audio": {
+            "type": "boolean"
           },
-          "den": {
-            "type": "integer",
-            "format": "uint64",
-            "minimum": 1,
-            "maximum": 9007199254740991
+          "normalization_mode": {
+            "$ref": "#/$defs/NormalizationMode"
+          },
+          "target_lufs": {
+            "type": "number",
+            "format": "double"
+          },
+          "true_peak_limit_db": {
+            "type": "number",
+            "format": "double"
+          },
+          "default_volume": {
+            "type": "number",
+            "format": "double"
+          },
+          "default_fade_in_seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "default_fade_out_seconds": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false,
         "required": [
-          "num",
-          "den"
+          "use_native_audio",
+          "normalization_mode",
+          "target_lufs",
+          "true_peak_limit_db",
+          "default_volume",
+          "default_fade_in_seconds",
+          "default_fade_out_seconds"
+        ]
+      },
+      "NormalizationMode": {
+        "type": "string",
+        "enum": [
+          "Integrated LUFS",
+          "Peak"
+        ]
+      },
+      "AudioTrack": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/AudioClip"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "clips"
+        ]
+      },
+      "AudioClip": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start": {
+            "$ref": "#/$defs/Time"
+          },
+          "duration": {
+            "$ref": "#/$defs/Time"
+          },
+          "source_in": {
+            "$ref": "#/$defs/Time"
+          },
+          "source_out": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "volume": {
+            "type": "number",
+            "format": "double"
+          },
+          "normalization": {
+            "$ref": "#/$defs/NormalizationOverrides"
+          },
+          "fade_in": {
+            "type": "number",
+            "format": "double"
+          },
+          "fade_out": {
+            "type": "number",
+            "format": "double"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lane": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "usage": {
+            "$ref": "#/$defs/AudioUsage"
+          },
+          "reference": {
+            "$ref": "#/$defs/AudioReference"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "start",
+          "duration",
+          "source_in",
+          "volume",
+          "normalization",
+          "fade_in",
+          "fade_out",
+          "enabled",
+          "locked",
+          "name",
+          "lane",
+          "usage",
+          "reference"
+        ]
+      },
+      "NormalizationOverrides": {
+        "type": "object",
+        "properties": {
+          "normalization_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/NormalizationMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_lufs": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "true_peak_limit_db": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AudioUsage": {
+        "type": "object",
+        "properties": {
+          "generation_reference": {
+            "type": "boolean"
+          },
+          "final_mix": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "generation_reference",
+          "final_mix"
+        ]
+      },
+      "AudioReference": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "$ref": "#/$defs/AudioPurpose"
+          },
+          "target_reference_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "relationship": {
+            "$ref": "#/$defs/AudioRelationship"
+          },
+          "description": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "purpose",
+          "relationship",
+          "description",
+          "strength"
+        ]
+      },
+      "AudioPurpose": {
+        "type": "string",
+        "enum": [
+          "voice_timbre",
+          "dialogue_lyrics",
+          "ambience_sfx",
+          "music_style",
+          "beat_rhythm",
+          "continuity",
+          "custom"
+        ]
+      },
+      "AudioRelationship": {
+        "type": "string",
+        "enum": [
+          "reference",
+          "weak_reference"
         ]
       },
       "Asset": {
@@ -722,41 +1718,6 @@
           "prompt"
         ]
       },
-      "Binding": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "asset": {
-            "type": "string"
-          },
-          "role": {
-            "$ref": "#/$defs/InputRole"
-          },
-          "enabled": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "asset",
-          "role",
-          "enabled"
-        ]
-      },
-      "InputRole": {
-        "type": "string",
-        "enum": [
-          "first_frame",
-          "last_frame",
-          "visual_reference",
-          "video_reference",
-          "voice_reference",
-          "audio_reference"
-        ]
-      },
       "Continuity": {
         "type": "object",
         "properties": {
@@ -765,6 +1726,10 @@
           },
           "method": {
             "$ref": "#/$defs/ContinuityMethod"
+          },
+          "include_audio": {
+            "type": "boolean",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -806,6 +1771,767 @@
       }
     }
   },
+  "review_request": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "ReviewRequest",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 1,
+        "maximum": 1
+      },
+      "expected_project_revision": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "scene_id": {
+        "type": "string"
+      },
+      "take_id": {
+        "type": "string"
+      },
+      "action": {
+        "$ref": "#/$defs/ReviewAction"
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "schema_version",
+      "expected_project_revision",
+      "scene_id",
+      "take_id",
+      "action"
+    ],
+    "$defs": {
+      "ReviewAction": {
+        "type": "string",
+        "enum": [
+          "accept",
+          "reject",
+          "candidate",
+          "outdated"
+        ]
+      }
+    }
+  },
+  "take_state": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "TakeState",
+    "type": "object",
+    "properties": {
+      "accepted": {
+        "type": "boolean"
+      },
+      "outdated": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "accepted",
+      "outdated"
+    ]
+  },
+  "run_request": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Request",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      },
+      "project_id": {
+        "type": "string"
+      },
+      "expected_project_revision": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "mode": {
+        "$ref": "#/$defs/Mode"
+      },
+      "selected_scene": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "schema_version",
+      "project_id",
+      "expected_project_revision",
+      "mode"
+    ],
+    "$defs": {
+      "Mode": {
+        "type": "string",
+        "enum": [
+          "missing_only",
+          "all_same_seeds",
+          "all_fresh_seeds",
+          "selected_with_dependents"
+        ]
+      }
+    }
+  },
+  "run": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Run",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      },
+      "id": {
+        "type": "string"
+      },
+      "project_id": {
+        "type": "string"
+      },
+      "mode": {
+        "$ref": "#/$defs/Mode"
+      },
+      "status": {
+        "$ref": "#/$defs/Status"
+      },
+      "targets": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/Target"
+        }
+      },
+      "current_job": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "failure": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "required": [
+      "schema_version",
+      "id",
+      "project_id",
+      "mode",
+      "status",
+      "targets"
+    ],
+    "$defs": {
+      "Mode": {
+        "type": "string",
+        "enum": [
+          "missing_only",
+          "all_same_seeds",
+          "all_fresh_seeds",
+          "selected_with_dependents"
+        ]
+      },
+      "Status": {
+        "type": "string",
+        "enum": [
+          "running",
+          "stopping",
+          "cancelling",
+          "completed",
+          "stopped",
+          "cancelled",
+          "failed",
+          "interrupted"
+        ]
+      },
+      "Target": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "type": "string"
+          },
+          "seed": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "seed_source": {
+            "type": "string"
+          },
+          "seed_take_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dependency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "job_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "completed_take_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "scene_id",
+          "seed",
+          "seed_source"
+        ]
+      }
+    }
+  },
+  "assembly_request": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Request",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      },
+      "project_id": {
+        "type": "string"
+      },
+      "expected_project_revision": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "options": {
+        "$ref": "#/$defs/Options",
+        "default": {
+          "audio_mode": "combined",
+          "generated_gain": 1.0,
+          "timeline_gain": 1.0,
+          "duck_generated": false,
+          "ducking_strength": 0.5,
+          "normalize_mix": true,
+          "continuous_tone_match": true,
+          "bit_depth": 8
+        }
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "schema_version",
+      "project_id",
+      "expected_project_revision"
+    ],
+    "$defs": {
+      "Options": {
+        "type": "object",
+        "properties": {
+          "audio_mode": {
+            "$ref": "#/$defs/MixMode"
+          },
+          "generated_gain": {
+            "type": "number",
+            "format": "double"
+          },
+          "timeline_gain": {
+            "type": "number",
+            "format": "double"
+          },
+          "duck_generated": {
+            "type": "boolean"
+          },
+          "ducking_strength": {
+            "type": "number",
+            "format": "double"
+          },
+          "normalize_mix": {
+            "type": "boolean"
+          },
+          "continuous_tone_match": {
+            "type": "boolean"
+          },
+          "bit_depth": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "audio_mode",
+          "generated_gain",
+          "timeline_gain",
+          "duck_generated",
+          "ducking_strength",
+          "normalize_mix",
+          "continuous_tone_match",
+          "bit_depth"
+        ]
+      },
+      "MixMode": {
+        "type": "string",
+        "enum": [
+          "generated",
+          "timeline",
+          "combined"
+        ]
+      }
+    }
+  },
+  "assembly_plan": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Plan",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      },
+      "id": {
+        "type": "string"
+      },
+      "project_id": {
+        "type": "string"
+      },
+      "project_revision": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "fingerprint": {
+        "type": "string"
+      },
+      "delivery": {
+        "$ref": "#/$defs/DeliverySettings"
+      },
+      "sample_rate": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      },
+      "frames": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "samples": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "options": {
+        "$ref": "#/$defs/Options"
+      },
+      "clips": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/ClipPlan"
+        }
+      },
+      "audio": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/AudioPlan"
+        }
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "schema_version",
+      "id",
+      "project_id",
+      "project_revision",
+      "fingerprint",
+      "delivery",
+      "sample_rate",
+      "frames",
+      "samples",
+      "options",
+      "clips",
+      "audio",
+      "warnings"
+    ],
+    "$defs": {
+      "DeliverySettings": {
+        "type": "object",
+        "properties": {
+          "fps": {
+            "$ref": "#/$defs/Time"
+          },
+          "width": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "height": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "fps",
+          "width",
+          "height"
+        ]
+      },
+      "Time": {
+        "description": "Exact, nonnegative timeline time. Validation belongs to the document boundary.",
+        "type": "object",
+        "properties": {
+          "num": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "den": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "num",
+          "den"
+        ]
+      },
+      "Options": {
+        "type": "object",
+        "properties": {
+          "audio_mode": {
+            "$ref": "#/$defs/MixMode"
+          },
+          "generated_gain": {
+            "type": "number",
+            "format": "double"
+          },
+          "timeline_gain": {
+            "type": "number",
+            "format": "double"
+          },
+          "duck_generated": {
+            "type": "boolean"
+          },
+          "ducking_strength": {
+            "type": "number",
+            "format": "double"
+          },
+          "normalize_mix": {
+            "type": "boolean"
+          },
+          "continuous_tone_match": {
+            "type": "boolean"
+          },
+          "bit_depth": {
+            "type": "integer",
+            "format": "uint8",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "audio_mode",
+          "generated_gain",
+          "timeline_gain",
+          "duck_generated",
+          "ducking_strength",
+          "normalize_mix",
+          "continuous_tone_match",
+          "bit_depth"
+        ]
+      },
+      "MixMode": {
+        "type": "string",
+        "enum": [
+          "generated",
+          "timeline",
+          "combined"
+        ]
+      },
+      "ClipPlan": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "type": "string"
+          },
+          "take_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "asset_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source": {
+            "$ref": "#/$defs/Source"
+          },
+          "source_in": {
+            "$ref": "#/$defs/Time"
+          },
+          "source_out": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timeline_start": {
+            "$ref": "#/$defs/Time"
+          },
+          "timeline_duration": {
+            "$ref": "#/$defs/Time"
+          },
+          "frames": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "output_start": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "overlap": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "boundary": {
+            "$ref": "#/$defs/BoundaryMode"
+          },
+          "include_audio": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "scene_id",
+          "source",
+          "source_in",
+          "timeline_start",
+          "timeline_duration",
+          "frames",
+          "output_start",
+          "overlap",
+          "boundary",
+          "include_audio"
+        ]
+      },
+      "Source": {
+        "type": "object",
+        "properties": {
+          "resource_id": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "bytes": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "mime_type": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "height": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "duration": {
+            "$ref": "#/$defs/Time"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "frames": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0
+          },
+          "audio": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "resource_id",
+          "sha256",
+          "bytes",
+          "mime_type",
+          "width",
+          "height",
+          "duration",
+          "audio"
+        ]
+      },
+      "BoundaryMode": {
+        "type": "string",
+        "enum": [
+          "hard_cut",
+          "continuous_shot",
+          "blend_seam",
+          "transition"
+        ]
+      },
+      "AudioPlan": {
+        "type": "object",
+        "properties": {
+          "clip_id": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/$defs/Source"
+          },
+          "start_sample": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "samples": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "source_in": {
+            "$ref": "#/$defs/Time"
+          },
+          "source_out": {
+            "$ref": "#/$defs/Time"
+          },
+          "source_start_sample": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0
+          },
+          "source_end_sample": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint64",
+            "minimum": 0
+          },
+          "volume": {
+            "type": "number",
+            "format": "double"
+          },
+          "fade_in": {
+            "type": "number",
+            "format": "double"
+          },
+          "fade_out": {
+            "type": "number",
+            "format": "double"
+          },
+          "normalization": {
+            "$ref": "#/$defs/NormalizationOverrides"
+          }
+        },
+        "required": [
+          "clip_id",
+          "source",
+          "start_sample",
+          "samples",
+          "source_in",
+          "source_out",
+          "volume",
+          "fade_in",
+          "fade_out",
+          "normalization"
+        ]
+      },
+      "NormalizationOverrides": {
+        "type": "object",
+        "properties": {
+          "normalization_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/NormalizationMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_lufs": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "true_peak_limit_db": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "NormalizationMode": {
+        "type": "string",
+        "enum": [
+          "Integrated LUFS",
+          "Peak"
+        ]
+      }
+    }
+  },
   "project": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "VideoProject",
@@ -834,6 +2560,9 @@
       "global_prompt": {
         "type": "string"
       },
+      "creative": {
+        "$ref": "#/$defs/Creative"
+      },
       "assets": {
         "type": "object",
         "additionalProperties": {
@@ -845,6 +2574,28 @@
         "items": {
           "$ref": "#/$defs/Scene"
         }
+      },
+      "audio": {
+        "$ref": "#/$defs/AudioSettings",
+        "default": {
+          "use_native_audio": false,
+          "normalization_mode": "Integrated LUFS",
+          "target_lufs": -16.0,
+          "true_peak_limit_db": -1.0,
+          "default_volume": 100.0,
+          "default_fade_in_seconds": 0.0,
+          "default_fade_out_seconds": 0.0
+        }
+      },
+      "audio_tracks": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/AudioTrack"
+        },
+        "default": []
+      },
+      "assembly": {
+        "$ref": "#/$defs/Intent"
       }
     },
     "additionalProperties": false,
@@ -934,6 +2685,474 @@
           "den"
         ]
       },
+      "Creative": {
+        "type": "object",
+        "properties": {
+          "references": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/VisualReference"
+            }
+          },
+          "sections": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/SectionSource"
+            }
+          },
+          "scene_prompts": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/ScenePrompt"
+            }
+          },
+          "visual_references_enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "global_prompt": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/GlobalPromptOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "references",
+          "sections"
+        ]
+      },
+      "VisualReference": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "alias": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "strength": {
+            "type": "number",
+            "format": "double"
+          },
+          "retention": {
+            "type": "string"
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ReferenceRelationship"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ReferenceImage"
+            }
+          },
+          "voice": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Voice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Origin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "alias",
+          "kind",
+          "description",
+          "enabled",
+          "strength",
+          "retention",
+          "images"
+        ]
+      },
+      "ReferenceRelationship": {
+        "type": "object",
+        "properties": {
+          "marker": {
+            "type": "string",
+            "default": ""
+          },
+          "note": {
+            "type": "string",
+            "default": ""
+          },
+          "target_reference_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "additionalProperties": false
+      },
+      "ReferenceImage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "preview": {
+            "type": "boolean"
+          },
+          "contribution": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "asset",
+          "enabled",
+          "preview"
+        ]
+      },
+      "Voice": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "assets": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reference_settings": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/VoiceReferenceSettings"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "language",
+          "description",
+          "assets"
+        ]
+      },
+      "VoiceReferenceSettings": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "voice_description": {
+            "type": "string",
+            "default": ""
+          },
+          "contribution": {
+            "type": "string",
+            "default": ""
+          },
+          "strength": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double",
+            "default": null
+          },
+          "relationship": {
+            "type": "string",
+            "default": "reference"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Origin": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": "string"
+          },
+          "entry_id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "library_id",
+          "entry_id",
+          "revision"
+        ]
+      },
+      "SectionSource": {
+        "type": "object",
+        "properties": {
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ImageBinding"
+            }
+          },
+          "videos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "dialogue_intent": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DialogueIntent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "images"
+        ]
+      },
+      "ImageBinding": {
+        "type": "object",
+        "properties": {
+          "image_id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/$defs/InputRole"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "image_id",
+          "asset",
+          "role"
+        ]
+      },
+      "InputRole": {
+        "type": "string",
+        "enum": [
+          "first_frame",
+          "last_frame",
+          "visual_reference",
+          "video_reference",
+          "voice_reference",
+          "audio_reference"
+        ]
+      },
+      "Binding": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/$defs/InputRole"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "video": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/VideoReferenceSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "asset",
+          "role",
+          "enabled"
+        ]
+      },
+      "VideoReferenceSettings": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "default": ""
+          },
+          "custom_role": {
+            "type": "string",
+            "default": ""
+          },
+          "relationship": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ReferenceRelationship"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "source_in": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "source_out": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "soundtrack_usage": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "additionalProperties": false
+      },
+      "DialogueIntent": {
+        "type": "object",
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "max_turns": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "participants",
+          "purpose"
+        ]
+      },
+      "ScenePrompt": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "default": ""
+          },
+          "summary": {
+            "type": "string",
+            "default": ""
+          },
+          "ambient_sound": {
+            "type": "string",
+            "default": ""
+          },
+          "non_diegetic_music": {
+            "type": "string",
+            "default": ""
+          }
+        },
+        "additionalProperties": false
+      },
+      "GlobalPromptOptions": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "position"
+        ]
+      },
       "Asset": {
         "type": "object",
         "properties": {
@@ -1100,41 +3319,6 @@
           "prompt"
         ]
       },
-      "Binding": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "asset": {
-            "type": "string"
-          },
-          "role": {
-            "$ref": "#/$defs/InputRole"
-          },
-          "enabled": {
-            "type": "boolean"
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "asset",
-          "role",
-          "enabled"
-        ]
-      },
-      "InputRole": {
-        "type": "string",
-        "enum": [
-          "first_frame",
-          "last_frame",
-          "visual_reference",
-          "video_reference",
-          "voice_reference",
-          "audio_reference"
-        ]
-      },
       "Continuity": {
         "type": "object",
         "properties": {
@@ -1143,6 +3327,10 @@
           },
           "method": {
             "$ref": "#/$defs/ContinuityMethod"
+          },
+          "include_audio": {
+            "type": "boolean",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -1180,6 +3368,344 @@
           "id",
           "model",
           "source_fingerprint"
+        ]
+      },
+      "AudioSettings": {
+        "type": "object",
+        "properties": {
+          "use_native_audio": {
+            "type": "boolean"
+          },
+          "normalization_mode": {
+            "$ref": "#/$defs/NormalizationMode"
+          },
+          "target_lufs": {
+            "type": "number",
+            "format": "double"
+          },
+          "true_peak_limit_db": {
+            "type": "number",
+            "format": "double"
+          },
+          "default_volume": {
+            "type": "number",
+            "format": "double"
+          },
+          "default_fade_in_seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "default_fade_out_seconds": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "use_native_audio",
+          "normalization_mode",
+          "target_lufs",
+          "true_peak_limit_db",
+          "default_volume",
+          "default_fade_in_seconds",
+          "default_fade_out_seconds"
+        ]
+      },
+      "NormalizationMode": {
+        "type": "string",
+        "enum": [
+          "Integrated LUFS",
+          "Peak"
+        ]
+      },
+      "AudioTrack": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "clips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/AudioClip"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "clips"
+        ]
+      },
+      "AudioClip": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start": {
+            "$ref": "#/$defs/Time"
+          },
+          "duration": {
+            "$ref": "#/$defs/Time"
+          },
+          "source_in": {
+            "$ref": "#/$defs/Time"
+          },
+          "source_out": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "volume": {
+            "type": "number",
+            "format": "double"
+          },
+          "normalization": {
+            "$ref": "#/$defs/NormalizationOverrides"
+          },
+          "fade_in": {
+            "type": "number",
+            "format": "double"
+          },
+          "fade_out": {
+            "type": "number",
+            "format": "double"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "locked": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lane": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "usage": {
+            "$ref": "#/$defs/AudioUsage"
+          },
+          "reference": {
+            "$ref": "#/$defs/AudioReference"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "start",
+          "duration",
+          "source_in",
+          "volume",
+          "normalization",
+          "fade_in",
+          "fade_out",
+          "enabled",
+          "locked",
+          "name",
+          "lane",
+          "usage",
+          "reference"
+        ]
+      },
+      "NormalizationOverrides": {
+        "type": "object",
+        "properties": {
+          "normalization_mode": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/NormalizationMode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target_lufs": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "true_peak_limit_db": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
+      "AudioUsage": {
+        "type": "object",
+        "properties": {
+          "generation_reference": {
+            "type": "boolean"
+          },
+          "final_mix": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "generation_reference",
+          "final_mix"
+        ]
+      },
+      "AudioReference": {
+        "type": "object",
+        "properties": {
+          "purpose": {
+            "$ref": "#/$defs/AudioPurpose"
+          },
+          "target_reference_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "relationship": {
+            "$ref": "#/$defs/AudioRelationship"
+          },
+          "description": {
+            "type": "string"
+          },
+          "strength": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "purpose",
+          "relationship",
+          "description",
+          "strength"
+        ]
+      },
+      "AudioPurpose": {
+        "type": "string",
+        "enum": [
+          "voice_timbre",
+          "dialogue_lyrics",
+          "ambience_sfx",
+          "music_style",
+          "beat_rhythm",
+          "continuity",
+          "custom"
+        ]
+      },
+      "AudioRelationship": {
+        "type": "string",
+        "enum": [
+          "reference",
+          "weak_reference"
+        ]
+      },
+      "Intent": {
+        "type": "object",
+        "properties": {
+          "clips": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/ClipInstance"
+            },
+            "default": {}
+          },
+          "boundaries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Boundary"
+            },
+            "default": []
+          }
+        },
+        "additionalProperties": false
+      },
+      "ClipInstance": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string"
+          },
+          "source_in": {
+            "$ref": "#/$defs/Time"
+          },
+          "source_out": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "speed": {
+            "type": "number",
+            "format": "double"
+          },
+          "include_audio": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "asset",
+          "source_in",
+          "speed"
+        ]
+      },
+      "Boundary": {
+        "type": "object",
+        "properties": {
+          "left": {
+            "type": "string"
+          },
+          "right": {
+            "type": "string"
+          },
+          "mode": {
+            "$ref": "#/$defs/BoundaryMode"
+          },
+          "blend_frames": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "left",
+          "right",
+          "mode",
+          "blend_frames"
+        ]
+      },
+      "BoundaryMode": {
+        "type": "string",
+        "enum": [
+          "hard_cut",
+          "continuous_shot",
+          "blend_seam",
+          "transition"
         ]
       }
     }
@@ -1329,6 +3855,14 @@
     "description": "No image CFG/negative-conditioning defaults. Exact runtime constraints belong to P05.",
     "type": "object",
     "properties": {
+      "audio_reference_mode": {
+        "type": "string",
+        "default": "Timeline Audio References"
+      },
+      "ref_image_size": {
+        "type": "string",
+        "default": "Standard"
+      },
       "stage_one": {
         "$ref": "#/$defs/H3Stage"
       },
@@ -1341,6 +3875,12 @@
             "type": "null"
           }
         ]
+      },
+      "base_steps_to_run": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0,
+        "default": 4
       }
     },
     "additionalProperties": false,
@@ -1361,6 +3901,19 @@
           },
           "scheduler": {
             "type": "string"
+          },
+          "denoise": {
+            "type": "number",
+            "format": "double",
+            "default": 1.0
+          },
+          "sigmas": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "float"
+            },
+            "default": []
           }
         },
         "additionalProperties": false,

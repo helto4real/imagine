@@ -1,3 +1,5 @@
+#[path = "../ui/tests/support/destination.rs"]
+mod destination;
 use axum::{
     Json, Router,
     routing::{get, post},
@@ -76,7 +78,9 @@ async fn serve(router: Router) -> (String, tokio::task::JoinHandle<()>) {
 #[tokio::test]
 async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     let dir = tempfile::tempdir().unwrap();
-    let store = Store::open(dir.path()).await.unwrap();
+    let mut store = Store::open(dir.path()).await.unwrap();
+    store.videos.destination = Some(destination::destination(dir.path()));
+    let proof = destination::proof(dir.path());
     let probe = Arc::new(Probe::default());
     let socket = dir.path().join("gpu.sock");
     let (control, scheduler) = scheduler::start_coordinated(
@@ -89,6 +93,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
 
     let (_, engine) = watch::channel(EngineState::default());
     let (imagine, imagine_task) = serve(api::router(App {
+        video: control.video.clone(),
         enhancement: imagine_server::enhancement::Service::open(
             dir.path().join("enhancement-profiles.json"),
         )
@@ -241,7 +246,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     let submit = || {
         client
             .post(format!("{imagine}/v1/jobs"))
-            .json(&json!({"model":MODEL,"operation":"text_to_image","prompt":"synthetic"}))
+            .json(&json!({"model":MODEL,"operation":"text_to_image","prompt":"synthetic","client_metadata":{"video_destination":proof}}))
     };
     let first: Value = submit().send().await.unwrap().json().await.unwrap();
     until(|| probe.calls.load(Ordering::SeqCst) == 1).await;

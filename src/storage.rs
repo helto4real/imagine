@@ -16,7 +16,17 @@ use std::{
 pub struct Store {
     pub db: SqlitePool,
     pub media: PathBuf,
+    pub videos: crate::video::output::Outputs,
+    media_files: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, std::fs::File>>>,
+    uploads:
+        std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<[u8]>>>>,
     pub session: std::sync::Arc<crate::session::Session>,
+}
+struct VideoPublication {
+    delivery: Option<Box<crate::video::assembly::Plan>>,
+    asset_id: String,
+    take: Option<Value>,
+    owned: Option<std::fs::File>,
 }
 pub fn now() -> i64 {
     SystemTime::now()
@@ -65,10 +75,30 @@ impl Store {
               id TEXT PRIMARY KEY, status TEXT NOT NULL, mode TEXT NOT NULL, created INTEGER NOT NULL, finished INTEGER);
         ").execute(&db).await?;
         let media = session.media.clone();
-        Ok(Self { db, media, session })
+        Ok(Self {
+            db,
+            media,
+            session,
+            uploads: Default::default(),
+            media_files: Default::default(),
+            videos: crate::video::output::Outputs::configure(&data.join("video-output.json")),
+        })
     }
     pub async fn close(&self) -> Result<()> {
+        self.media_files
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .clear();
         self.db.close().await;
+        self.uploads
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .clear();
+        self.videos
+            .published
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .clear();
         self.session.clear()
     }
     pub async fn paused(&self) -> Result<bool> {
@@ -126,118 +156,405 @@ impl Store {
                 "bytes":r.get::<i64,_>("bytes"),"sha256":r.get::<String,_>("sha256")})))
     }
     pub async fn read_asset(&self, id: &str, owner: &str) -> Result<Vec<u8>> {
-        if self.asset(id, owner).await?.is_none() {
-            bail!("asset_not_found");
+        let info = self.asset(id, owner).await?.context("asset_not_found")?;
+        let bytes = if let Some(mut file) = self.open_media(id)? {
+            use std::io::Read;
+            let mut bytes = vec![];
+            file.read_to_end(&mut bytes)?;
+            bytes
+        } else {
+            self.upload_bytes(id)?
+                .map(|b| b.to_vec())
+                .context("asset_not_found")?
+        };
+        if info["bytes"].as_u64() != Some(bytes.len() as u64)
+            || info["sha256"].as_str() != Some(hash(&bytes).as_str())
+        {
+            bail!(crate::engine::EngineError("asset_content_changed"));
         }
-        // Only IDs obtained from our database reach the path, never user paths.
-        Ok(tokio::fs::read(self.media.join(id)).await?)
+        Ok(bytes)
     }
-    /// Publish all roles and job success in one transaction. Files are inaccessible
-    /// through the API until commit, and are removed on any staging/commit failure.
+
+    pub fn upload_bytes(&self, id: &str) -> Result<Option<std::sync::Arc<[u8]>>> {
+        Ok(self
+            .uploads
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .get(id)
+            .cloned())
+    }
+    pub fn open_media(&self, id: &str) -> Result<Option<std::fs::File>> {
+        use std::os::fd::AsRawFd;
+        let owned = self
+            .media_files
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .get(id)
+            .map(|file| std::fs::File::open(format!("/proc/self/fd/{}", file.as_raw_fd())))
+            .transpose()
+            .map_err(anyhow::Error::from)?;
+        if owned.is_some() {
+            return Ok(owned);
+        }
+        self.videos.open(id).map_err(anyhow::Error::msg)
+    }
+    pub async fn register_media(
+        &self,
+        owner: &str,
+        file: std::fs::File,
+        info: &crate::video::media::Info,
+    ) -> Result<Value> {
+        Ok(self
+            .register_media_batch(owner, vec![(file, info.clone())])
+            .await?
+            .remove(0))
+    }
+    pub async fn register_media_batch(
+        &self,
+        owner: &str,
+        files: Vec<(std::fs::File, crate::video::media::Info)>,
+    ) -> Result<Vec<Value>> {
+        let prepared = tokio::task::spawn_blocking(move || -> Result<Vec<_>> {
+            files.into_iter().map(|(mut file, info)| {
+                let (digest, bytes) = crate::video::bundle::digest(&mut file)?;
+                let asset_id = id("asset");
+                let metadata = json!({"id":asset_id,"mime_type":info.mime_type,"width":info.width,"height":info.height,"bytes":bytes,"sha256":digest,"media":info});
+                Ok((asset_id, file, metadata))
+            }).collect()
+        }).await??;
+        let mut tx = self.db.begin().await?;
+        for (asset_id, _, info) in &prepared {
+            sqlx::query("INSERT INTO assets VALUES (?,?,?,?,?,?,?,?)")
+                .bind(asset_id)
+                .bind(owner)
+                .bind(info["mime_type"].as_str().unwrap())
+                .bind(info["width"].as_u64().unwrap() as i64)
+                .bind(info["height"].as_u64().unwrap() as i64)
+                .bind(info["bytes"].as_u64().unwrap() as i64)
+                .bind(info["sha256"].as_str().unwrap())
+                .bind(now())
+                .execute(&mut *tx)
+                .await?;
+        }
+        tx.commit().await?;
+        let mut handles = self
+            .media_files
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?;
+        let mut result = Vec::with_capacity(prepared.len());
+        for (id, file, value) in prepared {
+            handles.insert(id, file);
+            result.push(value);
+        }
+        Ok(result)
+    }
+    pub async fn reserve_images(
+        &self,
+        request: &crate::contract::JobRequest,
+        owner: &str,
+    ) -> Result<Vec<crate::video::output::Pending>> {
+        let destination = self
+            .videos
+            .destination()
+            .map_err(crate::engine::EngineError)?;
+        let source = if request
+            .resolved_profile
+            .as_ref()
+            .is_some_and(|p| p.id == "image_upscale")
+        {
+            if let Some(id) = request.inputs.reference_images.first() {
+                if self.asset(id, owner).await?.is_none() {
+                    bail!(crate::engine::EngineError("asset_not_found"));
+                }
+                self.videos
+                    .published
+                    .lock()
+                    .map_err(|_| anyhow::anyhow!("storage_error"))?
+                    .get(id)
+                    .cloned()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        let count = if request.operation == crate::contract::Operation::CharacterSheet {
+            3
+        } else {
+            1
+        };
+        (0..count)
+            .map(|_| {
+                destination
+                    .reserve_image(
+                        &request.client_metadata["video_destination"],
+                        32 * 1024 * 1024 * count,
+                        source.as_ref(),
+                    )
+                    .map_err(|e| crate::engine::EngineError(e).into())
+            })
+            .collect()
+    }
+    /// Publish all roles and job success together. Pending files roll back until commit.
     pub async fn publish_output(
         &self,
         job: &str,
         owner: &str,
         generated: impl Into<crate::generation::Generated>,
     ) -> Result<()> {
-        let mut video_shape = None;
-        let (artifacts, format) = match generated.into() {
-            crate::generation::Generated::Images(artifacts) => {
-                let mut media = Vec::new();
-                for a in artifacts {
-                    media.push((
-                        a.role,
-                        tokio::task::spawn_blocking(move || inspect_image(a.bytes)).await??,
-                    ));
-                }
-                (media, "png")
-            }
-            crate::generation::Generated::Video(bytes) => {
-                let (bytes, shape) = tokio::task::spawn_blocking(move || {
-                    let av = crate::short_av::decode(&bytes).map_err(anyhow::Error::msg)?;
-                    Ok::<_, anyhow::Error>((bytes, av.shape))
-                })
-                .await??;
-                video_shape = Some(shape);
-                (
-                    vec![(
-                        "video",
-                        ImageInfo {
-                            bytes,
-                            width: shape.width,
-                            height: shape.height,
-                            mime: crate::short_av::MIME.into(),
-                        },
-                    )],
-                    "mkv",
+        match generated.into() {
+            crate::generation::Generated::Delivery {
+                bytes,
+                plan,
+                pending,
+            } => {
+                self.publish_video(
+                    job,
+                    owner,
+                    &bytes,
+                    *pending,
+                    VideoPublication {
+                        delivery: Some(plan),
+                        asset_id: id("asset"),
+                        take: None,
+                        owned: None,
+                    },
                 )
+                .await
             }
+            crate::generation::Generated::Video { bytes, pending, .. } => {
+                self.publish_video(
+                    job,
+                    owner,
+                    &bytes,
+                    *pending,
+                    VideoPublication {
+                        delivery: None,
+                        asset_id: id("asset"),
+                        take: None,
+                        owned: None,
+                    },
+                )
+                .await
+            }
+            crate::generation::Generated::Images { artifacts, pending } => {
+                self.publish_images(job, owner, artifacts, pending).await
+            }
+        }
+    }
+    pub(crate) async fn publish_scene(
+        &self,
+        job: &str,
+        owner: &str,
+        generated: crate::generation::Generated,
+        take: Value,
+        owned: std::fs::File,
+    ) -> Result<String> {
+        let crate::generation::Generated::Video { bytes, pending, .. } = generated else {
+            bail!("invalid_scene_output");
         };
-        if artifacts.is_empty() {
-            bail!("empty generation result");
+        let asset = id("asset");
+        self.publish_video(
+            job,
+            owner,
+            &bytes,
+            *pending,
+            VideoPublication {
+                delivery: None,
+                asset_id: asset.clone(),
+                take: Some(take),
+                owned: Some(owned),
+            },
+        )
+        .await?;
+        Ok(asset)
+    }
+    pub(crate) async fn publish_delivery(
+        &self,
+        job: &str,
+        owner: &str,
+        generated: crate::generation::Generated,
+        asset_id: String,
+        owned: std::fs::File,
+    ) -> Result<()> {
+        let crate::generation::Generated::Delivery {
+            bytes,
+            pending,
+            plan,
+        } = generated
+        else {
+            bail!("invalid_delivery_output");
+        };
+        self.publish_video(
+            job,
+            owner,
+            &bytes,
+            *pending,
+            VideoPublication {
+                delivery: Some(plan),
+                asset_id,
+                take: None,
+                owned: Some(owned),
+            },
+        )
+        .await
+    }
+    async fn publish_images(
+        &self,
+        job: &str,
+        owner: &str,
+        artifacts: Vec<crate::generation::Artifact>,
+        mut pending: Vec<crate::video::output::Pending>,
+    ) -> Result<()> {
+        if artifacts.is_empty() || pending.len() != artifacts.len() {
+            bail!("image_output_not_reserved");
         }
-        let mut paths = Vec::new();
-        let result = async {
-            let mut transaction = self.db.begin().await?;
-            let mut assets = Vec::new();
-            for (role,info) in artifacts {
-                let asset_id = id("asset");
-                let tmp = self.media.join(format!("{asset_id}.partial"));
-                let destination = self.media.join(&asset_id);
-                paths.extend([tmp.clone(), destination.clone()]);
-                let mut file = tokio::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&tmp).await?;
-                use tokio::io::AsyncWriteExt;
-                file.write_all(&info.bytes).await?;
-                file.sync_all().await?;
-                drop(file);
-                tokio::fs::rename(&tmp, &destination).await?;
-                let sha256 = hash(&info.bytes);
-                sqlx::query("INSERT INTO assets VALUES (?,?,?,?,?,?,?,?)")
-                    .bind(&asset_id).bind(owner).bind(&info.mime).bind(info.width).bind(info.height)
-                    .bind(info.bytes.len() as i64).bind(&sha256).bind(now()).execute(&mut *transaction).await?;
-                assets.push(json!({"id":asset_id,"role":role,"mime_type":info.mime,"width":info.width,
-                    "height":info.height,"bytes":info.bytes.len(),"sha256":sha256}));
+        let mut inspected = Vec::new();
+        for a in artifacts {
+            inspected.push((
+                a.role,
+                tokio::task::spawn_blocking(move || inspect_image(a.bytes)).await??,
+            ));
+        }
+        let mut tx = self.db.begin().await?;
+        let mut published = Vec::new();
+        let mut assets = Vec::new();
+        let mut group = None;
+        for ((role, info), pending) in inspected.into_iter().zip(pending.iter_mut()) {
+            let saved = pending
+                .publish_image(&info.bytes, role, &info.mime, group.as_deref())
+                .map_err(crate::engine::EngineError)?;
+            if role == "character_sheet" {
+                group = saved
+                    .path
+                    .file_stem()
+                    .and_then(|v| v.to_str())
+                    .and_then(|v| v.strip_suffix("_character_sheet"))
+                    .map(str::to_owned);
             }
-            let mut output=json!({"assets":assets,"format":format});
-            if let Some(shape)=video_shape {output["video"]=json!({"frames":shape.frames,"fps":shape.fps,"duration_seconds":shape.seconds(),"audio":true,"sample_rate":32000,"channels":2,"samples":shape.audio_samples()});}
-            let updated = sqlx::query("UPDATE jobs SET status='succeeded',output=?,finished=? WHERE id=? AND owner=? AND status='running'")
-                .bind(output.to_string()).bind(now()).bind(job).bind(owner).execute(&mut *transaction).await?;
-            if updated.rows_affected() != 1 { bail!("output job is no longer running"); }
-            transaction.commit().await?;
-            Ok(())
-        }.await;
-        if result.is_err() {
-            let mut cleanup_error = None;
-            for path in paths {
-                match tokio::fs::remove_file(path).await {
-                    Ok(()) => {}
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                    Err(e) => {
-                        cleanup_error = Some(e);
-                    }
-                }
-            }
-            if let Some(error) = cleanup_error {
-                return Err(error.into());
+            let id = id("asset");
+            let digest = hash(&info.bytes);
+            sqlx::query("INSERT INTO assets VALUES (?,?,?,?,?,?,?,?)")
+                .bind(&id)
+                .bind(owner)
+                .bind(&info.mime)
+                .bind(info.width)
+                .bind(info.height)
+                .bind(info.bytes.len() as i64)
+                .bind(&digest)
+                .bind(now())
+                .execute(&mut *tx)
+                .await?;
+            assets.push(json!({"id":id,"role":role,"mime_type":info.mime,"width":info.width,"height":info.height,"bytes":info.bytes.len(),"sha256":digest,"saved_path":saved.path,"persistent":true}));
+            published.push((id, saved));
+        }
+        let output = json!({"assets":assets,"format":"png","persistent":true,"saved_path":assets[0]["saved_path"]});
+        let updated = sqlx::query("UPDATE jobs SET status='succeeded',output=?,finished=? WHERE id=? AND owner=? AND status='running'").bind(output.to_string()).bind(now()).bind(job).bind(owner).execute(&mut *tx).await?;
+        if updated.rows_affected() != 1 {
+            bail!("output job is no longer running");
+        }
+        {
+            let mut map = self
+                .videos
+                .published
+                .lock()
+                .map_err(|_| anyhow::anyhow!("storage_error"))?;
+            for (id, saved) in &published {
+                map.insert(id.clone(), saved.clone());
             }
         }
-        result
+        if let Err(error) = tx.commit().await {
+            let mut map = self
+                .videos
+                .published
+                .lock()
+                .map_err(|_| anyhow::anyhow!("storage_error"))?;
+            for (id, _) in published {
+                map.remove(&id);
+            }
+            return Err(error.into());
+        }
+        for pending in pending {
+            pending.commit();
+        }
+        Ok(())
+    }
+    async fn publish_video(
+        &self,
+        job: &str,
+        owner: &str,
+        bytes: &[u8],
+        mut pending: crate::video::output::Pending,
+        publication: VideoPublication,
+    ) -> Result<()> {
+        let VideoPublication {
+            delivery,
+            asset_id,
+            take,
+            owned,
+        } = publication;
+        let (width, height, video) = if let Some(plan) = &delivery {
+            (
+                plan.delivery.width,
+                plan.delivery.height,
+                json!({"frames":plan.frames,"fps":crate::video::assembly::seconds(plan.delivery.fps),"fps_rational":plan.delivery.fps,"duration_seconds":plan.frames as f64/crate::video::assembly::seconds(plan.delivery.fps),"audio":true,"sample_rate":plan.sample_rate,"channels":2,"samples":plan.samples}),
+            )
+        } else {
+            let decoded = crate::short_av::decode(bytes).map_err(anyhow::Error::msg)?;
+            let shape = decoded.shape;
+            (
+                shape.width,
+                shape.height,
+                json!({"frames":shape.frames,"fps":shape.fps,"duration_seconds":shape.seconds(),"audio":true,"sample_rate":32000,"channels":2,"samples":shape.audio_samples()}),
+            )
+        };
+        let published = pending.publish(bytes).map_err(crate::engine::EngineError)?;
+        let digest = hash(bytes);
+        let mut output = json!({"format":"mp4","saved_path":published.path,"persistent":true,"assets":[{"id":asset_id,"role":"video","mime_type":crate::short_av::MIME,"width":width,"height":height,"bytes":bytes.len(),"sha256":digest}],"video":video});
+        if let Some(plan) = delivery {
+            output["delivery"] = json!(plan);
+        }
+        if let Some(take) = take {
+            output["take"] = take;
+        }
+        let mut tx = self.db.begin().await?;
+        sqlx::query("INSERT INTO assets VALUES (?,?,?,?,?,?,?,?)")
+            .bind(&asset_id)
+            .bind(owner)
+            .bind(crate::short_av::MIME)
+            .bind(width)
+            .bind(height)
+            .bind(bytes.len() as i64)
+            .bind(digest)
+            .bind(now())
+            .execute(&mut *tx)
+            .await?;
+        let updated=sqlx::query("UPDATE jobs SET status='succeeded',output=?,finished=? WHERE id=? AND owner=? AND status='running'").bind(output.to_string()).bind(now()).bind(job).bind(owner).execute(&mut *tx).await?;
+        if updated.rows_affected() != 1 {
+            bail!("output job is no longer running");
+        }
+        self.videos
+            .published
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .insert(asset_id.clone(), published);
+        if let Some(file) = owned {
+            self.media_files
+                .lock()
+                .map_err(|_| anyhow::anyhow!("storage_error"))?
+                .insert(asset_id.clone(), file);
+        }
+        if let Err(e) = tx.commit().await {
+            self.videos.published.lock().unwrap().remove(&asset_id);
+            self.media_files.lock().unwrap().remove(&asset_id);
+            return Err(e.into());
+        }
+        pending.commit();
+        Ok(())
     }
     pub async fn save_asset(&self, owner: &str, bytes: Vec<u8>) -> Result<Value> {
         let info = tokio::task::spawn_blocking(move || inspect_image(bytes)).await??;
         let asset_id = id("asset");
-        let tmp = self.media.join(format!("{asset_id}.partial"));
-        let mut f = tokio::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&tmp)
-            .await?;
-        use tokio::io::AsyncWriteExt;
-        f.write_all(&info.bytes).await?;
-        f.sync_all().await?;
-        drop(f);
-        tokio::fs::rename(&tmp, self.media.join(&asset_id)).await?;
         sqlx::query("INSERT INTO assets VALUES (?,?,?,?,?,?,?,?)")
             .bind(&asset_id)
             .bind(owner)
@@ -249,6 +566,10 @@ impl Store {
             .bind(now())
             .execute(&self.db)
             .await?;
+        self.uploads
+            .lock()
+            .map_err(|_| anyhow::anyhow!("storage_error"))?
+            .insert(asset_id.clone(), info.bytes.into());
         self.asset(&asset_id, owner)
             .await?
             .context("saved asset missing")

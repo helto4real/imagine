@@ -36,10 +36,10 @@ cd /home/thhel/ChatGPT/imagine
   --imagine-url http://127.0.0.1:8080 \
   --mcp-port 8190 \
   --mcp-input-dir /run/media/veracrypt1/mcp-inputs \
-  --mcp-output-dir "$PWD/.imagine/coordinated/output"
+  --mcp-output-dir /run/media/veracrypt1/imagine/.mcp-cache
 ```
 
-`start-proxy.sh` defaults to chat port **5002**, image port **8189**, and enabled MCP on **8190**, matching `st-stack.zsh`. ComfyUI defaults to upstream port 8188 and KoboldCpp to 5001. MCP output defaults to `/run/media/veracrypt1/mcp-images`, matching the original proxy and Pi container mount. Reference input defaults to `/run/media/veracrypt1/mcp-inputs`. Environment variables and CLI arguments can override these defaults.
+`start-proxy.sh` defaults to chat port **5002**, image port **8189**, and enabled MCP on **8190**, matching `st-stack.zsh`. ComfyUI defaults to upstream port 8188 and KoboldCpp to 5001. MCP output defaults to `/run/media/veracrypt1/imagine/.mcp-cache`, as a direct child of the trusted Imagine media destination. Reference input defaults to `/run/media/veracrypt1/mcp-inputs`. Environment variables and CLI arguments can override these defaults.
 
 `./start-proxy.sh` without arguments incrementally builds the release binaries and runs `proxy/st-stack.zsh` in **all** mode. It starts or reuses KoboldCpp, TabbyAPI, Prism, SC117, Orca, SC117 128k and Orca 128k, waits for readiness, then starts the proxy with the combined `backend/model` catalog that Pi expects. Models are activated on demand through the shared GPU coordinator. Imagine must be started separately first. Ctrl-C or `./start-proxy.sh --stop` stops the stack; `--log` shows backend logs. Set `ST_PROXY_LLM_BACKEND` to select another stack backend.
 
@@ -144,13 +144,14 @@ For `image_upscale`, **3200 is only the default** when omitted, not the maximum.
 
 ## Image delivery and temporary storage
 
-Each MCP job has a private `job-<uuid>` directory under `ST_PROXY_MCP_OUTPUT_DIR`
-(default `/run/media/veracrypt1/mcp-images`). Batch items share this directory,
+Each MCP process creates a fresh `session-<uuid>` child of `ST_PROXY_MCP_OUTPUT_DIR`.
+Each job has a private `job-<uuid>` directory inside that session
+(default `/run/media/veracrypt1/imagine/.mcp-cache`). Batch items share this directory,
 with one `<item-index>.png` per successful item. Results include `image_id`,
 `path`, `bytes`, `sha256` and `storage: "temporary"`. These delivery image IDs
 are distinct from IDs returned by `register_image`.
 
-The client must copy every successful image to a unique persistent project path,
+The client must copy every successful image to a unique persistent path under the returned `persistent_root` on the verified encrypted volume, outside the MCP cache,
 check that the destination is a regular file, and compute its byte size and
 SHA-256. Both must match the result metadata. This is a file integrity check:
 do not open, render, visually inspect or analyze the image, or judge whether it
@@ -166,7 +167,7 @@ partial batch):
     "job_id": "teapot-001",
     "images": [{
       "image_id": "<image_id from the result>",
-      "saved_path": "/workspace/images/teapot-001.png",
+      "saved_path": "/run/media/veracrypt1/imagine/teapot-001.png",
       "bytes": 123456,
       "sha256": "<SHA-256 computed from the destination file>"
     }]
@@ -184,11 +185,23 @@ If filesystem cleanup fails partway through, retry the same confirmation;
 Confirmed images have `storage: "saved"`, `saved_path`, and `path` pointing to the
 client's persistent copy, including in same-job generation retries.
 
-The proxy relies on the client's integrity check: it does not read destination
-paths that may exist only inside a container. Job lookup and confirmations remain
-session-local. Imagine session loss, proxy shutdown and proxy startup clear
-MCP history, unconfirmed files and reference previews. The whole MCP output
-directory is disposable and must not contain saved originals. Imagine clears
-its own asset storage on shutdown/startup. See [privacy](../docs/PRIVACY.md). To use a saved
-local copy as a reference, copy it into the configured MCP input directory first
-if its path is outside the allowed input/output roots.
+The proxy relies on the client's content-integrity check, but also verifies that the
+saved path is a regular file under the same trusted media destination. Container-only
+paths or unverified mappings are rejected; never copy to plaintext workspace/tmp paths.
+Job lookup and references remain session-local. Normal Imagine session loss or proxy
+shutdown removes only that process's owned delivery copies and previews. Startup never
+scans/deletes old cache entries. Crash leftovers may therefore remain on the encrypted disk.
+Generated originals saved by Imagine survive session shutdown. Saved files under the
+trusted destination can be registered directly without another input-directory copy.
+
+Before opening the cache, the proxy fetches `/v1/media-destination` from Imagine and
+verifies its host, mount, source, filesystem identity and root locally using the shared
+media-destination code. Imagine must therefore be available before MCP proxy startup.
+`mcp_output_dir` must be a direct child of that trusted root; a legacy override such as
+`/run/media/veracrypt1/mcp-images` is rejected without creating it. Root/cache symlinks,
+wrong/unmounted/read-only/unwritable/full destinations fail closed, with no fallback.
+All cache/media creation uses directory file descriptors pinned to that volume; atomic
+partials remain there. Metadata, normalization and HTTP upload/download use RAM.
+Preview paths remain available for the MCP contract, so normalized previews are kept
+only in this encrypted process cache. Historical plaintext cache/session files are not
+inspected, migrated or deleted by this implementation.
