@@ -547,6 +547,18 @@ impl ImagineApp {
                     let pair = comparison.ids.clone().map(Some);
                     self.timeline.comparison_explicit |= self.timeline.comparison_selection != pair;
                     self.timeline.comparison_selection = pair;
+                    // Recipe metadata follows Hide previews like the pictures.
+                    ui.collapsing("Differences", |ui| {
+                        if helto::reveal_in_viewport(ui, self.prefs.privacy_mode) {
+                            let takes = comparison
+                                .ids
+                                .each_ref()
+                                .map(|id| d.take(&TakeId(id.clone())));
+                            super::review::take_differences(ui, takes);
+                        } else {
+                            ui.label("Hidden metadata");
+                        }
+                    });
                 }
             });
         if response.should_close() {

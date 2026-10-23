@@ -8,6 +8,47 @@ pub(super) fn attached(document: &Snapshot, take: &snapshot::TakeView) -> bool {
         .is_none_or(|capture| !capture.detached && !capture.removed)
 }
 
+/// Settings that differ between two Takes, highlighted; recipe fields are
+/// shown as recorded, and an imported Take has none.
+pub(super) fn take_differences(ui: &mut egui::Ui, pair: [Option<&snapshot::TakeView>; 2]) {
+    egui::Grid::new("take-metadata-differences").show(ui, |ui| {
+        ui.strong("Setting");
+        ui.strong("A");
+        ui.strong("B");
+        ui.end_row();
+        for (label, path) in [
+            ("Status", ""),
+            ("Seed", "/seed"),
+            ("Model", "/model/model"),
+            ("Variant", "/model/variant"),
+            ("Profile", "/model/profile"),
+            ("Profile revision", "/model/profile_revision"),
+            ("First stage steps", "/settings/values/stage_one/steps"),
+        ] {
+            let values = pair.map(|take| match take {
+                Some(t) if path.is_empty() => t.status.label().into(),
+                Some(t) => t
+                    .provenance
+                    .as_ref()
+                    .and_then(|p| p.pointer(path))
+                    .map(|v| {
+                        v.as_str()
+                            .map(str::to_owned)
+                            .unwrap_or_else(|| v.to_string())
+                    })
+                    .unwrap_or_else(|| "—".into()),
+                None => "—".into(),
+            });
+            ui.label(label);
+            let different = values[0] != values[1];
+            for value in values {
+                ui.colored_label(if different { helto::ACCENT } else { helto::DIM }, value);
+            }
+            ui.end_row();
+        }
+    });
+}
+
 pub(super) fn comparison_entries(
     document: &Snapshot,
     scene: &SceneId,
@@ -274,46 +315,7 @@ impl ImagineApp {
                         id.as_ref()
                             .and_then(|id| document.take(&TakeId(id.clone())))
                     });
-                    egui::Grid::new("take-metadata-differences").show(ui, |ui| {
-                        ui.strong("Setting");
-                        ui.strong("A");
-                        ui.strong("B");
-                        ui.end_row();
-                        for (label, path) in [
-                            ("Status", ""),
-                            ("Seed", "/seed"),
-                            ("Model", "/model/model"),
-                            ("Variant", "/model/variant"),
-                            ("Profile", "/model/profile"),
-                            ("Profile revision", "/model/profile_revision"),
-                            ("First stage steps", "/settings/values/stage_one/steps"),
-                        ] {
-                            // Recipe fields are shown as recorded; an imported Take has none.
-                            let values = pair.map(|take| match take {
-                                Some(t) if path.is_empty() => t.status.label().into(),
-                                Some(t) => t
-                                    .provenance
-                                    .as_ref()
-                                    .and_then(|p| p.pointer(path))
-                                    .map(|v| {
-                                        v.as_str()
-                                            .map(str::to_owned)
-                                            .unwrap_or_else(|| v.to_string())
-                                    })
-                                    .unwrap_or_else(|| "—".into()),
-                                None => "—".into(),
-                            });
-                            ui.label(label);
-                            let different = values[0] != values[1];
-                            for value in values {
-                                ui.colored_label(
-                                    if different { helto::ACCENT } else { helto::DIM },
-                                    value,
-                                );
-                            }
-                            ui.end_row();
-                        }
-                    });
+                    take_differences(ui, pair);
                 });
                 #[cfg(feature = "ui-preview")]
                 super::qa::control(ui, "take-differences".into(), &menu);
@@ -361,5 +363,32 @@ mod tests {
             [Some("third".into()), Some("fourth".into())]
         );
         assert!(!state.comparison_explicit);
+    }
+}
+
+#[cfg(test)]
+mod difference_tests {
+    use super::*;
+    #[test]
+    fn differences_show_recorded_recipes_and_mark_unknown_imported_takes() {
+        let takes: Vec<snapshot::TakeView> = serde_json::from_value(json!([
+            {"id":"a","scene_id":"s","status":"accepted","provenance":{"seed":7,"model":{"model":"own-h3"}}},
+            {"id":"b","scene_id":"s","status":"candidate","provenance":null}
+        ]))
+        .unwrap();
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            take_differences(ui, [takes.first(), takes.get(1)]);
+        });
+        output.textures_delta.clear();
+        let mut texts = vec![];
+        for shape in &output.shapes {
+            if let egui::Shape::Text(text) = &shape.shape {
+                texts.push(text.galley.text().to_owned());
+            }
+        }
+        for expected in ["accepted", "candidate", "7", "own-h3", "—"] {
+            assert!(texts.iter().any(|t| t == expected), "{expected}: {texts:?}");
+        }
     }
 }
