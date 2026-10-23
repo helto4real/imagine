@@ -115,6 +115,14 @@ impl ImagineApp {
             .iter()
             .any(|j| j.error.is_some() || j.terminal() && j.observation["status"] != "succeeded")
     }
+    /// Timeline work shown in the queue dock; growth means new work was submitted.
+    pub(in crate::app) fn timeline_queue_work(&self) -> usize {
+        self.timeline.jobs.len()
+            + self.timeline.runs.len()
+            + usize::from(self.timeline.pending.is_some())
+            + usize::from(self.timeline.pending_run.is_some())
+            + usize::from(self.timeline.admitting)
+    }
     pub(in crate::app) fn timeline_queue_counts(&self) -> (usize, usize) {
         let pending = self
             .timeline

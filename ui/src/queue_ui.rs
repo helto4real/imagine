@@ -11,6 +11,7 @@ fn panel_revealed(ui: &egui::Ui, rect: Rect, privacy: bool) -> bool {
 
 impl ImagineApp {
     pub(super) fn queue_panel(&mut self, ui: &mut egui::Ui, rect: Rect) {
+        self.expand_queue_for_new_work();
         workspace::panel(ui, rect, false);
         let revealed = panel_revealed(ui, rect, self.prefs.privacy_mode);
         let header = Rect::from_min_max(

@@ -643,3 +643,19 @@ async fn ui_retries_uncertain_batch_admission_and_failed_retrieval_without_dupli
     assert_eq!(admissions[0].1["jobs"][1]["prompt"], "Second\n\nparagraph");
     server.abort();
 }
+
+#[test]
+fn empty_dock_starts_collapsed_and_new_work_expands_it() {
+    let mut desk = Desk::new();
+    assert!(desk.app.queue.collapsed);
+    stage(&mut desk, &["First"]);
+    desk.frame(vec![]);
+    assert!(!desk.app.queue.collapsed);
+    // A manual collapse holds until more work is added.
+    desk.click("Collapse queue");
+    desk.frame(vec![]);
+    assert!(desk.app.queue.collapsed);
+    stage(&mut desk, &["Second"]);
+    desk.frame(vec![]);
+    assert!(!desk.app.queue.collapsed);
+}

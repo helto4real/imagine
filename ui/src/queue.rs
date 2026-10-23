@@ -37,6 +37,8 @@ pub(super) struct Queue {
     pub loading: Option<String>,
     pub follow: bool,
     pub collapsed: bool,
+    /// Queue work seen last frame; new work expands the collapsed dock.
+    pub seen_work: usize,
     pub drafts: Option<Vec<String>>,
     /// Drafts from a closed Multiple prompts window, restored on reopen.
     pub parked_drafts: Option<Vec<String>>,
@@ -50,11 +52,25 @@ impl Default for Queue {
             selected: None,
             loading: None,
             follow: true,
-            collapsed: false,
+            // An empty dock starts collapsed (D12).
+            collapsed: true,
+            seen_work: 0,
             drafts: None,
             parked_drafts: None,
             draft_error: None,
         }
+    }
+}
+impl ImagineApp {
+    /// Expand the dock when any image, video, run or export work is added.
+    pub(super) fn expand_queue_for_new_work(&mut self) {
+        let work = self.queue.jobs.len()
+            + usize::from(self.video.working || self.video.pending.is_some())
+            + self.timeline_queue_work();
+        if work > self.queue.seen_work {
+            self.queue.collapsed = false;
+        }
+        self.queue.seen_work = work;
     }
 }
 impl Queue {
@@ -188,7 +204,6 @@ impl ImagineApp {
         let batch = self.queue.stage(prepared);
         self.image.error = None;
         self.queue.draft_error = None;
-        self.queue.collapsed = false;
         self.run_batch(ctx, &batch);
         true
     }

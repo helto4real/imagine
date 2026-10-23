@@ -218,6 +218,7 @@ impl ImagineApp {
         let header = Rect::from_min_size(bounds.min, egui::vec2(bounds.width(), 64.));
         self.header(ui, header);
         self.sampling_preview_poll(ui.ctx());
+        self.expand_queue_for_new_work();
         let dock_height = if self.queue.collapsed {
             44.
         } else {
