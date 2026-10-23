@@ -6,6 +6,7 @@ pub mod boundary;
 pub mod captures;
 pub mod contract;
 pub mod creative;
+pub mod dialogue;
 pub mod editing;
 pub mod generation;
 pub mod loras;

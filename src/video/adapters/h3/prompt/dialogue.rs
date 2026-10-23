@@ -314,3 +314,24 @@ pub fn compile(text: &str, maps: &Maps) -> String {
     out.push_str(&text[cursor..]);
     out
 }
+
+#[cfg(test)]
+mod warning_agreement_tests {
+    use super::*;
+    #[test]
+    fn macros_the_compiler_reads_are_never_flagged() {
+        for text in [
+            "@tomas says \"Hello\"",
+            "@ann whispers off-screen [English] \"Hi\"",
+            "@Ann SHOUTS in voiceover \"Run!\" then @bo sings \"La\"",
+        ] {
+            assert!(!parse(text).is_empty(), "{text}");
+            assert!(
+                imagine_video_contract::dialogue::issues(text).is_empty(),
+                "{text}"
+            );
+        }
+        assert!(parse("@tomas says Hello").is_empty());
+        assert!(!imagine_video_contract::dialogue::issues("@tomas says Hello").is_empty());
+    }
+}

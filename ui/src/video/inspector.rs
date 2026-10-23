@@ -323,6 +323,7 @@ impl ImagineApp {
                         if r.lost_focus() {
                             commands.extend(self.timeline.draft_edits());
                         }
+                        dialogue_warnings(ui, &self.timeline.draft_description);
                         let source_header = ui.collapsing("Scene prompt fields", |ui| {
                             let p = &mut self.timeline.draft_scene_prompt;
                             let mut save = false;
@@ -387,6 +388,7 @@ impl ImagineApp {
                             if r.lost_focus() {
                                 commands.extend(self.timeline.draft_edits());
                             }
+                            dialogue_warnings(ui, &self.timeline.draft_section);
                             ui.weak(format!(
                                 "{:.3}–{:.3} s",
                                 seconds(section.start),
@@ -465,6 +467,21 @@ impl ImagineApp {
     }
 }
 
+/// Director's dialogue warnings for a prompt field. Only the advice is shown;
+/// the quoted words stay in the field, which follows Hide previews.
+fn dialogue_warnings(ui: &mut egui::Ui, text: &str) {
+    let mut shown = std::collections::BTreeSet::new();
+    for issue in imagine_video_contract::dialogue::issues(text) {
+        if shown.insert(issue.code) {
+            ui.label(
+                egui::RichText::new(issue.message())
+                    .small()
+                    .color(helto::ACCENT),
+            );
+        }
+    }
+}
+
 /// What H3 will actually render for the scene: the project canvas and the
 /// duration after H3's frame alignment, as compiled by the server.
 fn effective_timing(project: &VideoProject, scene: &Scene) -> Option<String> {
@@ -539,6 +556,24 @@ impl ImagineApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn dialogue_warnings_show_advice_once_without_the_quoted_words() {
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            dialogue_warnings(ui, "@own says Hi and \"Own secret\" and \"Own other\"");
+        });
+        output.textures_delta.clear();
+        let texts: Vec<String> = output
+            .shapes
+            .iter()
+            .filter_map(|s| match &s.shape {
+                egui::Shape::Text(t) => Some(t.galley.text().to_owned()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(texts.len(), 2, "{texts:?}");
+        assert!(texts.iter().all(|t| !t.contains("Own secret")));
+    }
     #[test]
     fn effective_timing_shows_the_h3_canvas_and_aligned_duration() {
         let mut project = media_picker::tests::project();
