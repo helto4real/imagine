@@ -1553,6 +1553,7 @@ fn headless_icon_sheet() {
         Scene,
         PanelRight,
         PanelBottom,
+        Snap,
     ];
     let ctx = egui::Context::default();
     helto::install(&ctx);

@@ -55,6 +55,7 @@ pub enum Icon {
     Scene,
     PanelRight,
     PanelBottom,
+    Snap,
 }
 
 pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
@@ -206,6 +207,22 @@ pub fn paint(painter: &Painter, rect: Rect, icon: Icon, color: Color32) {
         Icon::PanelRight => {
             box_at(3., 4., 18., 16., 2);
             line(&[[15., 4.], [15., 20.]]);
+        }
+        Icon::Snap => {
+            // A magnet: the timeline edge an item jumps to.
+            line(&[[6., 3.], [6., 11.]]);
+            line(&[[18., 3.], [18., 11.]]);
+            painter.add(egui::Shape::line(
+                (0..=12)
+                    .map(|i| {
+                        let a = std::f32::consts::PI * i as f32 / 12.;
+                        pos(12. - 6. * a.cos(), 11. + 6. * a.sin())
+                    })
+                    .collect(),
+                stroke,
+            ));
+            line(&[[6., 6.], [10., 6.]]);
+            line(&[[14., 6.], [18., 6.]]);
         }
         Icon::PanelBottom => {
             box_at(3., 4., 18., 16., 2);

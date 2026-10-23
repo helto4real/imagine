@@ -278,92 +278,85 @@ impl ImagineApp {
                     whole,
                     seconds(project.delivery.fps)
                 ));
-                let mode = egui::ComboBox::from_id_salt("timeline-display")
-                    .selected_text(self.timeline.navigation.display.label())
-                    .show_ui(ui, |ui| {
-                        for value in [
-                            navigation::Display::Sections,
-                            navigation::Display::Media,
-                            navigation::Display::Prompts,
-                        ] {
-                            let r = ui.selectable_value(
-                                &mut self.timeline.navigation.display,
-                                value,
-                                value.label(),
-                            );
-                            #[cfg(feature = "ui-preview")]
-                            super::qa::control(
-                                ui,
-                                format!("timeline-display-{}", value.label().to_lowercase()),
-                                &r,
-                            );
-                            let _ = r;
-                        }
-                    });
-                #[cfg(feature = "ui-preview")]
-                super::qa::control(ui, "timeline-display".into(), &mode.response);
-                let _ = mode;
-                ui.separator();
-                ui.label("Snap");
-                egui::ComboBox::from_id_salt("video-snap")
-                    .width(70.)
-                    .selected_text(match self.timeline.snap {
-                        Snap::None => "None",
-                        Snap::Seconds => "Seconds",
-                        Snap::Frames => "Frames",
-                    })
-                    .show_ui(ui, |ui| {
-                        for (value, label) in [
-                            (Snap::None, "None"),
-                            (Snap::Seconds, "Seconds"),
-                            (Snap::Frames, "Frames"),
-                        ] {
-                            ui.selectable_value(&mut self.timeline.snap, value, label);
-                        }
-                    });
-                let edit_mode = egui::ComboBox::from_id_salt("video-edit-mode")
-                    .width(100.)
-                    .selected_text(if self.timeline.mode == Mode::Ripple {
-                        "Ripple Edit"
-                    } else {
-                        "Trim Neighbor"
-                    })
-                    .show_ui(ui, |ui| {
-                        let trim = ui.selectable_value(
-                            &mut self.timeline.mode,
-                            Mode::TrimNeighbor,
-                            "Trim Neighbor",
-                        );
-                        let ripple = ui.selectable_value(
-                            &mut self.timeline.mode,
-                            Mode::Ripple,
-                            "Ripple Edit",
-                        );
-                        #[cfg(feature = "ui-preview")]
-                        {
-                            super::qa::control(ui, "timeline-edit-trim".into(), &trim);
-                            super::qa::control(ui, "timeline-edit-ripple".into(), &ripple);
-                        }
-                        let _ = (trim, ripple);
-                    });
-                #[cfg(feature = "ui-preview")]
-                super::qa::control(ui, "timeline-edit-mode".into(), &edit_mode.response);
-                let _ = edit_mode;
-                let zoom = ui.add_sized(
-                    [150., 24.],
-                    egui::Slider::new(&mut self.timeline.zoom, 0.1..=5000.0)
-                        .show_value(false)
-                        .text("Zoom"),
+                // Director's mode menus: one icon each, the current choice in its name.
+                let display = self.timeline.navigation.display;
+                let menu = helto::icon_button(
+                    ui,
+                    crate::icons::Icon::Menu,
+                    &format!("Labels: {}", display.label()),
+                    false,
                 );
                 #[cfg(feature = "ui-preview")]
-                super::qa::control(ui, "timeline-zoom".into(), &zoom);
-                if zoom.changed() {
-                    let (start, _) = self.timeline.navigation.view.unwrap_or((0., whole));
-                    let end = start + f64::from(width / self.timeline.zoom);
-                    self.timeline
-                        .navigation
-                        .set(start, end, whole, width, &mut self.timeline.zoom);
-                }
+                super::qa::control(ui, "timeline-display".into(), &menu);
+                egui::Popup::menu(&menu).show(|ui| {
+                    for value in [
+                        navigation::Display::Sections,
+                        navigation::Display::Media,
+                        navigation::Display::Prompts,
+                    ] {
+                        let r = ui.selectable_value(
+                            &mut self.timeline.navigation.display,
+                            value,
+                            value.label(),
+                        );
+                        #[cfg(feature = "ui-preview")]
+                        super::qa::control(
+                            ui,
+                            format!("timeline-display-{}", value.label().to_lowercase()),
+                            &r,
+                        );
+                        let _ = r;
+                    }
+                });
+                let mode = if self.timeline.mode == Mode::Ripple {
+                    "Ripple Edit"
+                } else {
+                    "Trim Neighbor"
+                };
+                let menu = helto::icon_button(
+                    ui,
+                    crate::icons::Icon::Swap,
+                    &format!("Edit mode: {mode}"),
+                    self.timeline.mode == Mode::Ripple,
+                );
+                #[cfg(feature = "ui-preview")]
+                super::qa::control(ui, "timeline-edit-mode".into(), &menu);
+                egui::Popup::menu(&menu).show(|ui| {
+                    let trim = ui.selectable_value(
+                        &mut self.timeline.mode,
+                        Mode::TrimNeighbor,
+                        "Trim Neighbor",
+                    );
+                    let ripple =
+                        ui.selectable_value(&mut self.timeline.mode, Mode::Ripple, "Ripple Edit");
+                    #[cfg(feature = "ui-preview")]
+                    {
+                        super::qa::control(ui, "timeline-edit-trim".into(), &trim);
+                        super::qa::control(ui, "timeline-edit-ripple".into(), &ripple);
+                    }
+                    let _ = (trim, ripple);
+                });
+                let snap = match self.timeline.snap {
+                    Snap::None => "None",
+                    Snap::Seconds => "Seconds",
+                    Snap::Frames => "Frames",
+                };
+                let menu = helto::icon_button(
+                    ui,
+                    crate::icons::Icon::Snap,
+                    &format!("Snap: {snap}"),
+                    self.timeline.snap != Snap::None,
+                );
+                egui::Popup::menu(&menu).show(|ui| {
+                    for (value, label) in [
+                        (Snap::None, "None"),
+                        (Snap::Seconds, "Seconds"),
+                        (Snap::Frames, "Frames"),
+                    ] {
+                        ui.selectable_value(&mut self.timeline.snap, value, label);
+                    }
+                });
+                ui.separator();
                 let play =
                     helto::icon_button(ui, crate::icons::Icon::Play, "Play from playhead", false);
                 #[cfg(feature = "ui-preview")]
