@@ -5,7 +5,7 @@ use imagine_video_contract::captures::{Action, Request};
 #[derive(Default)]
 pub(super) struct State {
     pub open: bool,
-    confirm: Option<TakeId>,
+    pub(super) confirm: Option<TakeId>,
 }
 
 impl ImagineApp {

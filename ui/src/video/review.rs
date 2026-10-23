@@ -230,6 +230,16 @@ impl ImagineApp {
                         action = Some(value);
                     }
                 }
+                // Removal confirms in Captures, which also explains retained receipts.
+                let remove =
+                    helto::icon_button(ui, crate::icons::Icon::Trash, "Remove Take", false);
+                #[cfg(feature = "ui-preview")]
+                super::qa::control(ui, "take-remove".into(), &remove);
+                if remove.clicked() {
+                    self.timeline.clear_preview();
+                    self.timeline.captures.confirm = Some(TakeId(id.clone()));
+                    self.timeline.captures.open = true;
+                }
                 if outdated {
                     ui.weak("Inputs changed");
                 }

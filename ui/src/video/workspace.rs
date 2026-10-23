@@ -810,6 +810,73 @@ mod tests {
     }
 
     #[test]
+    fn take_strip_removes_a_take_through_the_capture_confirmation() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let project = super::super::media_picker::tests::project();
+        let scene = project.scenes[0].id.clone();
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-synthetic-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.document = Some(Snapshot::with(
+            project,
+            json!({"persistence":{"state":"saved"},
+                "takes":[{"id":"own-take","scene_id":scene,"status":"candidate","provenance":null}]}),
+        ));
+        app.timeline.selected.insert(scene);
+        app.timeline.selected_take = Some("own-take".into());
+        let frame = |app: &mut ImagineApp, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 800.),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            output.textures_delta.clear();
+            output.platform_output.accesskit_update.unwrap().nodes
+        };
+        let mut nodes = vec![];
+        for _ in 0..3 {
+            nodes = frame(&mut app, vec![]);
+        }
+        let bounds = nodes
+            .iter()
+            .find(|(_, n)| n.label() == Some("Remove Take"))
+            .and_then(|(_, n)| n.bounds())
+            .expect("Remove Take on the strip");
+        let pos = egui::pos2(
+            ((bounds.x0 + bounds.x1) / 2.) as f32,
+            ((bounds.y0 + bounds.y1) / 2.) as f32,
+        );
+        for pressed in [true, false] {
+            frame(
+                &mut app,
+                vec![
+                    egui::Event::PointerMoved(pos),
+                    egui::Event::PointerButton {
+                        pos,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: egui::Modifiers::NONE,
+                    },
+                ],
+            );
+        }
+        assert!(app.timeline.captures.open);
+        assert_eq!(
+            app.timeline.captures.confirm,
+            Some(TakeId("own-take".into()))
+        );
+    }
+
+    #[test]
     fn inspector_without_a_selection_shows_project_settings() {
         let root = tempfile::tempdir().unwrap();
         let ctx = egui::Context::default();
