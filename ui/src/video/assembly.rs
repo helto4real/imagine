@@ -712,7 +712,7 @@ impl ImagineApp {
 }
 // A new seam uses Director's three-frame overlap; persisted boundaries retain
 // their explicit overlap when reopened or when only their mode is edited.
-fn boundary_for(
+pub(super) fn boundary_for(
     project: &VideoProject,
     left: &SceneId,
     right: &SceneId,

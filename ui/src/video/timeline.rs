@@ -9,6 +9,25 @@ pub(super) struct Drag {
     origin: egui::Pos2,
     before: VideoProject,
 }
+fn boundary_label(mode: &imagine_video_contract::assembly::BoundaryMode) -> &'static str {
+    use imagine_video_contract::assembly::BoundaryMode;
+    match mode {
+        BoundaryMode::HardCut => "Hard cut",
+        BoundaryMode::ContinuousShot => "Continuous shot",
+        BoundaryMode::BlendSeam => "Blend seam",
+        BoundaryMode::Transition => "Generated transition",
+    }
+}
+fn boundary_glyph(mode: &imagine_video_contract::assembly::BoundaryMode) -> &'static str {
+    use imagine_video_contract::assembly::BoundaryMode;
+    match mode {
+        BoundaryMode::HardCut => "|",
+        BoundaryMode::ContinuousShot => "≈",
+        BoundaryMode::BlendSeam => "×",
+        BoundaryMode::Transition => "»",
+    }
+}
+
 pub(super) fn gesture(
     timeline: &mut Timeline,
     response: &egui::Response,
@@ -70,6 +89,11 @@ impl ImagineApp {
                 .prepare(whole, width, &mut self.timeline.zoom);
             ui.horizontal_wrapped(|ui| {
                 ui.strong("Timeline");
+                ui.weak(format!(
+                    "{:.0} s · {} fps",
+                    whole,
+                    seconds(project.delivery.fps)
+                ));
                 let mode = egui::ComboBox::from_id_salt("timeline-display")
                     .selected_text(self.timeline.navigation.display.label())
                     .show_ui(ui, |ui| {
@@ -317,7 +341,15 @@ impl ImagineApp {
                         helto::DIM,
                     );
                 }
+                // Scene titles are authored text and follow Hide previews.
+                let titles_revealed = helto::revealed(ui, canvas, self.prefs.privacy_mode);
+                let states: Vec<_> = project
+                    .scenes
+                    .iter()
+                    .map(|scene| self.timeline.scene_state(project, scene))
+                    .collect();
                 for (index, scene) in project.scenes.iter().enumerate() {
+                    let state = states[index];
                     let x = canvas.left() + seconds(scene.start) as f32 * self.timeline.zoom;
                     let w = seconds(scene.duration) as f32 * self.timeline.zoom;
                     let bar = Rect::from_min_size(
@@ -348,12 +380,34 @@ impl ImagineApp {
                             helto::FIELD
                         },
                     );
+                    if let Some(color) = state.color() {
+                        ui.painter().rect_filled(
+                            Rect::from_min_max(egui::pos2(bar.left(), bar.bottom() - 3.), bar.max),
+                            egui::CornerRadius {
+                                sw: 3,
+                                se: 3,
+                                ..Default::default()
+                            },
+                            color,
+                        );
+                    }
+                    let title = scene.description.lines().next().unwrap_or("").trim();
+                    let response = response.on_hover_text(format!(
+                        "Scene {} · {:.2} s · {}",
+                        index + 1,
+                        seconds(scene.duration),
+                        state.label()
+                    ));
                     ui.painter()
                         .with_clip_rect(bar.intersect(ui.clip_rect()))
                         .text(
                             bar.left_center() + egui::vec2(8., 0.),
                             egui::Align2::LEFT_CENTER,
-                            format!("{:02} · {:.2} s", index + 1, seconds(scene.duration)),
+                            if title.is_empty() || !titles_revealed {
+                                format!("{:02} · {:.2} s", index + 1, seconds(scene.duration))
+                            } else {
+                                format!("{:02} · {title}", index + 1)
+                            },
                             egui::FontId::proportional(12.),
                             if active {
                                 helto::ACCENT_TEXT
@@ -457,6 +511,12 @@ impl ImagineApp {
                             egui::pos2(x, bar.center().y),
                             egui::vec2(11., 18.),
                         );
+                        let mode = super::assembly::boundary_for(
+                            project,
+                            &project.scenes[index - 1].id,
+                            &scene.id,
+                        )
+                        .mode;
                         let response = ui
                             .interact(
                                 marker,
@@ -467,7 +527,11 @@ impl ImagineApp {
                                     Sense::hover()
                                 },
                             )
-                            .on_hover_text(format!("Boundary before Scene {}", index + 1));
+                            .on_hover_text(format!(
+                                "Boundary before Scene {} · {}",
+                                index + 1,
+                                boundary_label(&mode)
+                            ));
                         ui.painter().rect_filled(
                             marker,
                             3,
@@ -489,6 +553,13 @@ impl ImagineApp {
                                 },
                             ),
                             egui::StrokeKind::Inside,
+                        );
+                        ui.painter().text(
+                            marker.center(),
+                            egui::Align2::CENTER_CENTER,
+                            boundary_glyph(&mode),
+                            egui::FontId::proportional(10.),
+                            helto::DIM,
                         );
                         #[cfg(feature = "ui-preview")]
                         super::qa::control(ui, format!("boundary-{index}"), &response);

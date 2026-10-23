@@ -753,6 +753,57 @@ mod tests {
     }
 
     #[test]
+    fn scene_bars_show_titles_only_when_revealed_and_name_their_state() {
+        fn painted(shapes: &[egui::epaint::ClippedShape], needle: &str) -> bool {
+            fn find(shape: &egui::Shape, needle: &str) -> bool {
+                match shape {
+                    egui::Shape::Text(text) => text.galley.text().contains(needle),
+                    egui::Shape::Vec(shapes) => shapes.iter().any(|s| find(s, needle)),
+                    _ => false,
+                }
+            }
+            shapes.iter().any(|s| find(&s.shape, needle))
+        }
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let mut project = super::super::media_picker::tests::project();
+        project.scenes[0].description = "Own signal title\nmore".into();
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-synthetic-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.document = Some(Snapshot::with(
+            project.clone(),
+            json!({"persistence":{"state":"saved"}}),
+        ));
+        assert_eq!(
+            app.timeline.scene_state(&project, &project.scenes[0]),
+            SceneState::Empty
+        );
+        for (privacy, shown) in [(false, true), (true, false)] {
+            app.prefs.privacy_mode = privacy;
+            let mut output = egui::FullOutput::default();
+            for _ in 0..2 {
+                output.append(ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(1280., 800.),
+                        )),
+                        events: vec![egui::Event::PointerGone],
+                        focused: true,
+                        ..Default::default()
+                    },
+                    |ui| app.content(ui),
+                ));
+            }
+            output.textures_delta.clear();
+            assert_eq!(painted(&output.shapes, "01 · Own signal title"), shown);
+            assert!(!painted(&output.shapes, "more"));
+        }
+    }
+
+    #[test]
     fn narrow_windows_give_the_viewer_the_media_shelf_width() {
         for (width, shelf) in [(760., false), (1280., true)] {
             let root = tempfile::tempdir().unwrap();

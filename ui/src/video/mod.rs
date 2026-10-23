@@ -322,6 +322,34 @@ pub(super) enum FolderMode {
     SaveAs,
 }
 #[derive(Clone, Copy, PartialEq, Debug)]
+pub(super) enum SceneState {
+    Empty,
+    Candidates,
+    Accepted,
+    Outdated,
+    Generating,
+}
+impl SceneState {
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Self::Empty => "No Take yet",
+            Self::Candidates => "Takes to review",
+            Self::Accepted => "Accepted Take",
+            Self::Outdated => "Accepted Take is outdated",
+            Self::Generating => "Generating",
+        }
+    }
+    pub(super) fn color(self) -> Option<egui::Color32> {
+        match self {
+            Self::Empty => None,
+            Self::Candidates => Some(helto::DIM),
+            Self::Accepted => Some(helto::OK),
+            Self::Outdated => Some(helto::ERROR),
+            Self::Generating => Some(helto::FOCUS),
+        }
+    }
+}
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub(super) enum Replace {
     New,
     Open,
@@ -1564,6 +1592,36 @@ impl Timeline {
                 && job.matches(project, scene)
                 && job.status() == jobs::JobStatus::Running
         })
+    }
+    /// Where a scene stands, as shown on its Timeline bar.
+    fn scene_state(&self, project: &VideoProject, scene: &Scene) -> SceneState {
+        if self
+            .jobs
+            .iter()
+            .any(|j| j.matches(&project.id, &scene.id) && !j.terminal())
+        {
+            return SceneState::Generating;
+        }
+        let Some(document) = &self.document else {
+            return SceneState::Empty;
+        };
+        if let Some(accepted) = &scene.accepted_take {
+            return if document.take_state(&accepted.id).outdated {
+                SceneState::Outdated
+            } else {
+                SceneState::Accepted
+            };
+        }
+        if document
+            .view
+            .takes
+            .iter()
+            .any(|t| t.scene_id == scene.id && review::attached(document, t))
+        {
+            SceneState::Candidates
+        } else {
+            SceneState::Empty
+        }
     }
     fn scene_active(&self) -> bool {
         let Some(document) = &self.document else {
