@@ -81,6 +81,9 @@ impl Clipboard {
                     break;
                 }
             }
+            // Close the queue before reporting: a copy sent after `finish` must
+            // fail to send and stay with the native backend, not vanish here.
+            drop(rx);
             let _ = finished_tx.send(());
         });
         let hook_tx = tx.clone();
