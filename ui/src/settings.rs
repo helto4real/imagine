@@ -53,6 +53,20 @@ pub struct Preferences {
     pub sheet_width: u32,
     #[serde(default)]
     pub upscale_target: UpscaleTarget,
+    #[serde(default)]
+    pub layout: PanelLayout,
+}
+/// Pane sizes set by dragging dividers, in points; None uses the default.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PanelLayout {
+    pub dock: Option<f32>,
+    pub references: Option<f32>,
+    pub prompt: Option<f32>,
+    pub edit_inspector: Option<f32>,
+    pub shelf: Option<f32>,
+    pub inspector: Option<f32>,
+    pub tracks: Option<f32>,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum UpscaleTarget {
@@ -182,6 +196,7 @@ struct PublicUi {
     generation: GenerationSettings,
     sheet_width: u32,
     upscale_target: UpscaleTarget,
+    layout: PanelLayout,
 }
 impl Default for PublicUi {
     fn default() -> Self {
@@ -190,6 +205,7 @@ impl Default for PublicUi {
             generation: Default::default(),
             sheet_width: sheet_width(),
             upscale_target: Default::default(),
+            layout: Default::default(),
         }
     }
 }
@@ -354,6 +370,7 @@ impl PreferencesStore {
                 generation: public.generation,
                 sheet_width: public.sheet_width,
                 upscale_target: public.upscale_target,
+                layout: public.layout,
             },
             warning,
         ))
@@ -415,6 +432,7 @@ impl PreferencesStore {
                 generation: prefs.generation.clone(),
                 sheet_width: prefs.sheet_width,
                 upscale_target: prefs.upscale_target,
+                layout: prefs.layout,
             })?,
             runtime,
         )?;
@@ -437,6 +455,7 @@ impl Preferences {
                 generation: GenerationSettings::default(),
                 sheet_width: sheet_width(),
                 upscale_target: UpscaleTarget::default(),
+                layout: PanelLayout::default(),
             });
         }
         serde_json::from_slice(&std::fs::read(path)?).context("Could not read ui-settings.json.")
@@ -877,6 +896,10 @@ mod tests {
             preferred_prompt_profile: Some("own custom profile".into()),
             sheet_width: 1536,
             upscale_target: UpscaleTarget::K3,
+            layout: PanelLayout {
+                dock: Some(260.),
+                ..Default::default()
+            },
             generation: GenerationSettings {
                 steps: 24,
                 cfg_scale: 3.,

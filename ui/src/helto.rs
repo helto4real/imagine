@@ -274,6 +274,54 @@ fn paint_icon_button(ui: &mut egui::Ui, icon: Icon, label: &str, active: bool) -
     response
 }
 
+/// A pane divider drawn in the gap `handle`. Dragging moves it along the
+/// x axis for a vertical bar, else the y axis; double-click asks to reset.
+pub(crate) enum Divider {
+    Moved(f32),
+    Reset,
+}
+pub(crate) fn divider(
+    ui: &mut egui::Ui,
+    handle: egui::Rect,
+    vertical_bar: bool,
+    label: &str,
+) -> Option<Divider> {
+    let response = ui.interact(
+        handle,
+        ui.id().with(("divider", label)),
+        egui::Sense::click_and_drag(),
+    );
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Other, true, label));
+    let active = response.hovered() || response.dragged();
+    if active {
+        ui.ctx().set_cursor_icon(if vertical_bar {
+            egui::CursorIcon::ResizeHorizontal
+        } else {
+            egui::CursorIcon::ResizeVertical
+        });
+        let line = if vertical_bar {
+            egui::Rect::from_center_size(handle.center(), egui::vec2(2., handle.height() - 16.))
+        } else {
+            egui::Rect::from_center_size(handle.center(), egui::vec2(handle.width() - 16., 2.))
+        };
+        ui.painter().rect_filled(
+            line,
+            1,
+            if response.dragged() {
+                ACCENT
+            } else {
+                BORDER_HOVER
+            },
+        );
+    }
+    if response.double_clicked() {
+        return Some(Divider::Reset);
+    }
+    let delta = response.drag_delta();
+    let delta = if vertical_bar { delta.x } else { delta.y };
+    (response.dragged() && delta != 0.).then_some(Divider::Moved(delta))
+}
+
 pub fn select_button(ui: &mut egui::Ui, label: &str, active: bool) -> egui::Response {
     let galley = ui.painter().layout_no_wrap(
         label.into(),

@@ -165,6 +165,11 @@ pixels or fit, Ctrl+Enter Add to queue/Generate, Ctrl+P focus the prompt; in the
 Timeline Ctrl+Z Undo, Ctrl+Shift+Z or Ctrl+Y Redo, Delete/Backspace delete the
 selection and Ctrl+S Save project (also while typing).
 
+Drag the gaps between panes to resize the references, prompt and edit panels,
+the queue, and the Timeline's media shelf, inspector and timeline height.
+Sizes are kept with the other public UI settings; double-click a gap to restore
+its default. In a narrow window the media shelf makes room for the viewer.
+
 The gear opens a separate native **Settings** window with **Generation** (Steps,
 CFG, Reference size, Upscale target), **Models**, **Prompt enhancement**,
 **Storage** (output folder) and **Privacy** (Hide previews). Switches save at once;

@@ -159,7 +159,80 @@ impl ViewerProgress {
     }
 }
 
+/// A pane whose size the user can drag; see `settings::PanelLayout`.
+#[derive(Clone, Copy)]
+pub(super) enum Pane {
+    Dock,
+    References,
+    Prompt,
+    EditInspector,
+    Shelf,
+    Inspector,
+    Tracks,
+}
+impl Pane {
+    fn slot(self, layout: &mut crate::settings::PanelLayout) -> &mut Option<f32> {
+        match self {
+            Self::Dock => &mut layout.dock,
+            Self::References => &mut layout.references,
+            Self::Prompt => &mut layout.prompt,
+            Self::EditInspector => &mut layout.edit_inspector,
+            Self::Shelf => &mut layout.shelf,
+            Self::Inspector => &mut layout.inspector,
+            Self::Tracks => &mut layout.tracks,
+        }
+    }
+    fn label(self) -> &'static str {
+        match self {
+            Self::Dock => "Resize queue",
+            Self::References => "Resize references",
+            Self::Prompt => "Resize prompt panel",
+            Self::EditInspector => "Resize edit panel",
+            Self::Shelf => "Resize media shelf",
+            Self::Inspector => "Resize inspector",
+            Self::Tracks => "Resize timeline",
+        }
+    }
+}
+
 impl ImagineApp {
+    /// The pane's dragged size, or `default`, within `range`.
+    pub(super) fn pane_size(
+        &mut self,
+        pane: Pane,
+        default: f32,
+        range: std::ops::RangeInclusive<f32>,
+    ) -> f32 {
+        let (min, max) = (*range.start(), range.end().max(*range.start()));
+        pane.slot(&mut self.prefs.layout)
+            .unwrap_or(default)
+            .clamp(min, max)
+    }
+    /// The divider for `pane` in `gap`. `grow` is +1 when dragging right or
+    /// down enlarges the pane. Saved once the drag settles; double-click resets.
+    pub(super) fn pane_divider(
+        &mut self,
+        ui: &mut Ui,
+        pane: Pane,
+        gap: Rect,
+        size: f32,
+        grow: f32,
+        vertical_bar: bool,
+    ) {
+        match helto::divider(ui, gap, vertical_bar, pane.label()) {
+            Some(helto::Divider::Moved(delta)) => {
+                *pane.slot(&mut self.prefs.layout) = Some(size + delta * grow);
+                self.prefs_dirty = true;
+                ui.ctx().request_repaint();
+            }
+            Some(helto::Divider::Reset) => {
+                *pane.slot(&mut self.prefs.layout) = None;
+                self.prefs_dirty = true;
+            }
+            None => {}
+        }
+    }
+
     pub(super) fn viewer_progress(&self) -> ViewerProgress {
         let desk = self.desk();
         let mut progress = ViewerProgress {
@@ -230,7 +303,11 @@ impl ImagineApp {
         let dock_height = if self.queue.collapsed {
             44.
         } else {
-            (bounds.height() * 0.26).clamp(204., 240.)
+            self.pane_size(
+                Pane::Dock,
+                (bounds.height() * 0.26).clamp(204., 240.),
+                160.0..=(bounds.height() * 0.55),
+            )
         };
         let dock = Rect::from_min_max(
             egui::pos2(bounds.left() + 8., bounds.bottom() - dock_height - 8.),
@@ -267,6 +344,13 @@ impl ImagineApp {
             Workspace::Video => self.timeline_workspace(ui, body),
         });
         self.queue_panel(ui, dock);
+        if !self.queue.collapsed {
+            let gap = Rect::from_min_max(
+                egui::pos2(body.left(), body.bottom()),
+                egui::pos2(body.right(), dock.top()),
+            );
+            self.pane_divider(ui, Pane::Dock, gap, dock_height, -1., false);
+        }
         self.multiple_prompts_window(ui.ctx());
         if self.models.open {
             self.loras_window(ui.ctx());
@@ -428,9 +512,19 @@ impl ImagineApp {
             self.edit_workspace(ui, rect);
             return;
         }
-        let (references, viewer, prompt) = if rect.width() >= 900. {
-            let refs_width = (rect.width() * 0.195).clamp(180., 320.);
-            let prompt_width = (rect.width() * 0.235).clamp(240., 360.);
+        let wide = rect.width() >= 900.;
+        let (references, viewer, prompt) = if wide {
+            // The viewer keeps at least 320 points between the side panes.
+            let refs_width = self.pane_size(
+                Pane::References,
+                (rect.width() * 0.195).clamp(180., 320.),
+                160.0..=(rect.width() * 0.3),
+            );
+            let prompt_width = self.pane_size(
+                Pane::Prompt,
+                (rect.width() * 0.235).clamp(240., 360.),
+                240.0..=(rect.width() - refs_width - 336.).min(rect.width() * 0.4),
+            );
             let references = Rect::from_min_size(rect.min, egui::vec2(refs_width, rect.height()));
             let prompt = Rect::from_min_max(
                 egui::pos2(rect.right() - prompt_width, rect.top()),
@@ -460,11 +554,40 @@ impl ImagineApp {
         });
         region(ui, "viewer", viewer.shrink(10.), |ui| self.viewer(ui));
         region(ui, "prompt", prompt.shrink(12.), |ui| self.prompt_panel(ui));
+        if wide {
+            let gap = |a: Rect, b: Rect| {
+                Rect::from_min_max(
+                    egui::pos2(a.right(), a.top()),
+                    egui::pos2(b.left(), b.bottom()),
+                )
+            };
+            self.pane_divider(
+                ui,
+                Pane::References,
+                gap(references, viewer),
+                references.width(),
+                1.,
+                true,
+            );
+            self.pane_divider(
+                ui,
+                Pane::Prompt,
+                gap(viewer, prompt),
+                prompt.width(),
+                -1.,
+                true,
+            );
+        }
     }
 
     fn edit_workspace(&mut self, ui: &mut Ui, rect: Rect) {
-        let (viewer, inspector) = if rect.width() >= 900. {
-            let width = (rect.width() * 0.28).clamp(300., 380.);
+        let wide = rect.width() >= 900.;
+        let (viewer, inspector) = if wide {
+            let width = self.pane_size(
+                Pane::EditInspector,
+                (rect.width() * 0.28).clamp(300., 380.),
+                280.0..=(rect.width() * 0.5),
+            );
             (
                 Rect::from_min_max(
                     rect.min,
@@ -480,6 +603,13 @@ impl ImagineApp {
         };
         panel(ui, viewer, true);
         panel(ui, inspector, false);
+        if wide {
+            let gap = Rect::from_min_max(
+                egui::pos2(viewer.right(), rect.top()),
+                egui::pos2(inspector.left(), rect.bottom()),
+            );
+            self.pane_divider(ui, Pane::EditInspector, gap, inspector.width(), -1., true);
+        }
         region(ui, "edit-viewer", viewer.shrink(10.), |ui| self.viewer(ui));
         region(ui, "edit-inspector", inspector.shrink(12.), |ui| {
             egui::ScrollArea::vertical()

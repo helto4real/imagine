@@ -23,6 +23,7 @@ impl ImagineApp {
                 generation: Default::default(),
                 sheet_width: 1536,
                 upscale_target: Default::default(),
+                layout: Default::default(),
             },
         );
         app.client = Some(Client::connect(&app.connection).unwrap());

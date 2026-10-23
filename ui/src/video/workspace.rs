@@ -3,6 +3,8 @@ use super::*;
 use crate::app::workspace as chrome;
 use crate::icons::Icon;
 use egui::{Rect, RichText};
+/// Narrower than this, the media shelf yields its width to the viewer.
+const MIN_VIEWER: f32 = 360.;
 impl ImagineApp {
     pub(in crate::app) fn timeline_workspace(&mut self, ui: &mut egui::Ui, bounds: Rect) {
         self.timeline_catalog_install(ui.ctx());
@@ -11,16 +13,20 @@ impl ImagineApp {
         if self.timeline.zoom == 0. {
             self.timeline.zoom = 68.;
         }
-        let stacked_toolbar = bounds.width() < 1000.;
+        let stacked_toolbar = bounds.width() < 760.;
         let toolbar = Rect::from_min_size(
             bounds.min,
             egui::vec2(bounds.width(), if stacked_toolbar { 78. } else { 38. }),
         );
-        let timeline_h = if bounds.width() < 850. {
-            (bounds.height() * 0.35).clamp(224., 280.)
-        } else {
-            (bounds.height() * 0.29).clamp(160., 220.)
-        };
+        let timeline_h = self.pane_size(
+            chrome::Pane::Tracks,
+            if bounds.width() < 850. {
+                (bounds.height() * 0.35).clamp(224., 280.)
+            } else {
+                (bounds.height() * 0.29).clamp(160., 220.)
+            },
+            140.0..=(bounds.height() * 0.6),
+        );
         let tracks = Rect::from_min_max(
             egui::pos2(bounds.left(), bounds.bottom() - timeline_h),
             bounds.max,
@@ -93,15 +99,27 @@ impl ImagineApp {
             },
         );
         if let Some(document) = &document {
-            let left_w = if self.timeline.shelf_collapsed {
-                0.
-            } else {
-                (main.width() * 0.20).clamp(176., 230.)
-            };
             let right_w = if self.timeline.inspector_collapsed {
                 0.
             } else {
-                (main.width() * 0.25).clamp(220., 310.)
+                self.pane_size(
+                    chrome::Pane::Inspector,
+                    (main.width() * 0.25).clamp(220., 310.),
+                    220.0..=(main.width() * 0.45),
+                )
+            };
+            let shelf_w = self.pane_size(
+                chrome::Pane::Shelf,
+                (main.width() * 0.20).clamp(176., 230.),
+                160.0..=(main.width() * 0.35),
+            );
+            // A narrow window gives the viewer room first; the shelf returns when widened.
+            let left_w = if self.timeline.shelf_collapsed
+                || main.width() - right_w - shelf_w - 12. < MIN_VIEWER
+            {
+                0.
+            } else {
+                shelf_w
             };
             let left =
                 Rect::from_min_max(main.min, egui::pos2(main.left() + left_w, main.bottom()));
@@ -119,6 +137,30 @@ impl ImagineApp {
                 self.timeline_inspector(ui, right, document, enabled, &mut commands);
             }
             self.timeline_tracks(ui, tracks, &document.project, enabled, &mut commands);
+            let gap = |a: Rect, b: Rect| {
+                Rect::from_min_max(
+                    egui::pos2(a.right(), main.top()),
+                    egui::pos2(b.left(), main.bottom()),
+                )
+            };
+            if left_w > 0. {
+                self.pane_divider(ui, chrome::Pane::Shelf, gap(left, center), left_w, 1., true);
+            }
+            if right_w > 0. {
+                self.pane_divider(
+                    ui,
+                    chrome::Pane::Inspector,
+                    gap(center, right),
+                    right_w,
+                    -1.,
+                    true,
+                );
+            }
+            let gap = Rect::from_min_max(
+                egui::pos2(bounds.left(), main.bottom()),
+                egui::pos2(bounds.right(), tracks.top()),
+            );
+            self.pane_divider(ui, chrome::Pane::Tracks, gap, timeline_h, -1., false);
         } else {
             chrome::panel(ui, main, false);
             chrome::region(ui, "timeline-empty", main.shrink(24.), |ui| {
@@ -719,6 +761,44 @@ mod tests {
         app.timeline.selected.clear();
         refresh(&mut app, false);
         assert!(app.timeline.selected.is_empty());
+    }
+
+    #[test]
+    fn narrow_windows_give_the_viewer_the_media_shelf_width() {
+        for (width, shelf) in [(760., false), (1280., true)] {
+            let root = tempfile::tempdir().unwrap();
+            let ctx = egui::Context::default();
+            ctx.enable_accesskit();
+            let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+            let project = super::super::media_picker::tests::project();
+            app.workspace = Workspace::Video;
+            app.timeline.session = Some("own-synthetic-session".into());
+            app.timeline.session_checked = true;
+            app.timeline.document = Some(Snapshot::with(
+                project.clone(),
+                json!({"persistence":{"state":"saved"}}),
+            ));
+            app.timeline.selected.insert(project.scenes[0].id.clone());
+            let mut nodes = vec![];
+            for _ in 0..3 {
+                let mut output = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(width, 800.),
+                        )),
+                        ..Default::default()
+                    },
+                    |ui| app.content(ui),
+                );
+                output.textures_delta.clear();
+                nodes = output.platform_output.accesskit_update.unwrap().nodes;
+            }
+            let has = |label| nodes.iter().any(|(_, n)| n.label() == Some(label));
+            assert_eq!(has("Cast & references…"), shelf, "{width}");
+            assert_eq!(has("Resize media shelf"), shelf, "{width}");
+            assert!(has("Resize inspector") && has("Resize timeline"), "{width}");
+        }
     }
 
     #[test]

@@ -1572,3 +1572,58 @@ fn headless_icon_sheet() {
         combined.textures_delta.clear();
     }
 }
+
+#[test]
+fn pane_dividers_resize_save_once_settled_and_reset_on_double_click() {
+    let mut desk = Desk::new();
+    let prompt_width = |desk: &Desk| desk.control("Prompt").bounds().unwrap().width();
+    let before = prompt_width(&desk);
+    let handle = desk.control("Resize prompt panel").bounds().unwrap();
+    let start = egui::pos2(
+        (handle.x0 + handle.x1) as f32 / 2.,
+        (handle.y0 + handle.y1) as f32 / 2.,
+    );
+    let button = |pos, pressed| egui::Event::PointerButton {
+        pos,
+        button: egui::PointerButton::Primary,
+        pressed,
+        modifiers: egui::Modifiers::NONE,
+    };
+    desk.frame(vec![egui::Event::PointerMoved(start), button(start, true)]);
+    for step in 1..=4 {
+        desk.frame(vec![egui::Event::PointerMoved(
+            start - egui::vec2(15. * step as f32, 0.),
+        )]);
+    }
+    // Still dragging: the size is live but not yet saved.
+    let dragged = f64::from(desk.app.prefs.layout.prompt.unwrap());
+    assert!(dragged > before + 40., "{before} -> {dragged}");
+    assert!(
+        Preferences::load(desk._root.path())
+            .unwrap()
+            .layout
+            .prompt
+            .is_none()
+    );
+    let end = start - egui::vec2(60., 0.);
+    desk.frame(vec![button(end, false)]);
+    desk.frame(Vec::new());
+    assert!(prompt_width(&desk) > before + 40.);
+    assert_eq!(
+        Preferences::load(desk._root.path()).unwrap().layout.prompt,
+        desk.app.prefs.layout.prompt
+    );
+    // Double-click restores the default width.
+    let handle = desk.control("Resize prompt panel").bounds().unwrap();
+    let pos = egui::pos2(
+        (handle.x0 + handle.x1) as f32 / 2.,
+        (handle.y0 + handle.y1) as f32 / 2.,
+    );
+    for _ in 0..2 {
+        desk.frame(vec![egui::Event::PointerMoved(pos), button(pos, true)]);
+        desk.frame(vec![button(pos, false)]);
+    }
+    desk.frame(Vec::new());
+    assert!(desk.app.prefs.layout.prompt.is_none());
+    assert!((prompt_width(&desk) - before).abs() < 1.);
+}
