@@ -23,6 +23,10 @@ pub enum Edit {
     SetCreative {
         creative: crate::creative::Creative,
     },
+    /// Insert or replace one cast/visual reference by its ID.
+    UpsertVisualReference {
+        reference: crate::creative::VisualReference,
+    },
     SetSceneKind {
         scene_id: SceneId,
         kind: crate::creative::SceneKind,
@@ -144,6 +148,28 @@ pub fn apply(project: &mut VideoProject, request: EditRequest) -> Result<(), Iss
     for command in request.commands {
         match command {
             Edit::SetCreative { creative } => candidate.creative = creative,
+            Edit::UpsertVisualReference { reference } => {
+                check(
+                    !reference.id.is_empty(),
+                    "invalid_creative_reference",
+                    "reference.id",
+                )?;
+                check(
+                    reference.images.iter().all(|image| {
+                        candidate
+                            .assets
+                            .get(&image.asset)
+                            .is_some_and(|a| a.kind == MediaKind::Image)
+                    }),
+                    "reference_image_asset_invalid",
+                    "reference.images",
+                )?;
+                let references = &mut candidate.creative.references;
+                match references.iter_mut().find(|r| r.id == reference.id) {
+                    Some(existing) => *existing = reference,
+                    None => references.push(reference),
+                }
+            }
             Edit::SetSceneKind { scene_id, kind } => {
                 scene(&mut candidate, &scene_id)?;
                 candidate.creative.scene_kinds.insert(scene_id, kind);

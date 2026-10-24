@@ -287,3 +287,64 @@ fn sampling_preview_is_complete_bounded_and_never_counts_as_exported_av() {
             .is_err()
     );
 }
+#[test]
+fn failure_diagnostics_are_bounded_and_messages_only_select_kind_and_integers() {
+    use imagine_server::h3_protocol::{Failure, FailureKind, Stage, classify_message};
+    let (kind, sizes) = classify_message(
+        "The size of tensor a (7) must match the size of tensor b (8) at non-singleton dimension 2",
+    );
+    assert_eq!((kind, sizes), (FailureKind::ShapeMismatch, vec![7, 8, 2]));
+    assert_eq!(
+        classify_message("CUDA out of memory. Tried to allocate").0,
+        FailureKind::OutOfMemory
+    );
+    assert_eq!(
+        classify_message("expected scalar type Half but found Float").0,
+        FailureKind::TypeMismatch
+    );
+    assert_eq!(
+        classify_message("something private /home/user/secret").0,
+        FailureKind::Internal
+    );
+    let many = classify_message("shape [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]").1;
+    assert_eq!(many.len(), imagine_server::h3_protocol::MAX_FAILURE_SIZES);
+    let failure = Failure {
+        stage: Some(Stage::PreparingMotionContext),
+        kind: Some(FailureKind::ShapeMismatch),
+        exception: Some("RuntimeError".into()),
+        accelerator_code: None,
+        sizes: vec![7, 8],
+    };
+    assert!(failure.valid());
+    let event = imagine_server::h3_protocol::Event::Error {
+        id: Some("fixture-1".into()),
+        code: imagine_server::h3_protocol::ErrorCode::GenerationFailed,
+        failure: Some(failure.clone()),
+    };
+    let json = serde_json::to_value(&event).unwrap();
+    assert_eq!(json["failure"]["stage"], "preparing_motion_context");
+    assert_eq!(
+        serde_json::from_value::<imagine_server::h3_protocol::Event>(json).unwrap(),
+        event
+    );
+    // An error without diagnostics keeps the earlier shape.
+    let plain: imagine_server::h3_protocol::Event =
+        serde_json::from_str(r#"{"type":"error","id":null,"code":"generation_failed"}"#).unwrap();
+    assert!(matches!(
+        plain,
+        imagine_server::h3_protocol::Event::Error { failure: None, .. }
+    ));
+    for bad in [
+        Failure {
+            exception: Some("Not a class".into()),
+            ..Default::default()
+        },
+        Failure {
+            sizes: vec![1; 9],
+            ..Default::default()
+        },
+    ] {
+        assert!(!bad.valid());
+    }
+    assert!(serde_json::from_str::<Failure>(r#"{"message":"private"}"#).is_err());
+}

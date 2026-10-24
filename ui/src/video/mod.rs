@@ -1,5 +1,6 @@
 //! Native Timeline session. Server documents are authoritative; drafts/history stay in memory.
 use super::*;
+use crate::video_defaults::new_project;
 use imagine_video_contract::snapshot;
 use imagine_video_contract::{
     contract::*,
@@ -1902,29 +1903,6 @@ impl Timeline {
     }
 }
 
-/// A new project: the default canvas, Quick Draft 16:9, for five seconds.
-fn new_project() -> CreateProject {
-    let generation = imagine_video_contract::generation::Defaults::default();
-    let canvas = generation.canvas.clone().expect("default canvas");
-    let shape = crate::h3_protocol::Selection {
-        ratio: canvas.ratio,
-        portrait: canvas.portrait,
-        quality: canvas.quality,
-        seconds: 5.,
-    }
-    .resolve()
-    .expect("default video geometry");
-    CreateProject {
-        generation: Some(generation),
-        schema_version: 1,
-        default_model: imagine_video_contract::generation::h3_model("reference"),
-        delivery: DeliverySettings {
-            width: shape.width,
-            height: shape.height,
-            fps: Time { num: 24, den: 1 },
-        },
-    }
-}
 #[cfg(test)]
 mod mixed_selection_regression {
     use super::*;

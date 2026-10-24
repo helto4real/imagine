@@ -176,29 +176,48 @@ impl Grounding {
             {
                 return Err("story_image_missing");
             }
-            let resource=session.document().resources.iter().find(|r|matches!(&r.kind,ResourceKind::Reference{asset_id,..} if asset_id==&selection.asset)).ok_or("reference_resource_missing")?;
-            let mut file = session
-                .resource_file(&resource.id)
-                .map_err(|_| "resource_missing")?;
-            crate::video::media::detect(&file)?;
-            file.rewind().map_err(|_| "media_io_failed")?;
-            let mut bytes = vec![];
-            file.read_to_end(&mut bytes)
-                .map_err(|_| "media_io_failed")?;
-            let normalized = super::vision::normalize(&bytes)?;
-            images.push((
-                selection,
-                ProviderImage {
-                    mime: "image/jpeg".into(),
-                    base64: STANDARD.encode(normalized.jpeg),
-                },
-            ));
+            let image = normalized(session, &selection.asset)?;
+            images.push((selection, image));
         }
         Ok(Self {
             images,
             cast: json!(cast),
             opening,
         })
+    }
+    /// The enabled identity images of the requested cast, for an external agent.
+    pub fn identities(
+        session: &ProjectSession,
+        request: &Request,
+    ) -> Result<Vec<super::steps::Identity>, &'static str> {
+        let base = &session.document().project;
+        let mut out = vec![];
+        for id in &request.cast {
+            let r = base
+                .creative
+                .references
+                .iter()
+                .find(|r| &r.id == id)
+                .ok_or("cast_reference_missing")?;
+            if !r.enabled {
+                continue;
+            }
+            for image in r.images.iter().filter(|i| i.enabled) {
+                if base
+                    .assets
+                    .get(&image.asset)
+                    .is_none_or(|a| a.kind != MediaKind::Image)
+                {
+                    return Err("story_image_missing");
+                }
+                out.push(super::steps::Identity {
+                    image_id: image.id.clone(),
+                    label: format!("{} (@{})", r.name, r.alias.trim_start_matches('@')),
+                    image: normalized(session, &image.asset)?,
+                });
+            }
+        }
+        Ok(out)
     }
     pub fn selected(&self, ids: &[String]) -> Vec<ProviderImage> {
         self.images
@@ -207,4 +226,26 @@ impl Grounding {
             .map(|(_, p)| p.clone())
             .collect()
     }
+}
+/// A project image as the provider receives it.
+fn normalized(session: &ProjectSession, asset: &AssetId) -> Result<ProviderImage, &'static str> {
+    let resource = session
+        .document()
+        .resources
+        .iter()
+        .find(|r| matches!(&r.kind,ResourceKind::Reference{asset_id,..} if asset_id==asset))
+        .ok_or("reference_resource_missing")?;
+    let mut file = session
+        .resource_file(&resource.id)
+        .map_err(|_| "resource_missing")?;
+    crate::video::media::detect(&file)?;
+    file.rewind().map_err(|_| "media_io_failed")?;
+    let mut bytes = vec![];
+    file.read_to_end(&mut bytes)
+        .map_err(|_| "media_io_failed")?;
+    let normalized = super::vision::normalize(&bytes)?;
+    Ok(ProviderImage {
+        mime: "image/jpeg".into(),
+        base64: STANDARD.encode(normalized.jpeg),
+    })
 }

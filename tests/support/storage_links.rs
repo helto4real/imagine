@@ -109,7 +109,7 @@ async fn linked_original_http_save_reopen_and_relink_never_copies_reference_byte
     stop(h).await;
 }
 
-struct OwnVolume(std::sync::Mutex<String>);
+pub(super) struct OwnVolume(pub(super) std::sync::Mutex<String>);
 impl imagine_server::video_destination::Environment for OwnVolume {
     fn mounts(&self) -> imagine_server::video_destination::Result<String> {
         Ok(self.0.lock().unwrap().clone())
@@ -118,7 +118,9 @@ impl imagine_server::video_destination::Environment for OwnVolume {
         Ok("own-storage-http".into())
     }
 }
-fn private_volume(path: &Path) -> (imagine_server::private_storage::Root, Arc<OwnVolume>) {
+pub(super) fn private_volume(
+    path: &Path,
+) -> (imagine_server::private_storage::Root, Arc<OwnVolume>) {
     use imagine_server::video_destination as d;
     let mount = path.join("own-volume");
     let root = mount.join("imagine");
@@ -141,7 +143,7 @@ fn private_volume(path: &Path) -> (imagine_server::private_storage::Root, Arc<Ow
         .unwrap();
     (root, environment)
 }
-async fn setup_private(root: &imagine_server::private_storage::Root) -> Harness {
+pub(super) async fn setup_private(root: &imagine_server::private_storage::Root) -> Harness {
     let store = Store::open_private(root.clone(), "own-image-workspace".into())
         .await
         .unwrap();

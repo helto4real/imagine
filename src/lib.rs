@@ -51,6 +51,8 @@ pub mod h3_protocol;
 #[path = "../shared/short_av.rs"]
 pub mod short_av;
 
+#[path = "../shared/video_defaults.rs"]
+pub mod video_defaults;
 #[path = "../shared/video_destination.rs"]
 pub mod video_destination;
 

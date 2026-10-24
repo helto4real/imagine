@@ -34,13 +34,38 @@ fn native_error() -> Error {
     Error::Native("H3 product boundary failed".into())
 }
 fn classify(error: &Error, fallback: ErrorCode) -> ErrorCode {
-    match error.root() {
+    let root = error.root();
+    // The message only selects a kind and shape integers; its text is never sent.
+    let (kind, sizes) = p::classify_message(&root.to_string());
+    let (exception, accelerator_code) = match root {
+        Error::ReferenceException { class, .. } => (Some(*class), None),
+        Error::AcceleratorException { code, .. } => (None, Some(*code)),
+        _ => (None, None),
+    };
+    let oom = matches!(
+        root,
         Error::AcceleratorException { code: 2, .. }
-        | Error::ReferenceException {
-            class: "OutOfMemoryError",
-            ..
-        } => ErrorCode::OutOfMemory,
-        _ => fallback,
+            | Error::ReferenceException {
+                class: "OutOfMemoryError",
+                ..
+            }
+    );
+    let kind = match root {
+        _ if oom => p::FailureKind::OutOfMemory,
+        Error::AcceleratorException { .. } if kind == p::FailureKind::Internal => {
+            p::FailureKind::Accelerator
+        }
+        Error::ReferenceException {
+            class: "KeyError", ..
+        } => p::FailureKind::MissingTensor,
+        Error::BindingGap { .. } => p::FailureKind::NotImplemented,
+        _ => kind,
+    };
+    wire::record(kind, exception, accelerator_code, sizes);
+    if oom {
+        ErrorCode::OutOfMemory
+    } else {
+        fallback
     }
 }
 struct Models {
@@ -399,6 +424,9 @@ impl Generator for Native {
         let sampling = request.sampling.clone().unwrap_or_default();
         let output_shape = request.shape;
         let base_shape = sampling.input_shape(output_shape);
+        if request.continuation.is_some() {
+            wire::stage(p::Stage::PreparingContinuation);
+        }
         let (mut shape, head, guide) = request
             .continuation
             .as_ref()
@@ -427,7 +455,8 @@ impl Generator for Native {
         };
         let start = Instant::now();
         let dev = Device::Cuda(0);
-        let phase = |emit: &mut Emit<'_>, phase| {
+        let phase = |emit: &mut Emit<'_>, phase: Phase| {
+            wire::stage(phase.into());
             emit(
                 &Event::Phase {
                     id: request.id.clone(),
@@ -603,6 +632,7 @@ impl Generator for Native {
         )?;
         let keyframe_latent = if let Some(image) = &start_image {
             phase(emit, Phase::LoadingVideoVae)?;
+            wire::stage(p::Stage::EncodingStartImage);
             Some(component(
                 &rt,
                 &aimdo,
@@ -643,6 +673,7 @@ impl Generator for Native {
         if let (Some(input), Some(context)) = (&request.continuation, &context_tail)
             && input.method == p::continuation::Method::MotionContext
         {
+            wire::stage(p::Stage::PreparingMotionContext);
             keys.push(h3::layout::Keyframe {
                 resolved_frame_index: i64::from(guide),
                 video_t: Some(7),
@@ -656,6 +687,7 @@ impl Generator for Native {
         let mut reference_blocks = vec![];
         if !reference_images.is_empty() {
             phase(emit, Phase::LoadingVideoVae)?;
+            wire::stage(p::Stage::EncodingReferences);
             let reference_shape = p::Shape {
                 width: reference_images
                     .iter()
@@ -1032,11 +1064,24 @@ impl Generator for Native {
                     };
                     let mask =
                         if let (Some(input), Some(context)) = (&request.continuation, context) {
+                            wire::stage(p::Stage::PreparingMotionContext);
+                            // Reference images sit between the keyframes and the target.
+                            let keyframe_rows = keys
+                                .iter()
+                                .map(|key| {
+                                    key.video_t.unwrap_or(0)
+                                        * i64::from(shape.width / 32)
+                                        * i64::from(shape.height / 32)
+                                        + key.audio_t.unwrap_or(0) * 2
+                                })
+                                .sum();
                             exec.window = Some(super::motion::Window::new(
                                 input,
                                 shape,
                                 conditioning.context.size()[1],
-                            ));
+                                keyframe_rows,
+                                super::reference_window::rows(&reference_blocks),
+                            )?);
                             if input.method == p::continuation::Method::MotionContextExp {
                                 let values = latent.unbind();
                                 let values = values.borrow();
@@ -1071,6 +1116,7 @@ impl Generator for Native {
                             }
                             None
                         };
+                    wire::stage(p::Stage::Sampling);
                     let noise = if index == 0 {
                         latent.prepare_noise(request.seed, None)?
                     } else {
@@ -1189,6 +1235,7 @@ impl Generator for Native {
         }
         drop(conditioning);
         if request.capture_continuation {
+            wire::stage(p::Stage::CapturingContinuation);
             let artifact = super::motion::capture(
                 &latents.0,
                 &latents.1,
@@ -1324,7 +1371,15 @@ fn run_inner(observer: Option<Observer>) -> Result<(), ErrorCode> {
     let config = match config {
         Ok(config) => config,
         Err(code) => {
-            let _ = wire::write(&mut output, &Event::Error { id: None, code }, &[]);
+            let _ = wire::write(
+                &mut output,
+                &Event::Error {
+                    id: None,
+                    code,
+                    failure: None,
+                },
+                &[],
+            );
             return Err(code);
         }
     };

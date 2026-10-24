@@ -82,6 +82,7 @@ fn check(value: &Value, ty: &str, location: &str, issues: &mut Vec<String>) {
         "object" => value.is_object(),
         "array" => value.is_array(),
         "integer" => value.is_i64() || value.is_u64(),
+        "boolean" => value.is_boolean(),
         _ => true,
     };
     if !ok {
@@ -89,6 +90,7 @@ fn check(value: &Value, ty: &str, location: &str, issues: &mut Vec<String>) {
             "string" => ("string_type", "Input should be a valid string"),
             "object" => ("dict_type", "Input should be a valid dictionary"),
             "array" => ("list_type", "Input should be a valid list"),
+            "boolean" => ("bool_type", "Input should be a valid boolean"),
             _ => ("int_type", "Input should be a valid integer"),
         };
         issues.push(issue(location, code, message, value));

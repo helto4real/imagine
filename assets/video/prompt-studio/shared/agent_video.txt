@@ -1,0 +1,73 @@
+Imagine video authoring for an external agent
+
+This guidance covers how an agent drives Imagine's Story authoring. The selected prompt profile's text is the creative and narrative guidance; it is delivered verbatim and applies unchanged. Nothing here replaces, narrows or overrides it.
+
+1. Story source: Develop or Adapt
+
+- Adapt: when the user supplies a story, pass it unchanged as the Draft `brief`.
+- Develop: when the user gives an open idea or premise, first develop the plot progression within that premise yourself, then pass the developed story as the `brief`.
+Once the brief is set, it is the story source for the outline and every expansion, and the profile's rules about supplied stories apply to it.
+
+2. The context bundle
+
+Starting a Draft with `provider: "external"` returns a bundle with everything the local provider would be given:
+- `inventory`: the image-inventory system prompt and one user message per story image.
+- `outline`: the outline system prompt, the rendered user message and its JSON schema.
+- `expansion`: the Scene-expansion system prompt, one user message template and the Scene shape.
+- `images`: every story image (role `story`) and the selected cast's identity images (role `cast`).
+- `profile`, `limits` and `code_owned_fields`.
+Treat each system prompt as the instructions for that step and each user message as its task, exactly as the provider would. Dialogue variants are already selected by `add_dialogue`.
+
+User messages contain slots written as {{SLOT:name}}, listed in `slots`. They stand for values from your own work:
+- `image_inventory`: your inventory notes as a JSON array of {id, note}, in story image order.
+- `previous_scene_context`: your expansion of the previous Scene as compact JSON; for the first Scene, the value given in `slot_values` (an existing Scene when continuing a timeline, otherwise null).
+- `next_scene_summary`: the next outline Scene's summary; empty for the last Scene.
+- `scene_json`: this Scene from your outline, as projected by the server.
+- `image_context`: the `with_images` text when the Scene uses any story image, otherwise `without_images`.
+
+3. One submission
+
+Write everything in one pass, then submit it in one call:
+- `inventory`: one note per story image, by image id.
+- `outline`: the outline answer, as JSON text matching the outline schema.
+- `expansions`: one expansion answer per outline Scene, in order, as JSON text in the Scene shape.
+- `production`: one entry per outline Scene, in order.
+Submit with `dry_run: true` first. The server parses and validates everything, checks the plan on a copy of the project and reports each Scene's model, continuity, planned seconds and blockers. Submit again with `dry_run: false` to apply it. Errors name a stable code and where it was found (`inventory`, `outline`, `expansions[i]`, `production.scenes[i]`) and change nothing.
+When the Scenes cannot hold `duration_seconds` (`story_scene_duration_capacity`), `detail` is `minimum_scenes=N`: write at least N Scenes, none longer than `limits.max_scene_seconds`.
+
+4. Code-owned fields
+
+The server assigns Scene and Section ids and image assignments when it projects the outline: `setting_reference_matches` become the Scene's `image_ids`, and `visual_placements` become Section `image_ids`, `first_frame_id` and `last_frame_id`. In an expansion these fields are copied from the projected outline Scene; you may omit them. An expansion keeps the outline Scene's weight, boundary, number of Sections, Section weights and dialogue participants; it rewrites the text.
+
+5. Production block
+
+Each entry is {"model": "reference" | "i2v", "continuity": null | {"method", "include_audio"}, "rationale"}.
+- `model` is required.
+- `continuity` is only for a Scene whose `boundary_from_previous` is `continuous_shot`; leave it null otherwise. `method: "auto"` resolves by the target model, as `limits.continuity` reports.
+- `rationale` is a planning note; it never reaches a prompt.
+
+6. Reference or I2V
+
+Default to `reference`. Use `i2v` only when the Scene must start from one specific image.
+- `reference`: every Scene with cast members, including a continuous shot, which carries motion over from the previous clip (section 7). Also several independent visual references in one Scene, or no image input at all. Each cast member keeps their identity picture as a subject reference.
+- `i2v`: animating one specific image you have, supplied or generated, from its composition. I2V has exactly one image input, the opening frame (frame zero); there is no end-frame input. A start frame for I2V is a story image with usage `start_frame` paired with its own id (`pair_with`), placed on the Scene's first Section. Setting references, required moments, end frames and frames on later Sections are not I2V inputs; use `reference` for those Scenes.
+I2V carries no identity references: cast members are known only from the opening frame and from text, and each cast tag in the Scene's text is replaced by that member's full description. Do not choose `i2v` to continue a shot with cast members; use `reference` with motion continuity. A dry run warns with `i2v_cast_identity_text_only` when an I2V Scene names cast members.
+The number of available images is not the deciding factor.
+
+7. Boundaries and continuity
+
+- `hard_cut`: a deliberate cut to a different view, location, time or beat. Clothing, object state and identity carry over unless the story changes them; state them in the new Scene when its images do not.
+- `continuous_shot`: the same visible action continues without an intended cut, including a split forced by the Scene length limit.
+The first Scene can be a continuous shot only when continuing a timeline (`destination: continue`).
+For a continuous shot, the target Scene's model decides the mechanism:
+- `reference` (the normal choice): motion carry-over (combo, influence, motion_context or motion_context_exp) with the cast identity references kept.
+- `i2v`: the previous clip's last frame becomes this Scene's opening frame (`last_frame_first_frame`). Only for a continuation without cast members to preserve. An I2V Scene has exactly one opening frame, so it then has no start-frame image of its own.
+A continuous shot planned before rendering waits for the previous Scene's accepted take; the run generates the Scenes in order, so this is never a blocker. A dry run warns about it (`continuity_source_pending`) only for I2V last-frame continuity.
+
+8. Cast identity images
+
+Images with role `cast` show the selected cast members, labelled with their name and reference tag. They identify who a character is; they do not fix a frame, pose or composition. Refer to cast members by the reference tags in the outline and expansions as the profile describes.
+
+9. Provider settings
+
+The profile's generation settings (temperature, token limits) are reported for information only; they describe the local provider and do not apply to an external agent.

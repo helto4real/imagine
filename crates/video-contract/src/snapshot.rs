@@ -23,6 +23,9 @@ pub struct PersistenceStatus {
     pub state: SaveState,
     pub saved_revision: Option<u64>,
     pub error_code: Option<String>,
+    /// The folder a bound project saves to; absent while session-only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub location: Option<std::path::PathBuf>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

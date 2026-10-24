@@ -3,13 +3,46 @@ use crate::config::Config;
 use anyhow::{Result, anyhow, bail};
 use serde_json::Value;
 #[derive(Debug)]
-struct Rejected(reqwest::StatusCode, String);
+struct Rejected(reqwest::StatusCode, String, Option<String>, Option<String>);
 impl std::fmt::Display for Rejected {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Imagine {}: {}", self.0, self.1)
     }
 }
 impl std::error::Error for Rejected {}
+/// A validated Imagine rejection: HTTP status, stable code, field path and short detail.
+pub struct Rejection<'a> {
+    pub status: u16,
+    pub code: &'a str,
+    pub at: Option<&'a str>,
+    pub detail: Option<&'a str>,
+}
+pub fn rejection(error: &anyhow::Error) -> Option<Rejection<'_>> {
+    error.downcast_ref::<Rejected>().map(|e| Rejection {
+        status: e.0.as_u16(),
+        code: &e.1,
+        at: e.2.as_deref(),
+        detail: e.3.as_deref(),
+    })
+}
+pub(crate) fn stable_code(code: &str) -> bool {
+    code.len() <= 128
+        && code.starts_with(|c: char| c.is_ascii_lowercase())
+        && code
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+}
+/// Field paths such as `expansions[3]` or `production.scenes[0].continuity`.
+fn field_path(at: &str) -> bool {
+    !at.is_empty()
+        && at.len() <= 128
+        && at
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"_.[]".contains(&b))
+}
+fn short_detail(detail: &str) -> bool {
+    !detail.is_empty() && detail.chars().count() <= 500 && !detail.chars().any(char::is_control)
+}
 pub fn retryable(error: &anyhow::Error) -> bool {
     error
         .downcast_ref::<Rejected>()
@@ -38,6 +71,9 @@ impl Client {
             session: Some(session),
             ..self.clone()
         }
+    }
+    pub fn session_id(&self) -> Option<&str> {
+        self.session.as_deref()
     }
     fn bound(&self, request: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         if let Some(id) = &self.session {
@@ -82,15 +118,39 @@ impl Client {
             let status = response.status();
             // Imagine errors contain stable codes, never prompts or credentials.
             let value = response.json::<Value>().await.unwrap_or(Value::Null);
-            let code = value["error"]["code"]
+            // Both `{"error":{"code","at","detail"}}` and `{"error":code,"at","detail"}`.
+            let error = if value["error"].is_string() {
+                &value
+            } else {
+                &value["error"]
+            };
+            let text = |v: &Value, valid: fn(&str) -> bool| {
+                v.as_str().filter(|s| valid(s)).map(str::to_owned)
+            };
+            let code = value["error"]
                 .as_str()
-                .filter(|s| {
-                    s.len() <= 128 && s.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
-                })
+                .or(error["code"].as_str())
+                .filter(|s| stable_code(s))
                 .unwrap_or("operation_rejected");
-            return Err(Rejected(status, code.to_owned()).into());
+            return Err(Rejected(
+                status,
+                code.to_owned(),
+                text(&error["at"], field_path),
+                text(&error["detail"], short_detail),
+            )
+            .into());
         };
         Ok(response.json().await?)
+    }
+    /// Link an original for a video project in place, as the Director media import does.
+    pub async fn link_video(&self, path: &std::path::Path) -> Result<Value> {
+        self.json(
+            reqwest::Method::POST,
+            "/v1/video/assets/link",
+            Some(&serde_json::json!({"path":path})),
+            None,
+        )
+        .await
     }
     pub async fn link(&self, path: &std::path::Path) -> Result<Value> {
         let r = self

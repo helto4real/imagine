@@ -1,5 +1,7 @@
 //! Editable source proposals. These types never contain credentials or model-family syntax.
-use crate::contract::{AssetId, ProjectId, Scene, SceneId, SectionId, VideoProject};
+use crate::contract::{
+    AssetId, ContinuityMethod, ProjectId, Scene, SceneId, SectionId, VideoProject,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -243,6 +245,97 @@ pub struct Draft {
     /// The rows of a whole-Scene enhancement.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<FieldProposal>,
+    /// Model and continuity per outline Scene, chosen by an external agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub production: Option<Production>,
+}
+/// Choices the prompt profiles do not write, aligned to the outline's Scenes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Production {
+    pub scenes: Vec<ProductionScene>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProductionModel {
+    Reference,
+    I2v,
+}
+impl ProductionModel {
+    pub fn variant(self) -> &'static str {
+        match self {
+            Self::Reference => "reference",
+            Self::I2v => "i2v",
+        }
+    }
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProductionScene {
+    pub model: ProductionModel,
+    /// Only for a Scene whose boundary is a continuous shot.
+    #[serde(default)]
+    pub continuity: Option<ContinuityChoice>,
+    /// A planning note; never compiled into a prompt.
+    #[serde(default)]
+    pub rationale: String,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ContinuityChoice {
+    /// `auto` (none) resolves by the target variant.
+    #[serde(default, with = "auto_method")]
+    pub method: Option<ContinuityMethod>,
+    #[serde(default)]
+    pub include_audio: bool,
+}
+mod auto_method {
+    use super::ContinuityMethod;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    #[derive(Serialize, Deserialize)]
+    #[serde(untagged)]
+    enum Choice {
+        Auto(Auto),
+        Method(ContinuityMethod),
+    }
+    #[derive(Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    enum Auto {
+        Auto,
+    }
+    pub fn serialize<S: Serializer>(
+        value: &Option<ContinuityMethod>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        match value {
+            None => Choice::Auto(Auto::Auto),
+            Some(method) => Choice::Method(method.clone()),
+        }
+        .serialize(serializer)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<ContinuityMethod>, D::Error> {
+        Ok(match Choice::deserialize(deserializer)? {
+            Choice::Auto(_) => None,
+            Choice::Method(method) => Some(method),
+        })
+    }
+}
+/// An external agent's complete Story: inventory notes, the outline answer,
+/// one expansion answer per Scene and the production block.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Submission {
+    pub schema_version: u32,
+    pub expected_project_revision: u64,
+    #[serde(default)]
+    pub inventory: Vec<InventoryNote>,
+    pub outline: String,
+    pub expansions: Vec<String>,
+    #[serde(default)]
+    pub production: Option<Production>,
+    pub dry_run: bool,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

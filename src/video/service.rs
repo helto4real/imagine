@@ -3,7 +3,7 @@ use super::{bundle::Directory, contract::*, persistence::*, project::ProjectServ
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
 };
 
 #[derive(Default)]
@@ -32,6 +32,12 @@ pub struct Snapshot {
     pub runtime_takes: BTreeMap<TakeId, String>,
     pub take_states: BTreeMap<TakeId, super::review::TakeState>,
 }
+fn check_location(path: &Path, session_data: &Path) -> Result<(), StorageError> {
+    if !path.is_absolute() || path.starts_with(session_data) || session_data.starts_with(path) {
+        return Err(StorageError::new("invalid_project_location"));
+    }
+    Ok(())
+}
 impl Service {
     pub fn with_reference_cache(
         reference_cache: Option<std::sync::Arc<dyn super::reference_cache::Control>>,
@@ -51,14 +57,48 @@ impl Service {
             take_states: super::review::states(project.document()),
         })
     }
+    /// Create only a missing leaf folder for an explicit location, never its
+    /// parents. Private storage creates it only inside an approved root.
+    pub fn create_location(
+        &self,
+        path: &Path,
+        session_data: &Path,
+        private: Option<&crate::private_storage::Root>,
+    ) -> Result<(), StorageError> {
+        check_location(path, session_data)?;
+        if path
+            .components()
+            .any(|part| !matches!(part, Component::RootDir | Component::Normal(_)))
+        {
+            return Err(StorageError::new("invalid_project_location"));
+        }
+        self.projects.outside_projects(path)?;
+        if std::fs::symlink_metadata(path).is_ok() {
+            return Ok(());
+        }
+        if let Some(root) = private {
+            return root.create_location(path).map_err(StorageError::new);
+        }
+        let parent = path
+            .parent()
+            .ok_or_else(|| StorageError::new("invalid_project_location"))?;
+        if std::fs::symlink_metadata(parent)
+            .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+        {
+            return Err(StorageError::new("location_parent_missing"));
+        }
+        use std::os::unix::fs::DirBuilderExt;
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(path)
+            .map_err(|_| StorageError::new("storage_io_failed"))
+    }
     pub fn select_location(
         &mut self,
         path: &Path,
         session_data: &Path,
     ) -> Result<String, StorageError> {
-        if !path.is_absolute() || path.starts_with(session_data) || session_data.starts_with(path) {
-            return Err(StorageError::new("invalid_project_location"));
-        }
+        check_location(path, session_data)?;
         let directory = Directory::select(path)?;
         let id = format!("location_{}", uuid::Uuid::new_v4().simple());
         self.locations.insert(

@@ -154,7 +154,16 @@ impl Window {
             weights,
         }
     }
-    pub fn new(input: &c::Input, shape: p::Shape, text: i64) -> Self {
+    /// The sequence is [text][keyframes][reference blocks][audio][video].
+    /// `keyframes` counts every keyframe row, including a MotionContext guide,
+    /// which is the last keyframe; `references` counts the reference block rows.
+    pub fn new(
+        input: &c::Input,
+        shape: p::Shape,
+        text: i64,
+        keyframes: i64,
+        references: i64,
+    ) -> Result<Self, Error> {
         let frame = i64::from(shape.height / 32) * i64::from(shape.width / 32);
         let video_rows = shape.video_latent_t() * frame;
         let audio_rows = shape.audio_latent_t() * 2;
@@ -163,14 +172,18 @@ impl Window {
         } else {
             0
         };
-        let minimum = text + guide_rows + audio_rows + video_rows;
+        if keyframes < guide_rows || references < 0 {
+            return Err(error());
+        }
+        let target = text + keyframes + references;
+        let minimum = target + audio_rows + video_rows;
         let limited = if input.method == c::Method::MotionContext {
-            vec![(text, text + guide_rows)]
+            vec![(text + keyframes - guide_rows, text + keyframes)]
         } else {
-            let mut ranges = vec![(text + audio_rows, text + audio_rows + 7 * frame)];
+            let mut ranges = vec![(target + audio_rows, target + audio_rows + 7 * frame)];
             if input.include_audio {
                 for channel in 0..2 {
-                    let start = text + channel * shape.audio_latent_t();
+                    let start = target + channel * shape.audio_latent_t();
                     ranges.push((start, start + 37));
                 }
             }
@@ -186,12 +199,12 @@ impl Window {
             .into_iter()
             .flat_map(|w| std::iter::repeat_n(w, frame as usize))
             .collect();
-        Self {
+        Ok(Self {
             minimum,
             video_rows,
             limited,
             weights,
-        }
+        })
     }
     pub fn run(
         &self,
@@ -415,5 +428,118 @@ mod tests {
         assert_eq!(decoded.0.size(), [1, 24, 7, 4, 6]);
         assert!(values(&decoded.0).iter().all(|v| *v == 1.));
         assert!(values(&decoded.1).iter().all(|v| *v == 0.25));
+    }
+    fn window_input(method: c::Method, include_audio: bool) -> c::Input {
+        let shape = p::Shape {
+            width: 64,
+            height: 32,
+            frames: 56,
+            fps: 24,
+        };
+        c::Input {
+            method,
+            include_audio,
+            descriptor: c::Descriptor {
+                schema_version: 1,
+                shape,
+                sampled_frames: 56,
+                visible_end_frame: 56,
+                selected_end_frame: 56,
+                handoff_upscale: None,
+            },
+            sha256: "a".repeat(64),
+        }
+    }
+    #[test]
+    fn motion_windows_place_the_guide_and_prefix_after_keyframes_and_reference_blocks() {
+        use crate::models::minimax_h3::layout::{ReferenceBlock, ReferenceKind};
+        let shape = p::Shape {
+            width: 64,
+            height: 32,
+            frames: 56,
+            fps: 24,
+        };
+        let frame = 2;
+        let (audio_rows, video_rows) = (shape.audio_latent_t() * 2, shape.video_latent_t() * frame);
+        let image = ReferenceBlock {
+            kind: ReferenceKind::Image,
+            latent_t: 1,
+            latent_h: 4,
+            latent_w: 4,
+            ref_audio_t: 0,
+        };
+        let references = super::super::reference_window::rows(&[image.clone(), image.clone()]);
+        assert_eq!(references, 8);
+        // MotionContext: the guide is the last keyframe, before the reference blocks.
+        let guide = 7 * frame;
+        let context = window_input(c::Method::MotionContext, false);
+        for (keyframes, start) in [(guide, 2), (guide + 4, 6)] {
+            let window = Window::new(&context, shape, 2, keyframes, references).unwrap();
+            assert_eq!(window.limited, vec![(start, start + guide)]);
+            assert_eq!(
+                window.minimum,
+                2 + keyframes + references + audio_rows + video_rows
+            );
+        }
+        assert!(Window::new(&context, shape, 2, guide - 1, references).is_err());
+        // Exp/Combo/Influence: the restricted prefix is inside the target, after the references.
+        let exp = window_input(c::Method::MotionContextExp, true);
+        let window = Window::new(&exp, shape, 2, 0, references).unwrap();
+        let target = 2 + references;
+        let mut expected = vec![
+            (target, target + 37),
+            (
+                target + shape.audio_latent_t(),
+                target + shape.audio_latent_t() + 37,
+            ),
+            (target + audio_rows, target + audio_rows + 7 * frame),
+        ];
+        expected.sort_unstable();
+        assert_eq!(window.limited, expected);
+        assert_eq!(window.minimum, target + audio_rows + video_rows);
+        // The sequence now matches; the old length without reference rows did not.
+        let attention = |q: &Tensor, k: &Tensor, v: &Tensor| -> Result<Tensor, Error> {
+            let d = q.size();
+            Ok(q.f_matmul(&k.f_transpose(2, 3)?)?
+                .f_softmax(-1, Kind::Double)?
+                .f_matmul(v)?
+                .f_transpose(1, 2)?
+                .f_contiguous()?
+                .f_view([d[0], d[2], d[1] * d[3]])?)
+        };
+        let tokens = |n: i64| Tensor::zeros([1, 1, n, 3], (Kind::Double, Device::Cpu));
+        let full = tokens(window.minimum);
+        assert!(window.run(&full, &full, &full, attention).is_ok());
+        let legacy = Window::new(&exp, shape, 2, 0, 0).unwrap();
+        assert!(legacy.run(&full, &full, &full, attention).is_err());
+    }
+    #[test]
+    fn reference_rows_match_the_boundary_window_layout() {
+        use crate::models::minimax_h3::layout::{ReferenceBlock, ReferenceKind};
+        let shape = p::Shape {
+            width: 64,
+            height: 32,
+            frames: 56,
+            fps: 24,
+        };
+        let block = |kind, latent_t, latent_h, latent_w, ref_audio_t| ReferenceBlock {
+            kind,
+            latent_t,
+            latent_h,
+            latent_w,
+            ref_audio_t,
+        };
+        let blocks = [
+            block(ReferenceKind::Image, 1, 4, 4, 0),
+            block(ReferenceKind::Audio, 0, 0, 0, 3),
+            block(ReferenceKind::VideoAudio, 2, 2, 4, 2),
+            block(ReferenceKind::Video, 3, 4, 2, 0),
+        ];
+        let window = super::super::reference_window::prepare(shape, 2, 3, &blocks).unwrap();
+        let rows = super::super::reference_window::rows(&blocks);
+        assert_eq!(
+            window.minimum,
+            2 + 3 + rows + shape.audio_latent_t() * 2 + shape.video_latent_t() * 2
+        );
     }
 }

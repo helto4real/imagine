@@ -62,6 +62,7 @@ async fn run() -> Result<()> {
     let mut comfy_root = None;
     let mut comfy_python = None;
     let mut rust_runtime = None;
+    let mut project_roots = vec![];
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -87,6 +88,9 @@ async fn run() -> Result<()> {
                     args.next().context("--rust-runtime needs a path")?,
                 ))
             }
+            "--private-project-root" => project_roots.push(PathBuf::from(
+                args.next().context("--private-project-root needs a path")?,
+            )),
             "--comfy-root" => {
                 comfy_root = Some(PathBuf::from(
                     args.next().context("--comfy-root needs a path")?,
@@ -99,7 +103,7 @@ async fn run() -> Result<()> {
             }
             "--help" => {
                 println!(
-                    "imagine-server [--project PATH] [--data PATH] [--profiles PATH] [--bind 127.0.0.1:8080] [--backend rust|native|comfy] [--rust-runtime PATH] [--comfy-root PATH --comfy-python PATH]"
+                    "imagine-server [--project PATH] [--data PATH] [--profiles PATH] [--bind 127.0.0.1:8080] [--backend rust|native|comfy] [--rust-runtime PATH] [--comfy-root PATH --comfy-python PATH] [--private-project-root PATH ...]"
                 );
                 return Ok(());
             }
@@ -135,6 +139,11 @@ async fn run() -> Result<()> {
     let private = imagine_server::private_storage::Root::system()
         .and_then(|root| root.with_runtime_directory(runtime.clone()))
         .map_err(anyhow::Error::msg)?;
+    let (private, warnings) =
+        imagine_server::config::private_project_roots(private, &project_roots);
+    for warning in warnings {
+        eprintln!("{warning}");
+    }
     let workspace = image_workspace(&private)?;
     let layout = private.project(&workspace).map_err(anyhow::Error::msg)?;
     if data.as_ref().is_some_and(|path| *path != layout.work) {

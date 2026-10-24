@@ -75,6 +75,10 @@ assert q['kind']=='generate_video' and q['seed']==42
 if q['prompt']=='hang':time.sleep(60)
 if q['prompt']=='failure':
  emit(dict(type='error',id=q['id'],code='generation_failed'));sys.exit(0)
+if q['prompt']=='diagnosed':
+ emit(dict(type='error',id=q['id'],code='generation_failed',failure=dict(stage='sampling',kind='shape_mismatch',exception='RuntimeError',sizes=[7,8,2])));sys.exit(0)
+if q['prompt']=='overlong':
+ emit(dict(type='error',id=q['id'],code='generation_failed',failure=dict(stage='sampling',exception='Not a class name')));sys.exit(0)
 if q['prompt']=='oversize':
  h=json.dumps(dict(type='video_frame',id=q['id'],index=0)).encode()
  w.write(struct.pack('>I',len(h))+h+struct.pack('>I',4194305));w.flush();time.sleep(60)
@@ -363,4 +367,36 @@ fn historical_provenance_is_optional_but_required_pillow_remains_checked() {
         );
         assert!(state.borrow().pid.is_none());
     }
+}
+#[tokio::test]
+async fn worker_failure_diagnostics_cross_the_pipe_bounded_and_invalid_ones_are_dropped() {
+    let (_dir, mut engine, _state) = fake(false);
+    let error = engine
+        .generate_video(&input("diagnosed"))
+        .await
+        .err()
+        .expect("must fail");
+    assert_eq!(error.to_string(), "h3_generation_failed");
+    let failure = &error
+        .downcast_ref::<imagine_server::engine::H3Failure>()
+        .expect("diagnostics")
+        .0;
+    assert_eq!(failure.stage, Some(h3::Stage::Sampling));
+    assert_eq!(failure.kind, Some(h3::FailureKind::ShapeMismatch));
+    assert_eq!(failure.exception.as_deref(), Some("RuntimeError"));
+    assert_eq!(failure.sizes, vec![7, 8, 2]);
+    engine.stop().await.unwrap();
+    let (_dir, mut engine, _state) = fake(false);
+    let error = engine
+        .generate_video(&input("overlong"))
+        .await
+        .err()
+        .expect("must fail");
+    assert_eq!(error.to_string(), "h3_generation_failed");
+    assert!(
+        error
+            .downcast_ref::<imagine_server::engine::H3Failure>()
+            .is_none()
+    );
+    engine.stop().await.unwrap();
 }

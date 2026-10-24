@@ -69,6 +69,10 @@ struct Fault {
     message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
 }
 impl Fault {
     fn new(category: &str, message: impl ToString) -> Self {
@@ -76,6 +80,8 @@ impl Fault {
             category: category.into(),
             message: message.to_string(),
             code: None,
+            at: None,
+            detail: None,
         }
     }
     fn generation(job: &Value) -> Self {
@@ -92,6 +98,8 @@ impl Fault {
                 |code| format!("image generation failed: {code}"),
             ),
             code: code.map(str::to_owned),
+            at: None,
+            detail: None,
         }
     }
 }
@@ -102,7 +110,13 @@ fn error(f: Fault, id: Option<&str>) -> Value {
     json!({"job_id":id,"error":f})
 }
 fn tool_result(payload: Value) -> Value {
-    json!({"content":[{"type":"text","text":python_json(&payload)}],"structuredContent":payload,"isError":payload.get("error").is_some_and(|v|!v.is_null())})
+    tool_result_with(payload, vec![])
+}
+/// Extra content blocks (images) follow the text block; structuredContent stays plain JSON.
+fn tool_result_with(payload: Value, blocks: Vec<Value>) -> Value {
+    let mut content = vec![json!({"type":"text","text":python_json(&payload)})];
+    content.extend(blocks);
+    json!({"content":content,"structuredContent":payload,"isError":payload.get("error").is_some_and(|v|!v.is_null())})
 }
 pub fn python_json(value: &Value) -> String {
     crate::json_wire::dumps(value, true, false)
@@ -242,6 +256,15 @@ impl Mcp {
                 .client
                 .with_session(self.inner.session.lock().unwrap().clone().unwrap()),
         };
+        // Video tools keep no proxy state, so their longer calls do not hold the session gate.
+        let limit = video::limit(name, args);
+        let guard = if limit.is_some() {
+            drop(guard);
+            None
+        } else {
+            Some(guard)
+        };
+        let mut blocks = vec![];
         let operation = async {
             match name {
                 "list_profiles" => active
@@ -267,12 +290,16 @@ impl Mcp {
                         })
                 }
                 "get_job" => active.get(id.unwrap_or(""), false).await,
+                _ if limit.is_some() => active.video(name, args).await.map(|(value, images)| {
+                    blocks = images;
+                    value
+                }),
                 _ => Err(validation(format!("Unknown tool: {name}"))),
             }
         };
         let result = tokio::select! {
             _ = self.inner.stop.cancelled() => Err(Fault::new("shutdown", "broker is shutting down")),
-            result = tokio::time::timeout(Duration::from_secs(5), operation) =>
+            result = tokio::time::timeout(limit.unwrap_or(Duration::from_secs(5)), operation) =>
                 result.unwrap_or_else(|_| Err(Fault::new("connection", "Imagine did not respond; retry within the same session"))),
         };
         drop(guard);
@@ -284,10 +311,10 @@ impl Mcp {
         } else {
             result
         };
-        tool_result(match result {
-            Ok(v) => v,
-            Err(e) => error(e, id),
-        })
+        match result {
+            Ok(v) => tool_result_with(v, blocks),
+            Err(e) => tool_result(error(e, id)),
+        }
     }
     fn confirm_saved(&self, args: Value) -> std::result::Result<Value, Fault> {
         let args: SavedImages = serde_json::from_value(args).map_err(|_| {
@@ -1341,6 +1368,9 @@ mod profile_tests {
         assert!(mcp.inner.jobs.lock().unwrap().is_empty());
     }
 }
+
+#[path = "mcp_video.rs"]
+mod video;
 
 #[cfg(test)]
 #[path = "mcp_delivery_tests.rs"]

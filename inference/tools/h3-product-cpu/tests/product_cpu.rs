@@ -199,7 +199,8 @@ fn invalid_request_rejects_before_factory_or_native_initialization() {
             event(&mut input).0,
             Event::Error {
                 id: None,
-                code: ErrorCode::InvalidRequest
+                code: ErrorCode::InvalidRequest,
+                ..
             }
         ));
         assert!(input.is_empty());
@@ -444,7 +445,8 @@ fn transport_write_failure_is_returned_without_exception_or_path_text() {
             &mut Broken,
             &Event::Error {
                 id: None,
-                code: ErrorCode::GenerationFailed
+                code: ErrorCode::GenerationFailed,
+                failure: None,
             },
             &[]
         ),

@@ -301,6 +301,24 @@
             ]
           },
           {
+            "description": "Insert or replace one cast/visual reference by its ID.",
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "upsert_visual_reference"
+              },
+              "reference": {
+                "$ref": "#/$defs/VisualReference"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "operation",
+              "reference"
+            ]
+          },
+          {
             "type": "object",
             "properties": {
               "operation": {

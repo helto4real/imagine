@@ -1,4 +1,8 @@
 //! Synthetic HTTP/media/persistence cases, with all file fixtures on the owned encrypted volume.
+#[path = "support/video_authoring_external.rs"]
+mod authoring_external;
+#[path = "support/video_authoring_messages.rs"]
+mod authoring_messages;
 #[path = "support/video_authoring.rs"]
 mod authoring_tests;
 #[path = "../ui/tests/support/destination.rs"]
@@ -6,6 +10,8 @@ mod authoring_tests;
 mod destination;
 #[path = "support/video_media_health.rs"]
 mod media_health_tests;
+#[path = "support/video_project_location.rs"]
+mod project_location_tests;
 #[path = "support/storage_links.rs"]
 mod storage_links;
 use axum::{

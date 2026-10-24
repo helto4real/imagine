@@ -3,6 +3,8 @@ use std::path::{Component, Path, PathBuf};
 
 pub const PRIVATE_ROOT: &str = "/run/media/veracrypt1/imagine";
 pub const PRIVATE_MOUNT: &str = "/run/media/veracrypt1";
+/// Approved roots for agent-selected project folders, besides the private root.
+pub const DEFAULT_PROJECT_ROOTS: &[&str] = &["/run/media/veracrypt1/mcp-inputs"];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Layout {
@@ -39,8 +41,21 @@ impl Layout {
         if !matches!(parts.next(), Some(Component::Normal(_))) || parts.next().is_some() {
             return Err("invalid_project_id");
         }
-        let root = self.root.join("projects").join(id);
-        Ok(Project {
+        Ok(Self::at(self.root.join("projects").join(id)))
+    }
+    /// The same project classes at a folder bound by an explicit location.
+    pub fn project_at(&self, path: &Path) -> Result<Project, &'static str> {
+        if !path.is_absolute()
+            || path
+                .components()
+                .any(|part| !matches!(part, Component::RootDir | Component::Normal(_)))
+        {
+            return Err("invalid_project_location");
+        }
+        Ok(Self::at(path.to_path_buf()))
+    }
+    fn at(root: PathBuf) -> Project {
+        Project {
             document: root.join("project.json"),
             images: root.join("outputs/images"),
             videos: root.join("outputs/videos"),
@@ -49,7 +64,7 @@ impl Layout {
             tmp: root.join("tmp"),
             autosave: root.join("autosave"),
             root,
-        })
+        }
     }
     pub fn library(&self) -> PathBuf {
         self.root.join("library")
@@ -122,6 +137,26 @@ mod tests {
         );
         for id in ["", ".", "..", "/absolute", "one/two", "one/../two"] {
             assert!(layout.project(id).is_err(), "{id}");
+        }
+        let elsewhere = Path::new("/own-volume/own-inputs/own-project");
+        let named = layout.project("own-project").unwrap();
+        let moved = layout.project_at(elsewhere).unwrap();
+        for (at, by_id) in [
+            (&moved.document, &named.document),
+            (&moved.images, &named.images),
+            (&moved.videos, &named.videos),
+            (&moved.audio, &named.audio),
+            (&moved.work, &named.work),
+            (&moved.tmp, &named.tmp),
+            (&moved.autosave, &named.autosave),
+        ] {
+            assert_eq!(
+                at.strip_prefix(elsewhere).unwrap(),
+                by_id.strip_prefix(&named.root).unwrap()
+            );
+        }
+        for path in ["relative", "/own/../escape", "./own"] {
+            assert!(layout.project_at(Path::new(path)).is_err(), "{path}");
         }
     }
 }

@@ -274,6 +274,9 @@ impl<T: Bundle> Store<T> {
     pub(crate) fn inject_sync_failure_after_rename(&mut self, enabled: bool) {
         self.root.fail_sync_after_rename = enabled;
     }
+    pub(crate) fn path(&self) -> &Path {
+        &self.root.path
+    }
     pub(crate) fn is_at(&self, path: &Path) -> Result<bool, StorageError> {
         if self.root.path != path {
             return Ok(false);
@@ -299,7 +302,7 @@ impl<T: Bundle> Store<T> {
         root: &crate::private_storage::Root,
     ) -> Result<Self, StorageError> {
         root.proof().map_err(StorageError::new)?;
-        if !path.starts_with(root.layout().root()) {
+        if !root.allows(path) {
             return Err(StorageError::new("invalid_storage_root"));
         }
         let mut store = Self::select(path, manifest)?;
@@ -311,7 +314,7 @@ impl<T: Bundle> Store<T> {
         root: &crate::private_storage::Root,
     ) -> Result<(), StorageError> {
         root.proof().map_err(StorageError::new)?;
-        if !self.root.path.starts_with(root.layout().root()) {
+        if !root.allows(&self.root.path) {
             return Err(StorageError::new("invalid_storage_root"));
         }
         self.private_root = Some(root.clone());

@@ -4,5 +4,6 @@ pub mod engine;
 pub(crate) mod grounding;
 pub mod profiles;
 pub mod references;
+pub mod steps;
 pub mod vision;
 pub mod visuals;

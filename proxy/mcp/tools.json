@@ -213,5 +213,371 @@
       "idempotentHint": true,
       "openWorldHint": false
     }
+  },
+  {
+    "name": "list_video_profiles",
+    "description": "List the video prompt profiles for storyboard authoring. No GPU acquisition. Describe the chosen profile with describe_video_profile before starting a storyboard. The video prompt profile is independent of the image tools' nsfw LoRA switch.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "describe_video_profile",
+    "description": "Get one video prompt profile exactly as stored: metadata, revision, prompt files and inheritance, the shared agent video guidance and authoring limits. No GPU acquisition. An unknown profile is an error, never a fallback. Apply the guidance when writing the storyboard; provider generation settings are informational only.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "description": "Profile ID from list_video_profiles."
+        }
+      },
+      "required": [
+        "profile"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "video_capabilities",
+    "description": "Get the video models (reference, i2v), their limits including the per-scene cap, supported boundaries and continuity methods, the canvas size presets (ratios, qualities, default), runtime availability and media limits. No GPU acquisition.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "video_project",
+    "description": "Create, read, edit or save a headless video project. No GPU acquisition.\ncreate: path is an absolute new or empty folder inside the MCP input directory (its parent must exist); the whole production (project document, takes, final video) lives there and Imagine saves it at creation. Size: optional canvas {ratio, portrait, quality} picks the video size preset; Imagine resolves the delivery size from it. Ratios and qualities are listed by video_capabilities canvas (quality: Quick Draft, Draft, Standard, High, Native Resolution); the default is 16:9 landscape Quick Draft. Alternatively, project is a full CreateProject body (schema_version, default_model, delivery, generation); give either canvas or project, not both. Returns the projection below plus path.\nget: a bounded projection with project_revision, scenes (timing, model, continuity, accepted take, section IDs and prompts), assets, cast, takes, deliveries and persistence (save state). No media.\nedit: request is an EditRequest {schema_version (1), expected_project_revision, commands} of typed edits on canonical scene/section IDs; returns the same projection.\nsave: only when persistence.state is not saved; bound projects autosave after every edit, storyboard commit and accepted take.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "create",
+            "get",
+            "edit",
+            "save"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "description": "create: absolute project folder path inside the MCP input directory."
+        },
+        "project": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "create: optional CreateProject body."
+        },
+        "canvas": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "create: optional size preset {ratio, portrait, quality}, e.g. {\"ratio\":\"16:9\",\"portrait\":false,\"quality\":\"Draft\"}.",
+          "properties": {
+            "ratio": {
+              "type": "string"
+            },
+            "portrait": {
+              "type": "boolean"
+            },
+            "quality": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "ratio",
+            "portrait",
+            "quality"
+          ],
+          "additionalProperties": false
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "description": "get, edit, save: project ID."
+        },
+        "request": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "edit: EditRequest."
+        },
+        "expected_project_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The project_revision you last read; stale revisions are rejected."
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "video_register_reference",
+    "description": "Attach a local PNG/JPEG/WebP image to a video project without copying it, and optionally add it as a cast member. No GPU acquisition.\npath is absolute under the MCP input or verified media directory; register image MCP results by their saved_path. The original is linked in place and verified by size and SHA-256. cast {name, alias, description} adds or replaces the cast entry for that alias (stored without @) with this image as its identity image; use the returned reference_id in the storyboard request's cast and the tag (@alias) in prompts. Returns the project asset_id for storyboard images and the new project_revision.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "description": "Project ID."
+        },
+        "path": {
+          "type": "string",
+          "description": "Absolute image path."
+        },
+        "expected_project_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The project_revision you last read; stale revisions are rejected."
+        },
+        "name": {
+          "type": "string",
+          "description": "Optional asset label; defaults to the file name."
+        },
+        "cast": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Story name."
+            },
+            "alias": {
+              "type": "string",
+              "description": "One-word prompt tag, with or without @."
+            },
+            "description": {
+              "type": "string",
+              "description": "Appearance description."
+            }
+          },
+          "required": [
+            "name",
+            "alias"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "project_id",
+        "path",
+        "expected_project_revision"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "video_storyboard",
+    "description": "Author the whole storyboard yourself with the profile's own prompts. No GPU acquisition; the local authoring model is never used.\nstart: request is the authoring request {schema_version (1), expected_project_revision, prompt_profile_id, brief, instruction, duration_seconds, destination (replace or append for a new, empty project; continue extends the project's last scene and allows a first-scene continuous shot), cast [reference IDs], images [{id, asset, label, usage (setting_reference, required_moment, start_frame, end_frame), pair_with}], add_dialogue, add_music}; the proxy sets the external provider. An I2V opening frame is a start_frame image paired with itself (pair_with is its own id). Returns the Draft and its context bundle: verbatim system prompts, rendered user messages with {{SLOT:name}} slots (listed in slots, fixed values in slot_values), schemas, limits and image labels. Each bundle image is attached as an image content block in bundle.images order, to be viewed while writing the prompts (the image tools' delivery-acknowledgement rule does not apply here); its JSON entry keeps image_id, role, usage, label, mime and the block index.\nsubmit: submission is {schema_version (1), expected_project_revision (the Draft's), inventory [{id, note}, one per story image], outline (JSON text), expansions [JSON text, one per outline scene], production (optional) {scenes [{model, continuity, rationale}]}, dry_run (required)}. continuity is {method, include_audio} and only for continuous_shot Scenes; include_audio also carries the previous clip's audio into the continuation (unrelated to the assembly plan's per-clip include_audio, which says whether a clip's own audio is in the final mix) and works only with the reference motion methods (with last_frame_first_frame it is continuity_endpoint_incompatible). Without production every scene uses the project default model and continuous shots use motion_context_exp. dry_run true parses and checks everything on a copy and returns {valid, scenes [{ordinal, model, boundary, continuity, planned_seconds, blockers}], warnings}; warnings do not block: continuity_source_pending (I2V last-frame continuity waits for the previous Scene's take) and i2v_cast_identity_text_only (an I2V Scene names cast members but I2V has no identity references; use reference); dry_run false applies it atomically and returns the project projection plus scene_map. Errors give code, at (inventory, outline, expansions[i], production.scenes[i]) and detail, and change nothing; story_scene_duration_capacity reports minimum_scenes=N, the fewest Scenes that fit duration_seconds.\nget: the Draft and its phase (review after a dry run, applied after a commit). review: a Review body that corrects the parsed Draft before the next submit.\nlist: this session's Drafts for project_id (id, phase, provider, prompt_profile_id). bundle: the context bundle of an external Draft again, with the same image blocks as start.\nA Draft changes nothing in the project until a submit with dry_run false. After a start timeout, list the project's Drafts and fetch the bundle of the new one instead of starting another; after a submit timeout, use get with the same draft_id before submitting again.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "start",
+            "submit",
+            "get",
+            "review",
+            "list",
+            "bundle"
+          ]
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "description": "start, list: project ID."
+        },
+        "draft_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "description": "submit, get, review, bundle: Draft ID."
+        },
+        "request": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "start: authoring request."
+        },
+        "submission": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "submit: complete submission."
+        },
+        "review": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "review: Review body."
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "video_run",
+    "description": "Generate the project's scenes. start is the first and only GPU handover; call it only after the storyboard is committed.\nstart: job_id plus request {schema_version (1), project_id, expected_project_revision, mode (missing_only, all_same_seeds, all_fresh_seeds, selected_with_dependents), selected_scene (scene ID for selected_with_dependents, otherwise null)}; returns the run with id, status and targets. There is no seed parameter: each scene gets a fresh random seed, except that all_same_seeds and locked takes reuse the seed of the scene's existing take. Imagine accepts technically valid takes automatically; that is not a visual review.\nget: run status with per-scene targets; wait true polls up to wait_seconds (max 60). A failed run adds failed_scene {scene_id, job_id, error {code, stage, kind, exception, accelerator_code, sizes}}: stage says where generation stopped (for example preparing_motion_context or sampling) and kind what failed (for example out_of_memory or shape_mismatch); use them to change the failing scene instead of retrying it unchanged. Runs continue when a call times out or the client disconnects.\nstop: cancel_current true also cancels the scene in progress.\nAfter a timeout, call start again with the same job_id and request, or get with the run_id; never use a new job_id to recover.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "start",
+            "get",
+            "stop"
+          ]
+        },
+        "job_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "description": "Caller-chosen unique ID for this request. Imagine forwards it as the idempotency key: repeating it with the same request returns the same operation (reused); a different request is idempotency_conflict."
+        },
+        "request": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "start: run request."
+        },
+        "run_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "description": "get, stop: run ID."
+        },
+        "wait": {
+          "type": "boolean",
+          "default": false,
+          "description": "Poll until the status is terminal or wait_seconds elapse."
+        },
+        "wait_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60,
+          "default": 30,
+          "description": "Bounded wait in seconds when wait is true."
+        },
+        "cancel_current": {
+          "type": "boolean",
+          "description": "stop: also cancel the current scene."
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "video_assembly",
+    "description": "Assemble accepted takes into the final video on the CPU.\nplan: request is {schema_version (1), expected_project_revision, options (optional)} for project_id, which the proxy fills in; returns a frozen plan with its id. Omit options for the defaults: {audio_mode: combined (generated plus timeline audio; or generated, timeline), generated_gain: 1.0, timeline_gain: 1.0, duck_generated: false, ducking_strength: 0.5, normalize_mix: true, continuous_tone_match: true (evens out brightness where a continuous shot joins the previous clip), bit_depth: 8 (or 10)}; if given, options must contain every field, plus optional output_filename.\nsubmit: job_id starts the assembly job for plan_id; the same job_id returns the same job.\nget: plan progress and, once submitted, the job status and its published output (saved_path, format, size, SHA-256, video metadata); wait true polls up to wait_seconds (max 60).\nReport the published saved_path directly; do not copy it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "plan",
+            "submit",
+            "get"
+          ]
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "description": "plan: project ID."
+        },
+        "request": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "plan: assembly request."
+        },
+        "plan_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "description": "submit, get: assembly plan ID."
+        },
+        "job_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "description": "Caller-chosen unique ID for this request. Imagine forwards it as the idempotency key: repeating it with the same request returns the same operation (reused); a different request is idempotency_conflict."
+        },
+        "wait": {
+          "type": "boolean",
+          "default": false,
+          "description": "Poll until the status is terminal or wait_seconds elapse."
+        },
+        "wait_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60,
+          "default": 30,
+          "description": "Bounded wait in seconds when wait is true."
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
   }
 ]

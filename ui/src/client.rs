@@ -812,7 +812,43 @@ fn job_error_message(error: &Value) -> String {
             return details.to_string();
         }
     }
-    error_message(code)
+    let mut message = error_message(code);
+    // H3 jobs may carry bounded diagnostics: where it failed and what kind of failure.
+    let fields = ["stage", "kind", "exception", "accelerator_code", "sizes"];
+    let failure = serde_json::Value::Object(
+        fields
+            .iter()
+            .filter(|f| !error[**f].is_null())
+            .map(|f| ((*f).to_owned(), error[*f].clone()))
+            .collect(),
+    );
+    if let Ok(failure) = serde_json::from_value::<crate::h3_protocol::Failure>(failure)
+        && failure.valid()
+        && !failure.is_empty()
+    {
+        let name = |value: &serde_json::Value| value.as_str().unwrap_or("").replace('_', " ");
+        let failure = serde_json::to_value(&failure).unwrap();
+        if failure["stage"].is_string() {
+            message.push_str(&format!(" Stage: {}.", name(&failure["stage"])));
+        }
+        if failure["kind"].is_string() {
+            message.push_str(&format!(" Cause: {}.", name(&failure["kind"])));
+        }
+        let mut extra = vec![];
+        if let Some(class) = failure["exception"].as_str() {
+            extra.push(class.to_owned());
+        }
+        if let Some(code) = failure["accelerator_code"].as_i64() {
+            extra.push(format!("accelerator code {code}"));
+        }
+        if let Some(sizes) = failure["sizes"].as_array() {
+            extra.push(format!("sizes {}", serde_json::Value::Array(sizes.clone())));
+        }
+        if !extra.is_empty() {
+            message.push_str(&format!(" ({})", extra.join(", ")));
+        }
+    }
+    message
 }
 pub fn error_message(code: &str) -> String {
     if let Some(message) = enhancement::message(code) {
@@ -934,6 +970,24 @@ mod tests {
             assert!(!message.contains("The server could not complete"));
         }
         assert!(super::error_message("h3_generation_failed").contains("did not identify"));
+    }
+    #[test]
+    fn h3_job_errors_show_bounded_stage_and_cause_but_never_other_text() {
+        let message = super::job_error_message(&serde_json::json!({"code":"h3_generation_failed",
+            "stage":"preparing_motion_context","kind":"shape_mismatch","exception":"RuntimeError","sizes":[7,8]}));
+        assert!(
+            message.contains("Stage: preparing motion context."),
+            "{message}"
+        );
+        assert!(message.contains("Cause: shape mismatch."), "{message}");
+        assert!(message.contains("(RuntimeError, sizes [7,8])"), "{message}");
+        // Unknown or malformed fields drop the diagnostics instead of showing them.
+        let message = super::job_error_message(&serde_json::json!({"code":"h3_generation_failed",
+            "stage":"sampling","exception":"Not a class /home/x"}));
+        assert!(
+            !message.contains("Stage") && !message.contains("/home"),
+            "{message}"
+        );
     }
     #[test]
     fn larger_image_sampling_reaches_the_server_and_keeps_130_step_progress() {

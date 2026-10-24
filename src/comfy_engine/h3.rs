@@ -193,17 +193,29 @@ impl PipeBackend {
                     self.stop().await?;
                     return Ok(result);
                 }
-                wire::Event::Error { code, .. } => bail!(EngineError(match code {
-                    wire::ErrorCode::InvalidRequest => "invalid_h3_request",
-                    wire::ErrorCode::DeploymentMismatch => "h3_deployment_mismatch",
-                    wire::ErrorCode::ModelIdentityMismatch => "h3_model_identity_mismatch",
-                    wire::ErrorCode::ComponentLoadFailed => "h3_component_load_failed",
-                    wire::ErrorCode::OutOfMemory => "h3_out_of_memory",
-                    wire::ErrorCode::GenerationFailed => "h3_generation_failed",
-                    wire::ErrorCode::LatentUpscaleFailed => "h3_latent_upscale_failed",
-                    wire::ErrorCode::LoraLoadFailed => "h3_lora_load_failed",
-                    wire::ErrorCode::UpscaleContextUnavailable => "h3_upscale_context_unavailable",
-                })),
+                wire::Event::Error { code, failure, .. } => {
+                    let code = EngineError(match code {
+                        wire::ErrorCode::InvalidRequest => "invalid_h3_request",
+                        wire::ErrorCode::DeploymentMismatch => "h3_deployment_mismatch",
+                        wire::ErrorCode::ModelIdentityMismatch => "h3_model_identity_mismatch",
+                        wire::ErrorCode::ComponentLoadFailed => "h3_component_load_failed",
+                        wire::ErrorCode::OutOfMemory => "h3_out_of_memory",
+                        wire::ErrorCode::GenerationFailed => "h3_generation_failed",
+                        wire::ErrorCode::LatentUpscaleFailed => "h3_latent_upscale_failed",
+                        wire::ErrorCode::LoraLoadFailed => "h3_lora_load_failed",
+                        wire::ErrorCode::UpscaleContextUnavailable => {
+                            "h3_upscale_context_unavailable"
+                        }
+                    });
+                    match failure.filter(wire::Failure::valid) {
+                        Some(failure) => {
+                            return Err(
+                                anyhow::Error::new(crate::engine::H3Failure(failure)).context(code)
+                            );
+                        }
+                        None => bail!(code),
+                    }
+                }
                 wire::Event::Ready { .. } => unreachable!("stream rejects second Ready"),
             }
         }

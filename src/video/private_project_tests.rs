@@ -458,3 +458,113 @@ fn private_library_create_preserves_only_the_decided_shared_metadata_files() {
     assert_eq!(error.code, "storage_not_empty");
     assert!(!other.join("library.json").exists());
 }
+
+#[test]
+fn located_private_project_saves_autosaves_and_reopens_only_inside_approved_roots() {
+    use imagine_video_contract::editing::Edit;
+    let (fixtures, unconfigured, _) = fixture_root();
+    let inputs = fixtures.path().join("own-volume/own-inputs");
+    std::fs::create_dir(&inputs).unwrap();
+    let (root, ignored) = unconfigured
+        .clone()
+        .with_project_roots(std::slice::from_ref(&inputs));
+    assert!(ignored.is_empty());
+    let folder = inputs.join("own-agent-project");
+    std::fs::create_dir(&folder).unwrap();
+    let mut session = session(fixtures.path());
+    session.save_private_at(&root, &folder).unwrap();
+    let id = session.document.project.id.clone();
+    assert_eq!(session.document.storage_layout, Some(1));
+    assert_eq!(session.status.state, SaveState::Saved);
+    assert_eq!(session.status.location.as_deref(), Some(folder.as_path()));
+    assert!(folder.join("project.json").is_file());
+    let layout = root.layout().project_at(&folder).unwrap();
+    for path in [
+        &layout.images,
+        &layout.videos,
+        &layout.work,
+        &layout.autosave,
+    ] {
+        assert!(path.is_dir());
+    }
+    for resource in &session.document.resources {
+        let directory = session.document.resource_directory(resource);
+        assert_eq!(
+            folder.join(directory).join(&resource.sha256).exists(),
+            resource.source.is_none()
+        );
+    }
+    assert!(!root.layout().project(&id.0).unwrap().root.exists());
+    let revision = session.document.project.project_revision;
+    let edit = |revision, prompt: &str| EditRequest {
+        schema_version: 1,
+        expected_project_revision: revision,
+        commands: vec![Edit::SetGlobalPrompt {
+            prompt: prompt.into(),
+        }],
+    };
+    session.edit(edit(revision, "own located text")).unwrap();
+    assert_eq!(session.status.saved_revision, Some(revision + 1));
+
+    let mut reopened = ProjectSession::open_for_private(&root, &folder).unwrap();
+    assert_eq!(reopened.document, session.document);
+    assert!(reopened.status.error_code.is_none());
+    assert_eq!(reopened.status.location.as_deref(), Some(folder.as_path()));
+    reopened
+        .edit(edit(revision + 1, "own reopened text"))
+        .unwrap();
+    assert_eq!(reopened.status.saved_revision, Some(revision + 2));
+    assert_eq!(
+        ProjectSession::open_for_private(&unconfigured, &folder)
+            .err()
+            .unwrap()
+            .code,
+        "private_storage_location_required"
+    );
+    let moved = fixtures.path().join("own-moved-outside");
+    std::fs::rename(&folder, &moved).unwrap();
+    assert_eq!(
+        ProjectSession::open_for_private(&root, &moved)
+            .err()
+            .unwrap()
+            .code,
+        "private_storage_location_required"
+    );
+    let other_id = root.project("own-other-id").unwrap().root;
+    std::fs::remove_dir_all(&other_id).unwrap();
+    std::fs::rename(&moved, &other_id).unwrap();
+    assert_eq!(
+        ProjectSession::open_for_private(&root, &other_id)
+            .err()
+            .unwrap()
+            .code,
+        "private_storage_location_required"
+    );
+
+    let occupied = inputs.join("own-occupied");
+    std::fs::create_dir(&occupied).unwrap();
+    std::fs::write(occupied.join("own-note"), b"OWN NOTE").unwrap();
+    let outside = fixtures.path().join("own-outside");
+    std::fs::create_dir(&outside).unwrap();
+    let named = root.layout().root().join("projects/own-chosen");
+    std::fs::create_dir_all(&named).unwrap();
+    for (path, code) in [
+        (occupied.clone(), "storage_not_empty"),
+        (outside.clone(), "invalid_storage_root"),
+        (inputs.clone(), "invalid_storage_root"),
+        (PathBuf::from("own-relative"), "invalid_project_location"),
+        (named.clone(), "invalid_project_location"),
+    ] {
+        let mut refused = self::session(fixtures.path());
+        assert_eq!(
+            refused.save_private_at(&root, &path).unwrap_err().code,
+            code,
+            "{path:?}"
+        );
+        assert!(refused.store.is_none());
+        assert_eq!(refused.status.state, SaveState::NotSaved);
+    }
+    assert_eq!(std::fs::read_dir(&occupied).unwrap().count(), 1);
+    assert_eq!(std::fs::read_dir(&outside).unwrap().count(), 0);
+    assert_eq!(std::fs::read_dir(&named).unwrap().count(), 0);
+}

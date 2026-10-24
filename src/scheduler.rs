@@ -819,9 +819,17 @@ impl Scheduler {
                             .map(|e| e.0)
                             .unwrap_or("generation_failed")
                     };
+                    let details = match details.filter(|details| details.valid()) {
+                        Some(details) => Some(serde_json::to_string(details)?),
+                        None => error
+                            .downcast_ref::<crate::engine::H3Failure>()
+                            .filter(|failure| failure.0.valid())
+                            .map(|failure| serde_json::to_string(&failure.0))
+                            .transpose()?,
+                    };
                     sqlx::query("UPDATE jobs SET status='failed',error=?,error_details=?,finished=? WHERE id=?")
                         .bind(code)
-                        .bind(details.filter(|details|details.valid()).map(serde_json::to_string).transpose()?)
+                        .bind(details)
                         .bind(now())
                         .bind(&active.id)
                         .execute(&self.store.db)

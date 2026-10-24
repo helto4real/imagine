@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 // v15 carries trained-upscale continuation geometry. v14 readers reject that
 // descriptor field; negotiate a matching worker before sending physical tails.
 // v16 reports actual adaptive-solver callback progress, including total corrections.
-pub const VERSION: u32 = 16;
+// v17 adds bounded failure diagnostics (stage, kind, integers) to Error events.
+pub const VERSION: u32 = 17;
 #[path = "h3_reference_cache.rs"]
 pub mod cache;
 #[path = "h3_continuation.rs"]
@@ -255,7 +256,126 @@ pub enum Event {
     Error {
         id: Option<String>,
         code: ErrorCode,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        failure: Option<Failure>,
     },
+}
+/// Where a request was when it failed: every Phase plus input preparation steps.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Stage {
+    Admission,
+    PreparingContinuation,
+    LoadingText,
+    EncodingText,
+    EncodingStartImage,
+    EncodingReferences,
+    PreparingMotionContext,
+    LoadingDit,
+    Sampling,
+    LoadingUpscaler,
+    UpscalingLatents,
+    CapturingContinuation,
+    LoadingVideoVae,
+    DecodingVideo,
+    LoadingAudioVae,
+    DecodingAudio,
+}
+impl From<Phase> for Stage {
+    fn from(phase: Phase) -> Self {
+        match phase {
+            Phase::LoadingText => Self::LoadingText,
+            Phase::EncodingText => Self::EncodingText,
+            Phase::LoadingDit => Self::LoadingDit,
+            Phase::Sampling => Self::Sampling,
+            Phase::LoadingUpscaler => Self::LoadingUpscaler,
+            Phase::UpscalingLatents => Self::UpscalingLatents,
+            Phase::LoadingVideoVae => Self::LoadingVideoVae,
+            Phase::DecodingVideo => Self::DecodingVideo,
+            Phase::LoadingAudioVae => Self::LoadingAudioVae,
+            Phase::DecodingAudio => Self::DecodingAudio,
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FailureKind {
+    OutOfMemory,
+    Accelerator,
+    ShapeMismatch,
+    MissingTensor,
+    TypeMismatch,
+    InvalidValue,
+    NotImplemented,
+    Panic,
+    Internal,
+}
+pub const MAX_FAILURE_SIZES: usize = 8;
+/// Bounded diagnostics. Native message text never crosses the wire: only
+/// enums, a code-defined exception class name and integers.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Failure {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage: Option<Stage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<FailureKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exception: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accelerator_code: Option<i32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sizes: Vec<i64>,
+}
+impl Failure {
+    pub fn valid(&self) -> bool {
+        self.sizes.len() <= MAX_FAILURE_SIZES
+            && self.exception.as_deref().is_none_or(|class| {
+                !class.is_empty()
+                    && class.len() <= 48
+                    && class
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b == b'_')
+            })
+    }
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+}
+/// Derives a kind and, for shape errors, the integers in a native message.
+/// The message itself is never returned.
+pub fn classify_message(message: &str) -> (FailureKind, Vec<i64>) {
+    let lower = message.to_ascii_lowercase();
+    let has = |words: &[&str]| words.iter().any(|w| lower.contains(w));
+    if has(&["out of memory", "outofmemory"]) {
+        return (FailureKind::OutOfMemory, vec![]);
+    }
+    if has(&[
+        "size of tensor",
+        "shape",
+        "dimension",
+        "size mismatch",
+        "sizes",
+    ]) {
+        let sizes = lower
+            .split(|c: char| !c.is_ascii_digit() && c != '-')
+            .filter_map(|t| t.parse::<i64>().ok())
+            .take(MAX_FAILURE_SIZES)
+            .collect();
+        return (FailureKind::ShapeMismatch, sizes);
+    }
+    let kind = if has(&["missing", "not found", "keyerror", "unexpected key"]) {
+        FailureKind::MissingTensor
+    } else if has(&["dtype", "scalar type", "expected type"]) {
+        FailureKind::TypeMismatch
+    } else if has(&["not implemented", "notimplemented", "unsupported"]) {
+        FailureKind::NotImplemented
+    } else if has(&["invalid", "out of range", "must be"]) {
+        FailureKind::InvalidValue
+    } else {
+        FailureKind::Internal
+    };
+    (kind, vec![])
 }
 impl Event {
     pub fn payload_limit(&self) -> usize {

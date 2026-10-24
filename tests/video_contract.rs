@@ -726,6 +726,66 @@ fn section_edits_roundtrip_and_apply_atomically() {
 }
 
 #[test]
+fn upsert_visual_reference_inserts_replaces_and_requires_image_assets() {
+    let mut p = project();
+    let asset = |id: &str, kind| Edit::AddAsset {
+        asset: Asset {
+            library_source: None,
+            name: String::new(),
+            id: AssetId(id.into()),
+            revision: 1,
+            kind,
+        },
+    };
+    edit(
+        &mut p,
+        vec![
+            asset("face", MediaKind::Image),
+            asset("other-face", MediaKind::Image),
+            asset("voice", MediaKind::Audio),
+        ],
+    )
+    .unwrap();
+    // The MCP proxy's wire shape: alias without '@', one enabled identity image.
+    let upsert = |asset: &str, description: &str| -> Edit {
+        serde_json::from_value(json!({"operation":"upsert_visual_reference","reference":{
+            "id":"reference_mcp_keeper","name":"Keeper","alias":"keeper","kind":"character",
+            "description":description,"tags":[],"enabled":true,"strength":1.0,"retention":"",
+            "images":[{"id":format!("image_{asset}"),"asset":asset,"enabled":true,"preview":true}],
+            "voice":null,"origin":null}}))
+        .unwrap()
+    };
+    let revision = p.project_revision;
+    edit(&mut p, vec![upsert("face", "First")]).unwrap();
+    assert_eq!(p.project_revision, revision + 1);
+    assert_eq!(p.creative.references.len(), 1);
+    assert_eq!(p.creative.references[0].alias, "keeper");
+    assert_eq!(p.creative.references[0].images[0].asset.0, "face");
+    edit(&mut p, vec![upsert("other-face", "Second")]).unwrap();
+    assert_eq!(p.creative.references.len(), 1);
+    assert_eq!(p.creative.references[0].description, "Second");
+    assert_eq!(p.creative.references[0].images[0].asset.0, "other-face");
+    let before = p.clone();
+    for asset in ["missing", "voice"] {
+        let error = edit(&mut p, vec![upsert(asset, "Rejected")]).unwrap_err();
+        assert_eq!(error.code, "reference_image_asset_invalid");
+        assert_eq!(error.field, "reference.images");
+        assert_eq!(p, before);
+    }
+    let stale = apply(
+        &mut p,
+        EditRequest {
+            schema_version: 1,
+            expected_project_revision: revision,
+            commands: vec![upsert("face", "Stale")],
+        },
+    )
+    .unwrap_err();
+    assert_eq!(stale.code, "revision_conflict");
+    assert_eq!(p, before);
+}
+
+#[test]
 fn canonical_fingerprint_ignores_json_key_order_and_equivalent_times() {
     let mut p = project();
     let before = input_revision(&p, &SceneId("a".into())).unwrap();

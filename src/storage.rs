@@ -22,6 +22,9 @@ pub struct Store {
         std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, std::sync::Arc<[u8]>>>>,
     originals: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, Original>>>,
     private: Option<(crate::private_storage::Root, String)>,
+    /// Private video projects bound to an explicit folder publish their
+    /// outputs there instead of under the project ID.
+    project_locations: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, PathBuf>>>,
     pub session: std::sync::Arc<crate::session::Session>,
 }
 #[derive(Clone)]
@@ -74,6 +77,27 @@ impl Store {
     pub fn private_root(&self) -> Option<&crate::private_storage::Root> {
         self.private.as_ref().map(|(root, _)| root)
     }
+    pub fn bind_project_location(&self, project: &str, path: PathBuf) {
+        if let Ok(mut locations) = self.project_locations.lock() {
+            locations.insert(project.into(), path);
+        }
+    }
+    fn project_layout(
+        &self,
+        root: &crate::private_storage::Root,
+        project: &str,
+    ) -> crate::video_destination::Result<crate::storage_layout::Project> {
+        let location = self
+            .project_locations
+            .lock()
+            .map_err(|_| "video_destination_unavailable")?
+            .get(project)
+            .cloned();
+        match location {
+            Some(path) => root.project_at(&path),
+            None => root.project(project),
+        }
+    }
     /// The server selects the project and output class. Client folder strings
     /// are never used to move private bytes outside the mounted project tree.
     pub fn output_destination(
@@ -82,7 +106,7 @@ impl Store {
         video: bool,
     ) -> crate::video_destination::Result<crate::video::output::Destination> {
         if let Some((root, workspace)) = &self.private {
-            let layout = root.project(project.unwrap_or(workspace))?;
+            let layout = self.project_layout(root, project.unwrap_or(workspace))?;
             crate::video::output::Destination::private(
                 root,
                 if video {
@@ -102,17 +126,22 @@ impl Store {
         if let Some((root, _)) = &self.private {
             let proof: crate::video_destination::Proof =
                 serde_json::from_value(proof.clone()).map_err(|_| "video_destination_invalid")?;
-            let relative = proof
-                .config
-                .root
+            let output = &proof.config.root;
+            let class = output.file_name().and_then(|name| name.to_str());
+            let located = output.parent().is_some_and(|outputs| {
+                outputs.file_name() == Some("outputs".as_ref())
+                    && self.project_locations.lock().is_ok_and(|locations| {
+                        locations
+                            .values()
+                            .any(|path| Some(path.as_path()) == outputs.parent())
+                    })
+            });
+            let parts = output
                 .strip_prefix(root.layout().root())
-                .map_err(|_| "video_destination_invalid")?;
-            let parts = relative.iter().collect::<Vec<_>>();
-            if parts.len() != 4
-                || parts[0] != "projects"
-                || parts[2] != "outputs"
-                || !matches!(parts[3].to_str(), Some("images" | "videos" | "audio"))
-            {
+                .map(|relative| relative.iter().collect::<Vec<_>>())
+                .unwrap_or_default();
+            let named = parts.len() == 4 && parts[0] == "projects" && parts[2] == "outputs";
+            if !(named || located) || !matches!(class, Some("images" | "videos" | "audio")) {
                 return Err("video_destination_invalid");
             }
             let destination = crate::video::output::Destination::private(root, &proof.config.root)?;
@@ -178,6 +207,7 @@ impl Store {
             media_files: Default::default(),
             videos,
             private,
+            project_locations: Default::default(),
         })
     }
     pub async fn close(&self) -> Result<()> {
@@ -231,9 +261,16 @@ impl Store {
             let error = error.map(|code| {
                 let mut value = json!({"code":code});
                 if code == "model_component_load_failed" && let Some(details) = details
-                    .and_then(|text|serde_json::from_str::<crate::component_error::ComponentLoadError>(&text).ok())
+                    .as_deref()
+                    .and_then(|text|serde_json::from_str::<crate::component_error::ComponentLoadError>(text).ok())
                     .filter(crate::component_error::ComponentLoadError::valid) {
                     value.as_object_mut().unwrap().extend(serde_json::to_value(details).unwrap().as_object().unwrap().clone());
+                } else if let Some(failure) = details
+                    .as_deref()
+                    .filter(|_| code.starts_with("h3_") || code == "invalid_h3_request")
+                    .and_then(|text| serde_json::from_str::<crate::h3_protocol::Failure>(text).ok())
+                    .filter(crate::h3_protocol::Failure::valid) {
+                    value.as_object_mut().unwrap().extend(serde_json::to_value(failure).unwrap().as_object().unwrap().clone());
                 }
                 value
             });

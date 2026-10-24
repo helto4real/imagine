@@ -6,9 +6,23 @@ use crate::video::{
 };
 pub use imagine_video_contract::authoring::*;
 type Result<T> = std::result::Result<T, &'static str>;
+/// The longest Scene a Story may plan; the outline message states it too.
+pub const MAX_SCENE_SECONDS: f64 = 15.;
+pub const MAX_SCENES: usize = 128;
+pub const MAX_SECTIONS_PER_SCENE: usize = 12;
+pub const BOUNDARIES: [&str; 2] = ["hard_cut", "continuous_shot"];
+/// What `auto` continuity resolves to for a target variant; `reference`
+/// keeps the Story's motion carry-over.
+pub fn auto_continuity(variant: &str) -> Option<ContinuityMethod> {
+    match variant {
+        "i2v" => Some(ContinuityMethod::LastFrameFirstFrame),
+        "reference" => Some(ContinuityMethod::MotionContextExp),
+        _ => None,
+    }
+}
 
 pub fn validate(board: &Storyboard) -> Result<()> {
-    if board.scenes.is_empty() || board.scenes.len() > 128 {
+    if board.scenes.is_empty() || board.scenes.len() > MAX_SCENES {
         return Err("invalid_storyboard");
     }
     let mut ids = std::collections::BTreeSet::new();
@@ -18,8 +32,8 @@ pub fn validate(board: &Storyboard) -> Result<()> {
             || !scene.weight.is_finite()
             || scene.weight <= 0.
             || scene.sections.is_empty()
-            || scene.sections.len() > 12
-            || !["hard_cut", "continuous_shot"].contains(&scene.boundary_from_previous.as_str())
+            || scene.sections.len() > MAX_SECTIONS_PER_SCENE
+            || !BOUNDARIES.contains(&scene.boundary_from_previous.as_str())
         {
             return Err("invalid_storyboard");
         }
@@ -122,6 +136,122 @@ pub fn expansion(text: &str, source: &StoryScene) -> Result<StoryScene> {
         return Err("story_expansion_changed_structure");
     }
     Ok(scene)
+}
+/// One Scene's production choice, resolved against the target variant.
+pub struct Planned {
+    /// None keeps the project default.
+    pub model: Option<ModelSelection>,
+    pub i2v: bool,
+    pub continuity: Option<(ContinuityMethod, bool)>,
+}
+/// A production error and the Scene and Section it concerns (0-based).
+#[derive(Debug, PartialEq)]
+pub struct Misplaced {
+    pub code: &'static str,
+    pub scene: Option<usize>,
+    pub section: Option<usize>,
+}
+/// Resolves the Draft's production block for its expanded Scenes. Without
+/// one, Scenes keep the project default and continuous shots carry motion.
+pub fn production(
+    base: &VideoProject,
+    draft: &Draft,
+) -> std::result::Result<Vec<Planned>, Misplaced> {
+    let misplaced = |code, scene, section| Misplaced {
+        code,
+        scene,
+        section,
+    };
+    let scenes = draft
+        .scenes
+        .iter()
+        .cloned()
+        .collect::<Option<Vec<_>>>()
+        .ok_or(misplaced("story_not_expanded", None, None))?;
+    // Only a continued timeline gives the first Scene a shot to continue.
+    let source = draft.request.destination == Destination::Continue && !base.scenes.is_empty();
+    if !source
+        && scenes
+            .first()
+            .is_some_and(|s| s.boundary_from_previous == "continuous_shot")
+    {
+        return Err(misplaced("story_continuity_source_missing", None, None));
+    }
+    let Some(production) = &draft.production else {
+        return Ok(scenes
+            .iter()
+            .map(|s| Planned {
+                model: None,
+                i2v: false,
+                continuity: (s.boundary_from_previous == "continuous_shot")
+                    .then_some((ContinuityMethod::MotionContextExp, false)),
+            })
+            .collect());
+    };
+    if production.scenes.len() != scenes.len() {
+        return Err(misplaced("production_scene_count_mismatch", None, None));
+    }
+    let variants = crate::video::adapters::h3::variants();
+    let mut out = vec![];
+    for (i, (scene, choice)) in scenes.iter().zip(&production.scenes).enumerate() {
+        let at = |code, section| misplaced(code, Some(i), section);
+        let (model, capabilities) = variants
+            .iter()
+            .find(|(m, _)| m.variant == choice.model.variant())
+            .ok_or(at("scene_runtime_unsupported", None))?;
+        let i2v = model.variant == "i2v";
+        let continuity = match (&choice.continuity, scene.boundary_from_previous.as_str()) {
+            (choice, "continuous_shot") => {
+                let method = choice
+                    .as_ref()
+                    .and_then(|c| c.method.clone())
+                    .or_else(|| auto_continuity(&model.variant))
+                    .filter(|m| capabilities.continuity.contains(m))
+                    .ok_or(at("continuity_method_unsupported", None))?;
+                let include_audio = choice.as_ref().is_some_and(|c| c.include_audio);
+                if method == ContinuityMethod::LastFrameFirstFrame {
+                    if include_audio {
+                        return Err(at("continuity_endpoint_incompatible", None));
+                    }
+                    if !scene.sections[0].first_frame_id.is_empty() {
+                        return Err(at("continuity_first_frame_conflict", Some(0)));
+                    }
+                }
+                Some((method, include_audio))
+            }
+            (Some(_), _) => return Err(at("continuity_requires_continuous_shot", None)),
+            (None, _) => None,
+        };
+        if i2v {
+            // One opening First Frame is I2V's only image input; a start
+            // frame paired with itself is that frame alone.
+            if !scene.image_ids.is_empty() {
+                return Err(at("i2v_input_role_unsupported", Some(0)));
+            }
+            for (j, s) in scene.sections.iter().enumerate() {
+                let opening = j == 0 && s.last_frame_id == s.first_frame_id;
+                if !s.image_ids.is_empty()
+                    || (j > 0 && !s.first_frame_id.is_empty())
+                    || (!s.last_frame_id.is_empty() && !opening)
+                {
+                    return Err(at("i2v_input_role_unsupported", Some(j)));
+                }
+            }
+            if scene.sections[0].first_frame_id.is_empty()
+                && continuity
+                    .as_ref()
+                    .is_none_or(|(m, _)| *m != ContinuityMethod::LastFrameFirstFrame)
+            {
+                return Err(at("i2v_start_frame_required", None));
+            }
+        }
+        out.push(Planned {
+            model: (model != &base.default_model).then(|| model.clone()),
+            i2v,
+            continuity,
+        });
+    }
+    Ok(out)
 }
 fn time(seconds: f64) -> Time {
     Time {
@@ -238,6 +368,7 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
             });
         }
         Operation::Outline => {
+            let planned = production(base, draft).map_err(|m| m.code)?;
             let scenes = draft
                 .scenes
                 .iter()
@@ -250,7 +381,7 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
             let lengths = durations(
                 &scenes.iter().map(|s| s.weight).collect::<Vec<_>>(),
                 request.duration_seconds,
-                15.,
+                MAX_SCENE_SECONDS,
             )?;
             if request.destination == Destination::Replace {
                 creative.sections.clear();
@@ -285,7 +416,9 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
             };
             // Cuts between the new Scenes, added once all of them exist.
             let mut commands_after = vec![];
-            for (i, (scene, len)) in scenes.into_iter().zip(lengths).enumerate() {
+            for (i, ((scene, len), plan)) in
+                scenes.into_iter().zip(lengths).zip(planned).enumerate()
+            {
                 let id = SceneId(format!("scene_{}_{}", draft.id, i));
                 let start = time(cursor);
                 let end = time(cursor + len);
@@ -342,7 +475,11 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                         (&source.first_frame_id, InputRole::FirstFrame),
                         (&source.last_frame_id, InputRole::LastFrame),
                     ] {
-                        if !image_id.is_empty() {
+                        // I2V opens on the frame alone.
+                        let opening = plan.i2v
+                            && role == InputRole::LastFrame
+                            && image_id == &source.first_frame_id;
+                        if !image_id.is_empty() && !opening {
                             let asset = asset_for(image_id)?;
                             images.push(ImageBinding {
                                 anchor: None,
@@ -387,10 +524,14 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                             )
                         },
                     });
+                    let (method, include_audio) = plan
+                        .continuity
+                        .clone()
+                        .ok_or("story_continuity_source_missing")?;
                     Some(Continuity {
                         source_scene,
-                        method: ContinuityMethod::MotionContextExp,
-                        include_audio: false,
+                        method,
+                        include_audio,
                     })
                 } else {
                     None
@@ -415,7 +556,10 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                         }
                         .normalized(),
                         description,
-                        model: ModelChoice::ProjectDefault,
+                        model: plan
+                            .model
+                            .clone()
+                            .map_or(ModelChoice::ProjectDefault, ModelChoice::Override),
                         settings: base
                             .scenes
                             .iter()
@@ -435,6 +579,12 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                         accepted_take: None,
                     }),
                 });
+                if let Some(model) = plan.model {
+                    commands.push(Edit::InheritModelSettings {
+                        scene_id: id.clone(),
+                        model,
+                    });
+                }
                 previous = Some(id);
             }
             commands.append(&mut commands_after);

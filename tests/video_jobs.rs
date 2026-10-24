@@ -77,7 +77,17 @@ impl Backend for Fake {
             self.0.calls.lock().unwrap().push(p.prompt.clone());
             self.0.release.notified().await;
             if self.0.fail.swap(false, Ordering::SeqCst) {
-                anyhow::bail!("own synthetic worker failure");
+                use imagine_server::h3_protocol::{Failure, FailureKind, Stage};
+                let failure = Failure {
+                    stage: Some(Stage::PreparingMotionContext),
+                    kind: Some(FailureKind::ShapeMismatch),
+                    sizes: vec![7, 8],
+                    ..Default::default()
+                };
+                return Err(
+                    anyhow::Error::new(imagine_server::engine::H3Failure(failure))
+                        .context(imagine_server::engine::EngineError("h3_generation_failed")),
+                );
             }
             self.0.produced.notify_one();
             let continuation = p.capture_continuation.then(|| {
@@ -627,7 +637,13 @@ async fn queued_and_active_cancel_publish_no_take_and_failed_job_requires_explic
     let failed = submit(&h, request.clone(), "failure").await;
     wait_calls(&h, 2).await;
     h.probe.release.notify_one();
-    assert_eq!(terminal(&h, &failed).await["status"], "failed");
+    let ended = terminal(&h, &failed).await;
+    assert_eq!(ended["status"], "failed");
+    // Bounded worker diagnostics reach the job error; nothing else does.
+    assert_eq!(
+        ended["error"],
+        json!({"code":"h3_generation_failed","stage":"preparing_motion_context","kind":"shape_mismatch","sizes":[7,8]})
+    );
     assert_eq!(submit(&h, request.clone(), "failure").await, failed);
     assert_eq!(h.probe.calls.lock().unwrap().len(), 2);
     let retry = submit(&h, request, "explicit-retry").await;

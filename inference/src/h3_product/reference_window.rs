@@ -4,6 +4,22 @@ use crate::{
     models::minimax_h3::layout::{ReferenceBlock, ReferenceKind},
     native::Error,
 };
+/// Attention rows of the packed reference blocks, in the order `prepare` walks them.
+pub fn rows(blocks: &[ReferenceBlock]) -> i64 {
+    blocks
+        .iter()
+        .map(|block| {
+            let frame = (block.latent_h / 2) * (block.latent_w / 2);
+            match block.kind {
+                ReferenceKind::Image => frame,
+                ReferenceKind::Audio => block.ref_audio_t * 2,
+                ReferenceKind::Video | ReferenceKind::VideoAudio => {
+                    block.ref_audio_t.max(0) * 2 + block.latent_t * frame
+                }
+            }
+        })
+        .sum()
+}
 /// Reference blocks are packed image/audio/video in the model's conditioning order.
 /// Only the first video and its paired audio are restricted; pictures stay available.
 pub fn prepare(

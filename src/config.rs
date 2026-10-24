@@ -176,6 +176,34 @@ impl Config {
         Ok(())
     }
 }
+/// Approve `--private-project-root` folders (default: the MCP input folder).
+/// A root outside the verified encrypted mount is ignored with a warning.
+pub fn private_project_roots(
+    root: crate::private_storage::Root,
+    configured: &[PathBuf],
+) -> (crate::private_storage::Root, Vec<String>) {
+    let defaults: Vec<PathBuf>;
+    let roots = if configured.is_empty() {
+        defaults = crate::storage_layout::DEFAULT_PROJECT_ROOTS
+            .iter()
+            .map(PathBuf::from)
+            .collect();
+        &defaults
+    } else {
+        configured
+    };
+    let (root, ignored) = root.with_project_roots(roots);
+    let warnings = ignored
+        .iter()
+        .map(|path| {
+            format!(
+                "Ignoring private project root outside the encrypted volume: {}",
+                path.display()
+            )
+        })
+        .collect();
+    (root, warnings)
+}
 fn model_root(project: &Path) -> PathBuf {
     let local: serde_json::Value =
         std::fs::read(project.join("experiments/qwen-image21-sage/local-settings.json"))
@@ -231,6 +259,26 @@ mod tests {
         ))));
         let root = Root::with_environment(config, environment.clone()).unwrap();
         (directory, root, environment)
+    }
+    #[test]
+    fn private_project_roots_default_and_ignore_roots_outside_the_mount() {
+        let (fixture, root, _) = private_fixture();
+        let mount = fixture.path().join("own-volume");
+        // The production default is outside this synthetic mount: ignored, never inspected.
+        let (defaulted, warnings) = private_project_roots(root.clone(), &[]);
+        assert!(defaulted.project_roots().is_empty());
+        assert_eq!(
+            warnings,
+            [format!(
+                "Ignoring private project root outside the encrypted volume: {}",
+                crate::storage_layout::DEFAULT_PROJECT_ROOTS[0]
+            )]
+        );
+        let inputs = mount.join("own-inputs");
+        let (configured, warnings) =
+            private_project_roots(root, &[inputs.clone(), fixture.path().join("outside")]);
+        assert_eq!(configured.project_roots(), [inputs]);
+        assert_eq!(warnings.len(), 1);
     }
     #[test]
     fn private_config_uses_guarded_work_and_port_scoped_runtime_locks() {

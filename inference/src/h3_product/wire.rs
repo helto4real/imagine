@@ -12,6 +12,45 @@ pub trait Generator {
         input: &mut dyn Read,
     ) -> Result<(), ErrorCode>;
 }
+/// Diagnostics for the one request this process serves: the current stage and
+/// the first classified failure. Enums and integers only.
+static FAILURE: std::sync::Mutex<p::Failure> = std::sync::Mutex::new(p::Failure {
+    stage: None,
+    kind: None,
+    exception: None,
+    accelerator_code: None,
+    sizes: Vec::new(),
+});
+pub fn stage(stage: p::Stage) {
+    if let Ok(mut failure) = FAILURE.lock()
+        && failure.kind.is_none()
+    {
+        failure.stage = Some(stage);
+    }
+}
+/// Keeps the first failure; later cleanup errors do not replace the cause.
+pub fn record(
+    kind: p::FailureKind,
+    exception: Option<&str>,
+    accelerator_code: Option<i32>,
+    sizes: Vec<i64>,
+) {
+    if let Ok(mut failure) = FAILURE.lock()
+        && failure.kind.is_none()
+    {
+        failure.kind = Some(kind);
+        failure.exception = exception.map(str::to_owned);
+        failure.accelerator_code = accelerator_code;
+        failure.sizes = sizes;
+    }
+}
+fn failure() -> Option<p::Failure> {
+    FAILURE
+        .lock()
+        .ok()
+        .map(|failure| failure.clone())
+        .filter(|failure| !failure.is_empty() && failure.valid())
+}
 pub fn write(out: &mut impl Write, event: &Event, payload: &[u8]) -> Result<(), ErrorCode> {
     let header = serde_json::to_vec(event).map_err(|_| ErrorCode::GenerationFailed)?;
     if header.len() > p::MAX_HEADER || payload.len() > event.payload_limit() {
@@ -122,7 +161,17 @@ pub fn serve<G: Generator>(
     let request = match request(input) {
         Ok(request) => request,
         Err(code) => {
-            let _ = write(output, &Event::Error { id: None, code }, &[]);
+            stage(p::Stage::Admission);
+            let failure = failure();
+            let _ = write(
+                output,
+                &Event::Error {
+                    id: None,
+                    code,
+                    failure,
+                },
+                &[],
+            );
             return Err(code);
         }
     };
@@ -145,7 +194,10 @@ pub fn serve<G: Generator>(
         };
         generator.generate(&request, &mut emit, input)
     }))
-    .unwrap_or(Err(ErrorCode::GenerationFailed));
+    .unwrap_or_else(|_| {
+        record(p::FailureKind::Panic, None, None, vec![]);
+        Err(ErrorCode::GenerationFailed)
+    });
     match result {
         Ok(()) => {
             let complete = Event::Complete {
@@ -159,11 +211,29 @@ pub fn serve<G: Generator>(
                 return write(output, &complete, &[]);
             }
             let code = ErrorCode::GenerationFailed;
-            let _ = write(output, &Event::Error { id: Some(id), code }, &[]);
+            let failure = failure();
+            let _ = write(
+                output,
+                &Event::Error {
+                    id: Some(id),
+                    code,
+                    failure,
+                },
+                &[],
+            );
             Err(code)
         }
         Err(code) => {
-            let _ = write(output, &Event::Error { id: Some(id), code }, &[]);
+            let failure = failure();
+            let _ = write(
+                output,
+                &Event::Error {
+                    id: Some(id),
+                    code,
+                    failure,
+                },
+                &[],
+            );
             Err(code)
         }
     }

@@ -1,5 +1,5 @@
 //! Session-only proposals; provider dispatch holds no project lock or GPU lease.
-use super::{engine::*, profiles};
+use super::{engine::*, profiles, steps};
 use crate::{
     enhancement::{ProviderSnapshot, Service as ProviderService},
     scheduler::Fault,
@@ -16,6 +16,7 @@ pub struct Service {
     jobs: Mutex<BTreeMap<String, Job>>,
 }
 struct Job {
+    created: std::time::Instant,
     clock: std::time::Instant,
     clock_completed: usize,
     clock_elapsed: Option<f64>,
@@ -56,7 +57,14 @@ impl Service {
         {
             return Err(Fault::new(409, "authoring_revision_conflict"));
         }
-        if !profiles::PROVIDERS.contains(&request.provider.as_str())
+        // An external agent writes the whole Story itself; no provider task.
+        let external = request.provider == steps::EXTERNAL;
+        // An external Draft names its profile explicitly; never the default.
+        if external && request.prompt_profile_id.trim().is_empty() {
+            return Err(fault("profile_not_found"));
+        }
+        if !(external || profiles::PROVIDERS.contains(&request.provider.as_str()))
+            || (external && request.operation != Operation::Outline)
             || request.brief.len() + request.instruction.len() > 65536
             || !request.duration_seconds.is_finite()
             || !(0.25..=3600.).contains(&request.duration_seconds)
@@ -89,7 +97,8 @@ impl Service {
             return Err(fault("story_continuation_source_missing"));
         }
         if request.destination == Destination::Continue {
-            let scene = last_scene(&base).ok_or(fault("story_continuation_source_missing"))?;
+            let scene =
+                steps::last_scene(&base).ok_or(fault("story_continuation_source_missing"))?;
             if scene.description.chars().count() > 16000
                 || scene.sections.len() > 128
                 || scene
@@ -109,6 +118,9 @@ impl Service {
         let profile = catalog
             .snapshot(&request.prompt_profile_id)
             .map_err(fault)?;
+        if external && profile.fallback {
+            return Err(fault("profile_not_found"));
+        }
         let id = format!("authoring_{}", uuid::Uuid::new_v4().simple());
         let request_rows = request.operation == Operation::EnhanceSceneAll;
         let scene_rows = request.scene_id.clone();
@@ -118,8 +130,16 @@ impl Service {
             .map(|operation| {
                 (
                     operation,
-                    profiles::resolve(&profile.profile.generation, &request.provider, operation)
-                        .unwrap(),
+                    profiles::resolve(
+                        &profile.profile.generation,
+                        if external {
+                            "koboldcpp"
+                        } else {
+                            &request.provider
+                        },
+                        operation,
+                    )
+                    .unwrap(),
                 )
             })
             .collect::<BTreeMap<_, _>>();
@@ -128,7 +148,11 @@ impl Service {
             id: id.clone(),
             project_id: base.id.clone(),
             request,
-            phase: Phase::Running,
+            phase: if external {
+                Phase::Outline
+            } else {
+                Phase::Running
+            },
             outline: None,
             scenes: vec![],
             text: None,
@@ -137,7 +161,12 @@ impl Service {
             prompt_profile_id: profile.resolved_id.clone(),
             prompt_profile_revision: profile.profile.revision.clone(),
             profile_warning: profile.warning.clone(),
-            provider_snapshot: json!({"profile_id":provider.profile.id,"name":provider.profile.name,"base_url":provider.profile.base_url,"model":provider.profile.model,"generation":generation_parameters}),
+            // An external Draft's generation parameters are informational only.
+            provider_snapshot: if external {
+                json!({"profile_id":steps::EXTERNAL,"generation":generation_parameters})
+            } else {
+                json!({"profile_id":provider.profile.id,"name":provider.profile.name,"base_url":provider.profile.base_url,"model":provider.profile.model,"generation":generation_parameters})
+            },
             planned_durations: vec![],
             inventory: vec![],
             selected_cast: grounding.cast.clone(),
@@ -147,14 +176,16 @@ impl Service {
             } else {
                 vec![]
             },
+            production: None,
         };
         let mut jobs = self.jobs.lock().unwrap();
-        if jobs.values().any(|j| j.draft.phase.busy()) {
+        if !external && jobs.values().any(|j| j.draft.phase.busy()) {
             return Err(Fault::new(409, "authoring_busy"));
         }
         jobs.insert(
             id.clone(),
             Job {
+                created: std::time::Instant::now(),
                 clock: std::time::Instant::now(),
                 clock_completed: 0,
                 clock_elapsed: None,
@@ -170,11 +201,44 @@ impl Service {
             },
         );
         drop(jobs);
-        let service = self.clone();
-        tokio::spawn(async move {
-            service.generate(id, 0, transport, false, 0).await;
-        });
+        if !external {
+            let service = self.clone();
+            tokio::spawn(async move {
+                service.generate(id, 0, transport, false, 0).await;
+            });
+        }
         Ok(draft)
+    }
+    /// An external Draft's context bundle: every prompt, message and image
+    /// the provider path would use.
+    pub(crate) fn bundle(
+        &self,
+        id: &str,
+        identities: &[steps::Identity],
+    ) -> Result<serde_json::Value, Fault> {
+        let jobs = self.jobs.lock().unwrap();
+        let j = jobs.get(id).ok_or(Fault::new(404, "authoring_not_found"))?;
+        steps::bundle(&j.draft, &j.base, &j.profile, &j.grounding, identities).map_err(fault)
+    }
+    /// Parses an external agent's submission into a copy of the Draft; the
+    /// stored Draft changes only through `store`.
+    pub fn submit(&self, id: &str, submission: &Submission) -> Result<Draft, steps::Rejection> {
+        let jobs = self.jobs.lock().unwrap();
+        let j = jobs.get(id).ok_or(Fault::new(404, "authoring_not_found"))?;
+        if j.draft.request.provider != steps::EXTERNAL {
+            return Err(Fault::new(409, "authoring_not_external").into());
+        }
+        if j.draft.phase.busy() || j.draft.phase == Phase::Applied {
+            return Err(Fault::new(409, "authoring_not_editable").into());
+        }
+        let mut draft = j.draft.clone();
+        steps::submit(&mut draft, &j.base, &j.grounding, submission)?;
+        Ok(draft)
+    }
+    pub fn store(&self, id: &str, draft: Draft) {
+        if let Some(job) = self.jobs.lock().unwrap().get_mut(id) {
+            job.draft = draft;
+        }
     }
     pub fn read(&self, id: &str) -> Result<Draft, Fault> {
         self.jobs
@@ -183,6 +247,22 @@ impl Service {
             .get(id)
             .map(|j| j.draft.clone())
             .ok_or(Fault::new(404, "authoring_not_found"))
+    }
+    /// This session's Drafts for a project, oldest first; identities only, no content.
+    pub fn list(&self, project: &ProjectId) -> Vec<serde_json::Value> {
+        let jobs = self.jobs.lock().unwrap();
+        let mut drafts = jobs
+            .values()
+            .filter(|j| &j.draft.project_id == project)
+            .collect::<Vec<_>>();
+        drafts.sort_by_key(|j| j.created);
+        drafts
+            .into_iter()
+            .map(|j| {
+                let d = &j.draft;
+                json!({"id":d.id,"phase":d.phase,"provider":d.request.provider,"prompt_profile_id":d.prompt_profile_id})
+            })
+            .collect()
     }
     pub fn progress(&self, id: &str) -> Result<serde_json::Value, Fault> {
         let jobs = self.jobs.lock().unwrap();
@@ -235,6 +315,9 @@ impl Service {
         let j = jobs
             .get_mut(id)
             .ok_or(Fault::new(404, "authoring_not_found"))?;
+        if j.draft.request.provider == steps::EXTERNAL {
+            return Err(Fault::new(409, "authoring_not_generated"));
+        }
         if !matches!(j.draft.phase, Phase::Failed | Phase::Cancelled) || j.draft.outline.is_some() {
             return Err(fault("authoring_not_retryable"));
         }
@@ -286,13 +369,15 @@ impl Service {
             d.planned_durations = durations(
                 &outline.scenes.iter().map(|s| s.weight).collect::<Vec<_>>(),
                 d.request.duration_seconds,
-                15.,
+                MAX_SCENE_SECONDS,
             )
             .map_err(fault)?;
             if d.outline.as_ref() != Some(&outline) {
                 d.scenes = vec![None; outline.scenes.len()];
                 d.outline = Some(outline);
                 d.phase = Phase::Outline;
+                // Production choices belong to the outline they were written for.
+                d.production = None;
             }
         }
         if let Some(scenes) = review.scenes {
@@ -353,6 +438,9 @@ impl Service {
         let j = jobs
             .get_mut(id)
             .ok_or(Fault::new(404, "authoring_not_found"))?;
+        if j.draft.request.provider == steps::EXTERNAL {
+            return Err(Fault::new(409, "authoring_not_generated"));
+        }
         // One row of a whole-Scene enhancement again, keeping the others.
         if !j.draft.fields.is_empty() {
             if j.draft.phase == Phase::Applied || index >= j.draft.fields.len() || !only {
@@ -416,24 +504,6 @@ impl Service {
         });
         Ok(result)
     }
-    pub fn edit_plan(
-        &self,
-        id: &str,
-        current: &VideoProject,
-    ) -> Result<crate::video::editing::EditRequest, Fault> {
-        let jobs = self.jobs.lock().unwrap();
-        let job = jobs.get(id).ok_or(Fault::new(404, "authoring_not_found"))?;
-        apply(current, &job.draft).map_err(|code| {
-            Fault::new(
-                if code == "authoring_revision_conflict" {
-                    409
-                } else {
-                    422
-                },
-                code,
-            )
-        })
-    }
     pub fn applied(&self, id: &str) {
         if let Some(job) = self.jobs.lock().unwrap().get_mut(id) {
             job.draft.phase = Phase::Applied;
@@ -477,8 +547,8 @@ impl Service {
                 }
                 let result=async{
                     let parameters=profiles::resolve(&profile.profile.generation,&draft.request.provider,"image_analysis")?;
-                    let system=system(&profile,"story_image_inventory")?;
-                    let prompt=format!("Task:\nInspect this one image for visual-story planning.\n\n<image_id>\n{}\n</image_id>\n\n<label>\n{}\n</label>\n\n<additional_instruction>\n{}\n</additional_instruction>",selection.id,selection.label,draft.request.instruction);
+                    let system=system(&profile,steps::INVENTORY)?;
+                    let prompt=steps::inventory_message(selection,&draft.request.instruction);
                     tokio::select!{biased;_=cancel.cancelled()=>Err("authoring_cancelled"),r=transport.authoring_complete(&provider,&draft.request.provider,&system,&prompt,&parameters,std::slice::from_ref(image))=>r}
                 }.await;
                 let mut jobs = self.jobs.lock().unwrap();
@@ -488,12 +558,8 @@ impl Service {
                 }
                 match result {
                     Ok(note) => {
-                        let row = InventoryNote {
-                            id: selection.id.clone(),
-                            note,
-                        };
-                        j.draft.inventory.push(row.clone());
-                        draft.inventory.push(row);
+                        steps::accept_inventory(&mut j.draft, &selection.id, note.clone());
+                        steps::accept_inventory(&mut draft, &selection.id, note);
                     }
                     Err(code) => {
                         j.draft.phase = Phase::Failed;
@@ -537,55 +603,38 @@ impl Service {
                     draft.request.scene_field.unwrap_or_default(),
                 ),
             };
-            let (mut key, operation, mut user, protected) = if expand {
+            let images = if expand {
+                let jobs = self.jobs.lock().unwrap();
+                let source = &jobs[&id].draft.outline.as_ref().unwrap().scenes[index];
+                grounding.selected(&steps::scene_image_ids(source))
+            } else if draft.request.operation == Operation::Outline {
+                vec![]
+            } else {
+                grounding.images.iter().map(|(_, p)| p.clone()).collect()
+            };
+            let inventory = json!(draft.inventory).to_string();
+            let (key, operation, user, protected) = if expand {
                 let jobs = self.jobs.lock().unwrap();
                 let d = &jobs[&id].draft;
                 let outline = d.outline.as_ref().unwrap();
-                let source = &outline.scenes[index];
-                let previous = if index > 0 {
-                    json!(d.scenes[index - 1])
-                } else if draft.request.destination == Destination::Continue {
-                    last_scene(&base)
-                        .map(|s| json!({"description":s.description,"sections":s.sections}))
-                        .unwrap_or(json!(null))
-                } else {
-                    json!(null)
-                };
                 (
-                    "story_scene",
+                    steps::scene_key(draft.request.add_dialogue),
                     "story_scene_expansion",
-                    format!(
-                        "Task:\nExpand this one Scene and its Sections. Return one JSON object matching the supplied Scene shape and no markdown.\n\nVisual context rule:\nNo images are supplied. Provide detailed environment, spatial layout, appearance, lighting, and atmosphere.\n\n<previous_scene_context>\n{previous}\n</previous_scene_context>\n\n<selected_cast>\n[]\n</selected_cast>\n\n<continuity_cast>\n[]\n</continuity_cast>\n\n<next_scene_summary>\n{}\n</next_scene_summary>\n\n<additional_instruction>\n{}\n</additional_instruction>\n\n<scene_json>\n{}\n</scene_json>",
-                        outline
-                            .scenes
-                            .get(index + 1)
-                            .map(|s| s.summary.as_str())
-                            .unwrap_or(""),
-                        draft.request.instruction,
-                        serde_json::to_string(source).unwrap()
+                    steps::expansion_message(
+                        &draft,
+                        &steps::previous_context(d, &base, index).to_string(),
+                        steps::next_summary(outline, index),
+                        &serde_json::to_string(&outline.scenes[index]).unwrap(),
+                        &inventory,
+                        !images.is_empty(),
                     ),
                     None,
                 )
             } else if draft.request.operation == Operation::Outline {
-                let context = if draft.request.destination == Destination::Continue {
-                    last_scene(&base)
-                        .into_iter()
-                        .map(|s| json!({"description":s.description,"sections":s.sections}))
-                        .collect::<Vec<_>>()
-                } else {
-                    vec![]
-                };
                 (
+                    steps::outline_key(draft.request.add_dialogue),
                     "story_outline",
-                    "story_outline",
-                    format!(
-                        "Task:\nPlan an ordered Story Outline. Return only JSON matching the supplied schema. Every Scene must fit 15 seconds and contain 1–12 sections. Requested duration: {} seconds.\n\n<story>\n{}\n</story>\n\n<latest_moment>\n{}\n</latest_moment>\n\n<earlier_continuity>\n{}\n</earlier_continuity>\n\n<selected_cast>\n[]\n</selected_cast>\n\n<additional_instruction>\n{}\n</additional_instruction>",
-                        draft.request.duration_seconds,
-                        draft.request.brief,
-                        draft.request.brief,
-                        json!(context),
-                        draft.request.instruction
-                    ),
+                    steps::outline_message(&draft, &base, &inventory),
                     None,
                 )
             } else {
@@ -602,6 +651,10 @@ impl Service {
                     field.source(&base, scene)
                 };
                 let protected = super::references::Protected::new(&source);
+                // The opening frame leads only the Scene fields and its first Section.
+                let opening = grounding.opening
+                    && (!is_section
+                        || scene.sections.first().map(|s| &s.id) == section_id.as_ref());
                 (
                     if section.is_some() {
                         "enhance_section"
@@ -609,78 +662,19 @@ impl Service {
                         "enhance_scene_field"
                     },
                     "text_enhancement",
-                    format!(
-                        "Task:\nEnhance one {}. Return only the enhanced text.\n\nVisual context rule:\nNo images are supplied. Add the environmental, spatial, lighting, and atmospheric detail needed for visual grounding.\n\nScene context:\n{}\n\nAdditional user instruction:\n{}\n\nSource text:\n{}",
-                        if section.is_some() {
-                            "Section (prompt)"
-                        } else {
-                            field.label()
-                        },
-                        scene.description,
-                        draft.request.instruction,
-                        protected.text
+                    super::references::enhancement_user_prompt(
+                        is_section,
+                        &scene.description,
+                        &draft.request.instruction,
+                        &protected.text,
+                        !images.is_empty(),
+                        opening,
                     ),
                     Some(protected),
                 )
             };
-            if draft.request.add_dialogue {
-                key = match key {
-                    "story_outline" => "story_outline_dialogue",
-                    "story_scene" => "story_scene_dialogue",
-                    other => other,
-                };
-            }
-            user = user.replace(
-                "<selected_cast>\n[]\n</selected_cast>",
-                &format!("<selected_cast>\n{}\n</selected_cast>", draft.selected_cast),
-            );
-            user.push_str(&format!(
-                "\n\n<image_sources>\n{}\n</image_sources>",
-                json!(draft.request.images)
-            ));
-            user.push_str(&format!("\n\n<image_inventory>\n{}\n</image_inventory>\n\n<visual_beats>\n{}\n</visual_beats>",json!(draft.inventory),json!(super::visuals::beats(&draft.request.images).unwrap().iter().map(|b|json!({"beat_key":b.key,"image_ids":b.ids,"semantic_role":b.role})).collect::<Vec<_>>())));
-            let images = if expand {
-                let jobs = self.jobs.lock().unwrap();
-                let d = &jobs[&id].draft;
-                let source = d.outline.as_ref().unwrap().scenes.get(index).unwrap();
-                let ids = source
-                    .image_ids
-                    .iter()
-                    .chain(source.sections.iter().flat_map(|s| {
-                        s.image_ids
-                            .iter()
-                            .chain([&s.first_frame_id, &s.last_frame_id])
-                    }))
-                    .cloned()
-                    .collect::<Vec<_>>();
-                grounding.selected(&ids)
-            } else if draft.request.operation == Operation::Outline {
-                vec![]
-            } else {
-                grounding.images.iter().map(|(_, p)| p.clone()).collect()
-            };
-            if !images.is_empty() {
-                user=user.replace("No images are supplied.","The selected source images are supplied. Ground visible details in those images; do not invent unseen facts.");
-            }
-            if let Some(protected) = &protected {
-                let scene = base
-                    .scene(draft.request.scene_id.as_ref().unwrap())
-                    .unwrap();
-                // The opening frame leads only the Scene fields and its first Section.
-                let opening = grounding.opening
-                    && (!is_section
-                        || scene.sections.first().map(|s| &s.id) == section_id.as_ref());
-                user = super::references::enhancement_user_prompt(
-                    is_section,
-                    &scene.description,
-                    &draft.request.instruction,
-                    &protected.text,
-                    !images.is_empty(),
-                    opening,
-                );
-            }
             let result=async {
-                if user.chars().count()>100000{return Err("story_context_limit");}
+                if user.chars().count()>steps::CONTEXT_LIMIT{return Err("story_context_limit");}
                 let parameters=profiles::resolve(&profile.profile.generation,&draft.request.provider,operation)?;
                 let system=system_with_images(&profile,key,&draft.request.images,draft.request.add_dialogue)?;
                 tokio::select!{biased;_=cancel.cancelled()=>Err("authoring_cancelled"),result=transport.authoring_complete(&provider,&draft.request.provider,&system,&user,&parameters,&images)=>result}
@@ -697,42 +691,9 @@ impl Service {
             }
             let result = result.and_then(|text| {
                 if expand {
-                    let source = &j.draft.outline.as_ref().unwrap().scenes[index];
-                    let mut scene = expansion(&text, source)?;
-                    if !j.draft.request.add_music {
-                        scene.non_diegetic_music.clear();
-                    }
-                    super::visuals::validate_cast(
-                        &Storyboard {
-                            scenes: vec![scene.clone()],
-                        },
-                        &j.draft.selected_cast,
-                        j.draft.request.add_dialogue,
-                    )?;
-                    j.draft.scenes[index] = Some(scene);
+                    steps::accept_expansion(&mut j.draft, index, &text)?;
                 } else if draft.request.operation == Operation::Outline {
-                    let mut board = outline_with_images(
-                        &text,
-                        &draft.request.images,
-                        draft.request.add_dialogue,
-                    )?;
-                    if !draft.request.add_music {
-                        for scene in &mut board.scenes {
-                            scene.non_diegetic_music.clear();
-                        }
-                    }
-                    super::visuals::validate_cast(
-                        &board,
-                        &j.draft.selected_cast,
-                        j.draft.request.add_dialogue,
-                    )?;
-                    j.draft.planned_durations = durations(
-                        &board.scenes.iter().map(|s| s.weight).collect::<Vec<_>>(),
-                        draft.request.duration_seconds,
-                        15.,
-                    )?;
-                    j.draft.scenes = vec![None; board.scenes.len()];
-                    j.draft.outline = Some(board);
+                    steps::accept_outline(&mut j.draft, &text)?;
                 } else {
                     if text.len() > 65536 {
                         return Err("story_text_limit");
@@ -786,12 +747,4 @@ impl Service {
             Phase::Review
         };
     }
-}
-fn last_scene(base: &VideoProject) -> Option<&Scene> {
-    base.scenes.iter().max_by(|a, b| {
-        let end = |s: &Scene| {
-            s.start.num as f64 / s.start.den as f64 + s.duration.num as f64 / s.duration.den as f64
-        };
-        end(a).total_cmp(&end(b))
-    })
 }

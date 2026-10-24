@@ -16,6 +16,7 @@ pub struct Root {
     config: d::Config,
     environment: Arc<dyn d::Environment>,
     runtime: Option<PathBuf>,
+    project_roots: Vec<PathBuf>,
 }
 impl Root {
     pub fn system() -> d::Result<Self> {
@@ -53,6 +54,7 @@ impl Root {
             config,
             environment,
             runtime: None,
+            project_roots: vec![],
         };
         root.proof()?;
         Ok(root)
@@ -64,6 +66,93 @@ impl Root {
     }
     pub fn layout(&self) -> layout::Layout {
         layout::Layout::new(self.config.root.clone())
+    }
+    /// Approve folders for explicitly located projects. Only roots strictly
+    /// inside this verified mount are kept; the rest are returned to report.
+    pub fn with_project_roots(mut self, roots: &[PathBuf]) -> (Self, Vec<PathBuf>) {
+        let (kept, ignored) = roots.iter().cloned().partition(|root| {
+            clean(root) && root.starts_with(&self.config.mount) && *root != self.config.mount
+        });
+        self.project_roots = kept;
+        (self, ignored)
+    }
+    pub fn project_roots(&self) -> &[PathBuf] {
+        &self.project_roots
+    }
+    /// One storage guard: the mount proof holds and the existing directory is
+    /// inside the private root or an approved project root on the same volume.
+    pub fn allows(&self, path: &Path) -> bool {
+        self.approved(path) && self.verified(path).is_ok()
+    }
+    fn approved(&self, path: &Path) -> bool {
+        clean(path)
+            && (path.starts_with(&self.config.root)
+                || self.project_roots.iter().any(|root| path.starts_with(root)))
+    }
+    fn verified(&self, path: &Path) -> d::Result<File> {
+        let proof = self.proof()?;
+        let file = d::directory(path)?;
+        if file
+            .metadata()
+            .map_err(|_| "video_destination_unavailable")?
+            .dev()
+            != proof.device
+            || d::fsid(&file)? != self.config.fsid
+        {
+            return Err("video_volume_mismatch");
+        }
+        Ok(file)
+    }
+    /// A folder an explicit location may bind a project to: strictly inside an
+    /// approved root, and outside the ID-named `projects` and the library areas.
+    pub fn project_location(&self, path: &Path) -> d::Result<()> {
+        if !clean(path) {
+            return Err("invalid_project_location");
+        }
+        let layout = self.layout();
+        if path.starts_with(layout.root().join("projects")) || path.starts_with(layout.library()) {
+            return Err("invalid_project_location");
+        }
+        let Some(root) = std::iter::once(&self.config.root)
+            .chain(&self.project_roots)
+            .find(|root| path != *root && path.starts_with(root))
+        else {
+            return Err("invalid_storage_root");
+        };
+        // Never inside another project's folder below the approved root.
+        if path
+            .ancestors()
+            .skip(1)
+            .take_while(|ancestor| ancestor != root)
+            .any(|ancestor| std::fs::symlink_metadata(ancestor.join("project.json")).is_ok())
+        {
+            return Err("project_location_nested");
+        }
+        Ok(())
+    }
+    /// Create one missing folder whose parent already exists and is allowed;
+    /// intermediate directories are never created.
+    pub fn create_location(&self, path: &Path) -> d::Result<()> {
+        self.project_location(path)?;
+        let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+            return Err("invalid_project_location");
+        };
+        self.proof()?;
+        if std::fs::symlink_metadata(parent)
+            .is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+        {
+            return Err("location_parent_missing");
+        }
+        let parent = self.verified(parent).map_err(|_| "invalid_storage_root")?;
+        d::writable(&parent, 0)?;
+        use std::os::unix::ffi::OsStrExt;
+        let name = CString::new(name.as_bytes()).map_err(|_| "invalid_project_location")?;
+        if unsafe { libc::mkdirat(parent.as_raw_fd(), name.as_ptr(), 0o700) } != 0
+            && std::io::Error::last_os_error().raw_os_error() != Some(libc::EEXIST)
+        {
+            return Err("video_destination_not_writable");
+        }
+        self.verified(path).map(|_| ())
     }
     /// Share the same mount witness with disk owners; fixtures inject only their
     /// own volume policy instead of substituting production paths.
@@ -99,12 +188,19 @@ impl Root {
         {
             return Err("video_destination_invalid");
         }
-        let (proof, mut parent) = d::inspect(&self.config, self.environment.as_ref())?;
+        let (proof, parent) = d::inspect(&self.config, self.environment.as_ref())?;
         d::writable(&parent, 0)?;
+        let parent = self.descend(&proof, parent, relative)?;
+        self.proof()?;
+        Ok(parent)
+    }
+    fn descend(&self, proof: &d::Proof, mut parent: File, relative: &Path) -> d::Result<File> {
         for part in relative.components() {
             use std::os::unix::ffi::OsStrExt;
-            let name = CString::new(part.as_os_str().as_bytes())
-                .map_err(|_| "video_destination_invalid")?;
+            let Component::Normal(part) = part else {
+                return Err("video_destination_invalid");
+            };
+            let name = CString::new(part.as_bytes()).map_err(|_| "video_destination_invalid")?;
             if unsafe { libc::mkdirat(parent.as_raw_fd(), name.as_ptr(), 0o700) } != 0
                 && std::io::Error::last_os_error().raw_os_error() != Some(libc::EEXIST)
             {
@@ -131,7 +227,6 @@ impl Root {
                 return Err("video_volume_mismatch");
             }
         }
-        self.proof()?;
         Ok(parent)
     }
     pub fn project(&self, id: &str) -> d::Result<layout::Project> {
@@ -151,16 +246,47 @@ impl Root {
         }
         Ok(project)
     }
+    /// The project classes inside an allowed, already existing project folder.
+    pub fn project_at(&self, path: &Path) -> d::Result<layout::Project> {
+        let project = self.layout().project_at(path)?;
+        if !self.approved(path) {
+            return Err("invalid_storage_root");
+        }
+        let (proof, _) = d::inspect(&self.config, self.environment.as_ref())?;
+        let base = self.verified(path)?;
+        d::writable(&base, 0)?;
+        for child in [
+            &project.images,
+            &project.videos,
+            &project.audio,
+            &project.work,
+            &project.tmp,
+            &project.autosave,
+        ] {
+            let relative = child
+                .strip_prefix(path)
+                .map_err(|_| "video_destination_invalid")?;
+            let base = base
+                .try_clone()
+                .map_err(|_| "video_destination_unavailable")?;
+            self.descend(&proof, base, relative)?;
+        }
+        self.proof()?;
+        Ok(project)
+    }
     pub fn library(&self) -> d::Result<PathBuf> {
         self.directory(Path::new("library"))?;
         Ok(self.layout().library())
     }
     /// Revalidated export destination for this exact private child directory.
     pub fn destination(&self, path: &Path) -> d::Result<d::Config> {
-        let relative = path
-            .strip_prefix(&self.config.root)
-            .map_err(|_| "video_destination_invalid")?;
-        self.directory(relative)?;
+        if let Ok(relative) = path.strip_prefix(&self.config.root) {
+            self.directory(relative)?;
+        } else if self.approved(path) {
+            self.verified(path)?;
+        } else {
+            return Err("video_destination_invalid");
+        }
         let mut config = self.config.clone();
         config.root = path.into();
         d::inspect(&config, self.environment.as_ref())?;
@@ -265,6 +391,13 @@ impl Root {
     }
 }
 
+fn clean(path: &Path) -> bool {
+    path.is_absolute()
+        && path
+            .components()
+            .all(|part| matches!(part, Component::RootDir | Component::Normal(_)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,5 +450,104 @@ mod tests {
         );
         assert!(!root.join("projects/after-unmount").exists());
         assert!(policy.directory(Path::new("../outside")).is_err());
+    }
+    #[test]
+    fn approved_project_roots_stay_inside_the_verified_mount() {
+        let temp = tempfile::tempdir().unwrap();
+        let mount = temp.path().join("volume");
+        let root = mount.join("imagine");
+        let inputs = mount.join("own-inputs");
+        let outside = temp.path().join("outside");
+        for path in [&root, &inputs, &outside] {
+            std::fs::create_dir_all(path).unwrap();
+        }
+        let config = d::Config {
+            root: root.clone(),
+            mount: mount.clone(),
+            source: "own-fixture".into(),
+            filesystem: "fixturefs".into(),
+            fsid: d::fsid(&d::directory(&mount).unwrap()).unwrap(),
+        };
+        let env = Arc::new(Environment(Mutex::new(format!(
+            "1 0 0:1 / {} rw - fixturefs own-fixture rw\n",
+            mount.display()
+        ))));
+        let (policy, ignored) = Root::with_environment(config, env.clone())
+            .unwrap()
+            .with_project_roots(&[
+                inputs.clone(),
+                outside.clone(),
+                mount.clone(),
+                "relative".into(),
+                mount.join("own/../escape"),
+            ]);
+        assert_eq!(policy.project_roots(), std::slice::from_ref(&inputs));
+        assert_eq!(
+            ignored,
+            [
+                outside.clone(),
+                mount.clone(),
+                "relative".into(),
+                mount.join("own/../escape")
+            ]
+        );
+        assert!(policy.allows(&root) && policy.allows(&inputs));
+        assert!(!policy.allows(&outside) && !policy.allows(&mount));
+        assert!(!policy.allows(&inputs.join("missing")));
+        std::os::unix::fs::symlink(&outside, inputs.join("redirect")).unwrap();
+        assert!(!policy.allows(&inputs.join("redirect")));
+        assert_eq!(
+            policy.create_location(&inputs.join("redirect/own")),
+            Err("invalid_storage_root")
+        );
+        assert!(!outside.join("own").exists());
+
+        let located = inputs.join("own-project");
+        policy.create_location(&located).unwrap();
+        assert!(located.is_dir());
+        assert_eq!(
+            policy.create_location(&inputs.join("missing/own")),
+            Err("location_parent_missing")
+        );
+        assert!(!inputs.join("missing").exists());
+        for (path, code) in [
+            (outside.join("own"), "invalid_storage_root"),
+            (mount.join("own"), "invalid_storage_root"),
+            (root.join("projects/own"), "invalid_project_location"),
+            (root.join("library/own"), "invalid_project_location"),
+        ] {
+            assert_eq!(policy.create_location(&path), Err(code), "{path:?}");
+            assert!(!path.exists());
+        }
+        assert_eq!(
+            policy.project_location(&inputs),
+            Err("invalid_storage_root")
+        );
+        assert_eq!(policy.project_location(&root), Err("invalid_storage_root"));
+        assert_eq!(
+            policy.project_location(Path::new("own-relative")),
+            Err("invalid_project_location")
+        );
+        policy
+            .project_location(&root.join("own-elsewhere"))
+            .unwrap();
+
+        let project = policy.project_at(&located).unwrap();
+        assert!(project.images.is_dir() && project.videos.is_dir() && project.autosave.is_dir());
+        assert_eq!(
+            policy.destination(&project.videos).unwrap().root,
+            project.videos
+        );
+        assert!(policy.project_at(&outside).is_err());
+        assert!(policy.destination(&outside).is_err());
+        assert!(!outside.join("outputs").exists());
+
+        env.0.lock().unwrap().clear();
+        assert!(!policy.allows(&located));
+        assert_eq!(
+            policy.create_location(&inputs.join("after-unmount")),
+            Err("video_volume_not_mounted")
+        );
+        assert!(!inputs.join("after-unmount").exists());
     }
 }

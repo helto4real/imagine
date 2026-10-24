@@ -481,7 +481,7 @@ async fn cast_inventory_dialogue_retry_apply_and_reopen_keep_owned_bindings_and_
     let _ = worker.await;
 }
 #[path = "../../examples/support/authoring_fixture.rs"]
-mod fixture;
+pub(super) mod fixture;
 async fn expanded(h: &Harness, project: &str, destination: &str) -> Value {
     let mut start = request(h, project, "outline", "koboldcpp").await;
     start["destination"] = json!(destination);

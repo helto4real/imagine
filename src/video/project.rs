@@ -19,6 +19,21 @@ impl ProjectService {
         }
         Ok(None)
     }
+    /// A new project folder never lies inside another open project's folder.
+    pub(crate) fn outside_projects(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<(), super::persistence::StorageError> {
+        if self.projects.values().any(|p| {
+            p.location()
+                .is_some_and(|location| path != location && path.starts_with(&location))
+        }) {
+            return Err(super::persistence::StorageError::new(
+                "project_location_nested",
+            ));
+        }
+        Ok(())
+    }
     pub fn create(&mut self, request: CreateProject) -> Result<VideoProject, Issue> {
         let project = VideoProject::create(request)?;
         self.projects.insert(
@@ -36,6 +51,31 @@ impl ProjectService {
         let project = VideoProject::create(request)?;
         let mut session = super::persistence::ProjectSession::new(project.clone())?;
         session.save_private(root)?;
+        self.insert(session)?;
+        Ok(project)
+    }
+    /// Create and save at once in an explicitly located folder, so every later
+    /// edit autosaves there. The folder must be new or empty.
+    pub fn create_private_at(
+        &mut self,
+        request: CreateProject,
+        root: &crate::private_storage::Root,
+        path: &std::path::Path,
+    ) -> Result<VideoProject, super::persistence::StorageError> {
+        let project = VideoProject::create(request)?;
+        let mut session = super::persistence::ProjectSession::new(project.clone())?;
+        session.save_private_at(root, path)?;
+        self.insert(session)?;
+        Ok(project)
+    }
+    pub fn create_at(
+        &mut self,
+        request: CreateProject,
+        path: &std::path::Path,
+    ) -> Result<VideoProject, super::persistence::StorageError> {
+        let project = VideoProject::create(request)?;
+        let mut session = super::persistence::ProjectSession::new(project.clone())?;
+        session.save_to(path)?;
         self.insert(session)?;
         Ok(project)
     }

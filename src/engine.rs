@@ -22,6 +22,15 @@ impl std::fmt::Display for EngineError {
     }
 }
 impl std::error::Error for EngineError {}
+/// Bounded H3 worker diagnostics behind an EngineError code; stored with the job.
+#[derive(Debug)]
+pub struct H3Failure(pub crate::h3_protocol::Failure);
+impl std::fmt::Display for H3Failure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("h3_failure_details")
+    }
+}
+impl std::error::Error for H3Failure {}
 
 pub type EngineFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T>> + Send + 'a>>;
 pub trait Backend: Send {

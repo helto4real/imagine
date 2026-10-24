@@ -576,6 +576,34 @@ impl Bundle for ProjectDocument {
         Ok(())
     }
 }
+/// Located private projects start in a new folder; only prepared, empty
+/// project classes from an interrupted first save may already exist.
+fn empty_project_folder(path: &Path) -> Result<(), StorageError> {
+    let io = |_| StorageError::new("storage_io_failed");
+    for entry in std::fs::read_dir(path).map_err(io)? {
+        let entry = entry.map_err(io)?;
+        let prepared = ["outputs", "work", "tmp", "autosave"]
+            .iter()
+            .any(|name| entry.file_name() == *name);
+        if !prepared || !only_directories(&entry)? {
+            return Err(StorageError::new("storage_not_empty"));
+        }
+    }
+    Ok(())
+}
+/// A real directory holding nothing but empty directories, at any depth.
+fn only_directories(entry: &std::fs::DirEntry) -> Result<bool, StorageError> {
+    let io = |_| StorageError::new("storage_io_failed");
+    if !entry.file_type().map_err(io)?.is_dir() {
+        return Ok(false);
+    }
+    for child in std::fs::read_dir(entry.path()).map_err(io)? {
+        if !only_directories(&child.map_err(io)?)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
 /// Caller supplies an already-existing session directory. Staged copies are immediately
 /// unlinked and live only through owned handles; no recovery files or hidden history.
 pub struct SessionStaging {
@@ -619,6 +647,7 @@ impl ProjectSession {
                 state: SaveState::SessionOnly,
                 saved_revision: None,
                 error_code: None,
+                location: None,
             },
         })
     }
@@ -776,13 +805,12 @@ impl ProjectSession {
             Ok(())
         }
     }
-    /// Publish reviewed source and its immutable provider/profile provenance in one revision.
-    pub fn apply_authoring(
-        &mut self,
+    /// The document `apply_authoring` would publish, validated; nothing changes.
+    pub fn authoring_candidate(
+        &self,
         request: EditRequest,
         mut draft: imagine_video_contract::authoring::Draft,
-    ) -> Result<(), StorageError> {
-        self.ensure_writable()?;
+    ) -> Result<ProjectDocument, StorageError> {
         let mut candidate = self.document.clone();
         editing::apply(&mut candidate.project, request)?;
         super::review::invalidate_changed(&self.document.project, &mut candidate)?;
@@ -792,6 +820,16 @@ impl ProjectSession {
         draft.phase = imagine_video_contract::authoring::Phase::Applied;
         candidate.authoring.push(draft);
         candidate.validate()?;
+        Ok(candidate)
+    }
+    /// Publish reviewed source and its immutable provider/profile provenance in one revision.
+    pub fn apply_authoring(
+        &mut self,
+        request: EditRequest,
+        draft: imagine_video_contract::authoring::Draft,
+    ) -> Result<(), StorageError> {
+        self.ensure_writable()?;
+        let candidate = self.authoring_candidate(request, draft)?;
         let previous = std::mem::replace(&mut self.document, candidate);
         if let Err(error) = self.autosave() {
             // Rename already committed this source revision. Keep it applied and let
@@ -855,16 +893,43 @@ impl ProjectSession {
         &mut self,
         root: &crate::private_storage::Root,
     ) -> Result<(), StorageError> {
+        let layout = root
+            .project(&self.document.project.id.0)
+            .map_err(StorageError::new);
+        self.bind_private(root, layout)
+    }
+    /// Bind a new session to an explicitly located folder in an approved
+    /// private project root. The folder must be empty; nothing is moved.
+    pub fn save_private_at(
+        &mut self,
+        root: &crate::private_storage::Root,
+        path: &Path,
+    ) -> Result<(), StorageError> {
+        let layout = root
+            .project_location(path)
+            .map_err(StorageError::new)
+            .and_then(|()| {
+                root.allows(path)
+                    .then_some(())
+                    .ok_or_else(|| StorageError::new("invalid_storage_root"))
+            })
+            .and_then(|()| empty_project_folder(path))
+            .and_then(|()| root.project_at(path).map_err(StorageError::new));
+        self.bind_private(root, layout)
+    }
+    fn bind_private(
+        &mut self,
+        root: &crate::private_storage::Root,
+        layout: Result<crate::storage_layout::Project, StorageError>,
+    ) -> Result<(), StorageError> {
         if self.store.is_some() {
             return Err(StorageError::new("project_already_bound"));
         }
         self.status.state = SaveState::Saving;
         let mut candidate = self.document.clone();
         candidate.storage_layout = Some(1);
-        let result = root
-            .project(&candidate.project.id.0)
-            .map_err(StorageError::new)
-            .and_then(|layout| Store::select_private(&layout.root, "project.json", root));
+        let result =
+            layout.and_then(|layout| Store::select_private(&layout.root, "project.json", root));
         let mut store = match result {
             Ok(store) => store,
             Err(error) => {
@@ -918,6 +983,7 @@ impl ProjectSession {
     ) -> Result<Self, StorageError> {
         let sources = store.files(&document)?;
         let revision = document.project.project_revision;
+        let location = Some(store.path().to_path_buf());
         Ok(Self {
             document,
             sources,
@@ -926,6 +992,7 @@ impl ProjectSession {
                 state: SaveState::Saved,
                 saved_revision: Some(revision),
                 error_code: None,
+                location,
             },
         })
     }
@@ -964,7 +1031,7 @@ impl ProjectSession {
                 .layout()
                 .project(&session.document.project.id.0)
                 .map_err(StorageError::new)?;
-            if path != expected.root {
+            if path != expected.root && root.project_location(path).is_err() {
                 return Err(StorageError::new("private_storage_location_required"));
             }
             session
@@ -1040,11 +1107,17 @@ impl ProjectSession {
             state: SaveState::Saved,
             saved_revision: Some(self.document.project.project_revision),
             error_code: None,
+            location: self.location(),
         };
     }
     fn failed(&mut self, error: &StorageError) {
         self.status.state = SaveState::NotSaved;
         self.status.error_code = Some(error.code.clone());
+        self.status.location = self.location();
+    }
+    /// The bound project folder, where every save and autosave goes.
+    pub fn location(&self) -> Option<PathBuf> {
+        self.store.as_ref().map(|store| store.path().to_path_buf())
     }
     pub(crate) fn files(&self) -> Result<BTreeMap<BlobKey, File>, StorageError> {
         bundle::clone_files(&self.sources)
@@ -1089,6 +1162,7 @@ impl ProjectSession {
                 state: SaveState::SessionOnly,
                 saved_revision: None,
                 error_code: None,
+                location: None,
             },
         })
     }
@@ -1500,6 +1574,7 @@ mod tests {
             selected_cast: serde_json::Value::Null,
             warnings: vec![],
             fields: vec![],
+            production: None,
         };
         session.store.as_mut().unwrap().fail_commit = true;
         assert_eq!(

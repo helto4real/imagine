@@ -113,6 +113,7 @@ pub fn routes() -> Router<App> {
         .route("/v1/video/capabilities", get(capabilities))
         .route("/v1/video/locations", post(location))
         .route("/v1/video/projects", post(create))
+        .route("/v1/video/projects/at-location", post(create_at))
         .route("/v1/video/projects/open", post(open))
         .route("/v1/video/projects/{id}", get(read))
         .route("/v1/video/projects/{id}/edits", post(edit))
@@ -191,7 +192,8 @@ async fn capabilities(State(app): State<App>) -> Json<Value> {
         .collect::<Vec<_>>();
     Json(
         json!({"schema_version":1,"media":{"mime_types":media::MIME_TYPES,"max_upload_bytes":null,"streaming":true,"max_buffered_image_bytes":media::MAX_UPLOAD},
-        "project_operations":["create","read","edits","review","attach_asset","save","open","save_as","export_compatible","preflight"],"models":models}),
+        "project_operations":["create","create_at_location","read","edits","review","attach_asset","save","open","save_as","export_compatible","preflight"],"models":models,"authoring":super::authoring::steps::limits(),
+        "canvas":{"ratios":crate::h3_protocol::geometry::RATIOS,"qualities":crate::h3_protocol::geometry::QUALITIES,"default":imagine_video_contract::generation::Canvas::default()}}),
     )
 }
 /// Project-only admission blockers for a scene; see `execution::preflight`.
@@ -230,6 +232,54 @@ async fn create(
         service.projects.create_private(request, root)?
     } else {
         service.projects.create(request)?
+    };
+    Ok((StatusCode::CREATED, Json(service.snapshot(&project.id)?)))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CreateAt {
+    schema_version: u32,
+    location_id: String,
+    #[serde(default)]
+    project: Option<CreateProject>,
+    /// The default project on this canvas; exclusive with `project`.
+    #[serde(default)]
+    canvas: Option<imagine_video_contract::generation::Canvas>,
+}
+/// Create a project saved at once in an explicitly selected, new or empty folder.
+async fn create_at(
+    State(app): State<App>,
+    body: Result<Json<CreateAt>, JsonRejection>,
+) -> Result<(StatusCode, Json<Snapshot>), Error> {
+    let request = input(body)?;
+    schema(request.schema_version)?;
+    let create = match (request.project, request.canvas) {
+        (Some(_), Some(_)) => {
+            return Err(Error::new(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "invalid_request",
+            ));
+        }
+        (Some(project), None) => project,
+        (None, Some(canvas)) => crate::video_defaults::with_canvas(canvas)
+            .map_err(|code| Error::new(StatusCode::UNPROCESSABLE_ENTITY, code))?,
+        (None, None) => crate::video_defaults::new_project(),
+    };
+    let mut service = app.video.lock().await;
+    let path = service.location(&request.location_id)?;
+    // A retried create finds the project this session already bound there.
+    if let Some(id) = service.projects.at_location(&path)? {
+        return Ok((StatusCode::OK, Json(service.snapshot(&id)?)));
+    }
+    service.projects.outside_projects(&path)?;
+    let project = if let Some(root) = app.store.private_root() {
+        let project = service.projects.create_private_at(create, root, &path)?;
+        if let Some(location) = service.projects.session(&project.id)?.location() {
+            app.store.bind_project_location(&project.id.0, location);
+        }
+        project
+    } else {
+        service.projects.create_at(create, &path)?
     };
     Ok((StatusCode::CREATED, Json(service.snapshot(&project.id)?)))
 }
@@ -282,6 +332,9 @@ async fn review(
 struct SelectLocation {
     schema_version: u32,
     path: PathBuf,
+    /// Create the missing leaf folder; its parent must already exist.
+    #[serde(default)]
+    create: bool,
 }
 async fn location(
     State(app): State<App>,
@@ -295,11 +348,11 @@ async fn location(
         .parent()
         .and_then(|p| p.parent())
         .ok_or_else(|| internal("session root"))?;
-    let id = app
-        .video
-        .lock()
-        .await
-        .select_location(&request.path, session_data)?;
+    let mut service = app.video.lock().await;
+    if request.create {
+        service.create_location(&request.path, session_data, app.store.private_root())?;
+    }
+    let id = service.select_location(&request.path, session_data)?;
     Ok((StatusCode::CREATED, Json(json!({"location_id":id}))))
 }
 #[derive(Deserialize)]
@@ -541,7 +594,15 @@ async fn register_project(
             _ => {}
         };
     }
+    let located = app
+        .store
+        .private_root()
+        .and_then(|_| project.document().storage_layout)
+        .and_then(|_| project.location());
     service.projects.insert(project)?;
+    if let Some(location) = located {
+        app.store.bind_project_location(&id.0, location);
+    }
     service.runtime_assets.insert(id.clone(), bindings);
     service.runtime_takes.insert(id.clone(), takes);
     Ok(Json(service.snapshot(&id)?))
