@@ -13,6 +13,8 @@ pub(super) struct State {
     key: Option<Key>,
     pending: Option<Key>,
     blockers: Vec<String>,
+    /// Selected model files the server could not find, for `blockers`' key.
+    missing_files: Vec<String>,
 }
 
 impl State {
@@ -114,12 +116,26 @@ impl ImagineApp {
         }
         state.pending = None;
         // A failed check shows nothing rather than a guess; Generate reports it.
-        state.blockers = result
+        let value = result
             .ok()
-            .filter(|value| value["project_revision"] == key.1)
-            .and_then(|value| serde_json::from_value(value["blockers"].clone()).ok())
-            .unwrap_or_default();
+            .filter(|value| value["project_revision"] == key.1);
+        let field = |name: &str| {
+            value
+                .as_ref()
+                .and_then(|value| serde_json::from_value(value[name].clone()).ok())
+                .unwrap_or_default()
+        };
+        state.blockers = field("blockers");
+        state.missing_files = field("missing_model_files");
         state.key = Some(key);
+    }
+    /// Model files behind an `h3_model_file_missing` blocker.
+    pub(super) fn timeline_missing_model_files(&self) -> &[String] {
+        if self.timeline_scene_blockers().is_empty() {
+            &[]
+        } else {
+            &self.timeline.preflight.missing_files
+        }
     }
     /// Blockers for the selected scene at the open project revision.
     pub(super) fn timeline_scene_blockers(&self) -> &[String] {
@@ -223,6 +239,16 @@ mod tests {
             Ok(json!({"project_revision":key.1,"blockers":["scene_runtime_unsupported"]})),
         );
         assert_eq!(app.timeline_scene_blockers(), ["scene_runtime_unsupported"]);
+        assert!(app.timeline_missing_model_files().is_empty());
+        app.timeline.preflight.pending = Some(key.clone());
+        app.timeline_preflight_reply(
+            key.clone(),
+            Ok(
+                json!({"project_revision":key.1,"blockers":["h3_model_file_missing"],
+                "missing_model_files":["vae/own.safetensors"]}),
+            ),
+        );
+        assert_eq!(app.timeline_missing_model_files(), ["vae/own.safetensors"]);
         app.timeline
             .document
             .as_mut()
@@ -230,5 +256,6 @@ mod tests {
             .project
             .project_revision += 1;
         assert!(app.timeline_scene_blockers().is_empty());
+        assert!(app.timeline_missing_model_files().is_empty());
     }
 }

@@ -30,6 +30,10 @@ pub trait Backend: Send {
     ) -> Option<std::sync::Arc<dyn crate::video::reference_cache::Control>> {
         None
     }
+    /// Where the H3 worker resolves model files, when H3 is deployed.
+    fn h3_model_root(&self) -> Option<std::path::PathBuf> {
+        None
+    }
     fn generate<'a>(&'a mut self, request: &'a ImagePass) -> EngineFuture<'a, Vec<u8>>;
     fn generate_video<'a>(
         &'a mut self,

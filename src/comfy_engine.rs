@@ -436,6 +436,12 @@ impl PipeBackend {
     }
 }
 impl Backend for PipeBackend {
+    fn h3_model_root(&self) -> Option<std::path::PathBuf> {
+        self.rust_runtime
+            .as_ref()
+            .and_then(|r| r.h3.as_ref())
+            .map(|h3| h3.model_root.clone())
+    }
     fn reference_cache(
         &self,
     ) -> Option<std::sync::Arc<dyn crate::video::reference_cache::Control>> {

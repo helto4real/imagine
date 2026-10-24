@@ -836,6 +836,7 @@ pub fn error_message(code: &str) -> String {
         "take_generation_recipe_unknown"=>"This imported Take has no generation recipe. Choose generation settings for a new Take.",
         "older_format_imported_take_not_representable"=>"The older project format cannot represent an imported Take without a generation recipe. The original project is unchanged.",
         "capture_source_missing"=>"The imported Take's source is missing from this project. Choose the video again.",
+        "h3_model_file_missing"=>"A model file selected in the generation settings is not in the model folder. Choose an existing file, or clear the field to use the default.",
         "h3_component_load_failed"|"component_load_failed"=>"H3 could not load a selected model component. Check the selected model, text encoder and VAE files (component_load_failed).",
         "h3_out_of_memory"|"out_of_memory"=>"H3 ran out of memory while loading or running the model (out_of_memory).",
         "h3_generation_failed"=>"H3 inference failed (h3_generation_failed). The worker did not identify a more specific component or cause.",

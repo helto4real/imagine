@@ -202,12 +202,22 @@ async fn preflight(
     let service = app.video.lock().await;
     let project = service.projects.read(&ProjectId(id))?;
     let scene = SceneId(scene);
-    project.scene(&scene)?;
+    let selected = project.scene(&scene)?;
+    let missing = service
+        .h3_model_root
+        .as_ref()
+        .map(|root| super::model_files::missing(&project, selected, root))
+        .unwrap_or_default();
+    let mut blockers = super::execution::preflight(&project, &scene);
+    if !missing.is_empty() {
+        blockers.push("h3_model_file_missing".into());
+    }
     Ok(Json(json!({
         "schema_version": 1,
         "project_revision": project.project_revision,
         "scene_id": scene,
-        "blockers": super::execution::preflight(&project, &scene),
+        "blockers": blockers,
+        "missing_model_files": missing,
     })))
 }
 async fn create(

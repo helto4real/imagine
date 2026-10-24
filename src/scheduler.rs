@@ -211,9 +211,10 @@ pub async fn start_coordinated(
     let (tx, rx) = mpsc::channel(128);
     let (state, receiver) = watch::channel(json!({"paused":paused,"active_job":false,"queued":0}));
     let coordinated = coordinator.is_some();
-    let video = std::sync::Arc::new(tokio::sync::Mutex::new(
-        crate::video::service::Service::with_reference_cache(engine.reference_cache()),
-    ));
+    let mut service =
+        crate::video::service::Service::with_reference_cache(engine.reference_cache());
+    service.h3_model_root = engine.h3_model_root();
+    let video = std::sync::Arc::new(tokio::sync::Mutex::new(service));
     let scheduler = Scheduler {
         assemblies: Default::default(),
         video_runs: Default::default(),
@@ -334,6 +335,17 @@ impl Scheduler {
                     .coordinator
                     .as_ref()
                     .ok_or(Fault::new(503, "coordinator_unavailable"))?;
+                // Named before queueing; the worker would only report a load failure.
+                {
+                    let service = self.video.lock().await;
+                    if let Some(root) = &service.h3_model_root
+                        && let Ok(project) = service.projects.read(&request.project_id)
+                        && let Ok(scene) = project.scene(&request.scene_id)
+                        && !crate::video::model_files::missing(&project, scene, root).is_empty()
+                    {
+                        return Err(Fault::new(422, "h3_model_file_missing"));
+                    }
+                }
                 let staging = crate::video::execution::staging(&self.store).map_err(scene_fault)?;
                 let frozen =
                     crate::video::execution::freeze(&*self.video.lock().await, &request, &staging)

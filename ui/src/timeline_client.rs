@@ -315,7 +315,7 @@ fn timeline_error_message(code: &str) -> String {
         }
         code if code.starts_with("older_format_") || code.starts_with("assembly_") || code.starts_with("story_image_") || code=="story_dialogue_cast_required" || code=="cast_reference_missing" || code=="h3_section_reference_unavailable"
             || code.starts_with("video_destination_")
-            || matches!(code, "media_decode_failed" | "output_save_failed" | "older_format_seed_out_of_range" | "imported_scene_not_generatable" | "take_requires_video" | "take_generation_recipe_unknown" | "older_format_imported_take_not_representable" | "capture_source_missing") => return error_message(code),
+            || matches!(code, "media_decode_failed" | "output_save_failed" | "older_format_seed_out_of_range" | "imported_scene_not_generatable" | "take_requires_video" | "take_generation_recipe_unknown" | "older_format_imported_take_not_representable" | "capture_source_missing" | "h3_model_file_missing") => return error_message(code),
         _ => "The video operation failed. Refresh and retry.",
     }
     .to_owned()
@@ -369,6 +369,7 @@ mod tests {
             "video_destination_write_failed",
             "older_format_seed_out_of_range",
             "older_format_boundary_not_representable",
+            "h3_model_file_missing",
         ] {
             assert_eq!(timeline_error_message(code), error_message(code));
         }

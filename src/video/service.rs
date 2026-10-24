@@ -9,6 +9,8 @@ use std::{
 #[derive(Default)]
 pub struct Service {
     pub reference_cache: Option<std::sync::Arc<dyn super::reference_cache::Control>>,
+    /// Where the deployed H3 worker resolves model files; none without H3.
+    pub h3_model_root: Option<PathBuf>,
     pub assemblies: BTreeMap<String, super::assembly::Entry>,
     pub authoring: std::sync::Arc<super::authoring::drafts::Service>,
     pub libraries: BTreeMap<String, super::library::LibrarySession>,

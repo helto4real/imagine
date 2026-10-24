@@ -251,6 +251,38 @@ mod tests {
         assert!(scene.bindings[0].enabled);
         assert!(scene.accepted_take.is_none());
         assert_eq!(first["resources"][0]["source"], json!(image));
+        // Generate names a selected model file the H3 model root does not have.
+        let models = own.path().join("models");
+        control.video.lock().await.h3_model_root = Some(models.clone());
+        let preflight = format!(
+            "/v1/video/projects/{}/scenes/{}/preflight",
+            project.id.0, scene.id.0
+        );
+        let checked = client
+            .timeline_request(&connection.id, false, &preflight, None)
+            .await
+            .unwrap();
+        let file = "diffusion_models/minimax_h3/minimaxH3.int8.safetensors";
+        assert!(
+            checked["blockers"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("h3_model_file_missing"))
+        );
+        assert_eq!(checked["missing_model_files"], json!([file]));
+        std::fs::create_dir_all(models.join(file).parent().unwrap()).unwrap();
+        std::fs::write(models.join(file), b"own").unwrap();
+        let checked = client
+            .timeline_request(&connection.id, false, &preflight, None)
+            .await
+            .unwrap();
+        assert_eq!(checked["missing_model_files"], json!([]));
+        assert!(
+            !checked["blockers"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("h3_model_file_missing"))
+        );
         let (_, second) = create(&client, &image, (320, 480)).await.unwrap();
         assert_ne!(first["project"]["id"], second["project"]["id"]);
         let folder = own.path().join("saved");

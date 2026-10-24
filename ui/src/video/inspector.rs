@@ -601,6 +601,11 @@ impl ImagineApp {
         ui.label(helto::error_text("Generate would be refused:", true));
         for code in blockers {
             ui.label(helto::error_text(&client::error_message(code), true).small());
+            if code == "h3_model_file_missing" {
+                for file in self.timeline_missing_model_files() {
+                    ui.label(helto::error_text(&format!("Not found: {file}"), true).small());
+                }
+            }
         }
         ui.add_space(4.);
     }

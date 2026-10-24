@@ -29,6 +29,7 @@ pub mod cast;
 pub mod execution;
 pub mod lora_catalog;
 pub mod media;
+pub mod model_files;
 pub(crate) mod reference_inputs;
 pub mod reference_video;
 pub mod review;
