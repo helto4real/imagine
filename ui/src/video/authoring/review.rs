@@ -68,14 +68,45 @@ pub(in crate::app) fn scene_status(
         _ => SceneStatus::Outline,
     }
 }
-/// A newly received `draft` with this side's edits to finished Scenes kept;
-/// `received` becomes the server's own Scenes.
+/// The status of whole-Scene enhancement row `index`, in the Scene terms.
+pub(in crate::app) fn row_status(
+    draft: &Draft,
+    received: &[Option<String>],
+    index: usize,
+) -> SceneStatus {
+    let Some(row) = draft.fields.get(index) else {
+        return SceneStatus::Queued;
+    };
+    if row.failure.is_some() {
+        return SceneStatus::Failed;
+    }
+    match &row.text {
+        Some(text) if received.get(index).and_then(Option::as_ref) == Some(text) => {
+            SceneStatus::Ready
+        }
+        Some(_) => SceneStatus::Edited,
+        None if draft.phase.busy()
+            && draft
+                .fields
+                .iter()
+                .position(|f| f.text.is_none() && f.failure.is_none())
+                == Some(index) =>
+        {
+            SceneStatus::Generating
+        }
+        None => SceneStatus::Queued,
+    }
+}
+/// A newly received `draft` with this side's edits to finished Scenes and
+/// enhancement rows kept; `received` and `received_rows` become the server's.
 pub(in crate::app) fn merge_received(
     local: Option<&Draft>,
     received: &mut Vec<Option<StoryScene>>,
+    received_rows: &mut Vec<Option<String>>,
     mut draft: Draft,
 ) -> Draft {
     let server = draft.scenes.clone();
+    let server_rows = draft.fields.iter().map(|f| f.text.clone()).collect();
     if let Some(local) = local.filter(|l| l.id == draft.id && l.outline == draft.outline) {
         for (index, scene) in draft.scenes.iter_mut().enumerate() {
             let mine = local.scenes.get(index).and_then(Option::as_ref);
@@ -84,8 +115,20 @@ pub(in crate::app) fn merge_received(
                 *scene = mine.cloned();
             }
         }
+        if local.fields.len() == draft.fields.len() {
+            for (index, row) in draft.fields.iter_mut().enumerate() {
+                let mine = &local.fields[index];
+                row.include = mine.include;
+                let edited = mine.text.is_some()
+                    && mine.text.as_ref() != received_rows.get(index).and_then(Option::as_ref);
+                if edited && row.text.is_some() {
+                    row.text = mine.text.clone();
+                }
+            }
+        }
     }
     *received = server;
+    *received_rows = server_rows;
     draft
 }
 /// A small coloured status label.
@@ -408,6 +451,46 @@ mod tests {
         assert!(outline_editable(&d) && d.phase == Phase::Outline);
     }
     #[test]
+    fn enhancement_rows_have_status_and_a_poll_keeps_their_edits_and_includes() {
+        let row = |field, text: Option<&str>| FieldProposal {
+            target: FieldTarget::Scene { field },
+            original: "Own original".into(),
+            text: text.map(Into::into),
+            failure: None,
+            include: true,
+        };
+        let mut local = draft(vec![None, None, None], Phase::Running);
+        local.fields = vec![
+            row(SceneField::Description, Some("Own proposal")),
+            row(SceneField::Summary, None),
+            row(SceneField::AmbientSound, None),
+        ];
+        let mut received_rows = vec![Some("Own proposal".to_owned()), None, None];
+        assert_eq!(row_status(&local, &received_rows, 0), SceneStatus::Ready);
+        assert_eq!(
+            row_status(&local, &received_rows, 1),
+            SceneStatus::Generating
+        );
+        assert_eq!(row_status(&local, &received_rows, 2), SceneStatus::Queued);
+        local.fields[0].text = Some("Own edited proposal".into());
+        local.fields[2].include = false;
+        assert_eq!(row_status(&local, &received_rows, 0), SceneStatus::Edited);
+        let mut server = local.clone();
+        server.fields[0].text = Some("Own proposal".into());
+        server.fields[1].text = Some("Own new summary".into());
+        server.fields[2].include = true;
+        server.fields[2].failure = Some("own_failure".into());
+        let merged = merge_received(Some(&local), &mut vec![], &mut received_rows, server);
+        assert_eq!(
+            merged.fields[0].text.as_deref(),
+            Some("Own edited proposal")
+        );
+        assert_eq!(merged.fields[1].text.as_deref(), Some("Own new summary"));
+        assert!(!merged.fields[2].include, "the local Include choice stays");
+        assert_eq!(row_status(&merged, &received_rows, 2), SceneStatus::Failed);
+        assert_eq!(row_status(&merged, &received_rows, 1), SceneStatus::Ready);
+    }
+    #[test]
     fn a_poll_keeps_edits_to_finished_scenes_and_takes_new_ones() {
         let first = scene("a", "Own arrival");
         let mut received = vec![Some(first.clone()), None, None];
@@ -418,7 +501,7 @@ mod tests {
             vec![Some(first.clone()), Some(second.clone()), None],
             Phase::Expanding,
         );
-        let merged = merge_received(Some(&local), &mut received, server);
+        let merged = merge_received(Some(&local), &mut received, &mut vec![], server);
         assert_eq!(
             merged.scenes[0].as_ref().unwrap().summary,
             "Own edited arrival"

@@ -1146,3 +1146,107 @@ async fn story_music_is_kept_only_when_asked_for() {
     worker.abort();
     let _ = worker.await;
 }
+#[tokio::test]
+async fn whole_scene_enhancement_reviews_rows_side_by_side_and_applies_only_included_ones() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "enhance-all").await;
+    let (url, worker, _) = fixture::spawn().await;
+    let project = configured(&h, &url).await;
+    let applied = expanded(&h, &project, "append").await;
+    let before = applied["project"].clone();
+    let scene = before["scenes"][0]["id"].as_str().unwrap().to_owned();
+    let mut payload = request(&h, &project, "enhance_scene_all", "koboldcpp").await;
+    payload["scene_id"] = json!(scene);
+    let (code, d) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/projects/{project}/authoring"),
+        Some(payload),
+    )
+    .await;
+    assert_eq!(code, 202, "{d}");
+    let id = d["id"].as_str().unwrap();
+    let mut ready = wait(&h, id, "review").await;
+    let rows = ready["fields"].as_array().unwrap().clone();
+    let sections = before["scenes"][0]["sections"].as_array().unwrap().len();
+    assert_eq!(rows.len(), 4 + sections);
+    assert_eq!(
+        rows[0]["target"],
+        json!({"kind":"scene","field":"description"})
+    );
+    assert_eq!(rows[0]["original"], before["scenes"][0]["description"]);
+    assert_eq!(rows[4]["target"]["kind"], "section");
+    assert!(rows.iter().all(|r| {
+        r["text"]
+            .as_str()
+            .is_some_and(|t| t.starts_with("Expanded"))
+    }));
+    assert_eq!(ready["progress"]["completed"], rows.len());
+    // One row again, alone.
+    let (code, again) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/authoring/{id}/expand"),
+        Some(json!({"schema_version":1,"start_index":1,"only":true})),
+    )
+    .await;
+    assert_eq!(code, 200, "{again}");
+    assert!(again["fields"][1]["text"].is_null() && again["fields"][0]["text"].is_string());
+    ready = wait(&h, id, "review").await;
+    assert!(ready["fields"][1]["text"].is_string());
+    // Edit the description, leave Summary out, keep Ambient's original.
+    let mut fields = ready["fields"].clone();
+    fields[0]["text"] = json!("Own reviewed description");
+    fields[1]["include"] = json!(false);
+    fields[2]["text"] = fields[2]["original"].clone();
+    let review =
+        json!({"schema_version":1,"outline":null,"scenes":null,"text":null,"fields":fields});
+    let (code, saved) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/authoring/{id}/review"),
+        Some(review),
+    )
+    .await;
+    assert_eq!(code, 200, "{saved}");
+    let mut changed = fields.clone();
+    changed[0]["original"] = json!("Own changed original");
+    let bad = json!({"schema_version":1,"outline":null,"scenes":null,"text":null,"fields":changed});
+    let (code, error) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/authoring/{id}/review"),
+        Some(bad),
+    )
+    .await;
+    assert_eq!(code, 422);
+    assert_eq!(error["error"]["code"], "invalid_authoring_fields");
+    let (code, result) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/authoring/{id}/apply"),
+        Some(json!({"schema_version":1,"expected_project_revision":ready["request"]["expected_project_revision"]})),
+    )
+    .await;
+    assert_eq!(code, 200, "{result}");
+    let after = &result["project"];
+    assert_eq!(
+        after["scenes"][0]["description"],
+        "Own reviewed description"
+    );
+    let prompts = |p: &Value, field: &str| p["creative"]["scene_prompts"][&scene][field].clone();
+    assert_eq!(prompts(after, "summary"), prompts(&before, "summary"));
+    assert_eq!(
+        prompts(after, "ambient_sound"),
+        prompts(&before, "ambient_sound")
+    );
+    assert_eq!(
+        after["scenes"][0]["sections"][0]["prompt"],
+        ready["fields"][4]["text"]
+    );
+    // The other Scene is untouched.
+    assert_eq!(after["scenes"][1], before["scenes"][1]);
+    stop(h).await;
+    worker.abort();
+    let _ = worker.await;
+}

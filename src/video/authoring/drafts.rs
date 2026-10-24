@@ -29,6 +29,8 @@ struct Job {
     /// The Scene a single-Scene regeneration replaces, put back if it fails
     /// or is cancelled.
     restore: Option<(usize, Option<StoryScene>)>,
+    /// A whole-Scene enhancement row is being retried alone.
+    single_row: bool,
 }
 /// Review when every Scene is expanded; otherwise the outline is still open.
 fn settled(draft: &Draft) -> Phase {
@@ -108,6 +110,8 @@ impl Service {
             .snapshot(&request.prompt_profile_id)
             .map_err(fault)?;
         let id = format!("authoring_{}", uuid::Uuid::new_v4().simple());
+        let request_rows = request.operation == Operation::EnhanceSceneAll;
+        let scene_rows = request.scene_id.clone();
         super::visuals::beats(&request.images).map_err(fault)?;
         let generation_parameters = profiles::OPERATIONS
             .into_iter()
@@ -138,6 +142,11 @@ impl Service {
             inventory: vec![],
             selected_cast: grounding.cast.clone(),
             warnings: vec![],
+            fields: if request_rows {
+                FieldProposal::rows(&base, base.scene(scene_rows.as_ref().unwrap()).unwrap())
+            } else {
+                vec![]
+            },
         };
         let mut jobs = self.jobs.lock().unwrap();
         if jobs.values().any(|j| j.draft.phase.busy()) {
@@ -157,6 +166,7 @@ impl Service {
                 generation: 0,
                 grounding,
                 restore: None,
+                single_row: false,
             },
         );
         drop(jobs);
@@ -179,6 +189,14 @@ impl Service {
         let job = jobs.get(id).ok_or(Fault::new(404, "authoring_not_found"))?;
         let draft = &job.draft;
         let (completed, total) = match draft.phase {
+            _ if !draft.fields.is_empty() => (
+                draft
+                    .fields
+                    .iter()
+                    .filter(|f| f.text.is_some() || f.failure.is_some())
+                    .count(),
+                draft.fields.len(),
+            ),
             Phase::Inventory => (draft.inventory.len(), draft.request.images.len().max(1)),
             Phase::Expanding
             | Phase::Review
@@ -294,6 +312,18 @@ impl Service {
                 Phase::Outline
             };
         }
+        if let Some(fields) = review.fields {
+            if fields.len() != d.fields.len()
+                || fields.iter().zip(&d.fields).any(|(a, b)| {
+                    a.target != b.target
+                        || a.original != b.original
+                        || a.text.as_ref().is_some_and(|t| t.len() > 65536)
+                })
+            {
+                return Err(fault("invalid_authoring_fields"));
+            }
+            d.fields = fields;
+        }
         if let Some(text) = review.text {
             if text.trim().is_empty()
                 || text.len() > 65536
@@ -323,6 +353,32 @@ impl Service {
         let j = jobs
             .get_mut(id)
             .ok_or(Fault::new(404, "authoring_not_found"))?;
+        // One row of a whole-Scene enhancement again, keeping the others.
+        if !j.draft.fields.is_empty() {
+            if j.draft.phase == Phase::Applied || index >= j.draft.fields.len() || !only {
+                return Err(fault("invalid_story_retry_index"));
+            }
+            let row = &mut j.draft.fields[index];
+            row.text = None;
+            row.failure = None;
+            j.single_row = true;
+            j.draft.phase = Phase::Running;
+            j.clock = std::time::Instant::now();
+            j.clock_elapsed = None;
+            j.cancel = CancellationToken::new();
+            j.generation += 1;
+            let generation = j.generation;
+            let result = j.draft.clone();
+            drop(jobs);
+            let service = self.clone();
+            let id = id.to_owned();
+            tokio::spawn(async move {
+                service
+                    .generate(id, index, transport, false, generation)
+                    .await;
+            });
+            return Ok(result);
+        }
         let outline = j
             .draft
             .outline
@@ -454,14 +510,33 @@ impl Service {
             }
             j.draft.phase = Phase::Running;
         }
+        let rows = !draft.fields.is_empty();
         let count = if !expand {
-            1
+            if !rows {
+                1
+            } else if self.jobs.lock().unwrap()[&id].single_row {
+                start + 1
+            } else {
+                draft.fields.len()
+            }
         } else if self.jobs.lock().unwrap()[&id].restore.is_some() {
             start + 1
         } else {
             draft.scenes.len()
         };
         for index in start..count {
+            // The text this pass enhances: a whole-Scene row, or the request's own.
+            let (is_section, section_id, field) = match draft.fields.get(index).map(|f| &f.target) {
+                Some(FieldTarget::Section { section_id }) => {
+                    (true, Some(section_id.clone()), SceneField::default())
+                }
+                Some(FieldTarget::Scene { field }) => (false, None, *field),
+                None => (
+                    draft.request.operation == Operation::EnhanceSection,
+                    draft.request.section_id.clone(),
+                    draft.request.scene_field.unwrap_or_default(),
+                ),
+            };
             let (mut key, operation, mut user, protected) = if expand {
                 let jobs = self.jobs.lock().unwrap();
                 let d = &jobs[&id].draft;
@@ -517,18 +592,14 @@ impl Service {
                 let scene = base
                     .scene(draft.request.scene_id.as_ref().unwrap())
                     .unwrap();
-                let section = scene.sections.iter().find(|s| {
-                    draft.request.operation == Operation::EnhanceSection
-                        && Some(&s.id) == draft.request.section_id.as_ref()
-                });
-                let source = if draft.request.operation == Operation::EnhanceSection {
+                let section = scene
+                    .sections
+                    .iter()
+                    .find(|s| is_section && Some(&s.id) == section_id.as_ref());
+                let source = if is_section {
                     section.unwrap().prompt.clone()
                 } else {
-                    draft
-                        .request
-                        .scene_field
-                        .unwrap_or_default()
-                        .source(&base, scene)
+                    field.source(&base, scene)
                 };
                 let protected = super::references::Protected::new(&source);
                 (
@@ -543,7 +614,7 @@ impl Service {
                         if section.is_some() {
                             "Section (prompt)"
                         } else {
-                            draft.request.scene_field.unwrap_or_default().label()
+                            field.label()
                         },
                         scene.description,
                         draft.request.instruction,
@@ -596,7 +667,7 @@ impl Service {
                     .scene(draft.request.scene_id.as_ref().unwrap())
                     .unwrap();
                 user = super::references::enhancement_user_prompt(
-                    draft.request.operation == Operation::EnhanceSection,
+                    is_section,
                     &scene.description,
                     &draft.request.instruction,
                     &protected.text,
@@ -664,13 +735,22 @@ impl Service {
                     let text=if let Some(protected)=&protected {
                         match protected.restore(&text){
                             Ok((restored,introduced))=>{if introduced {j.draft.warnings.push("The model introduced one or more new reference markers. Review them before applying.".into());}restored},
-                            Err(code)=>{j.draft.text=Some(protected.source.clone());return Err(code);}
+                            Err(code)=>{if !rows {j.draft.text=Some(protected.source.clone());}return Err(code);}
                         }
                     }else{text};
-                    j.draft.text = Some(text);
+                    if rows {
+                        j.draft.fields[index].text = Some(text);
+                    } else {
+                        j.draft.text = Some(text);
+                    }
                 }
                 Ok(())
             });
+            // A whole-Scene row fails alone; the others still run.
+            if rows && let Err(code) = result {
+                j.draft.fields[index].failure = Some(code.into());
+                continue;
+            }
             if let Err(code) = result {
                 j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
                 j.draft.failure = Some(code.into());
@@ -692,6 +772,7 @@ impl Service {
         }
         j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
         j.restore = None;
+        j.single_row = false;
         j.draft.phase = if !expand && draft.request.operation == Operation::Outline {
             Phase::Outline
         } else if expand {

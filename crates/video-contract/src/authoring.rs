@@ -8,6 +8,9 @@ pub enum Operation {
     Outline,
     EnhanceScene,
     EnhanceSection,
+    /// Every Scene field and Section prompt of one Scene, reviewed side by
+    /// side, as Director's Enhance mode.
+    EnhanceSceneAll,
 }
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -40,6 +43,59 @@ impl SceneField {
             Self::AmbientSound => source.ambient_sound.clone(),
             Self::NonDiegeticMusic => source.non_diegetic_music.clone(),
         }
+    }
+}
+/// The text one row of a whole-Scene enhancement proposes for.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
+pub enum FieldTarget {
+    Scene { field: SceneField },
+    Section { section_id: SectionId },
+}
+/// One row of a whole-Scene enhancement: the text when it was proposed and
+/// the proposal, editable, applied only when included.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FieldProposal {
+    pub target: FieldTarget,
+    pub original: String,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub failure: Option<String>,
+    #[serde(default = "included")]
+    pub include: bool,
+}
+fn included() -> bool {
+    true
+}
+impl FieldProposal {
+    /// The rows for `scene`: its four Scene fields, then each Section prompt.
+    pub fn rows(project: &VideoProject, scene: &Scene) -> Vec<Self> {
+        [
+            SceneField::Description,
+            SceneField::Summary,
+            SceneField::AmbientSound,
+            SceneField::NonDiegeticMusic,
+        ]
+        .into_iter()
+        .map(|field| (FieldTarget::Scene { field }, field.source(project, scene)))
+        .chain(scene.sections.iter().map(|s| {
+            (
+                FieldTarget::Section {
+                    section_id: s.id.clone(),
+                },
+                s.prompt.clone(),
+            )
+        }))
+        .map(|(target, original)| Self {
+            target,
+            original,
+            text: None,
+            failure: None,
+            include: true,
+        })
+        .collect()
     }
 }
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -184,6 +240,9 @@ pub struct Draft {
     pub selected_cast: serde_json::Value,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
+    /// The rows of a whole-Scene enhancement.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fields: Vec<FieldProposal>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -192,6 +251,8 @@ pub struct Review {
     pub outline: Option<Storyboard>,
     pub scenes: Option<Vec<Option<StoryScene>>>,
     pub text: Option<String>,
+    #[serde(default)]
+    pub fields: Option<Vec<FieldProposal>>,
 }
 /// Director ordinary-UI allocator: 250ms minimum when possible; weighted remainder and cap redistribution.
 pub fn durations(weights: &[f64], duration: f64, cap: f64) -> Result<Vec<f64>, &'static str> {

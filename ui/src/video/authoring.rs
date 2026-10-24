@@ -3,6 +3,7 @@ use super::*;
 use imagine_video_contract::authoring::*;
 mod inline;
 mod review;
+mod scene_all;
 pub(super) use review::*;
 #[derive(Clone, Copy)]
 pub(in crate::app) enum Reply {
@@ -53,6 +54,8 @@ pub(super) struct State {
     scrolled_to: Option<Option<String>>,
     /// The storyboard Scenes as the server last returned them.
     pub(super) received: Vec<Option<StoryScene>>,
+    /// The whole-Scene enhancement rows' proposals as the server last returned them.
+    pub(super) received_rows: Vec<Option<String>>,
     /// Apply was pressed for a proposal that replaces the timeline.
     pub(super) confirm_replace: bool,
     /// Edit outline was pressed while Scenes are expanded.
@@ -112,6 +115,7 @@ impl Default for State {
             show_options: false,
             scrolled_to: None,
             received: vec![],
+            received_rows: vec![],
             confirm_replace: false,
             confirm_edit_outline: false,
         }
@@ -213,6 +217,8 @@ pub(super) struct Actions {
     pub close: bool,
     pub pick_images: bool,
     pub restore: Option<usize>,
+    /// A whole-Scene enhancement row to propose again.
+    pub retry_row: Option<usize>,
 }
 fn authoring_stale(draft: &Draft, document: &Option<Snapshot>) -> bool {
     document.as_ref().is_none_or(|s| {
@@ -351,18 +357,20 @@ pub(super) fn regenerate_call(draft: &Draft, index: usize) -> Call {
         true,
         format!("/v1/video/authoring/{}/review", draft.id),
         Some(
-            json!({"schema_version":1,"outline":draft.outline,"scenes":draft.scenes,"text":draft.text,"then_regenerate":index}),
+            json!({"schema_version":1,"outline":draft.outline,"scenes":draft.scenes,"text":draft.text,
+                "fields":(!draft.fields.is_empty()).then_some(&draft.fields),"then_regenerate":index}),
         ),
     )
 }
 /// Saves the reviewed `draft` and applies it to the project.
-fn apply_call(draft: &Draft) -> Call {
+pub(super) fn apply_call(draft: &Draft) -> Call {
     (
         Reply::Applied,
         true,
         format!("/v1/video/authoring/{}/review", draft.id),
         Some(
-            json!({"schema_version":1,"outline":draft.outline,"scenes":(draft.request.operation==Operation::Outline).then_some(&draft.scenes),"text":draft.text,"then_apply":draft.request.expected_project_revision}),
+            json!({"schema_version":1,"outline":draft.outline,"scenes":(draft.request.operation==Operation::Outline).then_some(&draft.scenes),"text":draft.text,
+                "fields":(!draft.fields.is_empty()).then_some(&draft.fields),"then_apply":draft.request.expected_project_revision}),
         ),
     )
 }
@@ -848,7 +856,12 @@ impl ImagineApp {
                         self.timeline_refresh(ctx);
                     }
                     let state = &mut self.timeline.authoring;
-                    let draft = merge_received(state.draft.as_ref(), &mut state.received, draft);
+                    let draft = merge_received(
+                        state.draft.as_ref(),
+                        &mut state.received,
+                        &mut state.received_rows,
+                        draft,
+                    );
                     state.draft = Some(draft);
                     state.poll_at = Some(std::time::Instant::now());
                 } else {
@@ -893,7 +906,15 @@ impl ImagineApp {
     }
     /// Whether a Scene field or Section prompt enhancement is open in the inspector.
     pub(super) fn timeline_enhance_open(&self) -> bool {
-        self.timeline.authoring.open && self.authoring_operation() != Operation::Outline
+        self.timeline.authoring.open
+            && matches!(
+                self.authoring_operation(),
+                Operation::EnhanceScene | Operation::EnhanceSection
+            )
+    }
+    /// Whether a whole-Scene enhancement is open; it is shown as its own view.
+    pub(super) fn timeline_scene_enhance_open(&self) -> bool {
+        self.timeline.authoring.open && self.authoring_operation() == Operation::EnhanceSceneAll
     }
     /// Whether a story outline is open; it is shown as the Story view.
     pub(super) fn timeline_story_open(&self) -> bool {
@@ -940,6 +961,7 @@ impl ImagineApp {
     pub(super) fn timeline_authoring_background(&mut self, ctx: &egui::Context) {
         if !self.timeline.authoring.open
             || self.timeline_story_open()
+            || self.timeline_scene_enhance_open()
             || self.timeline.authoring.shown_in_pass == Some(ctx.cumulative_pass_nr())
         {
             return;

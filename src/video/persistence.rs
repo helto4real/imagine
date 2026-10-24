@@ -1499,6 +1499,7 @@ mod tests {
             inventory: vec![],
             selected_cast: serde_json::Value::Null,
             warnings: vec![],
+            fields: vec![],
         };
         session.store.as_mut().unwrap().fail_commit = true;
         assert_eq!(

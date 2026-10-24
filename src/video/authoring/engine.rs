@@ -169,6 +169,54 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                 }
             }
         }
+        Operation::EnhanceSceneAll => {
+            let scene = base
+                .scene(request.scene_id.as_ref().ok_or("scene_not_found")?)
+                .map_err(|_| "scene_not_found")?;
+            let mut prompts = false;
+            for row in draft.fields.iter().filter(|f| f.include) {
+                let Some(text) = row.text.clone().filter(|t| !t.trim().is_empty()) else {
+                    continue;
+                };
+                match &row.target {
+                    FieldTarget::Scene {
+                        field: SceneField::Description,
+                    } => commands.push(Edit::SetSceneDescription {
+                        scene_id: scene.id.clone(),
+                        description: text,
+                    }),
+                    FieldTarget::Scene { field } => {
+                        let source = creative.scene_prompts.entry(scene.id.clone()).or_default();
+                        match field {
+                            SceneField::Summary => source.summary = text,
+                            SceneField::AmbientSound => source.ambient_sound = text,
+                            SceneField::NonDiegeticMusic => source.non_diegetic_music = text,
+                            SceneField::Description => unreachable!(),
+                        }
+                        prompts = true;
+                    }
+                    FieldTarget::Section { section_id } => {
+                        let mut section = scene
+                            .sections
+                            .iter()
+                            .find(|s| &s.id == section_id)
+                            .cloned()
+                            .ok_or("section_not_found")?;
+                        section.prompt = text;
+                        commands.push(Edit::UpdateSection {
+                            scene_id: scene.id.clone(),
+                            section,
+                        });
+                    }
+                }
+            }
+            if prompts {
+                commands.push(Edit::SetCreative { creative });
+            }
+            if commands.is_empty() {
+                return Err("authoring_empty_draft");
+            }
+        }
         Operation::EnhanceSection => {
             let scene = base
                 .scene(request.scene_id.as_ref().ok_or("scene_not_found")?)

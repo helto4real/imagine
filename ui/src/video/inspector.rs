@@ -419,6 +419,26 @@ impl ImagineApp {
                                 match index {
                                     0 => self.timeline_take_card(ui, d, &scene),
                                     1 => {
+                                        // Director's Enhance mode: every field of this Scene at once.
+                                        let r = helto::action(
+                                            ui,
+                                            Icon::Enhance,
+                                            "Enhance whole Scene…",
+                                            false,
+                                            None,
+                                        );
+                                        #[cfg(feature = "ui-preview")]
+                                        super::qa::control(ui, "scene-enhance-all".into(), &r);
+                                        if r.clicked() {
+                                            let operation = imagine_video_contract::authoring::Operation::EnhanceSceneAll;
+                                            let edits = self.timeline.draft_edits();
+                                            if edits.is_empty() {
+                                                self.timeline_open_authoring(ui.ctx(), operation);
+                                            } else {
+                                                commands.extend(edits);
+                                                self.timeline.after_edit = Some(PostAction::Authoring(operation));
+                                            }
+                                        }
                                         self.timeline_scene_fields(ui, d, &scene, &["title"], commands);
                                         self.timeline_enhance_label(
                                             ui,

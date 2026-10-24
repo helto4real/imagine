@@ -138,6 +138,9 @@ impl ImagineApp {
             // The Story view takes the panes and track area; the toolbar stays.
             let area = Rect::from_min_max(main.min, bounds.max);
             self.timeline_story_view(ui, area);
+        } else if self.timeline_scene_enhance_open() {
+            let area = Rect::from_min_max(main.min, bounds.max);
+            self.timeline_scene_enhance_view(ui, area);
         } else if let Some(document) = &document {
             // The viewer takes a 16:9 picture at the row's height; the media bin the rest.
             let ideal_viewer = ((main.height() - 70.) * 16. / 9. + 20.).max(MIN_VIEWER);
@@ -839,6 +842,11 @@ impl ImagineApp {
                         imagine_video_contract::authoring::Operation::EnhanceSection,
                         "enhance-section",
                         "Enhance Section prompt",
+                    ),
+                    (
+                        imagine_video_contract::authoring::Operation::EnhanceSceneAll,
+                        "enhance-scene-all",
+                        "Enhance whole Scene…",
                     ),
                 ] {
                     let ready = operation == imagine_video_contract::authoring::Operation::Outline
