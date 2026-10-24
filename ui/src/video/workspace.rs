@@ -249,6 +249,16 @@ impl ImagineApp {
                     && m.focused()
                         .is_none_or(|id| self.timeline.keyboard_focus == Some(id))
             });
+            if timeline_focused
+                && !egui::Popup::is_any_open(ui.ctx())
+                && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape))
+                && let Some(d) = &self.timeline.document
+            {
+                let project = d.project.clone();
+                commands.extend(self.timeline.draft_edits());
+                self.timeline.clear_preview();
+                self.timeline.clear_selection(&project);
+            }
             if timeline_focused {
                 // Redo first: its Ctrl+Shift+Z must not be read as Undo.
                 self.command_shortcuts(
@@ -1489,5 +1499,111 @@ mod tests {
         click(&mut app, "Insert character from Library…");
         assert!(app.timeline.library.open);
         assert!(app.timeline.library.showing("character"));
+    }
+
+    #[test]
+    fn empty_track_space_and_escape_clear_a_full_length_section_selection() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        ctx.all_styles_mut(|s| s.scroll_animation = egui::style::ScrollAnimation::none());
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.client = None;
+        let mut project = super::super::media_picker::tests::project();
+        project.scenes.truncate(1);
+        let scene = &mut project.scenes[0];
+        // As Animate creates it: one Section across the whole Scene.
+        scene.sections = vec![Section {
+            id: SectionId("own-whole".into()),
+            start: Time { num: 0, den: 1 },
+            duration: scene.duration,
+            prompt: String::new(),
+        }];
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-synthetic-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.zoom = 40.;
+        app.timeline.document = Some(Snapshot::with(project.clone(), json!({})));
+        let frame = |app: &mut ImagineApp, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1400., 900.),
+                    )),
+                    events,
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            output.textures_delta.clear();
+            output.platform_output.accesskit_update.unwrap().nodes
+        };
+        let select = |app: &mut ImagineApp| {
+            app.timeline.set_selection(
+                &project,
+                vec![super::super::selection::Item::Section(SectionId(
+                    "own-whole".into(),
+                ))],
+            );
+            assert!(app.timeline.section.is_some());
+        };
+        select(&mut app);
+        let mut nodes = vec![];
+        for _ in 0..3 {
+            nodes = frame(&mut app, vec![]);
+        }
+        let b = nodes
+            .iter()
+            .find_map(|(_, n)| {
+                (n.label() == Some("Section 1 of Scene 1"))
+                    .then(|| n.bounds())
+                    .flatten()
+            })
+            .expect("Section block");
+        // The Section spans the Scene and the Scene the view; under the tracks
+        // is the only empty space.
+        let pos = egui::pos2(((b.x0 + b.x1) / 2.) as f32, b.y1 as f32 + 30.);
+        for pressed in [true, false] {
+            frame(
+                &mut app,
+                vec![
+                    egui::Event::PointerMoved(pos),
+                    egui::Event::PointerButton {
+                        pos,
+                        button: egui::PointerButton::Primary,
+                        pressed,
+                        modifiers: Default::default(),
+                    },
+                ],
+            );
+        }
+        assert!(app.timeline.section.is_none());
+        assert!(app.timeline.selected.is_empty());
+        let mut nodes = vec![];
+        for _ in 0..2 {
+            nodes = frame(&mut app, vec![]);
+        }
+        assert!(
+            nodes
+                .iter()
+                .any(|(_, n)| n.label() == Some("Project settings")),
+            "the project strip shows once nothing is selected"
+        );
+        select(&mut app);
+        frame(&mut app, vec![]);
+        frame(
+            &mut app,
+            vec![egui::Event::Key {
+                key: egui::Key::Escape,
+                physical_key: None,
+                pressed: true,
+                repeat: false,
+                modifiers: Default::default(),
+            }],
+        );
+        assert!(app.timeline.section.is_none());
+        assert!(app.timeline.selected.is_empty());
     }
 }

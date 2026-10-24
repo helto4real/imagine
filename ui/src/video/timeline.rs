@@ -545,9 +545,18 @@ impl ImagineApp {
             let scroll = area.show(ui, |ui| {
                 let size = egui::vec2(
                     (end as f32 * self.timeline.zoom).max(ui.available_width()),
-                    AUDIO_TOP + 3. + audio_lanes as f32 * 28.,
+                    // Down to the panel's bottom, so the space under the tracks
+                    // is empty track space too.
+                    (AUDIO_TOP + 3. + audio_lanes as f32 * 28.).max(ui.available_height()),
                 );
-                let (canvas, _) = ui.allocate_exact_size(size, Sense::hover());
+                // Blocks are added after it and win their own clicks; a click on
+                // empty track space clears the selection, as in Director.
+                let (canvas, background) = ui.allocate_exact_size(size, Sense::click());
+                if background.clicked() {
+                    commands.extend(self.timeline.draft_edits());
+                    self.timeline.clear_preview();
+                    self.timeline.clear_selection(project);
+                }
                 let ruler = ui.interact(
                     Rect::from_min_max(canvas.min, egui::pos2(canvas.right(), canvas.top() + 18.)),
                     ui.id().with("timeline-ruler"),

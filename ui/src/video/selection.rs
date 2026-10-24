@@ -139,6 +139,12 @@ impl Timeline {
         };
         self.set_selection(p, next);
     }
+    /// Nothing selected, so the inspector shows the project.
+    pub(super) fn clear_selection(&mut self, p: &VideoProject) {
+        self.boundary = false;
+        self.selected_take = None;
+        self.set_selection(p, vec![]);
+    }
     pub(super) fn set_selection(&mut self, p: &VideoProject, items: Vec<Item>) {
         self.selected.clear();
         self.section_selection.clear();
