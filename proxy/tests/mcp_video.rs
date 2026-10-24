@@ -407,7 +407,16 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
         json!({"schema_version":1,"location_id":"location_1","project":{"schema_version":1},"canvas":null})
     );
     h.probe.clear();
-    let canvas = json!({"ratio":"16:9","portrait":false,"quality":"Draft"});
+    // Without project or canvas, MCP productions default to Draft.
+    h.call("video_project", json!({"action":"create","path":project}))
+        .await;
+    assert_eq!(
+        h.probe.seen()[1].body,
+        json!({"schema_version":1,"location_id":"location_1","project":null,
+            "canvas":{"ratio":"16:9","portrait":false,"quality":"Draft"}})
+    );
+    h.probe.clear();
+    let canvas = json!({"ratio":"16:9","portrait":false,"quality":"Standard"});
     h.call(
         "video_project",
         json!({"action":"create","path":project,"canvas":canvas}),

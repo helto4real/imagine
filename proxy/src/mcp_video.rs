@@ -528,6 +528,10 @@ impl Mcp {
             _ => return Err(validation("project must be an object or null")),
         };
         let canvas = match &args["canvas"] {
+            // MCP productions default to Draft; the agent changes it only when the user asks.
+            Value::Null if project.is_null() => {
+                json!({"ratio":"16:9","portrait":false,"quality":"Draft"})
+            }
             Value::Null => Value::Null,
             Value::Object(_) if project.is_null() => args["canvas"].clone(),
             Value::Object(_) => return Err(validation("give either project or canvas, not both")),

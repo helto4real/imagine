@@ -271,7 +271,7 @@
   },
   {
     "name": "video_project",
-    "description": "Create, read, edit or save a headless video project. No GPU acquisition.\ncreate: path is an absolute new or empty folder inside the MCP input directory (its parent must exist); the whole production (project document, takes, final video) lives there and Imagine saves it at creation. Size: optional canvas {ratio, portrait, quality} picks the video size preset; Imagine resolves the delivery size from it. Ratios and qualities are listed by video_capabilities canvas (quality: Quick Draft, Draft, Standard, High, Native Resolution); the default is 16:9 landscape Quick Draft. Alternatively, project is a full CreateProject body (schema_version, default_model, delivery, generation); give either canvas or project, not both. Returns the projection below plus path.\nget: a bounded projection with project_revision, scenes (timing, model, continuity, accepted take, section IDs and prompts), assets, cast, takes, deliveries and persistence (save state). No media.\nedit: request is an EditRequest {schema_version (1), expected_project_revision, commands} of typed edits on canonical scene/section IDs; returns the same projection.\nsave: only when persistence.state is not saved; bound projects autosave after every edit, storyboard commit and accepted take.",
+    "description": "Create, read, edit or save a headless video project. No GPU acquisition.\ncreate: path is an absolute new or empty folder inside the MCP input directory (its parent must exist); the whole production (project document, takes, final video) lives there and Imagine saves it at creation. Size: the default is 16:9 landscape Draft. Leave canvas out unless the user asks for a specific size, quality or aspect ratio; then set canvas {ratio, portrait, quality} to what they asked for. Imagine resolves the delivery size from it. Ratios and qualities are listed by video_capabilities canvas (quality: Quick Draft, Draft, Standard, High, Native Resolution). Alternatively, project is a full CreateProject body (schema_version, default_model, delivery, generation); give either canvas or project, not both. Returns the projection below plus path.\nget: a bounded projection with project_revision, scenes (timing, model, continuity, accepted take, section IDs and prompts), assets, cast, takes, deliveries and persistence (save state). No media.\nedit: request is an EditRequest {schema_version (1), expected_project_revision, commands} of typed edits on canonical scene/section IDs; returns the same projection.\nsave: only when persistence.state is not saved; bound projects autosave after every edit, storyboard commit and accepted take.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -300,7 +300,7 @@
             "object",
             "null"
           ],
-          "description": "create: optional size preset {ratio, portrait, quality}, e.g. {\"ratio\":\"16:9\",\"portrait\":false,\"quality\":\"Draft\"}.",
+          "description": "create: size preset {ratio, portrait, quality}; omit it for 16:9 landscape Draft unless the user asks for another size, e.g. {\"ratio\":\"16:9\",\"portrait\":false,\"quality\":\"Standard\"}.",
           "properties": {
             "ratio": {
               "type": "string"
