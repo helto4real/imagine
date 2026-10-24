@@ -254,7 +254,6 @@ impl Library {
                             kind,
                             &mut visited,
                             &mut files,
-                            &mut warnings,
                             0,
                         )?;
                     }
@@ -575,7 +574,6 @@ fn scan_dir(
     kind: &str,
     visited: &mut BTreeSet<PathBuf>,
     files: &mut Vec<ModelFile>,
-    warnings: &mut Vec<String>,
     depth: usize,
 ) -> Result<()> {
     if depth > 32 || files.len() > 20_000 {
@@ -594,7 +592,7 @@ fn scan_dir(
             bail!("Model folder scan limit exceeded");
         }
         if path.is_dir() {
-            scan_dir(root, &path, kind, visited, files, warnings, depth + 1)?;
+            scan_dir(root, &path, kind, visited, files, depth + 1)?;
             continue;
         }
         if !path.is_file() {

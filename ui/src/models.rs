@@ -398,19 +398,19 @@ impl ImagineApp {
             });
         });
         self.select_model(selected);
-        if let Some(model) = &self.metadata {
-            if let (Some(architecture), Some(format)) = (
+        if let Some(model) = &self.metadata
+            && let (Some(architecture), Some(format)) = (
                 model["architecture"].as_str(),
                 model["checkpoint"]["format"].as_str(),
-            ) {
-                ui.label(
-                    RichText::new(format!(
-                        "{architecture} · {}",
-                        if format == "bf16" { "BF16" } else { "INT8" }
-                    ))
-                    .small(),
-                );
-            }
+            )
+        {
+            ui.label(
+                RichText::new(format!(
+                    "{architecture} · {}",
+                    if format == "bf16" { "BF16" } else { "INT8" }
+                ))
+                .small(),
+            );
         }
         if let Err(error) = self.model_selection() {
             ui.label(RichText::new(error.to_string()).small().color(helto::ERROR));
