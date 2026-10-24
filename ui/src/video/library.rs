@@ -1,7 +1,9 @@
 //! Explicit local library selection; copies never become live project dependencies.
 use super::*;
 use crate::icons::Icon;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+#[path = "library_filters.rs"]
+mod filters;
 #[derive(Clone, Copy)]
 pub(in crate::app) enum Reply {
     Catalog,
@@ -36,8 +38,16 @@ pub(super) struct State {
     search: String,
     reference: usize,
     tab: String,
-    recent: bool,
+    sort: filters::Sort,
+    /// The tab's filters that are on, by key.
+    filters: BTreeSet<&'static str>,
+    /// The one tag entries must carry.
+    tag: Option<String>,
     description: String,
+    /// The selected entry's tags, comma-separated while edited.
+    tags: String,
+    /// A field of the details to focus next frame: "title" or "tags".
+    focus: Option<&'static str>,
     asset: Option<AssetId>,
     saving_reference: Option<(ProjectId, String)>,
     pub(super) editor: Option<library_character::Editor>,
@@ -81,10 +91,24 @@ impl State {
     pub(super) fn open_on(&mut self, kind: &str) {
         self.open = true;
         if entry_kind(self) != kind {
-            self.tab = kind.into();
-            self.selected = None;
-            self.confirm_delete = None;
+            self.change_tab(kind);
         }
+    }
+    /// Another tab starts unfiltered, as in Director.
+    fn change_tab(&mut self, kind: &str) {
+        self.tab = kind.into();
+        self.selected = None;
+        self.confirm_delete = None;
+        self.filters.clear();
+        self.tag = None;
+    }
+    /// Selects `entry` and loads its editable details.
+    fn select(&mut self, entry: &Value) {
+        self.selected = entry["id"].as_str().map(str::to_owned);
+        self.title = entry["title"].as_str().unwrap_or("").into();
+        self.description = filters::description(entry).into();
+        self.tags = filters::tags(entry).join(", ");
+        self.confirm_delete = None;
     }
     pub(super) fn path_from_dialog(&mut self, path: PathBuf) {
         self.path = path.display().to_string();
@@ -140,26 +164,77 @@ fn entry_kind(state: &State) -> &str {
         &state.tab
     }
 }
-/// The current tab's entries matching the search, in the chosen order.
-fn library_rows(state: &State, entries: &[Value]) -> Vec<(usize, Value)> {
-    let needle = state.search.to_lowercase();
-    let mut rows = entries
-        .iter()
-        .enumerate()
-        .filter(|(_, e)| {
-            e["content"]["kind"] == entry_kind(state)
-                && [&e["title"], &e["content"]["document"]["description"]]
-                    .iter()
-                    .any(|t| t.as_str().unwrap_or("").to_lowercase().contains(&needle))
-        })
-        .map(|(i, e)| (i, e.clone()))
-        .collect::<Vec<_>>();
-    if state.recent {
-        rows.reverse();
-    } else {
-        rows.sort_by_key(|(_, e)| e["title"].as_str().unwrap_or("").to_lowercase());
+/// The current tab's entries for the search, filters and tag, in the chosen order.
+fn library_rows(
+    state: &State,
+    entries: &[Value],
+    project: Option<&VideoProject>,
+) -> Vec<(usize, Value)> {
+    filters::rows(
+        entries,
+        entry_kind(state),
+        &state.search,
+        &state.filters,
+        state.tag.as_deref(),
+        state.sort,
+        project,
+    )
+}
+/// Director's "Filters" sidebar: the tab's filters and its tags, with counts.
+fn library_sidebar(
+    ui: &mut egui::Ui,
+    state: &mut State,
+    entries: &[Value],
+    project: Option<&VideoProject>,
+) {
+    let kind = entry_kind(state).to_owned();
+    ui.label(helto::section("Filters"));
+    for (key, label) in filters::offered(&kind) {
+        // How many the filter would leave on its own, among this tab's entries.
+        let count = filters::rows(
+            entries,
+            &kind,
+            "",
+            &BTreeSet::from([*key]),
+            None,
+            filters::Sort::Recent,
+            project,
+        )
+        .len();
+        let mut on = state.filters.contains(key);
+        let r = ui.checkbox(&mut on, format!("{label} ({count})"));
+        control(ui, &format!("library-filter-{key}"), &r);
+        if r.changed() {
+            if on {
+                state.filters.insert(key);
+            } else {
+                state.filters.remove(key);
+            }
+        }
     }
-    rows
+    let tags = filters::tag_counts(entries, &kind);
+    if tags.is_empty() {
+        return;
+    }
+    ui.add_space(6.);
+    ui.label(helto::section("Tags"));
+    let total = entries
+        .iter()
+        .filter(|e| e["content"]["kind"] == kind)
+        .count();
+    let r = ui.selectable_label(state.tag.is_none(), format!("All ({total})"));
+    control(ui, "library-tag-all", &r);
+    if r.clicked() {
+        state.tag = None;
+    }
+    for (tag, count) in tags {
+        let on = state.tag.as_deref() == Some(tag.as_str());
+        let r = ui.selectable_label(on, format!("{tag} ({count})"));
+        control(ui, &format!("library-tag-{tag}"), &r);
+        if r.clicked() {
+            state.tag = (!on).then_some(tag);
+        }
+    }
 }
 fn library_folder_bar(
     ui: &mut egui::Ui,
@@ -218,10 +293,8 @@ fn library_tabs(ui: &mut egui::Ui, state: &mut State, entries: &[Value], action:
                 .count();
             let r = ui.selectable_label(entry_kind(state) == kind, format!("{label} {count}"));
             control(ui, &format!("library-tab-{kind}"), &r);
-            if r.clicked() {
-                state.tab = kind.into();
-                state.selected = None;
-                state.confirm_delete = None;
+            if r.clicked() && entry_kind(state) != kind {
+                state.change_tab(kind);
             }
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -237,13 +310,23 @@ fn library_tabs(ui: &mut egui::Ui, state: &mut State, entries: &[Value], action:
                     *action = Some("character-new");
                 }
             }
-            let r = ui.selectable_value(&mut state.recent, true, "Recent");
-            control(ui, "library-sort-recent", &r);
-            let r = ui.selectable_value(&mut state.recent, false, "Name");
-            control(ui, "library-sort-name", &r);
+            let r = egui::ComboBox::from_id_salt("library-sort")
+                .selected_text(state.sort.label())
+                .show_ui(ui, |ui| {
+                    for sort in filters::Sort::ALL {
+                        let r = ui.selectable_value(&mut state.sort, sort, sort.label());
+                        control(ui, &format!("library-sort-{sort:?}").to_lowercase(), &r);
+                    }
+                });
+            control(ui, "library-sort", &r.response);
+            let hint = match entry_kind(state) {
+                "character" => "Search characters…",
+                "asset" => "Search assets…",
+                _ => "Search projects…",
+            };
             let r = ui.add(
                 egui::TextEdit::singleline(&mut state.search)
-                    .hint_text("Search")
+                    .hint_text(hint)
                     .desired_width(180.),
             );
             control(ui, "library-search", &r);
@@ -267,16 +350,31 @@ fn library_detail(
         .add(egui::TextEdit::singleline(&mut state.title).desired_width(f32::INFINITY))
         .labelled_by(label.id);
     control(ui, "library-title", &r);
-    if character {
-        let label = ui.label("Description");
-        let r = ui
-            .add(
-                egui::TextEdit::multiline(&mut state.description)
-                    .desired_width(f32::INFINITY)
-                    .desired_rows(3),
-            )
-            .labelled_by(label.id);
-        control(ui, "library-description", &r);
+    if state.focus == Some("title") {
+        r.request_focus();
+        state.focus = None;
+    }
+    let label = ui.label("Description");
+    let r = ui
+        .add(
+            egui::TextEdit::multiline(&mut state.description)
+                .desired_width(f32::INFINITY)
+                .desired_rows(3),
+        )
+        .labelled_by(label.id);
+    control(ui, "library-description", &r);
+    let label = ui.label("Tags");
+    let r = ui
+        .add(
+            egui::TextEdit::singleline(&mut state.tags)
+                .hint_text("Comma-separated")
+                .desired_width(f32::INFINITY),
+        )
+        .labelled_by(label.id);
+    control(ui, "library-tags", &r);
+    if state.focus == Some("tags") {
+        r.request_focus();
+        state.focus = None;
     }
     ui.add_space(4.);
     let id = entry["id"].as_str().unwrap_or("").to_owned();
@@ -316,6 +414,11 @@ fn library_detail(
         control(ui, "library-edit", &r);
         if r.clicked() {
             *action = Some("edit");
+        }
+        let r = helto::action(ui, Icon::Duplicate, "Duplicate library entry", false, wait);
+        control(ui, "library-duplicate", &r);
+        if r.clicked() {
+            *action = Some("duplicate");
         }
         if character {
             let r = helto::action(ui, Icon::Edit, "Edit selected character", false, wait);
@@ -824,7 +927,23 @@ impl ImagineApp {
         };
         self.library_call(ctx, Reply::Catalog, true,
             format!("/v1/video/libraries/{}/entries/{}/edit", catalog["id"].as_str().unwrap_or(""), entry["id"].as_str().unwrap_or("")),
-            Some(json!({"schema_version":1,"expected_library_revision":catalog["revision"],"expected_entry_revision":entry["revision"],"title":state.title,"description":state.description,"remove":remove})));
+            Some(json!({"schema_version":1,"expected_library_revision":catalog["revision"],"expected_entry_revision":entry["revision"],"title":state.title,"description":state.description,
+                "tags":state.tags.split(',').map(str::trim).filter(|t| !t.is_empty()).collect::<Vec<_>>(),"remove":remove})));
+    }
+    fn library_duplicate(&mut self, ctx: &egui::Context) {
+        let state = &self.timeline.library;
+        let Some(catalog) = &state.catalog else {
+            return;
+        };
+        let Some(entry) = catalog["entries"].as_array().and_then(|rows| {
+            rows.iter()
+                .find(|e| e["id"].as_str() == state.selected.as_deref())
+        }) else {
+            return;
+        };
+        self.library_call(ctx, Reply::Catalog, true,
+            format!("/v1/video/libraries/{}/entries/{}/edit", catalog["id"].as_str().unwrap_or(""), entry["id"].as_str().unwrap_or("")),
+            Some(json!({"schema_version":1,"expected_library_revision":catalog["revision"],"expected_entry_revision":entry["revision"],"duplicate":true})));
     }
     /// An entry's first image, or an icon for its kind.
     fn library_thumbnail(&mut self, ui: &mut egui::Ui, lib: &str, entry: &Value) {
@@ -857,6 +976,7 @@ impl ImagineApp {
         state: &mut State,
         catalog: &Value,
         rows: &[(usize, Value)],
+        project: Option<&VideoProject>,
         action: &mut Action,
     ) {
         const CARD: egui::Vec2 = egui::vec2(112., 80.);
@@ -870,11 +990,16 @@ impl ImagineApp {
             .auto_shrink([false, true])
             .show(ui, |ui| {
                 if rows.is_empty() {
-                    ui.weak(if state.search.is_empty() {
-                        "Nothing saved here yet."
-                    } else {
-                        "No entries match the search."
-                    });
+                    ui.weak(
+                        if state.search.is_empty()
+                            && state.filters.is_empty()
+                            && state.tag.is_none()
+                        {
+                            "Nothing saved here yet."
+                        } else {
+                            "No entries match the search and filters."
+                        },
+                    );
                 }
                 egui::Grid::new("library-grid")
                     .spacing([8., 8.])
@@ -896,7 +1021,21 @@ impl ImagineApp {
                                         ui.set_width(CARD.x);
                                         self.library_thumbnail(ui, &lib, entry);
                                         ui.add(egui::Label::new(title).truncate());
-                                        ui.weak(format!("Revision {}", entry["revision"]));
+                                        let meta = filters::meta(entry);
+                                        if !meta.is_empty() {
+                                            ui.add(
+                                                egui::Label::new(egui::RichText::new(meta).weak())
+                                                    .truncate(),
+                                            );
+                                        }
+                                        if filters::in_project(entry, project) {
+                                            let label = if entry["content"]["kind"] == "character" {
+                                                "Loaded"
+                                            } else {
+                                                "In project"
+                                            };
+                                            super::authoring::pill(ui, label, helto::OK);
+                                        }
                                     });
                                 });
                             let r = ui
@@ -932,17 +1071,63 @@ impl ImagineApp {
                             }
                             control(ui, &format!("library-entry-{i}"), &r);
                             if r.clicked() {
-                                state.selected = Some(id.into());
-                                state.title = title.into();
-                                state.description = entry["content"]["document"]["description"]
-                                    .as_str()
-                                    .unwrap_or("")
-                                    .into();
-                                state.confirm_delete = None;
+                                state.select(entry);
                             }
                             if quick && r.double_clicked() && !state.busy {
                                 *action = Some("copy");
                             }
+                            // Director's ⋯ menu, over the card so it gets its own clicks.
+                            let corner = egui::Rect::from_min_size(
+                                egui::pos2(
+                                    card.response.rect.right() - 26.,
+                                    card.response.rect.top() + 2.,
+                                ),
+                                egui::vec2(24., 24.),
+                            );
+                            let menu = ui.interact(
+                                corner,
+                                ui.id().with(("library-card-menu", id)),
+                                egui::Sense::click(),
+                            );
+                            if menu.hovered() {
+                                ui.painter().rect_filled(corner, 4., helto::HOVER);
+                            }
+                            crate::icons::paint(
+                                ui.painter(),
+                                corner.shrink(5.),
+                                Icon::Menu,
+                                helto::TEXT,
+                            );
+                            let name = format!("{title} actions");
+                            menu.widget_info(|| {
+                                egui::WidgetInfo::labeled(egui::WidgetType::Button, true, &name)
+                            });
+                            let menu = menu.on_hover_text(&name);
+                            control(ui, &format!("library-entry-menu-{i}"), &menu);
+                            egui::Popup::menu(&menu).show(|ui| {
+                                for (label, name) in [
+                                    ("Rename", "rename"),
+                                    ("Duplicate", "duplicate"),
+                                    ("Edit tags", "tags"),
+                                    ("Delete", "delete"),
+                                ] {
+                                    let r = ui.add_enabled(
+                                        !state.busy || name == "rename" || name == "tags",
+                                        egui::Button::new(label),
+                                    );
+                                    control(ui, &format!("library-entry-{name}-{i}"), &r);
+                                    if r.clicked() {
+                                        state.select(entry);
+                                        match name {
+                                            "rename" => state.focus = Some("title"),
+                                            "tags" => state.focus = Some("tags"),
+                                            "duplicate" => *action = Some("duplicate"),
+                                            _ => state.confirm_delete = Some(id.into()),
+                                        }
+                                        ui.close();
+                                    }
+                                }
+                            });
                             if (n + 1) % columns == 0 {
                                 ui.end_row();
                             }
@@ -991,17 +1176,34 @@ impl ImagineApp {
                     let entries = catalog["entries"].as_array().cloned().unwrap_or_default();
                     library_tabs(ui, &mut state, &entries, &mut action);
                     ui.separator();
-                    let rows = library_rows(&state, &entries);
-                    let detail = 290_f32.min(ui.available_width() * 0.45);
+                    let project = document.as_ref().map(|d| &d.project);
+                    let rows = library_rows(&state, &entries, project);
+                    let detail = 290_f32.min(ui.available_width() * 0.4);
+                    let sidebar = 150_f32.min(ui.available_width() * 0.2);
                     let body = egui::vec2(ui.available_width(), 380.);
                     let row = egui::Layout::left_to_right(egui::Align::Min);
                     ui.allocate_ui_with_layout(body, row, |ui| {
-                        // The separator and two item gaps sit between the columns.
-                        let gaps = 2. * ui.spacing().item_spacing.x + 8.;
+                        ui.vertical(|ui| {
+                            ui.set_width(sidebar);
+                            egui::ScrollArea::vertical()
+                                .id_salt("library-sidebar")
+                                .max_height(380.)
+                                .show(ui, |ui| library_sidebar(ui, &mut state, &entries, project));
+                        });
+                        ui.separator();
+                        // Two separators and four item gaps sit between the columns.
+                        let gaps = 4. * ui.spacing().item_spacing.x + 16.;
                         let grid = (ui.available_width() - detail - gaps).max(140.);
                         ui.allocate_ui(egui::vec2(grid, 380.), |ui| {
                             ui.set_width(grid);
-                            self.library_grid(ui, &mut state, &catalog, &rows, &mut action);
+                            self.library_grid(
+                                ui,
+                                &mut state,
+                                &catalog,
+                                &rows,
+                                project,
+                                &mut action,
+                            );
                         });
                         ui.separator();
                         ui.vertical(|ui| {
@@ -1090,6 +1292,7 @@ impl ImagineApp {
                 }
             }
             Some("edit") => self.library_edit(ctx, false),
+            Some("duplicate") => self.library_duplicate(ctx),
             Some("delete") => self.library_edit(ctx, true),
             Some("copy") => {
                 if let Some(c) = &self.timeline.library.catalog
@@ -1167,9 +1370,14 @@ mod tests {
             json!({"id":id,"title":title,"revision":1,
                 "content":{"kind":kind,"document":{"description":format!("Own {title} notes")}}})
         };
+        let mut harbour = entry("p1", "project", "Own harbour");
+        harbour["tags"] = json!(["Dusk"]);
+        harbour["updated_ms"] = json!(20);
+        let mut lighthouse = entry("p2", "project", "Own lighthouse");
+        lighthouse["updated_ms"] = json!(10);
         app.timeline.library.catalog = Some(json!({"id":"own-library","revision":3,"entries":[
-            entry("p1","project","Own harbour"),
-            entry("p2","project","Own lighthouse"),
+            harbour,
+            lighthouse,
             entry("c1","character","Own keeper"),
         ]}));
         app.timeline.library.open = true;
@@ -1274,6 +1482,45 @@ mod tests {
         assert!(has(&nodes, "Own harbour") && !has(&nodes, "Own lighthouse"));
         let hidden = frame(&mut app, true, vec![egui::Event::PointerGone]);
         assert!(!has(&hidden, "Own harbour"));
+        // Director's sidebar: one tag narrows the tab; All widens it again.
+        app.timeline.library.search.clear();
+        frame(&mut app, false, vec![]);
+        let nodes = frame(&mut app, false, vec![]);
+        for text in [
+            "Filters",
+            "Has references (0)",
+            "Tags",
+            "All (2)",
+            "Dusk (1)",
+        ] {
+            assert!(has(&nodes, text), "{text}");
+        }
+        let nodes = click(&mut app, &nodes, "Dusk (1)");
+        assert_eq!(app.timeline.library.tag.as_deref(), Some("Dusk"));
+        assert!(has(&nodes, "Own harbour") && !has(&nodes, "Own lighthouse"));
+        let nodes = click(&mut app, &nodes, "All (2)");
+        assert!(has(&nodes, "Own lighthouse"));
+        // The card menu selects its entry; Edit tags focuses the tags.
+        let nodes = click(&mut app, &nodes, "Own lighthouse actions");
+        let nodes = click(&mut app, &nodes, "Edit tags");
+        assert_eq!(app.timeline.library.selected.as_deref(), Some("p2"));
+        assert!(
+            app.timeline.library.focus.is_none(),
+            "the tags field took focus"
+        );
+        // Nothing listens there: the request is either still out or has failed.
+        app.client = Some(
+            crate::client::Client::connect(&crate::settings::Connection {
+                url: "http://127.0.0.1:1".into(),
+            })
+            .unwrap(),
+        );
+        let nodes = click(&mut app, &nodes, "Own lighthouse actions");
+        click(&mut app, &nodes, "Duplicate");
+        assert!(
+            app.timeline.library.busy || app.timeline.library.error.is_some(),
+            "the duplicate request was sent"
+        );
         all.take().textures_delta.clear();
     }
 
