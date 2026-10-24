@@ -1483,6 +1483,7 @@ mod tests {
                 cast: vec![],
                 images: vec![],
                 add_dialogue: false,
+                add_music: false,
             },
             phase: Phase::Review,
             outline: None,

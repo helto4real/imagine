@@ -78,6 +78,10 @@ pub struct Request {
     pub images: Vec<StoryImage>,
     #[serde(default)]
     pub add_dialogue: bool,
+    /// Audience-only music in the Story; off clears what the model writes, as
+    /// in Director.
+    #[serde(default)]
+    pub add_music: bool,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]

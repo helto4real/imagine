@@ -1104,3 +1104,45 @@ async fn storyboard_review_accepts_cut_changes_but_not_structure_or_unknown_imag
     worker.abort();
     let _ = worker.await;
 }
+#[tokio::test]
+async fn story_music_is_kept_only_when_asked_for() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "story-music").await;
+    let (url, worker, _) = fixture::spawn().await;
+    let project = configured(&h, &url).await;
+    for music in [false, true] {
+        let mut start = request(&h, &project, "outline", "koboldcpp").await;
+        start["add_music"] = json!(music);
+        let (code, d) = call(
+            &h,
+            "POST",
+            &format!("/v1/video/projects/{project}/authoring"),
+            Some(start),
+        )
+        .await;
+        assert_eq!(code, 202, "{d}");
+        let id = d["id"].as_str().unwrap();
+        let outline = wait(&h, id, "outline").await;
+        let expected = if music { "Own score" } else { "" };
+        assert_eq!(
+            outline["outline"]["scenes"][0]["non_diegetic_music"],
+            expected
+        );
+        assert_eq!(
+            call(
+                &h,
+                "POST",
+                &format!("/v1/video/authoring/{id}/expand"),
+                Some(json!({"schema_version":1,"start_index":0}))
+            )
+            .await
+            .0,
+            200
+        );
+        let ready = wait(&h, id, "review").await;
+        assert_eq!(ready["scenes"][0]["non_diegetic_music"], expected);
+    }
+    stop(h).await;
+    worker.abort();
+    let _ = worker.await;
+}

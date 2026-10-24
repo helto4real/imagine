@@ -37,6 +37,7 @@ pub(super) struct State {
     cast: BTreeSet<String>,
     images: std::collections::BTreeMap<AssetId, ImageUse>,
     add_dialogue: bool,
+    add_music: bool,
     pairs: std::collections::BTreeMap<AssetId, AssetId>,
     provider_settings: bool,
     show_profiles: bool,
@@ -100,6 +101,7 @@ impl Default for State {
             cast: Default::default(),
             images: Default::default(),
             add_dialogue: false,
+            add_music: false,
             pairs: Default::default(),
             provider_settings: false,
             show_profiles: false,
@@ -445,7 +447,8 @@ fn generate_call(state: &State, d: &Snapshot) -> Call {
             } else {
                 vec![]
             },
-            add_dialogue: state.operation == Operation::Outline && state.add_dialogue
+            add_dialogue: state.operation == Operation::Outline && state.add_dialogue,
+            add_music: state.operation == Operation::Outline && state.add_music,
         })),
     )
 }
@@ -473,6 +476,7 @@ pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index
         .as_mut()
         .unwrap_or(&mut outline.scenes[index]);
     let images = &draft.request.images;
+    let music = draft.request.add_music;
     // The weight sets the Scene's length, fixed once it is expanded; the cut
     // and the images can still change in review, as in Director.
     ui.horizontal(|ui| {
@@ -527,11 +531,15 @@ pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index
             egui::TextEdit::singleline(&mut source.ambient_sound).desired_width(f32::INFINITY),
         );
         control(ui, "story-scene-ambient", &r);
-        ui.label("Music");
-        let r = ui.add(
-            egui::TextEdit::singleline(&mut source.non_diegetic_music).desired_width(f32::INFINITY),
-        );
-        control(ui, "story-scene-music", &r);
+        // Shown only when the Story was asked for music, as in Director.
+        if music {
+            ui.label("Audience-only music");
+            let r = ui.add(
+                egui::TextEdit::singleline(&mut source.non_diegetic_music)
+                    .desired_width(f32::INFINITY),
+            );
+            control(ui, "story-scene-music", &r);
+        }
         let count = source.sections.len();
         for (i, section) in source.sections.iter_mut().enumerate() {
             ui.horizontal(|ui| {
@@ -1350,6 +1358,8 @@ impl ImagineApp {
                 control(ui, &format!("story-destination-{name}"), &r);
             }
         });
+        let r = ui.checkbox(&mut state.add_music, "Audience-only music");
+        control(ui, "story-music", &r);
     }
     /// Hands back the state and runs what this frame asked for.
     pub(super) fn authoring_finish(

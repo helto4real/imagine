@@ -85,7 +85,7 @@ async fn reply(State(state): State<Arc<Fixture>>, Json(body): Json<Value>) -> Js
             scene.to_string()
         }
     } else if user.contains("<latest_moment>") {
-        let mut board = json!({"scenes":[{"title":"Arrival","summary":"Approach the lighthouse","description":"The keeper walks across the rocks.","ambient_sound":"Waves","non_diegetic_music":"","weight":1,"boundary_from_previous":"hard_cut","setting_reference_matches":{},"sections":[{"prompt":"The keeper approaches the lighthouse.","weight":1}]},{"title":"Signal","summary":"Light the beacon","description":"The keeper lights the beacon.","ambient_sound":"Wind","non_diegetic_music":"","weight":2,"boundary_from_previous":"continuous_shot","setting_reference_matches":{},"sections":[{"prompt":"The keeper switches on the beacon.","weight":1}]}],"visual_placements":[]});
+        let mut board = json!({"scenes":[{"title":"Arrival","summary":"Approach the lighthouse","description":"The keeper walks across the rocks.","ambient_sound":"Waves","non_diegetic_music":"Own score","weight":1,"boundary_from_previous":"hard_cut","setting_reference_matches":{},"sections":[{"prompt":"The keeper approaches the lighthouse.","weight":1}]},{"title":"Signal","summary":"Light the beacon","description":"The keeper lights the beacon.","ambient_sound":"Wind","non_diegetic_music":"","weight":2,"boundary_from_previous":"continuous_shot","setting_reference_matches":{},"sections":[{"prompt":"The keeper switches on the beacon.","weight":1}]}],"visual_placements":[]});
         let images = tag("image_sources");
         for scene in board["scenes"].as_array_mut().unwrap() {
             for image in images

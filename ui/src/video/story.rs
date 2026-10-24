@@ -511,6 +511,24 @@ mod tests {
                 );
             }
         };
+        // The Story was not asked for music, so its field is hidden.
+        let nodes = frame(&mut app, vec![]);
+        let music = |nodes: &[(egui::accesskit::NodeId, egui::accesskit::Node)]| {
+            nodes
+                .iter()
+                .any(|(_, n)| n.label().or(n.value()) == Some("Audience-only music"))
+        };
+        assert!(!music(&nodes));
+        app.timeline
+            .authoring
+            .draft
+            .as_mut()
+            .unwrap()
+            .request
+            .add_music = true;
+        frame(&mut app, vec![]);
+        let nodes = frame(&mut app, vec![]);
+        assert!(music(&nodes));
         let titles = |app: &ImagineApp| {
             let d = app.timeline.authoring.draft.as_ref().unwrap();
             d.outline

@@ -622,7 +622,10 @@ impl Service {
             let result = result.and_then(|text| {
                 if expand {
                     let source = &j.draft.outline.as_ref().unwrap().scenes[index];
-                    let scene = expansion(&text, source)?;
+                    let mut scene = expansion(&text, source)?;
+                    if !j.draft.request.add_music {
+                        scene.non_diegetic_music.clear();
+                    }
                     super::visuals::validate_cast(
                         &Storyboard {
                             scenes: vec![scene.clone()],
@@ -632,11 +635,16 @@ impl Service {
                     )?;
                     j.draft.scenes[index] = Some(scene);
                 } else if draft.request.operation == Operation::Outline {
-                    let board = outline_with_images(
+                    let mut board = outline_with_images(
                         &text,
                         &draft.request.images,
                         draft.request.add_dialogue,
                     )?;
+                    if !draft.request.add_music {
+                        for scene in &mut board.scenes {
+                            scene.non_diegetic_music.clear();
+                        }
+                    }
                     super::visuals::validate_cast(
                         &board,
                         &j.draft.selected_cast,
