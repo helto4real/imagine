@@ -9,6 +9,46 @@ pub(super) struct State {
     error: Option<String>,
     pending: Option<(Vec<VisualReference>, Option<bool>)>,
     changed_at: Option<std::time::Instant>,
+    /// The Library characters list is open, with its search.
+    from_library: bool,
+    library_search: String,
+}
+/// Library characters for `search` over name, alias, description and tags,
+/// as Director's cast picker matches them: (entry id, label, already in cast).
+fn library_characters(
+    catalog: Option<&Value>,
+    project: &VideoProject,
+    search: &str,
+) -> Vec<(String, String, bool)> {
+    let needle = search.trim().to_lowercase();
+    catalog
+        .and_then(|c| c["entries"].as_array())
+        .into_iter()
+        .flatten()
+        .filter(|e| e["content"]["kind"] == "character")
+        .filter(|e| {
+            let doc = &e["content"]["document"];
+            needle.is_empty()
+                || [&e["title"], &doc["alias"], &doc["description"]]
+                    .iter()
+                    .any(|t| t.as_str().unwrap_or("").to_lowercase().contains(&needle))
+                || doc["tags"].as_array().into_iter().flatten().any(|t| {
+                    t.as_str()
+                        .is_some_and(|t| t.to_lowercase().contains(&needle))
+                })
+        })
+        .map(|e| {
+            let id = e["id"].as_str().unwrap_or("").to_owned();
+            let alias = e["content"]["document"]["alias"].as_str().unwrap_or("");
+            let label = format!("{} · @{alias}", e["title"].as_str().unwrap_or(""));
+            let added = project
+                .creative
+                .references
+                .iter()
+                .any(|r| r.origin.as_ref().is_some_and(|o| o.entry_id == id));
+            (id, label, added)
+        })
+        .collect()
 }
 impl State {
     pub(super) fn merge_pending(&self, project: &VideoProject, creative: &mut Creative) {
@@ -78,6 +118,7 @@ impl ImagineApp {
                 error: None,
                 pending: None,
                 changed_at: None,
+                ..Default::default()
             };
         }
     }
@@ -136,6 +177,13 @@ impl ImagineApp {
         let mut close = false;
         let mut insert_tag = None;
         let mut library_reference = None;
+        let mut add_from_library = None;
+        let mut open_library = false;
+        let characters = library_characters(
+            self.timeline.library.catalog.as_ref(),
+            &document.project,
+            &state.library_search,
+        );
         egui::Window::new("Cast & Visual References")
             .id(egui::Id::new("video-cast"))
             .open(&mut open)
@@ -188,6 +236,16 @@ impl ImagineApp {
                                 origin: None,
                             });
                         }
+                        let r = helto::icon_button(
+                            ui,
+                            crate::icons::Icon::Library,
+                            "Add from Library…",
+                            state.from_library,
+                        );
+                        control(ui, "cast-from-library", &r);
+                        if r.clicked() {
+                            state.from_library = !state.from_library;
+                        }
                         let r = helto::icon_button(ui, crate::icons::Icon::Close, "Close", false);
                         control(ui, "cast-close", &r);
                         close = r.clicked();
@@ -200,6 +258,67 @@ impl ImagineApp {
                         control(ui, "cast-reload", &r);
                         reload = r.clicked();
                     });
+                    if state.from_library {
+                        ui.group(|ui| {
+                            ui.set_width(ui.available_width());
+                            ui.label(helto::section("Library characters"));
+                            if self.timeline.library.catalog.is_none() {
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.weak("No library is open.");
+                                    let r = helto::action(
+                                        ui,
+                                        crate::icons::Icon::Library,
+                                        "Open Library",
+                                        false,
+                                        None,
+                                    );
+                                    control(ui, "cast-open-library", &r);
+                                    open_library = r.clicked();
+                                });
+                            } else {
+                                let r = ui.add(
+                                    egui::TextEdit::singleline(&mut state.library_search)
+                                        .hint_text("Search characters…")
+                                        .desired_width(f32::INFINITY),
+                                );
+                                control(ui, "cast-library-search", &r);
+                                if characters.is_empty() {
+                                    ui.weak("No library characters match.");
+                                }
+                                // Copying needs the cast's own edits saved first.
+                                let wait = (state.changed_at.is_some() || state.pending.is_some())
+                                    .then_some("Wait for the cast edit to save.");
+                                for (n, (id, label, added)) in characters.iter().enumerate() {
+                                    ui.horizontal(|ui| {
+                                        ui.label(label);
+                                        ui.with_layout(
+                                            egui::Layout::right_to_left(egui::Align::Center),
+                                            |ui| {
+                                                let r = helto::action(
+                                                    ui,
+                                                    crate::icons::Icon::Plus,
+                                                    &format!("Add {label}"),
+                                                    false,
+                                                    if *added {
+                                                        Some("Already in the cast.")
+                                                    } else {
+                                                        wait
+                                                    },
+                                                );
+                                                control(ui, &format!("cast-library-add-{n}"), &r);
+                                                if r.clicked() {
+                                                    add_from_library = Some(id.clone());
+                                                }
+                                                if *added {
+                                                    ui.weak("Already in cast");
+                                                }
+                                            },
+                                        );
+                                    });
+                                }
+                            }
+                        });
+                    }
                     let mut remove = None;
                     for (i, reference) in state.draft.references.iter_mut().enumerate() {
                         ui.push_id(reference.id.clone(), |ui| {
@@ -675,12 +794,139 @@ impl ImagineApp {
         if let Some(target) = pick_media {
             self.timeline_pick_media(target);
         }
+        if open_library {
+            self.timeline_open_library(ctx, "character");
+        }
+        if let Some(entry) = add_from_library {
+            self.library_copy_character(ctx, &entry);
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn catalog() -> Value {
+        let character = |id: &str, title: &str, alias: &str, tags: Value| {
+            json!({"id":id,"title":title,"revision":1,"content":{"kind":"character",
+                "document":{"alias":alias,"description":format!("Own {title} notes"),"tags":tags}}})
+        };
+        json!({"id":"own-library","revision":2,"entries":[
+            character("c1","Own keeper","keeper",json!(["Sailor"])),
+            character("c2","Own guard","guard",json!([])),
+            {"id":"a1","title":"Own sailor asset","revision":1,"content":{"kind":"asset","document":{}}},
+        ]})
+    }
+    #[test]
+    fn the_cast_adds_library_characters_and_marks_ones_already_in_it() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        // Nothing listens there: a copy request is either still out or has failed.
+        app.client = Some(
+            crate::client::Client::connect(&crate::settings::Connection {
+                url: "http://127.0.0.1:1".into(),
+            })
+            .unwrap(),
+        );
+        let mut project = super::super::media_picker::tests::project();
+        project.creative.references[0].origin = Some(Origin {
+            library_id: "own-library".into(),
+            entry_id: "c2".into(),
+            revision: 1,
+        });
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.document = Some(Snapshot::with(project, json!({})));
+        app.timeline.library.catalog = Some(catalog());
+        app.timeline_open_cast();
+        let frame = |app: &mut ImagineApp, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 900.),
+                    )),
+                    events,
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            output.textures_delta.clear();
+            output.platform_output.accesskit_update.unwrap().nodes
+        };
+        let click = |app: &mut ImagineApp, label: &str| {
+            let mut nodes = vec![];
+            for _ in 0..2 {
+                nodes = frame(app, vec![]);
+            }
+            let b = nodes
+                .iter()
+                .find(|(_, n)| n.label() == Some(label))
+                .and_then(|(_, n)| n.bounds())
+                .unwrap_or_else(|| panic!("{label}"));
+            let pos = egui::pos2(((b.x0 + b.x1) / 2.) as f32, ((b.y0 + b.y1) / 2.) as f32);
+            for pressed in [true, false] {
+                frame(
+                    app,
+                    vec![
+                        egui::Event::PointerMoved(pos),
+                        egui::Event::PointerButton {
+                            pos,
+                            button: egui::PointerButton::Primary,
+                            pressed,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                );
+            }
+            frame(app, vec![])
+        };
+        let nodes = click(&mut app, "Add from Library…");
+        let button = |name: &str| {
+            nodes
+                .iter()
+                .find(|(_, n)| n.label() == Some(name))
+                .map(|(_, n)| n.clone())
+                .unwrap_or_else(|| panic!("{name}"))
+        };
+        assert!(!button("Add Own keeper · @keeper").is_disabled());
+        assert!(
+            button("Add Own guard · @guard").is_disabled(),
+            "already in the cast"
+        );
+        click(&mut app, "Add Own keeper · @keeper");
+        assert!(
+            app.timeline.library.busy || app.timeline.library.error.is_some(),
+            "the copy request was sent"
+        );
+    }
+    #[test]
+    fn library_characters_search_name_alias_description_and_tags_and_mark_the_cast() {
+        let mut project = super::super::media_picker::tests::project();
+        project.creative.references[0].origin = Some(Origin {
+            library_id: "own-library".into(),
+            entry_id: "c2".into(),
+            revision: 1,
+        });
+        let catalog = catalog();
+        let found = |search: &str| library_characters(Some(&catalog), &project, search);
+        assert_eq!(
+            found(""),
+            [
+                ("c1".into(), "Own keeper · @keeper".into(), false),
+                ("c2".into(), "Own guard · @guard".into(), true),
+            ]
+        );
+        // Tags count, and assets are not characters.
+        assert_eq!(found("sailor").len(), 1);
+        assert_eq!(found("GUARD")[0].0, "c2");
+        assert_eq!(found("guard notes")[0].0, "c2");
+        assert!(library_characters(None, &project, "").is_empty());
+    }
     #[test]
     fn immediate_project_action_flushes_pending_cast_and_scene_text_in_one_edit() {
         let project = super::super::media_picker::tests::project();

@@ -931,6 +931,31 @@ impl ImagineApp {
             Some(json!({"schema_version":1,"expected_library_revision":catalog["revision"],"expected_entry_revision":entry["revision"],"title":state.title,"description":state.description,
                 "tags":state.tags.split(',').map(str::trim).filter(|t| !t.is_empty()).collect::<Vec<_>>(),"remove":remove})));
     }
+    /// Copies Library character `entry` into the open project's cast.
+    pub(super) fn library_copy_character(&mut self, ctx: &egui::Context, entry: &str) {
+        let (Some(c), Some(document)) = (&self.timeline.library.catalog, &self.timeline.document)
+        else {
+            return;
+        };
+        let Some(entry) = c["entries"]
+            .as_array()
+            .and_then(|e| e.iter().find(|e| e["id"] == entry))
+        else {
+            return;
+        };
+        let body = json!({"schema_version":1,"expected_project_revision":document.project.project_revision,"library_id":c["id"],"entry_id":entry["id"],"expected_entry_revision":entry["revision"]});
+        let path = format!(
+            "/v1/video/projects/{}/cast/from-library",
+            document.project.id.0
+        );
+        self.library_call(
+            ctx,
+            Reply::Copied { replace: false },
+            true,
+            path,
+            Some(body),
+        );
+    }
     fn library_duplicate(&mut self, ctx: &egui::Context) {
         let state = &self.timeline.library;
         let Some(catalog) = &state.catalog else {
@@ -1328,8 +1353,9 @@ impl ImagineApp {
                             vec![source],
                             media_picker::Target::Project,
                         );
-                    } else if let Some(document) = &self.timeline.document {
-                        self.library_call(ctx,Reply::Copied{replace:false},true,format!("/v1/video/projects/{}/cast/from-library",document.project.id.0),Some(json!({"schema_version":1,"expected_project_revision":document.project.project_revision,"library_id":c["id"],"entry_id":entry["id"],"expected_entry_revision":entry["revision"]})));
+                    } else if self.timeline.document.is_some() {
+                        let entry = entry["id"].as_str().unwrap_or("").to_owned();
+                        self.library_copy_character(ctx, &entry);
                     } else {
                         self.timeline.library.error =
                             Some("Open a project for the character copy.".into());
