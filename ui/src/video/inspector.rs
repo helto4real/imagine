@@ -444,7 +444,7 @@ impl ImagineApp {
                                         if r.lost_focus() {
                                             commands.extend(self.timeline.draft_edits());
                                         }
-                                        dialogue_warnings(ui, &self.timeline.draft_description);
+                                        dialogue_warnings(ui, &self.timeline.draft_description, r.id);
                                         self.timeline_inline_enhance(
                                             ui,
                                             &scene.id,
@@ -704,7 +704,7 @@ impl ImagineApp {
         if r.lost_focus() {
             commands.extend(self.timeline.draft_edits());
         }
-        dialogue_warnings(ui, &self.timeline.draft_section);
+        dialogue_warnings(ui, &self.timeline.draft_section, r.id);
         self.timeline_inline_enhance(ui, &scene.id, Some(&section.id), Default::default(), r.rect);
     }
     /// The Section's image anchors, with images and videos one click away.
@@ -919,15 +919,29 @@ fn columns(rect: Rect, weights: &[f32]) -> Vec<Rect> {
 
 /// Director's dialogue warnings for a prompt field. Only the advice is shown;
 /// the quoted words stay in the field, which follows Hide previews.
-fn dialogue_warnings(ui: &mut egui::Ui, text: &str) {
+/// Director's dialogue advice for `text`, once per kind and without its
+/// words. Clicking one focuses `field` and selects the first text it means.
+pub(super) fn dialogue_warnings(ui: &mut egui::Ui, text: &str, field: egui::Id) {
     let mut shown = std::collections::BTreeSet::new();
     for issue in imagine_video_contract::dialogue::issues(text) {
         if shown.insert(issue.code) {
-            ui.label(
-                egui::RichText::new(issue.message())
-                    .small()
-                    .color(helto::ACCENT),
-            );
+            let r = ui
+                .add(
+                    egui::Label::new(
+                        egui::RichText::new(issue.message())
+                            .small()
+                            .color(helto::ACCENT),
+                    )
+                    .sense(egui::Sense::click()),
+                )
+                .on_hover_cursor(egui::CursorIcon::PointingHand)
+                .on_hover_text("Select it in the text");
+            if r.clicked() {
+                let start = text[..issue.at].chars().count();
+                let end = start + issue.token.chars().count();
+                ui.ctx().memory_mut(|m| m.request_focus(field));
+                prompt_tools::cursor(ui, field, start, end);
+            }
         }
     }
 }
@@ -1021,7 +1035,11 @@ mod tests {
     fn dialogue_warnings_show_advice_once_without_the_quoted_words() {
         let ctx = egui::Context::default();
         let mut output = ctx.run_ui(Default::default(), |ui| {
-            dialogue_warnings(ui, "@own says Hi and \"Own secret\" and \"Own other\"");
+            dialogue_warnings(
+                ui,
+                "@own says Hi and \"Own secret\" and \"Own other\"",
+                egui::Id::new("own-field"),
+            );
         });
         output.textures_delta.clear();
         let texts: Vec<String> = output
@@ -1034,6 +1052,65 @@ mod tests {
             .collect();
         assert_eq!(texts.len(), 2, "{texts:?}");
         assert!(texts.iter().all(|t| !t.contains("Own secret")));
+    }
+    #[test]
+    fn clicking_dialogue_advice_selects_the_text_it_means_in_its_field() {
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut text = "Own wave, then @own \"Hi\" åäö".to_owned();
+        let id = egui::Id::new("own-field");
+        let mut frame = |events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(800., 600.),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ui| {
+                    let r = ui.add(egui::TextEdit::multiline(&mut text).id(id));
+                    let source = text.clone();
+                    dialogue_warnings(ui, &source, r.id);
+                },
+            );
+            output.textures_delta.clear();
+            output.platform_output.accesskit_update.unwrap().nodes
+        };
+        frame(vec![]);
+        let nodes = frame(vec![]);
+        let b = nodes
+            .iter()
+            .find(|(_, n)| {
+                n.value()
+                    .or(n.label())
+                    .is_some_and(|t| t.starts_with("Quoted dialogue after @name"))
+            })
+            .and_then(|(_, n)| n.bounds())
+            .expect("advice");
+        let pos = egui::pos2(((b.x0 + b.x1) / 2.) as f32, ((b.y0 + b.y1) / 2.) as f32);
+        for pressed in [true, false] {
+            frame(vec![
+                egui::Event::PointerMoved(pos),
+                egui::Event::PointerButton {
+                    pos,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    modifiers: Default::default(),
+                },
+            ]);
+        }
+        let range = egui::TextEdit::load_state(&ctx, id)
+            .and_then(|s| s.cursor.char_range())
+            .expect("selection");
+        let (a, b) = (
+            range.primary.index.min(range.secondary.index),
+            range.primary.index.max(range.secondary.index),
+        );
+        let chars: Vec<char> = "Own wave, then @own \"Hi\" åäö".chars().collect();
+        assert_eq!(chars[a.0..b.0].iter().collect::<String>(), "@own \"Hi\"");
+        assert!(ctx.memory(|m| m.has_focus(id)));
     }
     #[test]
     fn effective_timing_shows_the_h3_canvas_and_aligned_duration() {

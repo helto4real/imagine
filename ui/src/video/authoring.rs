@@ -526,6 +526,7 @@ pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index
                 .desired_width(f32::INFINITY),
         );
         control(ui, "story-scene-description", &r);
+        super::inspector::dialogue_warnings(ui, &source.description, r.id);
         ui.label("Ambient sound");
         let r = ui.add(
             egui::TextEdit::singleline(&mut source.ambient_sound).desired_width(f32::INFINITY),
@@ -594,6 +595,7 @@ pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index
                     .desired_width(f32::INFINITY),
             );
             control(ui, &format!("story-section-{i}"), &r);
+            super::inspector::dialogue_warnings(ui, &section.prompt, r.id);
             if !images.is_empty() {
                 ui.push_id(("story-section-images", i), |ui| {
                     egui::CollapsingHeader::new(format!(

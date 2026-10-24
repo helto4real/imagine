@@ -2,11 +2,12 @@
 //! macro, quoted words after `@name` without a delivery word, and quoted text
 //! with no speaker. They are advisory; compilation still treats the text as written.
 
-/// A dialogue warning; `token` is the matched text.
+/// A dialogue warning; `token` is the matched text, starting at byte `at`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DialogueIssue {
     pub code: &'static str,
     pub token: String,
+    pub at: usize,
 }
 impl DialogueIssue {
     pub fn message(&self) -> &'static str {
@@ -210,6 +211,7 @@ pub fn issues(text: &str) -> Vec<DialogueIssue> {
                 DialogueIssue {
                     code: INVALID_SYNTAX,
                     token: text[at..end].into(),
+                    at,
                 },
             ));
         }
@@ -230,6 +232,7 @@ pub fn issues(text: &str) -> Vec<DialogueIssue> {
                 DialogueIssue {
                     code: SPEECH_VERB_REQUIRED,
                     token: text[at..end].into(),
+                    at,
                 },
             ));
         }
@@ -244,6 +247,7 @@ pub fn issues(text: &str) -> Vec<DialogueIssue> {
                         DialogueIssue {
                             code: QUOTED_TEXT_WITHOUT_SPEAKER,
                             token: text[p..end].into(),
+                            at: p,
                         },
                     ));
                 }
