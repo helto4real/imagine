@@ -86,6 +86,89 @@ pub(super) struct State {
     library_error: Option<String>,
     library_nonce: u64,
     import_error: Option<String>,
+    library_sort: super::library::Sort,
+}
+/// A type glyph where an image thumbnail would be.
+fn placeholder(ui: &mut egui::Ui, kind: &MediaKind) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(112., 80.), egui::Sense::hover());
+    ui.painter().rect_filled(rect, 4., helto::FIELD);
+    let glyph = egui::Rect::from_center_size(rect.center(), egui::vec2(24., 24.));
+    let icon = match kind {
+        MediaKind::Video => crate::icons::Icon::Video,
+        MediaKind::Audio => crate::icons::Icon::Audio,
+        _ => crate::icons::Icon::Image,
+    };
+    crate::icons::paint(ui.painter(), glyph, icon, helto::DIM);
+}
+/// `count` cards in as many columns as fit, as the Library grid lays them out.
+fn picker_grid(
+    ui: &mut egui::Ui,
+    id: &str,
+    count: usize,
+    mut card: impl FnMut(&mut egui::Ui, usize),
+) {
+    let columns = ((ui.available_width() + 8.) / 128.).floor().max(1.) as usize;
+    egui::Grid::new(id).spacing([8., 8.]).show(ui, |ui| {
+        for n in 0..count {
+            card(ui, n);
+            if (n + 1) % columns == 0 {
+                ui.end_row();
+            }
+        }
+    });
+}
+/// Media the target already uses, shown as "Already added", as in Director.
+fn already_added(project: &VideoProject, target: &Target) -> BTreeSet<AssetId> {
+    match target {
+        Target::ReferenceImage(id) | Target::ReferenceVoice(id) => project
+            .creative
+            .references
+            .iter()
+            .filter(|r| &r.id == id)
+            .flat_map(|r| {
+                if matches!(target, Target::ReferenceImage(_)) {
+                    r.images.iter().map(|i| i.asset.clone()).collect::<Vec<_>>()
+                } else {
+                    r.voice.iter().flat_map(|v| v.assets.clone()).collect()
+                }
+            })
+            .collect(),
+        Target::Generation {
+            section: Some(section),
+            ..
+        } => project
+            .creative
+            .sections
+            .get(section)
+            .into_iter()
+            .flat_map(|s| {
+                s.images
+                    .iter()
+                    .map(|i| i.asset.clone())
+                    .chain(s.videos.iter().map(|v| v.asset.clone()))
+            })
+            .collect(),
+        Target::Generation {
+            scene,
+            section: None,
+            ..
+        } => project
+            .scene(scene)
+            .into_iter()
+            .flat_map(|s| s.bindings.iter().map(|b| b.asset.clone()))
+            .collect(),
+        _ => BTreeSet::new(),
+    }
+}
+/// Whether a Library media row is already in the project as one of `added`.
+fn library_added(project: Option<&VideoProject>, added: &BTreeSet<AssetId>, entry: &Value) -> bool {
+    project.is_some_and(|p| {
+        added.iter().filter_map(|id| p.assets.get(id)).any(|a| {
+            a.library_source.as_ref().is_some_and(|s| {
+                entry["entry_id"] == s.entry_id && entry["resource_id"] == s.resource_id
+            })
+        })
+    })
 }
 impl State {
     pub(super) fn finish_import(&mut self, target: &Target, error: Option<String>) {
@@ -262,6 +345,66 @@ fn binding(asset: AssetId, role: InputRole) -> Binding {
     }
 }
 impl ImagineApp {
+    /// One picker card: the media's thumbnail or type, its name and, when the
+    /// target already uses it, "Already added" instead of being choosable.
+    #[allow(clippy::too_many_arguments)]
+    fn picker_card(
+        &mut self,
+        ui: &mut egui::Ui,
+        salt: (&str, usize),
+        selected: bool,
+        added: bool,
+        name: &str,
+        thumbnail: impl FnOnce(&mut Self, &mut egui::Ui),
+    ) -> egui::Response {
+        let card = egui::Frame::new()
+            .inner_margin(4.)
+            .corner_radius(4.)
+            .fill(if selected {
+                helto::FIELD
+            } else {
+                egui::Color32::TRANSPARENT
+            })
+            .show(ui, |ui| {
+                ui.vertical(|ui| {
+                    ui.set_width(112.);
+                    if added {
+                        ui.set_opacity(0.5);
+                    }
+                    thumbnail(self, ui);
+                    ui.add(egui::Label::new(name).truncate());
+                    if added {
+                        ui.weak("Already added");
+                    }
+                });
+            });
+        let r = ui.interact(
+            card.response.rect,
+            ui.id().with(("picker-card", salt)),
+            if added {
+                egui::Sense::hover()
+            } else {
+                egui::Sense::click()
+            },
+        );
+        let r = if added {
+            r.on_hover_text("Already added")
+        } else {
+            r.on_hover_text("Double-click to use")
+        };
+        r.widget_info(|| {
+            egui::WidgetInfo::selected(egui::WidgetType::SelectableLabel, !added, selected, name)
+        });
+        if selected {
+            ui.painter().rect_stroke(
+                card.response.rect,
+                4,
+                egui::Stroke::new(1.5, helto::ACCENT),
+                egui::StrokeKind::Inside,
+            );
+        }
+        r
+    }
     pub(super) fn timeline_pick_media(&mut self, target: Target) {
         if self.timeline.document.is_none() && !matches!(target, Target::LibraryCharacter { .. }) {
             return;
@@ -329,51 +472,121 @@ impl ImagineApp {
                     if state.library_id.is_none(){ui.weak("Choose an Imagine library.");}
                     if state.library_loading{ui.spinner();}
                     if let Some(error)=&state.library_error{ui.colored_label(helto::ERROR,error);}
-                    egui::ScrollArea::vertical().id_salt("picker-library").max_height(350.).show(ui,|ui|{
-                        for (i,entry) in state.library_assets.iter().enumerate(){
-                            let Ok(kind)=serde_json::from_value::<MediaKind>(entry["kind"].clone()) else{continue;};
-                            let name=entry["name"].as_str().unwrap_or("");
-                            if target.kind().as_ref().is_some_and(|k|k!=&kind)||!name.to_lowercase().contains(&state.search.to_lowercase()){continue;}
-                            if kind==MediaKind::Image {let library=state.library_id.as_deref().unwrap_or("");let resource=entry["resource_id"].as_str().unwrap_or("");let eid=entry["entry_id"].as_str().unwrap_or("");let rev=entry["entry_revision"].as_u64().unwrap_or(0);let asset=Asset{library_source:None,name:name.into(),id:AssetId(format!("library-{library}-{eid}-{rev}-{resource}")),revision:rev,kind:kind.clone()};let project=ProjectId(format!("library-{library}"));self.timeline_thumbnail_path(ui,&project,&asset,Some(format!("/v1/video/libraries/{library}/entries/{eid}/revisions/{rev}/media/{resource}")));}
-                            let mut selected=state.library_selected.contains(&i);let r=ui.checkbox(&mut selected,name);control(ui,&format!("media-picker-library-asset-{i}"),&r);
-                            if r.changed(){state.library_selected.remove(&i);if selected{if matches!(target,Target::AudioClip(_) | Target::Take(_)){state.library_selected.clear();}state.library_selected.insert(i);}}
-                        }
+                    ui.horizontal(|ui| {
+                        ui.label("Sort");
+                        let r = egui::ComboBox::from_id_salt("media-picker-sort")
+                            .selected_text(state.library_sort.label())
+                            .show_ui(ui, |ui| {
+                                for sort in super::library::Sort::ALL {
+                                    ui.selectable_value(&mut state.library_sort, sort, sort.label());
+                                }
+                            });
+                        control(ui, "media-picker-sort", &r.response);
+                    });
+                    let project = document.as_ref().map(|d| &d.project);
+                    let added = project.map(|p| already_added(p, &target)).unwrap_or_default();
+                    let needle = state.search.to_lowercase();
+                    let mut rows: Vec<(usize, Value)> = state
+                        .library_assets
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, e)| {
+                            serde_json::from_value::<MediaKind>(e["kind"].clone()).is_ok_and(|kind| {
+                                target.kind().as_ref().is_none_or(|k| k == &kind)
+                            }) && e["name"].as_str().unwrap_or("").to_lowercase().contains(&needle)
+                        })
+                        .map(|(i, e)| (i, e.clone()))
+                        .collect();
+                    let name = |e: &Value| e["name"].as_str().unwrap_or("").to_lowercase();
+                    let when = |(i, e): &(usize, Value)| (e["updated_ms"].as_u64().unwrap_or(0), *i);
+                    match state.library_sort {
+                        super::library::Sort::Recent => rows.sort_by_key(|r| std::cmp::Reverse(when(r))),
+                        super::library::Sort::Oldest => rows.sort_by_key(when),
+                        super::library::Sort::NameAz => rows.sort_by_key(|(_, e)| name(e)),
+                        super::library::Sort::NameZa => rows.sort_by_key(|(_, e)| std::cmp::Reverse(name(e))),
+                    }
+                    if state.library_id.is_some() && rows.is_empty() && !state.library_loading {
+                        ui.weak("No matching media in this library.");
+                    }
+                    let library = state.library_id.clone().unwrap_or_default();
+                    let single = matches!(target, Target::AudioClip(_) | Target::Take(_));
+                    egui::ScrollArea::vertical().id_salt("picker-library").max_height(350.).show(ui, |ui| {
+                        picker_grid(ui, "picker-library-grid", rows.len(), |ui, n| {
+                            let (i, entry) = &rows[n];
+                            let kind = serde_json::from_value::<MediaKind>(entry["kind"].clone()).unwrap_or(MediaKind::Image);
+                            let label = entry["name"].as_str().unwrap_or("").to_owned();
+                            let is_added = library_added(project, &added, entry);
+                            let r = self.picker_card(ui, ("library", *i), state.library_selected.contains(i), is_added, &label, |this, ui| {
+                                if kind == MediaKind::Image {
+                                    let resource = entry["resource_id"].as_str().unwrap_or("");
+                                    let eid = entry["entry_id"].as_str().unwrap_or("");
+                                    let rev = entry["entry_revision"].as_u64().unwrap_or(0);
+                                    let asset = Asset { library_source: None, name: label.clone(), id: AssetId(format!("library-{library}-{eid}-{rev}-{resource}")), revision: rev, kind: kind.clone() };
+                                    let project = ProjectId(format!("library-{library}"));
+                                    this.timeline_thumbnail_path(ui, &project, &asset, Some(format!("/v1/video/libraries/{library}/entries/{eid}/revisions/{rev}/media/{resource}")));
+                                } else {
+                                    placeholder(ui, &kind);
+                                }
+                            });
+                            control(ui, &format!("media-picker-library-asset-{i}"), &r);
+                            if r.clicked() || r.double_clicked() {
+                                let on = !state.library_selected.contains(i) || r.double_clicked();
+                                if single || r.double_clicked() {
+                                    state.library_selected.clear();
+                                }
+                                state.library_selected.remove(i);
+                                if on {
+                                    state.library_selected.insert(*i);
+                                }
+                            }
+                            if r.double_clicked() {
+                                use_selection = true;
+                            }
+                        });
                     });
                 } else if state.tab==SourceTab::Folders {ui.weak("Import selected files into this field.");}
                 if state.tab==SourceTab::Project && let Some(document)=&document {
-                egui::ScrollArea::vertical()
-                    .max_height(350.)
-                    .show(ui, |ui| {
-                        for (i, asset) in document
-                            .project
-                            .assets
-                            .values()
-                            .filter(|a| matches(a, target.kind().as_ref(), &state.search))
-                            .enumerate()
-                        {
-                            self.timeline_thumbnail(ui, document, asset);
-                            let mut selected = state.selected.contains(&asset.id);
-                            let r = ui.checkbox(
-                                &mut selected,
-                                if asset.name.is_empty() {
-                                    format!("{:?} · {}", asset.kind, asset.id.0)
-                                } else {
-                                    asset.name.clone()
-                                },
-                            );
-                            control(ui, &format!("media-picker-asset-{i}"), &r);
-                            control(ui, &format!("media-picker-id-{}", asset.id.0), &r);
-                            if r.changed() {
-                                state.selected.remove(&asset.id);
-                                if selected {
-                                    if matches!(target, Target::AudioClip(_) | Target::Take(_)) {
-                                        state.selected.clear();
-                                    }
-                                    state.selected.insert(asset.id.clone());
-                                }
+                let added = already_added(&document.project, &target);
+                let assets: Vec<Asset> = document
+                    .project
+                    .assets
+                    .values()
+                    .filter(|a| matches(a, target.kind().as_ref(), &state.search))
+                    .cloned()
+                    .collect();
+                let single = matches!(target, Target::AudioClip(_) | Target::Take(_));
+                egui::ScrollArea::vertical().id_salt("picker-project").max_height(350.).show(ui, |ui| {
+                    picker_grid(ui, "picker-project-grid", assets.len(), |ui, i| {
+                        let asset = &assets[i];
+                        let label = if asset.name.is_empty() {
+                            format!("{:?} · {}", asset.kind, asset.id.0)
+                        } else {
+                            asset.name.clone()
+                        };
+                        let r = self.picker_card(ui, ("project", i), state.selected.contains(&asset.id), added.contains(&asset.id), &label, |this, ui| {
+                            if asset.kind == MediaKind::Image {
+                                this.timeline_thumbnail(ui, document, asset);
+                            } else {
+                                placeholder(ui, &asset.kind);
+                            }
+                        });
+                        control(ui, &format!("media-picker-asset-{i}"), &r);
+                        control(ui, &format!("media-picker-id-{}", asset.id.0), &r);
+                        if r.clicked() || r.double_clicked() {
+                            let on = !state.selected.contains(&asset.id) || r.double_clicked();
+                            if single || r.double_clicked() {
+                                state.selected.clear();
+                            }
+                            state.selected.remove(&asset.id);
+                            if on {
+                                state.selected.insert(asset.id.clone());
                             }
                         }
+                        if r.double_clicked() {
+                            use_selection = true;
+                        }
                     });
+                });
                 }
                 if state.tab==SourceTab::Project && document.is_none() {ui.weak("No project is open. Choose media from Library or Folders.");}
                 if let Some(error) = &state.import_error {
@@ -390,7 +603,7 @@ impl ImagineApp {
                         self.timeline.busy.then_some("Wait for the current timeline operation.").or((!has_selection).then_some("Select media first.")),
                     );
                     control(ui, "media-picker-use", &r);
-                    use_selection = r.clicked();
+                    use_selection |= r.clicked();
                     let r = helto::icon_button(ui, crate::icons::Icon::Close, "Cancel", false);
                     control(ui, "media-picker-cancel", &r);
                     if r.clicked() {
@@ -644,6 +857,105 @@ pub(super) mod tests {
             "new-own-result"
         );
         assert!(app.timeline.media_picker.library_selected.contains(&0));
+    }
+    #[test]
+    fn picker_cards_mark_media_already_added_and_a_double_click_uses_one() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.client = None;
+        let mut p = project();
+        p.assets.get_mut(&AssetId("image".into())).unwrap().name = "Own first".into();
+        p.assets.insert(
+            AssetId("second".into()),
+            Asset {
+                library_source: None,
+                name: "Own second".into(),
+                id: AssetId("second".into()),
+                revision: 1,
+                kind: MediaKind::Image,
+            },
+        );
+        p.creative.references[0]
+            .images
+            .push(imagine_video_contract::creative::ReferenceImage {
+                id: "own-image".into(),
+                asset: AssetId("image".into()),
+                enabled: true,
+                preview: true,
+                contribution: String::new(),
+            });
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.document = Some(Snapshot::with(p, json!({})));
+        app.timeline_pick_media(Target::ReferenceImage("cast".into()));
+        // A double-click is two clicks close in time, so frames carry a clock.
+        let clock = std::cell::Cell::new(0.);
+        let frame = |app: &mut ImagineApp, events: Vec<egui::Event>| {
+            clock.set(clock.get() + 0.02);
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    time: Some(clock.get()),
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 900.),
+                    )),
+                    events,
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            output.textures_delta.clear();
+            output.platform_output.accesskit_update.unwrap().nodes
+        };
+        let mut nodes = vec![];
+        for _ in 0..3 {
+            nodes = frame(&mut app, vec![]);
+        }
+        let card = |nodes: &[(egui::accesskit::NodeId, egui::accesskit::Node)], name: &str| {
+            nodes
+                .iter()
+                .find(|(_, n)| n.label() == Some(name) && n.role() != egui::accesskit::Role::Label)
+                .map(|(_, n)| n.clone())
+                .unwrap_or_else(|| panic!("{name}"))
+        };
+        assert!(
+            card(&nodes, "Own first").is_disabled(),
+            "the character already uses it"
+        );
+        assert!(
+            nodes
+                .iter()
+                .any(|(_, n)| n.value().or(n.label()) == Some("Already added"))
+        );
+        let second = card(&nodes, "Own second");
+        assert!(!second.is_disabled());
+        let b = second.bounds().unwrap();
+        let pos = egui::pos2(((b.x0 + b.x1) / 2.) as f32, ((b.y0 + b.y1) / 2.) as f32);
+        for _ in 0..2 {
+            for pressed in [true, false] {
+                frame(
+                    &mut app,
+                    vec![
+                        egui::Event::PointerMoved(pos),
+                        egui::Event::PointerButton {
+                            pos,
+                            button: egui::PointerButton::Primary,
+                            pressed,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                );
+            }
+        }
+        frame(&mut app, vec![]);
+        assert!(
+            !app.timeline.media_picker.open,
+            "a double-click used the image"
+        );
     }
     pub(in crate::app::timeline) fn project() -> VideoProject {
         let mut p = VideoProject::create(CreateProject {

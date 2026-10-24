@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 use super::VideoProject;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(super) enum Sort {
+pub(in crate::app::timeline) enum Sort {
     #[default]
     Recent,
     Oldest,
@@ -14,8 +14,9 @@ pub(super) enum Sort {
     NameZa,
 }
 impl Sort {
-    pub(super) const ALL: [Self; 4] = [Self::Recent, Self::Oldest, Self::NameAz, Self::NameZa];
-    pub(super) fn label(self) -> &'static str {
+    pub(in crate::app::timeline) const ALL: [Self; 4] =
+        [Self::Recent, Self::Oldest, Self::NameAz, Self::NameZa];
+    pub(in crate::app::timeline) fn label(self) -> &'static str {
         match self {
             Self::Recent => "Recently updated",
             Self::Oldest => "Oldest first",

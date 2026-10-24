@@ -4,6 +4,7 @@ use crate::icons::Icon;
 use std::collections::{BTreeMap, BTreeSet};
 #[path = "library_filters.rs"]
 mod filters;
+pub(super) use filters::Sort;
 #[derive(Clone, Copy)]
 pub(in crate::app) enum Reply {
     Catalog,
