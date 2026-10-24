@@ -81,6 +81,9 @@ async fn review(
 struct Expand {
     schema_version: u32,
     start_index: usize,
+    /// Regenerates only that Scene.
+    #[serde(default)]
+    only: bool,
 }
 async fn expand(
     State(app): State<App>,
@@ -95,6 +98,7 @@ async fn expand(
     Ok(Json(json!(service.authoring.expand(
         &id,
         request.start_index,
+        request.only,
         app.enhancement.clone()
     )?)))
 }

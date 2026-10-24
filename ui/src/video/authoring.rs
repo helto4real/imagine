@@ -318,6 +318,17 @@ pub(super) fn authoring_draft_actions(
     }
 }
 type Call = (Reply, bool, String, Option<Value>);
+/// Saves the reviewed `draft` and regenerates only Scene `index`.
+pub(super) fn regenerate_call(draft: &Draft, index: usize) -> Call {
+    (
+        Reply::Draft,
+        true,
+        format!("/v1/video/authoring/{}/review", draft.id),
+        Some(
+            json!({"schema_version":1,"outline":draft.outline,"scenes":draft.scenes,"text":draft.text,"then_regenerate":index}),
+        ),
+    )
+}
 /// Saves the reviewed `draft` and applies it to the project.
 fn apply_call(draft: &Draft) -> Call {
     (
@@ -1338,12 +1349,19 @@ impl ImagineApp {
                     .as_object_mut()
                     .unwrap()
                     .remove("then_expand");
+                let only = body
+                    .as_mut()
+                    .unwrap()
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("then_regenerate");
                 let apply = body
                     .as_mut()
                     .unwrap()
                     .as_object_mut()
                     .unwrap()
                     .remove("then_apply");
+                let expand = only.map(|i| (i, true)).or(expand.map(|i| (i, false)));
                 self.authoring_review_then(ctx, kind, path, body.unwrap(), expand, apply);
             } else {
                 self.authoring_call(ctx, kind, post, path, body);
@@ -1356,7 +1374,7 @@ impl ImagineApp {
         kind: Reply,
         path: String,
         body: Value,
-        expand: Option<Value>,
+        expand: Option<(Value, bool)>,
         apply: Option<Value>,
     ) {
         let (Some(client), Some(session)) = (self.client.clone(), self.timeline.session.clone())
@@ -1375,10 +1393,10 @@ impl ImagineApp {
                     .timeline_request(&session, true, &path, Some(&body))
                     .await?;
                 let base = path.trim_end_matches("/review");
-                let (path, body) = if let Some(index) = expand {
+                let (path, body) = if let Some((index, only)) = expand {
                     (
                         format!("{base}/expand"),
-                        json!({"schema_version":1,"start_index":index}),
+                        json!({"schema_version":1,"start_index":index,"only":only}),
                     )
                 } else {
                     (

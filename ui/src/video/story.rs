@@ -188,6 +188,21 @@ impl ImagineApp {
             ui.horizontal(|ui| {
                 ui.label(helto::section(&format!("Scene {}", index + 1)));
                 status_pill(ui, status);
+                if status.reviewable() {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let r = helto::action(
+                            ui,
+                            crate::icons::Icon::Retry,
+                            "Regenerate Scene",
+                            false,
+                            busy.then_some("Wait for the current proposal."),
+                        );
+                        control(ui, "story-regenerate", &r);
+                        if r.clicked() {
+                            actions.call = Some(regenerate_call(draft, index));
+                        }
+                    });
+                }
                 if outline_editable(draft) {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Right to left: Remove is the outermost.
@@ -608,9 +623,19 @@ mod tests {
         for _ in 0..3 {
             nodes = frame(&mut app, vec![]);
         }
-        for text in ["3 Storyboard", "1 Story brief ✓", "Ready", "Ready to apply"] {
+        for text in [
+            "3 Storyboard",
+            "1 Story brief ✓",
+            "Ready",
+            "Ready to apply",
+            "Regenerate Scene",
+        ] {
             assert!(has(&nodes, text), "{text}");
         }
+        let d = app.timeline.authoring.draft.as_ref().unwrap();
+        let (_, _, path, body) = super::super::authoring::regenerate_call(d, 1);
+        assert!(path.ends_with("/review"));
+        assert_eq!(body.unwrap()["then_regenerate"], 1);
         click(&mut app, "Apply reviewed proposal");
         assert!(app.timeline.authoring.confirm_replace);
         assert!(!app.timeline.authoring.busy, "nothing is applied yet");

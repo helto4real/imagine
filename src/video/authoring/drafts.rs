@@ -26,6 +26,17 @@ struct Job {
     cancel: CancellationToken,
     generation: u64,
     grounding: super::grounding::Grounding,
+    /// The Scene a single-Scene regeneration replaces, put back if it fails
+    /// or is cancelled.
+    restore: Option<(usize, Option<StoryScene>)>,
+}
+/// Review when every Scene is expanded; otherwise the outline is still open.
+fn settled(draft: &Draft) -> Phase {
+    if draft.scenes.iter().all(Option::is_some) {
+        Phase::Review
+    } else {
+        Phase::Outline
+    }
 }
 fn fault(code: &'static str) -> Fault {
     Fault::new(422, code)
@@ -145,6 +156,7 @@ impl Service {
                 cancel: CancellationToken::new(),
                 generation: 0,
                 grounding,
+                restore: None,
             },
         );
         drop(jobs);
@@ -235,6 +247,10 @@ impl Service {
             j.generation += 1;
             j.draft.phase = Phase::Cancelled;
             j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
+            if let Some((index, scene)) = j.restore.take() {
+                j.draft.scenes[index] = scene;
+                j.draft.phase = settled(&j.draft);
+            }
         }
         Ok(j.draft.clone())
     }
@@ -291,10 +307,13 @@ impl Service {
         j.draft = d;
         Ok(j.draft.clone())
     }
+    /// Expands from `index` on, or with `only` regenerates just that Scene,
+    /// keeping the others, as Director's Regenerate Scene does.
     pub fn expand(
         self: &Arc<Self>,
         id: &str,
         index: usize,
+        only: bool,
         transport: Arc<ProviderService>,
     ) -> Result<Draft, Fault> {
         let mut jobs = self.jobs.lock().unwrap();
@@ -311,12 +330,15 @@ impl Service {
             .ok_or(fault("story_outline_required"))?;
         if j.draft.phase == Phase::Applied
             || index >= outline.scenes.len()
-            || j.draft.scenes[..index].iter().any(Option::is_none)
+            || (!only && j.draft.scenes[..index].iter().any(Option::is_none))
         {
             return Err(fault("invalid_story_retry_index"));
         }
-        for s in &mut j.draft.scenes[index..] {
-            *s = None;
+        j.restore = only.then(|| (index, j.draft.scenes[index].take()));
+        if !only {
+            for s in &mut j.draft.scenes[index..] {
+                *s = None;
+            }
         }
         j.draft.failure = None;
         j.draft.failed_index = None;
@@ -432,7 +454,13 @@ impl Service {
             }
             j.draft.phase = Phase::Running;
         }
-        let count = if expand { draft.scenes.len() } else { 1 };
+        let count = if !expand {
+            1
+        } else if self.jobs.lock().unwrap()[&id].restore.is_some() {
+            start + 1
+        } else {
+            draft.scenes.len()
+        };
         for index in start..count {
             let (mut key, operation, mut user, protected) = if expand {
                 let jobs = self.jobs.lock().unwrap();
@@ -636,9 +664,15 @@ impl Service {
                 Ok(())
             });
             if let Err(code) = result {
-                j.draft.phase = Phase::Failed;
                 j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
                 j.draft.failure = Some(code.into());
+                // A failed regeneration keeps the Scene it would have replaced.
+                if let Some((index, scene)) = j.restore.take() {
+                    j.draft.scenes[index] = scene;
+                    j.draft.phase = settled(&j.draft);
+                    return;
+                }
+                j.draft.phase = Phase::Failed;
                 j.draft.failed_index = expand.then_some(index);
                 return;
             }
@@ -649,8 +683,11 @@ impl Service {
             return;
         }
         j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
+        j.restore = None;
         j.draft.phase = if !expand && draft.request.operation == Operation::Outline {
             Phase::Outline
+        } else if expand {
+            settled(&j.draft)
         } else {
             Phase::Review
         };

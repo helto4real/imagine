@@ -952,3 +952,74 @@ async fn inline_enhancement_uses_and_applies_only_the_reviewed_scene_field() {
     worker.abort();
     let _ = worker.await;
 }
+#[tokio::test]
+async fn regenerating_one_scene_keeps_the_others_and_a_failure_restores_it() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "regenerate").await;
+    let (url, worker, state) = fixture::spawn().await;
+    let project = configured(&h, &url).await;
+    let start = request(&h, &project, "outline", "koboldcpp").await;
+    let (code, d) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/projects/{project}/authoring"),
+        Some(start),
+    )
+    .await;
+    assert_eq!(code, 202, "{d}");
+    let id = d["id"].as_str().unwrap();
+    wait(&h, id, "outline").await;
+    let expand = format!("/v1/video/authoring/{id}/expand");
+    let body = |index: usize, only: bool| {
+        Some(json!({"schema_version":1,"start_index":index,"only":only}))
+    };
+    assert_eq!(call(&h, "POST", &expand, body(0, false)).await.0, 200);
+    let mut reviewed = wait(&h, id, "review").await;
+    // Both Scenes are edited here; only the second is regenerated.
+    reviewed["scenes"][0]["description"] = json!("Own kept first Scene");
+    reviewed["scenes"][1]["description"] = json!("Own replaced second Scene");
+    let review = format!("/v1/video/authoring/{id}/review");
+    let edits = json!({"schema_version":1,"outline":reviewed["outline"],"scenes":reviewed["scenes"],"text":null});
+    assert_eq!(call(&h, "POST", &review, Some(edits)).await.0, 200);
+    let (code, running) = call(&h, "POST", &expand, body(1, true)).await;
+    assert_eq!(code, 200, "{running}");
+    assert!(running["scenes"][1].is_null() && !running["scenes"][0].is_null());
+    let regenerated = wait(&h, id, "review").await;
+    assert_eq!(
+        regenerated["scenes"][0]["description"],
+        "Own kept first Scene"
+    );
+    assert_ne!(
+        regenerated["scenes"][1]["description"],
+        "Own replaced second Scene"
+    );
+    assert!(
+        regenerated["scenes"][1]["description"]
+            .as_str()
+            .unwrap()
+            .starts_with("Expanded")
+    );
+    // A failed regeneration puts the Scene back and leaves the review open.
+    state
+        .fail_second_once
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    assert_eq!(call(&h, "POST", &expand, body(1, true)).await.0, 200);
+    let restored = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            let (_, d) = call(&h, "GET", &format!("/v1/video/authoring/{id}"), None).await;
+            if d["failure"].is_string() && d["phase"] != "expanding" {
+                break d;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(restored["phase"], "review");
+    assert!(restored["failed_index"].is_null());
+    assert_eq!(restored["scenes"][1], regenerated["scenes"][1]);
+    assert_eq!(restored["scenes"][0], regenerated["scenes"][0]);
+    worker.abort();
+    let _ = worker.await;
+    stop(h).await;
+}
