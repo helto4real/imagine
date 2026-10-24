@@ -254,7 +254,12 @@ struct EditEntry {
     title: Option<String>,
     description: Option<String>,
     #[serde(default)]
+    tags: Option<Vec<String>>,
+    #[serde(default)]
     remove: bool,
+    /// Copies the entry instead of changing it.
+    #[serde(default)]
+    duplicate: bool,
 }
 async fn edit_entry(
     State(app): State<App>,
@@ -269,11 +274,18 @@ async fn edit_entry(
         library.document().revision,
         request.expected_library_revision,
     )?;
+    if request.duplicate {
+        let copy = library.duplicate_entry(&entry, request.expected_entry_revision)?;
+        let mut document = json!(library.document());
+        document["duplicate_id"] = json!(copy);
+        return Ok(Json(document));
+    }
     library.edit_entry(
         &entry,
         request.expected_entry_revision,
         request.title,
         request.description,
+        request.tags,
         request.remove,
     )?;
     Ok(Json(json!(library.document())))

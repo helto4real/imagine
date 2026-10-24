@@ -302,7 +302,34 @@ async fn standalone_library_asset_metadata_and_removal_preserve_project_and_sour
         download(&h, copied["id"].as_str().unwrap(), None).await.1,
         bytes
     );
-    let (status, removed) = call(&h, "POST", &edit_route, Some(json!({"schema_version":1,"expected_library_revision":2,"expected_entry_revision":2,"remove":true}))).await;
+    // Entries record when they changed, take tags and a description, and copy.
+    assert!(edited["entries"][0]["updated_ms"].as_u64().unwrap() > 0);
+    let tagging = json!({"schema_version":1,"expected_library_revision":2,"expected_entry_revision":2,
+        "tags":[" Own harbour ","own harbour","Dusk",""],"description":"Own pier at dusk"});
+    let (status, tagged) = call(&h, "POST", &edit_route, Some(tagging)).await;
+    assert_eq!(status, 200, "{tagged}");
+    assert_eq!(tagged["entries"][0]["tags"], json!(["Own harbour", "Dusk"]));
+    assert_eq!(tagged["entries"][0]["description"], "Own pier at dusk");
+    let duplicate = json!({"schema_version":1,"expected_library_revision":3,"expected_entry_revision":3,"duplicate":true});
+    let (status, copies) = call(&h, "POST", &edit_route, Some(duplicate)).await;
+    assert_eq!(status, 200, "{copies}");
+    let copy = copies["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|e| e["id"] == copies["duplicate_id"])
+        .unwrap()
+        .clone();
+    assert_eq!(copy["title"], "Renamed own asset copy");
+    assert_eq!(copy["tags"], tagged["entries"][0]["tags"]);
+    assert_eq!(copy["content"], tagged["entries"][0]["content"]);
+    let copy_route = format!(
+        "/v1/video/libraries/{id}/entries/{}/edit",
+        copy["id"].as_str().unwrap()
+    );
+    let (status, _) = call(&h, "POST", &copy_route, Some(json!({"schema_version":1,"expected_library_revision":4,"expected_entry_revision":1,"remove":true}))).await;
+    assert_eq!(status, 200);
+    let (status, removed) = call(&h, "POST", &edit_route, Some(json!({"schema_version":1,"expected_library_revision":5,"expected_entry_revision":3,"remove":true}))).await;
     assert_eq!(status, 200, "{removed}");
     assert!(removed["entries"].as_array().unwrap().is_empty());
     assert_eq!(
@@ -359,6 +386,8 @@ async fn library_picker_media_streams_and_copies_owned_sources_with_revision_bou
     let row = &index["assets"][0];
     assert_eq!(row["name"], "Own blue library source.png");
     assert_eq!(row["kind"], "image");
+    assert_eq!(row["entry_kind"], "project");
+    assert!(row["updated_ms"].as_u64().unwrap() > 0);
     let route = format!(
         "/v1/video/libraries/{id}/entries/{}/revisions/1/media/{}",
         row["entry_id"].as_str().unwrap(),

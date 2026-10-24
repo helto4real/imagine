@@ -372,6 +372,7 @@ fn private_library_metadata_stays_in_fixed_root_and_origin_is_not_copied() {
                 document.entries[0].revision,
                 Some("own changed title".into()),
                 None,
+                None,
                 false
             )
             .unwrap_err()

@@ -101,6 +101,40 @@ pub struct LibraryEntry {
     pub revision: u64,
     pub title: String,
     pub content: LibraryContent,
+    /// When the entry was last saved or edited, in milliseconds since the
+    /// epoch; 0 for entries saved before it was recorded.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub updated_ms: u64,
+    /// Tags and description of an asset or project; a character keeps its own.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
+}
+fn is_zero(value: &u64) -> bool {
+    *value == 0
+}
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64)
+}
+/// Trimmed, non-empty, unique tags, as the Library filters them.
+fn clean_tags(tags: Vec<String>) -> Result<Vec<String>, StorageError> {
+    let mut out: Vec<String> = vec![];
+    for tag in tags {
+        let tag = tag.trim().to_owned();
+        if tag.chars().count() > 64 {
+            return Err(StorageError::new("invalid_library_tag"));
+        }
+        if !tag.is_empty() && !out.iter().any(|t| t.eq_ignore_ascii_case(&tag)) {
+            out.push(tag);
+        }
+    }
+    if out.len() > 64 {
+        return Err(StorageError::new("invalid_library_tag"));
+    }
+    Ok(out)
 }
 impl LibraryEntry {
     fn resources(&self) -> Vec<&Resource> {
@@ -173,6 +207,9 @@ pub struct MediaEntry {
     pub resource_id: String,
     pub name: String,
     pub kind: MediaKind,
+    /// What saved it: an asset, a character or a project.
+    pub entry_kind: &'static str,
+    pub updated_ms: u64,
 }
 pub struct LibrarySession {
     document: LibraryDocument,
@@ -277,6 +314,12 @@ impl LibrarySession {
                         resource_id: resource.id.clone(),
                         name,
                         kind,
+                        entry_kind: match &entry.content {
+                            LibraryContent::Project(_) => "project",
+                            LibraryContent::Character(_) => "character",
+                            LibraryContent::Asset(_) => "asset",
+                        },
+                        updated_ms: entry.updated_ms,
                     })
                 })
             })
@@ -343,8 +386,10 @@ impl LibrarySession {
         expected: u64,
         title: Option<String>,
         description: Option<String>,
+        tags: Option<Vec<String>>,
         remove: bool,
     ) -> Result<(), StorageError> {
+        let tags = tags.map(clean_tags).transpose()?;
         self.entry(id, expected)?;
         let mut candidate = self.document.clone();
         candidate.revision = candidate
@@ -366,10 +411,24 @@ impl LibrarySession {
             if let Some(title) = title {
                 entry.title = title;
             }
-            if let (Some(description), LibraryContent::Character(c)) =
-                (description, &mut entry.content)
-            {
-                c.description = description;
+            entry.updated_ms = now_ms();
+            match &mut entry.content {
+                LibraryContent::Character(c) => {
+                    if let Some(description) = description {
+                        c.description = description;
+                    }
+                    if let Some(tags) = tags {
+                        c.tags = tags;
+                    }
+                }
+                _ => {
+                    if let Some(description) = description {
+                        entry.description = description;
+                    }
+                    if let Some(tags) = tags {
+                        entry.tags = tags;
+                    }
+                }
             }
         }
         if !remove {
@@ -395,6 +454,38 @@ impl LibrarySession {
         result?;
         self.sources = self.store.files(&self.document)?;
         Ok(())
+    }
+    /// A copy of an entry under a new id, sharing its stored media.
+    pub fn duplicate_entry(&mut self, id: &str, expected: u64) -> Result<String, StorageError> {
+        let source = self.entry(id, expected)?.clone();
+        let mut candidate = self.document.clone();
+        candidate.revision = candidate
+            .revision
+            .checked_add(1)
+            .filter(|r| *r <= MAX_INTEGER)
+            .ok_or_else(|| StorageError::new("revision_exhausted"))?;
+        let copy = format!("entry_{}", uuid::Uuid::new_v4().simple());
+        candidate.entries.push(LibraryEntry {
+            id: copy.clone(),
+            revision: 1,
+            title: format!("{} copy", source.title),
+            updated_ms: now_ms(),
+            ..source
+        });
+        candidate.validate()?;
+        let mut sources = bundle::clone_files(&self.sources)?;
+        let result = self.store.save(&candidate, &mut sources);
+        if result.is_ok()
+            || result
+                .as_ref()
+                .is_err_and(|e| e.code == "storage_durability_uncertain")
+        {
+            self.document = candidate;
+            self.sources = sources;
+        }
+        result?;
+        self.sources = self.store.files(&self.document)?;
+        Ok(copy)
     }
     pub fn save_project(
         &mut self,
@@ -459,12 +550,22 @@ impl LibrarySession {
         } else {
             (format!("entry_{}", uuid::Uuid::new_v4().simple()), 1)
         };
+        // A replaced entry keeps the tags and description given to it here.
+        let (tags, description) = candidate
+            .entries
+            .iter()
+            .find(|entry| entry.id == id)
+            .map(|e| (e.tags.clone(), e.description.clone()))
+            .unwrap_or_default();
         candidate.entries.retain(|entry| entry.id != id);
         candidate.entries.push(LibraryEntry {
             id: id.clone(),
             revision,
             title,
             content,
+            updated_ms: now_ms(),
+            tags,
+            description,
         });
         candidate.validate()?;
         let mut sources = bundle::clone_files(&self.sources)?;
