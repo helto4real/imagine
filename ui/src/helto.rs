@@ -298,6 +298,52 @@ pub(crate) fn action(
     action_width(ui, icon, label, primary, blocked, ICON_BUTTON)
 }
 
+/// Where media `texels` in size sits in `area`. Actual pixels shrinks the
+/// media only when it is larger than `area`, and then aligns texels to
+/// physical pixels; Fit fills `area`.
+pub(crate) fn media_rect(
+    area: egui::Rect,
+    texels: egui::Vec2,
+    zoom: crate::settings::MediaZoom,
+    pixels_per_point: f32,
+) -> egui::Rect {
+    let fit = (area.width() / texels.x)
+        .min(area.height() / texels.y)
+        .max(0.);
+    let actual = 1. / pixels_per_point;
+    let scale = match zoom {
+        crate::settings::MediaZoom::Actual => fit.min(actual),
+        crate::settings::MediaZoom::Fit => fit,
+    };
+    let size = texels * scale;
+    let mut min = area.center() - size * 0.5;
+    if scale == actual {
+        min = egui::pos2(
+            (min.x * pixels_per_point).round() / pixels_per_point,
+            (min.y * pixels_per_point).round() / pixels_per_point,
+        );
+    }
+    egui::Rect::from_min_size(min, size)
+}
+/// Switches the viewer between actual pixels and fitting it; the icon shows
+/// what a click does.
+pub(crate) fn zoom_toggle(
+    ui: &mut egui::Ui,
+    zoom: &mut crate::settings::MediaZoom,
+    blocked: Option<&str>,
+) -> egui::Response {
+    use crate::settings::MediaZoom;
+    let (icon, label, next) = match zoom {
+        MediaZoom::Actual => (Icon::Fit, "Fit to viewer", MediaZoom::Fit),
+        MediaZoom::Fit => (Icon::Actual, "Actual pixels", MediaZoom::Actual),
+    };
+    let response = action(ui, icon, label, false, blocked);
+    if response.clicked() {
+        *zoom = next;
+    }
+    response
+}
+
 /// Icon buttons are square; the main action of a toolbar may be wider.
 pub(crate) const ICON_BUTTON: f32 = 32.;
 
@@ -722,6 +768,31 @@ fn redact_text_accessibility(ctx: &egui::Context, id: egui::Id) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn media_shows_actual_pixels_unless_larger_than_the_viewer_or_fit() {
+        use crate::settings::MediaZoom::{Actual, Fit};
+        let area = egui::Rect::from_min_size(egui::pos2(10., 20.), egui::vec2(800., 600.));
+        // At 2 physical pixels per point, 640×360 texels take 320×180 points.
+        let small = media_rect(area, egui::vec2(640., 360.), Actual, 2.);
+        assert_eq!(small.size(), egui::vec2(320., 180.));
+        assert_eq!(small.center(), area.center());
+        let filled = media_rect(area, egui::vec2(640., 360.), Fit, 2.);
+        assert_eq!(filled.size(), egui::vec2(800., 450.));
+        // Larger media shrinks to fit either way.
+        let large = egui::vec2(3200., 1800.);
+        assert_eq!(
+            media_rect(area, large, Actual, 1.).size(),
+            egui::vec2(800., 450.)
+        );
+        assert_eq!(
+            media_rect(area, large, Fit, 1.).size(),
+            egui::vec2(800., 450.)
+        );
+        // Texels land on physical pixels: odd leftovers round the corner.
+        let odd = media_rect(area, egui::vec2(101., 51.), Actual, 1.);
+        assert_eq!(odd.min, egui::pos2(360., 295.));
+    }
 
     #[test]
     fn a_typed_number_settles_once_on_enter_and_keeps_focus_while_typing() {

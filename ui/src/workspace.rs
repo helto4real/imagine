@@ -1242,6 +1242,10 @@ impl ImagineApp {
             |ui| {
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     self.sampling_preview_controls(ui);
+                    // The desk's own buttons scale results; this one scales the preview.
+                    if self.sampling_preview.showing() {
+                        self.media_zoom_toggle(ui, true);
+                    }
                     if self.workspace == Workspace::Image {
                         self.command_button(ui, Command::EditImage);
                     }

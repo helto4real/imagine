@@ -17,6 +17,7 @@ fn preview(marker: u8) -> Preview {
     Preview {
         width: 2,
         height: 2,
+        source: [2, 2],
         frames: vec![vec![marker; 12]; 3],
         pcm: vec![],
         duration: 3. / 24.,

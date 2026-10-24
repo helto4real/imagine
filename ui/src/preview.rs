@@ -24,6 +24,7 @@ impl ImagineApp {
                 sheet_width: 1536,
                 upscale_target: Default::default(),
                 layout: Default::default(),
+                media_zoom: Default::default(),
             },
         );
         app.client = Some(Client::connect(&app.connection).unwrap());

@@ -284,6 +284,7 @@ impl Comparison {
         privacy: bool,
         entries: &[Entry],
         enabled: bool,
+        zoom: &mut crate::settings::MediaZoom,
     ) -> Result<Interaction, String> {
         let looped = self.clock.advance(Instant::now());
         if self.clock.started.is_none() {
@@ -409,7 +410,7 @@ impl Comparison {
                 let picture =
                     egui::Rect::from_min_max(egui::pos2(panel.left(), header.bottom()), panel.max);
                 if picture.height() > 0. {
-                    self.players[side].paint_frame(ui, picture);
+                    self.players[side].paint_frame(ui, picture, *zoom);
                 }
             }
         }
@@ -443,6 +444,8 @@ impl Comparison {
                     "{:.2} / {:.2} s",
                     self.clock.position, self.clock.duration
                 ));
+                let r = helto::zoom_toggle(ui, zoom, None);
+                control(ui, "comparison-zoom", &r);
                 for (side, label, name) in [
                     (None, "Muted", "comparison-muted"),
                     (Some(0), "Audio A", "comparison-audio-a"),
@@ -514,6 +517,7 @@ mod tests {
         let media = |duration, value| Preview {
             width: 2,
             height: 2,
+            source: [2, 2],
             frames: vec![vec![0; 12]; 48],
             pcm: vec![value; 128000]
                 .into_iter()
@@ -549,6 +553,7 @@ mod tests {
         let media = |duration, pcm| Preview {
             width: 2,
             height: 2,
+            source: [2, 2],
             frames: vec![vec![0; 12]; 48],
             pcm,
             duration,
@@ -580,6 +585,7 @@ mod tests {
         let media = |count, duration| Preview {
             width: 2,
             height: 2,
+            source: [2, 2],
             frames: vec![vec![0; 12]; count],
             pcm: vec![],
             duration,

@@ -289,10 +289,19 @@ impl State {
         self.open = open && !close_requested;
         save
     }
+    /// A frame has arrived for the running job, so the preview owns the viewer.
+    pub(super) fn showing(&self) -> bool {
+        self.job.is_some() && self.clip.is_some()
+    }
     /// Paints a complete animation silently; at most one GPU texture is retained.
-    fn viewer(&mut self, ui: &mut egui::Ui, privacy: bool) -> bool {
+    fn viewer(
+        &mut self,
+        ui: &mut egui::Ui,
+        privacy: bool,
+        zoom: crate::settings::MediaZoom,
+    ) -> bool {
         // A waiting job must not hide an existing Take. Only actual RGB takes over.
-        if self.job.is_none() || self.clip.is_none() {
+        if !self.showing() {
             self.texture = None;
             return false;
         }
@@ -336,13 +345,13 @@ impl State {
                         }
                     }
                     if let Some((_, texture)) = &self.texture {
-                        let size = texture.size_vec2();
-                        let scale = (picture.width() / size.x)
-                            .min(picture.height() / size.y)
-                            .max(0.);
-                        let destination =
-                            egui::Rect::from_center_size(picture.center(), size * scale);
-                        ui.painter().image(
+                        let destination = helto::media_rect(
+                            picture,
+                            texture.size_vec2(),
+                            zoom,
+                            ui.ctx().pixels_per_point(),
+                        );
+                        ui.painter().with_clip_rect(picture).image(
                             texture.id(),
                             destination,
                             egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1., 1.)),
@@ -622,7 +631,21 @@ impl ImagineApp {
         });
     }
     pub(super) fn sampling_preview_viewer(&mut self, ui: &mut egui::Ui) -> bool {
-        self.sampling_preview.viewer(ui, self.prefs.privacy_mode)
+        self.sampling_preview
+            .viewer(ui, self.prefs.privacy_mode, self.prefs.media_zoom)
+    }
+    /// Actual pixels or fit for the video viewer and sampling previews.
+    pub(super) fn media_zoom_toggle(&mut self, ui: &mut egui::Ui, picture: bool) {
+        let response = helto::zoom_toggle(
+            ui,
+            &mut self.prefs.media_zoom,
+            (!picture).then_some("Nothing with a picture is in the viewer."),
+        );
+        #[cfg(feature = "ui-preview")]
+        crate::app::timeline::qa::control(ui, "media-zoom".into(), &response);
+        if response.clicked() {
+            self.save_preferences();
+        }
     }
 }
 
@@ -928,7 +951,7 @@ mod tests {
                     ..Default::default()
                 },
                 |ui| {
-                    assert!(state.viewer(ui, privacy));
+                    assert!(state.viewer(ui, privacy, Default::default()));
                 },
             )
         };

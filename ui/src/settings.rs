@@ -55,6 +55,18 @@ pub struct Preferences {
     pub upscale_target: UpscaleTarget,
     #[serde(default)]
     pub layout: PanelLayout,
+    #[serde(default)]
+    pub media_zoom: MediaZoom,
+}
+/// How the video viewer and sampling previews scale their picture.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MediaZoom {
+    /// Actual pixels, shrunk to fit only when larger than the viewer.
+    #[default]
+    Actual,
+    /// Fills the viewer, enlarging smaller media.
+    Fit,
 }
 /// Pane sizes set by dragging dividers, in points; None uses the default.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -197,6 +209,7 @@ struct PublicUi {
     sheet_width: u32,
     upscale_target: UpscaleTarget,
     layout: PanelLayout,
+    media_zoom: MediaZoom,
 }
 impl Default for PublicUi {
     fn default() -> Self {
@@ -206,6 +219,7 @@ impl Default for PublicUi {
             sheet_width: sheet_width(),
             upscale_target: Default::default(),
             layout: Default::default(),
+            media_zoom: Default::default(),
         }
     }
 }
@@ -371,6 +385,7 @@ impl PreferencesStore {
                 sheet_width: public.sheet_width,
                 upscale_target: public.upscale_target,
                 layout: public.layout,
+                media_zoom: public.media_zoom,
             },
             warning,
         ))
@@ -433,6 +448,7 @@ impl PreferencesStore {
                 sheet_width: prefs.sheet_width,
                 upscale_target: prefs.upscale_target,
                 layout: prefs.layout,
+                media_zoom: prefs.media_zoom,
             })?,
             runtime,
         )?;
@@ -456,6 +472,7 @@ impl Preferences {
                 sheet_width: sheet_width(),
                 upscale_target: UpscaleTarget::default(),
                 layout: PanelLayout::default(),
+                media_zoom: MediaZoom::default(),
             });
         }
         serde_json::from_slice(&std::fs::read(path)?).context("Could not read ui-settings.json.")
@@ -900,6 +917,7 @@ mod tests {
                 dock: Some(260.),
                 ..Default::default()
             },
+            media_zoom: MediaZoom::Fit,
             generation: GenerationSettings {
                 steps: 24,
                 cfg_scale: 3.,

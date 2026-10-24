@@ -24,6 +24,9 @@ pub(in crate::app) use comparison::{
 pub struct Preview {
     width: usize,
     height: usize,
+    /// The media's own size in pixels; frames are decoded smaller when they
+    /// would not fit the memory budget.
+    source: [usize; 2],
     frames: Vec<Vec<u8>>,
     pcm: Vec<u8>,
     duration: f64,
@@ -36,6 +39,7 @@ impl Preview {
         Self {
             width: 8,
             height: 8,
+            source: [8, 8],
             frames: vec![vec![40; 8 * 8 * 3]; frames],
             pcm: vec![],
             duration: seconds,
@@ -51,6 +55,9 @@ pub struct Player {
     muted: bool,
 }
 impl Player {
+    pub fn has_picture(&self) -> bool {
+        !self.media.frames.is_empty()
+    }
     pub fn is_playing(&self) -> bool {
         self.started.is_some()
     }
@@ -126,7 +133,12 @@ impl Player {
         self.started = Some((Instant::now(), self.frame));
         Ok(())
     }
-    pub fn show(&mut self, ui: &mut egui::Ui, privacy: bool) -> Result<(), String> {
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        privacy: bool,
+        zoom: crate::settings::MediaZoom,
+    ) -> Result<(), String> {
         self.advance();
         let size = egui::vec2(ui.available_width(), (ui.available_height() - 38.).max(40.));
         let (rect, _response) = ui.allocate_exact_size(size, egui::Sense::hover());
@@ -142,7 +154,7 @@ impl Player {
                 helto::DIM,
             );
         } else {
-            self.paint_frame(ui, rect);
+            self.paint_frame(ui, rect, zoom);
         }
         if self.media.duration == 0. {
             return Ok(());
@@ -199,7 +211,7 @@ impl Player {
         Ok(())
     }
     /// Rendering only: A/B owns a common clock and a single independent audio source.
-    fn paint_frame(&mut self, ui: &egui::Ui, rect: egui::Rect) {
+    fn paint_frame(&mut self, ui: &egui::Ui, rect: egui::Rect, zoom: crate::settings::MediaZoom) {
         if !self.media.frames.is_empty() {
             let index = self.frame.min(self.media.frames.len() - 1);
             if self.texture.as_ref().is_none_or(|(n, _)| *n != index) {
@@ -214,10 +226,9 @@ impl Player {
                 ));
             }
             let texture = &self.texture.as_ref().unwrap().1;
-            let original = texture.size_vec2();
-            let scale = (rect.width() / original.x).min(rect.height() / original.y);
-            let image = egui::Rect::from_center_size(rect.center(), original * scale);
-            ui.painter().image(
+            let source = egui::vec2(self.media.source[0] as f32, self.media.source[1] as f32);
+            let image = helto::media_rect(rect, source, zoom, ui.ctx().pixels_per_point());
+            ui.painter().with_clip_rect(rect).image(
                 texture.id(),
                 image,
                 egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1., 1.)),
@@ -234,19 +245,26 @@ impl Player {
         }
     }
 }
+/// The largest side a preview texture gets.
+const MAX_SIDE: usize = 4096;
 pub fn decode(bytes: Vec<u8>, info: Value, cancel: Arc<AtomicBool>) -> Result<Preview, String> {
     if cancel.load(Ordering::Acquire) {
         return Err("Preview cancelled.".into());
     }
     let kind = info["media"]["kind"].as_str().unwrap_or("");
     if kind == "image" {
-        let image = image::load_from_memory(&bytes)
-            .map_err(|_| "Could not decode the image.")?
-            .thumbnail(960, 540)
-            .to_rgb8();
+        let image = image::load_from_memory(&bytes).map_err(|_| "Could not decode the image.")?;
+        let source = [image.width() as usize, image.height() as usize];
+        let image = if image.width().max(image.height()) > MAX_SIDE as u32 {
+            image.thumbnail(MAX_SIDE as u32, MAX_SIDE as u32)
+        } else {
+            image
+        }
+        .to_rgb8();
         return Ok(Preview {
             width: image.width() as usize,
             height: image.height() as usize,
+            source,
             frames: vec![image.into_raw()],
             pcm: vec![],
             duration: 0.,
@@ -276,15 +294,17 @@ pub fn decode(bytes: Vec<u8>, info: Value, cancel: Arc<AtomicBool>) -> Result<Pr
     file.write_all(&bytes)
         .map_err(|_| "Could not prepare preview.")?;
     drop(bytes);
+    let mut source = [0, 0];
     let (width, height, frames) = if kind == "video" {
         let width = info["width"].as_u64().unwrap_or(0) as usize;
         let height = info["height"].as_u64().unwrap_or(0) as usize;
         if width == 0 || height == 0 {
             return Err("Invalid video dimensions.".into());
         }
+        source = [width, height];
+        // Full size when the frames fit the budget, so actual pixels are exact.
         let budget = 512. * 1024. * 1024.;
-        let scale = (960. / width as f64)
-            .min(540. / height as f64)
+        let scale = (MAX_SIDE as f64 / width.max(height) as f64)
             .min((budget / (duration * 24. * width as f64 * height as f64 * 3.)).sqrt())
             .min(1.);
         let width = (width as f64 * scale).floor().max(1.) as usize;
@@ -336,6 +356,7 @@ pub fn decode(bytes: Vec<u8>, info: Value, cancel: Arc<AtomicBool>) -> Result<Pr
     Ok(Preview {
         width,
         height,
+        source,
         frames,
         pcm,
         duration,
@@ -435,7 +456,7 @@ impl ImagineApp {
         chrome::region(
             ui,
             "timeline-viewer-heading",
-            Rect::from_min_size(inner.min, egui::vec2(inner.width(), 24.)),
+            Rect::from_min_size(inner.min, egui::vec2(inner.width(), helto::ICON_BUTTON)),
             |ui| {
                 let number = self
                     .timeline
@@ -452,12 +473,19 @@ impl ImagineApp {
                         ui.spinner();
                     }
                     self.sampling_preview_controls(ui);
+                    let picture = self.sampling_preview.showing()
+                        || self
+                            .timeline
+                            .player
+                            .as_ref()
+                            .is_some_and(Player::has_picture);
+                    self.media_zoom_toggle(ui, picture);
                 });
             },
         );
         let picture = Rect::from_min_max(
-            inner.min + egui::vec2(0., 28.),
-            egui::pos2(inner.right(), (inner.bottom() - 78.).max(inner.top() + 50.)),
+            inner.min + egui::vec2(0., helto::ICON_BUTTON + 4.),
+            egui::pos2(inner.right(), (inner.bottom() - 78.).max(inner.top() + 58.)),
         );
         chrome::region(ui, "timeline-player", picture, |ui| {
             if self.timeline.comparison.is_some() {
@@ -468,7 +496,8 @@ impl ImagineApp {
                     player.pause();
                 }
             } else if let Some(player) = &mut self.timeline.player {
-                if let Err(error) = player.show(ui, self.prefs.privacy_mode) {
+                if let Err(error) = player.show(ui, self.prefs.privacy_mode, self.prefs.media_zoom)
+                {
                     self.timeline.error = Some(error);
                 }
             } else {
@@ -526,6 +555,7 @@ impl ImagineApp {
     ) {
         let bounds = ctx.content_rect();
         let mut interaction = None;
+        let mut zoomed = false;
         let response =
             egui::Modal::new(egui::Id::new("timeline-comparison-dialog")).show(ctx, |ui| {
                 ui.set_width((bounds.width() - 48.).clamp(260., 1100.));
@@ -535,12 +565,16 @@ impl ImagineApp {
                         .as_ref()
                         .map(|id| super::review::comparison_entries(d, id))
                         .unwrap_or_default();
-                    match comparison.show(
+                    let zoom = self.prefs.media_zoom;
+                    let shown = comparison.show(
                         ui,
                         self.prefs.privacy_mode,
                         &entries,
                         !self.timeline.busy && !self.timeline.admitting,
-                    ) {
+                        &mut self.prefs.media_zoom,
+                    );
+                    zoomed = self.prefs.media_zoom != zoom;
+                    match shown {
                         Ok(value) => interaction = Some(value),
                         Err(error) => self.timeline.error = Some(error),
                     }
@@ -561,6 +595,9 @@ impl ImagineApp {
                     });
                 }
             });
+        if zoomed {
+            self.save_preferences();
+        }
         if response.should_close() {
             self.timeline.clear_preview();
             return;
@@ -605,6 +642,7 @@ mod tests {
         let mut player = Player::new(Preview {
             width: 32,
             height: 32,
+            source: [32, 32],
             frames: vec![vec![90; 32 * 32 * 3]; 39],
             pcm: vec![],
             duration: 39. / 24.,
@@ -623,10 +661,140 @@ mod tests {
                 focused: false,
                 ..Default::default()
             },
-            |ui| player.show(ui, true).unwrap(),
+            |ui| player.show(ui, true, Default::default()).unwrap(),
         );
         result.textures_delta.clear();
         assert!(!player.is_playing());
+    }
+    #[test]
+    fn small_video_shows_actual_pixels_until_fit_to_the_viewer() {
+        // Decoded at half size to fit memory; actual pixels follow the source.
+        let mut player = Player::new(Preview {
+            width: 16,
+            height: 9,
+            source: [32, 18],
+            frames: vec![vec![90; 16 * 9 * 3]],
+            pcm: vec![],
+            duration: 0.,
+        });
+        let ctx = egui::Context::default();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(640., 400.));
+        let mut painted = |zoom| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(screen),
+                    ..Default::default()
+                },
+                |ui| player.show(ui, false, zoom).unwrap(),
+            );
+            output.textures_delta.clear();
+            output
+                .shapes
+                .iter()
+                .find_map(|c| match &c.shape {
+                    egui::Shape::Mesh(m) if m.texture_id != egui::TextureId::default() => {
+                        Some(m.calc_bounds().size())
+                    }
+                    _ => None,
+                })
+                .unwrap()
+        };
+        assert_eq!(
+            painted(crate::settings::MediaZoom::Actual),
+            egui::vec2(32., 18.)
+        );
+        let fit = painted(crate::settings::MediaZoom::Fit);
+        assert!(
+            fit.x > 600. && (fit.x / fit.y - 32. / 18.).abs() < 0.01,
+            "{fit:?}"
+        );
+    }
+    #[test]
+    fn the_viewer_header_switches_between_actual_pixels_and_fit() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.client = None;
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.document = Some(Snapshot::with(
+            super::super::media_picker::tests::project(),
+            json!({}),
+        ));
+        let (width, height) = (320, 180);
+        let frame: Vec<u8> = (0..width * height)
+            .flat_map(|i| {
+                let (x, y) = (i % width, i / width);
+                [(x * 255 / width) as u8, (y * 255 / height) as u8, 160]
+            })
+            .collect();
+        app.timeline.player = Some(Player::new(Preview {
+            width,
+            height,
+            source: [width, height],
+            frames: vec![frame],
+            pcm: vec![],
+            duration: 0.,
+        }));
+        let all = std::cell::RefCell::new(egui::FullOutput::default());
+        let run = |app: &mut ImagineApp, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 900.),
+                    )),
+                    events,
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            let nodes = output
+                .platform_output
+                .accesskit_update
+                .take()
+                .unwrap()
+                .nodes;
+            all.borrow_mut().append(output);
+            nodes
+        };
+        let button = |nodes: &Vec<(egui::accesskit::NodeId, egui::accesskit::Node)>, name: &str| {
+            nodes
+                .iter()
+                .find(|(_, n)| n.label() == Some(name))
+                .and_then(|(_, n)| n.bounds())
+                .map(|b| egui::pos2(((b.x0 + b.x1) / 2.) as f32, ((b.y0 + b.y1) / 2.) as f32))
+        };
+        let save = |name: &str| {
+            if let Some(dir) = std::env::var_os("IMAGINE_UI_PREVIEW_DIR") {
+                let output = all.take();
+                // A later render still needs the textures uploaded so far.
+                all.borrow_mut().textures_delta.set = output.textures_delta.set.clone();
+                crate::app::tests::render(&ctx, output, 1280, 900)
+                    .save(std::path::PathBuf::from(dir).join(name))
+                    .unwrap();
+            }
+        };
+        run(&mut app, vec![]);
+        let nodes = run(&mut app, vec![]);
+        save("viewer-actual.png");
+        let at = button(&nodes, "Fit to viewer").expect("zoom toggle");
+        let press = |pressed| egui::Event::PointerButton {
+            pos: at,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: Default::default(),
+        };
+        run(&mut app, vec![egui::Event::PointerMoved(at), press(true)]);
+        run(&mut app, vec![press(false)]);
+        assert_eq!(app.prefs.media_zoom, crate::settings::MediaZoom::Fit);
+        let nodes = run(&mut app, vec![egui::Event::PointerGone]);
+        assert!(button(&nodes, "Actual pixels").is_some());
+        save("viewer-fit.png");
+        all.borrow_mut().textures_delta.clear();
     }
     #[test]
     fn generic_non_h3_video_previews_and_precancel_never_decodes() {
@@ -652,6 +820,7 @@ mod tests {
         let info = json!({"mime_type":"video/x-matroska","width":64,"height":48,"media":{"kind":"video","audio":false,"duration":{"num":1,"den":5}}});
         let preview = decode(output.stdout, info, Arc::new(AtomicBool::new(false))).unwrap();
         assert_eq!((preview.width, preview.height), (64, 48));
+        assert_eq!(preview.source, [64, 48]);
         assert!(!preview.frames.is_empty());
         assert_eq!(preview.duration, 0.2);
         assert!(decode(vec![], Value::Null, Arc::new(AtomicBool::new(true))).is_err());
