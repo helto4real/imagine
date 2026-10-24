@@ -49,15 +49,16 @@ impl ImagineApp {
 }
 
 fn request(source: (u32, u32)) -> Result<CreateProject, &'static str> {
+    let mut generation = imagine_video_contract::generation::Defaults::default();
+    let canvas = generation.canvas.as_mut().expect("default canvas");
+    canvas.ratio = "Source".into();
     let shape = crate::h3_protocol::Selection {
-        ratio: "Source".into(),
-        quality: "Standard".into(),
+        ratio: canvas.ratio.clone(),
+        portrait: false,
+        quality: canvas.quality.clone(),
         seconds: SECONDS as f64,
-        ..Default::default()
     }
     .resolve_with_source(Some(source))?;
-    let mut generation = imagine_video_contract::generation::Defaults::default();
-    generation.canvas.as_mut().expect("default canvas").ratio = "Source".into();
     Ok(CreateProject {
         schema_version: 1,
         default_model: imagine_video_contract::generation::h3_model("i2v"),
@@ -237,6 +238,12 @@ mod tests {
             imagine_video_contract::generation::h3_model("i2v")
         );
         assert!(project.delivery.height > project.delivery.width);
+        let canvas = project.generation.as_ref().unwrap().canvas.clone().unwrap();
+        assert_eq!(
+            (canvas.ratio.as_str(), canvas.quality.as_str()),
+            ("Source", "Quick Draft")
+        );
+        assert!(project.delivery.width * project.delivery.height <= 110_000);
         assert_eq!(project.scenes.len(), 1);
         let scene = &project.scenes[0];
         assert_eq!(scene.duration, Time { num: 10, den: 1 });
@@ -296,6 +303,23 @@ mod tests {
             )
             .await
             .unwrap();
+        // The project keeps the Quality chosen for it.
+        let mut generation = project.generation.clone().unwrap();
+        generation.canvas.as_mut().unwrap().quality = "Standard".into();
+        let edited = client
+            .timeline_request(
+                &connection.id,
+                true,
+                &format!("/v1/video/projects/{}/edits", project.id.0),
+                Some(&json!({"schema_version":1,
+                "expected_project_revision":project.project_revision,
+                "commands":[imagine_video_contract::editing::Edit::SetGenerationDefaults {
+                    generation: Some(generation),
+                }]})),
+            )
+            .await
+            .unwrap();
+        let project: VideoProject = serde_json::from_value(edited["project"].clone()).unwrap();
         let saved = client.timeline_request(&connection.id, true, &format!("/v1/video/projects/{}/save", project.id.0), Some(&json!({"schema_version":1,"expected_project_revision":project.project_revision,"location_id":location["location_id"]}))).await.unwrap();
         let reopened = client
             .timeline_request(
@@ -307,6 +331,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(saved["project"], reopened["project"]);
+        assert_eq!(
+            reopened["project"]["generation"]["canvas"]["quality"],
+            "Standard"
+        );
         assert_eq!(saved["resources"], reopened["resources"]);
         assert!(
             !folder.join("media").exists()

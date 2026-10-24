@@ -33,12 +33,13 @@ pub struct Canvas {
     pub portrait: bool,
     pub quality: String,
 }
+/// A new project's canvas; a saved project keeps its own.
 impl Default for Canvas {
     fn default() -> Self {
         Self {
             ratio: "16:9".into(),
             portrait: false,
-            quality: "Standard".into(),
+            quality: "Quick Draft".into(),
         }
     }
 }
@@ -147,7 +148,7 @@ mod tests {
     #[test]
     fn project_settings_inherit_by_exact_model_and_fingerprint_only_effective_values() {
         let g = Defaults::default();
-        assert_eq!(g.canvas.as_ref().unwrap().quality, "Standard");
+        assert_eq!(g.canvas.as_ref().unwrap().quality, "Quick Draft");
         assert_eq!(g.seed, 0);
         let mut p = VideoProject::create(CreateProject {
             generation: None,

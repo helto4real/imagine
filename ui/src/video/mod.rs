@@ -1254,30 +1254,12 @@ impl ImagineApp {
         }
     }
     fn timeline_new(&mut self, ctx: &egui::Context) {
-        let shape = crate::h3_protocol::Selection {
-            ratio: "16:9".into(),
-            quality: "Standard".into(),
-            seconds: 5.,
-            ..Default::default()
-        }
-        .resolve()
-        .expect("default video geometry");
-        let model = imagine_video_contract::generation::h3_model("reference");
         self.timeline.folder = None;
         self.timeline_request(
             ctx,
             true,
             "/v1/video/projects".into(),
-            Some(json!(CreateProject {
-                generation: Some(Default::default()),
-                schema_version: 1,
-                default_model: model,
-                delivery: DeliverySettings {
-                    width: shape.width,
-                    height: shape.height,
-                    fps: Time { num: 24, den: 1 }
-                }
-            })),
+            Some(json!(new_project())),
             true,
             None,
         );
@@ -1920,9 +1902,45 @@ impl Timeline {
     }
 }
 
+/// A new project: the default canvas, Quick Draft 16:9, for five seconds.
+fn new_project() -> CreateProject {
+    let generation = imagine_video_contract::generation::Defaults::default();
+    let canvas = generation.canvas.clone().expect("default canvas");
+    let shape = crate::h3_protocol::Selection {
+        ratio: canvas.ratio,
+        portrait: canvas.portrait,
+        quality: canvas.quality,
+        seconds: 5.,
+    }
+    .resolve()
+    .expect("default video geometry");
+    CreateProject {
+        generation: Some(generation),
+        schema_version: 1,
+        default_model: imagine_video_contract::generation::h3_model("reference"),
+        delivery: DeliverySettings {
+            width: shape.width,
+            height: shape.height,
+            fps: Time { num: 24, den: 1 },
+        },
+    }
+}
 #[cfg(test)]
 mod mixed_selection_regression {
     use super::*;
+    #[test]
+    fn new_projects_start_at_quick_draft() {
+        let project = new_project();
+        let canvas = project.generation.unwrap().canvas.unwrap();
+        assert_eq!(
+            (canvas.ratio.as_str(), canvas.quality.as_str()),
+            ("16:9", "Quick Draft")
+        );
+        assert_eq!(
+            (project.delivery.width, project.delivery.height),
+            (416, 224)
+        );
+    }
     #[test]
     fn audio_primary_keeps_secondary_sections_through_draft_refresh() {
         let mut p = super::media_picker::tests::project();
