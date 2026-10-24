@@ -284,7 +284,7 @@ impl Service {
             }
             for (scene, source) in scenes.iter().zip(&outline.scenes) {
                 if let Some(scene) = scene {
-                    expansion(&serde_json::to_string(scene).unwrap(), source).map_err(fault)?;
+                    reviewed(scene, source, &d.request.images).map_err(fault)?;
                 }
             }
             d.scenes = scenes;

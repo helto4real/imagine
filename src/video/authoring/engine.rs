@@ -70,6 +70,35 @@ pub fn outline_with_images(
         dialogue,
     )
 }
+/// A storyboard Scene as edited in review. Unlike a model's expansion, the cut
+/// and the image assignments may change, as in Director; the Scene's and
+/// Sections' identity, weights and dialogue participants may not.
+pub fn reviewed(scene: &StoryScene, source: &StoryScene, images: &[StoryImage]) -> Result<()> {
+    validate(&Storyboard {
+        scenes: vec![scene.clone()],
+    })?;
+    if scene.id != source.id
+        || scene.weight != source.weight
+        || scene.sections.len() != source.sections.len()
+        || scene.sections.iter().zip(&source.sections).any(|(a, b)| {
+            a.id != b.id
+                || a.weight != b.weight
+                || a.dialogue_intent.as_ref().map(|d| &d.participants)
+                    != b.dialogue_intent.as_ref().map(|d| &d.participants)
+        })
+    {
+        return Err("story_expansion_changed_structure");
+    }
+    let known = |id: &String| id.is_empty() || images.iter().any(|i| &i.id == id);
+    if !scene.image_ids.iter().all(known)
+        || !scene.sections.iter().all(|s| {
+            s.image_ids.iter().all(known) && known(&s.first_frame_id) && known(&s.last_frame_id)
+        })
+    {
+        return Err("story_image_missing");
+    }
+    Ok(())
+}
 pub fn expansion(text: &str, source: &StoryScene) -> Result<StoryScene> {
     let scene: StoryScene = serde_json::from_str(text).map_err(|_| "authoring_invalid_json")?;
     validate(&Storyboard {
@@ -206,6 +235,8 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
             } else {
                 None
             };
+            // Cuts between the new Scenes, added once all of them exist.
+            let mut commands_after = vec![];
             for (i, (scene, len)) in scenes.into_iter().zip(lengths).enumerate() {
                 let id = SceneId(format!("scene_{}_{}", draft.id, i));
                 let start = time(cursor);
@@ -294,10 +325,23 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                         );
                     }
                 }
-                let continuity = if scene.boundary_from_previous == "continuous_shot" {
+                // As a Continuous shot chosen on the Timeline: the cut is
+                // continuous and the previous Scene's motion carries over.
+                let continuous = scene.boundary_from_previous == "continuous_shot";
+                let continuity = if continuous {
+                    let source_scene = previous.clone().ok_or("story_continuity_source_missing")?;
+                    commands_after.push(Edit::SetAssemblyBoundary {
+                        boundary: imagine_video_contract::assembly::Boundary {
+                            mode: imagine_video_contract::assembly::BoundaryMode::ContinuousShot,
+                            ..imagine_video_contract::assembly::Boundary::new(
+                                source_scene.clone(),
+                                id.clone(),
+                            )
+                        },
+                    });
                     Some(Continuity {
-                        source_scene: previous.clone().ok_or("story_continuity_source_missing")?,
-                        method: ContinuityMethod::LastFrameFirstFrame,
+                        source_scene,
+                        method: ContinuityMethod::MotionContextExp,
                         include_audio: false,
                     })
                 } else {
@@ -345,6 +389,7 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                 });
                 previous = Some(id);
             }
+            commands.append(&mut commands_after);
             commands.push(Edit::SetCreative { creative });
         }
     }

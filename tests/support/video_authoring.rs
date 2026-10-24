@@ -554,6 +554,21 @@ async fn continuation_appends_after_occupied_end_and_preserves_reviewed_incoming
         continued["project"]["scenes"][2]["continuity"]["include_audio"],
         false
     );
+    // A Story Continuous shot is the Timeline's: a continuous cut whose next
+    // Scene carries the previous Scene's motion.
+    assert_eq!(
+        continued["project"]["scenes"][2]["continuity"]["method"],
+        "motion_context_exp"
+    );
+    let cut = continued["project"]["assembly"]["boundaries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|b| b["right"] == continued["project"]["scenes"][2]["id"])
+        .cloned()
+        .expect("continuous cut");
+    assert_eq!(cut["left"], original["project"]["scenes"][1]["id"]);
+    assert_eq!(cut["mode"], "continuous_shot");
     let mut invalid = request(&h, &project, "outline", "koboldcpp").await;
     invalid["destination"] = json!("continue");
     let revision = continued["project"]["project_revision"].clone();
@@ -1022,4 +1037,70 @@ async fn regenerating_one_scene_keeps_the_others_and_a_failure_restores_it() {
     worker.abort();
     let _ = worker.await;
     stop(h).await;
+}
+#[tokio::test]
+async fn storyboard_review_accepts_cut_changes_but_not_structure_or_unknown_images() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "review-cuts").await;
+    let (url, worker, _) = fixture::spawn().await;
+    let project = configured(&h, &url).await;
+    let start = request(&h, &project, "outline", "koboldcpp").await;
+    let (_, d) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/projects/{project}/authoring"),
+        Some(start),
+    )
+    .await;
+    let id = d["id"].as_str().unwrap();
+    wait(&h, id, "outline").await;
+    let expand = format!("/v1/video/authoring/{id}/expand");
+    assert_eq!(
+        call(
+            &h,
+            "POST",
+            &expand,
+            Some(json!({"schema_version":1,"start_index":0}))
+        )
+        .await
+        .0,
+        200
+    );
+    let ready = wait(&h, id, "review").await;
+    let review = format!("/v1/video/authoring/{id}/review");
+    let send = |scenes: Value| json!({"schema_version":1,"outline":ready["outline"],"scenes":scenes,"text":null});
+    // The fixture's second Scene continues the first; review makes it a hard cut.
+    let mut cut = ready["scenes"].clone();
+    assert_eq!(cut[1]["boundary_from_previous"], "continuous_shot");
+    cut[1]["boundary_from_previous"] = json!("hard_cut");
+    let (code, saved) = call(&h, "POST", &review, Some(send(cut.clone()))).await;
+    assert_eq!(code, 200, "{saved}");
+    assert_eq!(saved["scenes"][1]["boundary_from_previous"], "hard_cut");
+    let mut weight = cut.clone();
+    weight[1]["weight"] = json!(5);
+    let (code, error) = call(&h, "POST", &review, Some(send(weight))).await;
+    assert_eq!(code, 422);
+    assert_eq!(error["error"]["code"], "story_expansion_changed_structure");
+    let mut image = cut.clone();
+    image[0]["image_ids"] = json!(["own-unknown-image"]);
+    let (code, error) = call(&h, "POST", &review, Some(send(image))).await;
+    assert_eq!(code, 422);
+    assert_eq!(error["error"]["code"], "story_image_missing");
+    let (code, result) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/authoring/{id}/apply"),
+        Some(json!({"schema_version":1,"expected_project_revision":ready["request"]["expected_project_revision"]})),
+    )
+    .await;
+    assert_eq!(code, 200, "{result}");
+    assert!(result["project"]["scenes"][1]["continuity"].is_null());
+    assert!(
+        result["project"]["assembly"]["boundaries"]
+            .as_array()
+            .is_none_or(|b| b.iter().all(|b| b["mode"] != "continuous_shot"))
+    );
+    stop(h).await;
+    worker.abort();
+    let _ = worker.await;
 }

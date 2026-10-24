@@ -161,6 +161,30 @@ fn image_label(id: &str, images: &[StoryImage]) -> String {
         .map(|i| i.label.clone())
         .unwrap_or_else(|| "Unavailable source image".into())
 }
+fn boundary_label(id: &str) -> &'static str {
+    if id == "continuous_shot" {
+        "Continuous shot"
+    } else {
+        "Hard cut"
+    }
+}
+/// A checkbox per Story source image, toggling its id in `ids`.
+fn image_choices(ui: &mut egui::Ui, ids: &mut Vec<String>, images: &[StoryImage], name: &str) {
+    ui.horizontal_wrapped(|ui| {
+        for (n, image) in images.iter().enumerate() {
+            let mut on = ids.contains(&image.id);
+            let r = ui.checkbox(&mut on, &image.label);
+            control(ui, &format!("{name}-{n}"), &r);
+            if r.changed() {
+                if on {
+                    ids.push(image.id.clone());
+                } else {
+                    ids.retain(|id| id != &image.id);
+                }
+            }
+        }
+    });
+}
 fn source_image_label(project: &VideoProject, id: &AssetId) -> String {
     project
         .assets
@@ -448,33 +472,38 @@ pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index
     let source = draft.scenes[index]
         .as_mut()
         .unwrap_or(&mut outline.scenes[index]);
-    if !source.image_ids.is_empty() {
-        ui.weak(format!(
-            "Setting images: {}",
-            source
-                .image_ids
-                .iter()
-                .map(|id| image_label(id, &draft.request.images))
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-    }
-    ui.add_enabled_ui(!expanded, |ui| {
-        ui.horizontal(|ui| {
+    let images = &draft.request.images;
+    // The weight sets the Scene's length, fixed once it is expanded; the cut
+    // and the images can still change in review, as in Director.
+    ui.horizontal(|ui| {
+        ui.add_enabled_ui(!expanded, |ui| {
             ui.label("Relative weight");
             ui.add(egui::DragValue::new(&mut source.weight).range(0.001..=100000.));
-            egui::ComboBox::from_id_salt("story-boundary")
-                .selected_text(&source.boundary_from_previous)
-                .show_ui(ui, |ui| {
-                    for (id, label) in [
-                        ("hard_cut", "Hard cut"),
-                        ("continuous_shot", "Continuous shot"),
-                    ] {
-                        ui.selectable_value(&mut source.boundary_from_previous, id.into(), label);
-                    }
-                });
         });
+        // The first Scene's cut only matters when it continues the timeline.
+        if index > 0 || draft.request.destination == Destination::Continue {
+            ui.add_enabled_ui(editable, |ui| {
+                let r = egui::ComboBox::from_id_salt("story-boundary")
+                    .selected_text(boundary_label(&source.boundary_from_previous))
+                    .show_ui(ui, |ui| {
+                        for id in ["hard_cut", "continuous_shot"] {
+                            ui.selectable_value(
+                                &mut source.boundary_from_previous,
+                                id.into(),
+                                boundary_label(id),
+                            );
+                        }
+                    });
+                control(ui, "story-boundary", &r.response);
+            });
+        }
     });
+    if !images.is_empty() {
+        ui.add_enabled_ui(editable, |ui| {
+            ui.label("Scene references");
+            image_choices(ui, &mut source.image_ids, images, "story-scene-image");
+        });
+    }
     ui.add_enabled_ui(editable, |ui| {
         ui.label("Title");
         let r = ui.add(egui::TextEdit::singleline(&mut source.title).desired_width(f32::INFINITY));
@@ -557,21 +586,52 @@ pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index
                     .desired_width(f32::INFINITY),
             );
             control(ui, &format!("story-section-{i}"), &r);
-            if !section.image_ids.is_empty()
-                || !section.first_frame_id.is_empty()
-                || !section.last_frame_id.is_empty()
-            {
-                ui.weak(format!(
-                    "Images: {} · first: {} · last: {}",
-                    section
-                        .image_ids
-                        .iter()
-                        .map(|id| image_label(id, &draft.request.images))
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    image_label(&section.first_frame_id, &draft.request.images),
-                    image_label(&section.last_frame_id, &draft.request.images)
-                ));
+            if !images.is_empty() {
+                ui.push_id(("story-section-images", i), |ui| {
+                    egui::CollapsingHeader::new(format!(
+                        "Images · {}",
+                        section.image_ids.len()
+                            + usize::from(!section.first_frame_id.is_empty())
+                            + usize::from(!section.last_frame_id.is_empty())
+                    ))
+                    .show(ui, |ui| {
+                        ui.label("References");
+                        image_choices(
+                            ui,
+                            &mut section.image_ids,
+                            images,
+                            &format!("story-section-{i}-image"),
+                        );
+                        for (label, value) in [
+                            ("Start frame", &mut section.first_frame_id),
+                            ("End frame", &mut section.last_frame_id),
+                        ] {
+                            ui.horizontal(|ui| {
+                                ui.label(label);
+                                let r = egui::ComboBox::from_id_salt(label)
+                                    .selected_text(image_label(value, images))
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(value, String::new(), "None");
+                                        for image in images {
+                                            ui.selectable_value(
+                                                value,
+                                                image.id.clone(),
+                                                &image.label,
+                                            );
+                                        }
+                                    });
+                                control(
+                                    ui,
+                                    &format!(
+                                        "story-section-{i}-{}",
+                                        label.to_lowercase().replace(' ', "-")
+                                    ),
+                                    &r.response,
+                                );
+                            });
+                        }
+                    });
+                });
             }
             if let Some(intent) = &mut section.dialogue_intent {
                 ui.weak(format!(

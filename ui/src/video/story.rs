@@ -632,6 +632,22 @@ mod tests {
         ] {
             assert!(has(&nodes, text), "{text}");
         }
+        // An expanded Scene's cut stays editable in review.
+        app.timeline.authoring.selected = 1;
+        let mut nodes = vec![];
+        for _ in 0..2 {
+            nodes = frame(&mut app, vec![]);
+        }
+        let cut = nodes
+            .iter()
+            .find(|(_, n)| {
+                n.value()
+                    .or(n.label())
+                    .is_some_and(|t| t == "Continuous shot" || t == "Hard cut")
+            })
+            .map(|(_, n)| n)
+            .expect("cut choice");
+        assert!(!cut.is_disabled());
         let d = app.timeline.authoring.draft.as_ref().unwrap();
         let (_, _, path, body) = super::super::authoring::regenerate_call(d, 1);
         assert!(path.ends_with("/review"));
