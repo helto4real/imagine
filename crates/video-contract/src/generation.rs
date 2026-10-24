@@ -91,8 +91,9 @@ pub fn h3_defaults_for(variant: &str) -> H3Settings {
     let mut settings = h3_defaults();
     settings.components.model = Some(format!(
         "diffusion_models/minimax_h3/{}",
+        // The locked I2V file; Director's fl2va name is not installed here.
         if variant == "i2v" {
-            "minimax_h3_fl2va_pruned_int8_convrot.safetensors"
+            "minimaxH3.int8.safetensors"
         } else {
             "minimax_h3_ref2va_pruned_int8_convrot.safetensors"
         }

@@ -818,3 +818,44 @@ fn reference_transfer_targets_and_enable_options_affect_frozen_inputs() {
     p.creative.visual_references_enabled = Some(true);
     assert_ne!(disabled, input_revision(&p, &scene).unwrap());
 }
+#[test]
+fn default_h3_models_are_the_locked_installed_files() {
+    // A default naming a file the deployment does not have fails only at
+    // generation, as a component load failure.
+    let lock: Value = serde_json::from_slice(
+        &std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/design/h3-i2v-model-lock.json"
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let mut locked = vec![];
+    fn paths(value: &Value, out: &mut Vec<String>) {
+        match value {
+            Value::Object(map) => {
+                for (key, value) in map {
+                    match (key.as_str(), value.as_str()) {
+                        ("path", Some(path)) => out.push(path.into()),
+                        _ => paths(value, out),
+                    }
+                }
+            }
+            Value::Array(items) => items.iter().for_each(|v| paths(v, out)),
+            _ => {}
+        }
+    }
+    paths(&lock, &mut locked);
+    for variant in ["reference", "i2v"] {
+        let model = imagine_video_contract::generation::h3_defaults_for(variant)
+            .components
+            .model
+            .unwrap();
+        assert!(
+            locked
+                .iter()
+                .any(|path| path.ends_with(&format!("/{model}"))),
+            "{variant} default {model} is not in the model lock"
+        );
+    }
+}
