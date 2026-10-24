@@ -11,6 +11,18 @@ use std::io::{Read, Seek};
 pub(crate) struct Grounding {
     pub images: Vec<(StoryImage, ProviderImage)>,
     pub cast: Value,
+    /// The first image is the Scene's opening frame: its First Frame binding,
+    /// or its first Section's start frame.
+    pub opening: bool,
+}
+/// Puts the opening frame `asset` first in `selections`, adding it when absent.
+fn open_with(selections: &mut Vec<StoryImage>, image: StoryImage) {
+    if let Some(i) = selections.iter().position(|s| s.asset == image.asset) {
+        let found = selections.remove(i);
+        selections.insert(0, found);
+    } else {
+        selections.insert(0, image);
+    }
 }
 impl Grounding {
     pub fn capture(session: &ProjectSession, request: &Request) -> Result<Self, &'static str> {
@@ -69,11 +81,32 @@ impl Grounding {
                 }
             }
         }
+        let mut opening = false;
         if request.operation != Operation::Outline {
             let scene = base
                 .scene(request.scene_id.as_ref().ok_or("scene_not_found")?)
                 .map_err(|_| "scene_not_found")?;
             for binding in scene.bindings.iter().filter(|b| b.enabled) {
+                if binding.role == InputRole::FirstFrame
+                    && !opening
+                    && base
+                        .assets
+                        .get(&binding.asset)
+                        .is_some_and(|a| a.kind == MediaKind::Image)
+                {
+                    opening = true;
+                    open_with(
+                        &mut selections,
+                        StoryImage {
+                            pair_with: None,
+                            id: binding.asset.0.clone(),
+                            asset: binding.asset.clone(),
+                            label: "Opening frame".into(),
+                            usage: ImageUse::StartFrame,
+                        },
+                    );
+                    continue;
+                }
                 if binding.role == InputRole::VideoReference {
                     return Err("authoring_video_context_unavailable");
                 }
@@ -103,7 +136,22 @@ impl Grounding {
                     .into_iter()
                     .flat_map(|s| &s.images)
                 {
-                    if !selections.iter().any(|i| i.asset == binding.asset) {
+                    // Without a Scene First Frame, the first Section's start frame opens it.
+                    let starts = binding.role == InputRole::FirstFrame
+                        && scene.sections.first().map(|s| &s.id) == Some(&section.id);
+                    if starts && !opening {
+                        opening = true;
+                        open_with(
+                            &mut selections,
+                            StoryImage {
+                                pair_with: None,
+                                id: binding.image_id.clone(),
+                                asset: binding.asset.clone(),
+                                label: "Opening frame".into(),
+                                usage: ImageUse::StartFrame,
+                            },
+                        );
+                    } else if !selections.iter().any(|i| i.asset == binding.asset) {
                         selections.push(StoryImage {
                             pair_with: None,
                             id: binding.image_id.clone(),
@@ -149,6 +197,7 @@ impl Grounding {
         Ok(Self {
             images,
             cast: json!(cast),
+            opening,
         })
     }
     pub fn selected(&self, ids: &[String]) -> Vec<ProviderImage> {

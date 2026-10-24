@@ -27,7 +27,7 @@ fn evaluate(input: &serde_json::Value) -> serde_json::Value {
             serde_json::json!({"protected":p.text,"references":p.references,"restored":r.as_ref().ok().map(|x|&x.0),"introduced":r.as_ref().ok().map(|x|x.1)})
         }
         "enhancement_user" => {
-            serde_json::json!({"prompt":imagine_server::video::authoring::references::enhancement_user_prompt(input["section"].as_bool().unwrap(),input["context"].as_str().unwrap(),input["instruction"].as_str().unwrap(),input["source"].as_str().unwrap(),input["images"].as_bool().unwrap())})
+            serde_json::json!({"prompt":imagine_server::video::authoring::references::enhancement_user_prompt(input["section"].as_bool().unwrap(),input["context"].as_str().unwrap(),input["instruction"].as_str().unwrap(),input["source"].as_str().unwrap(),input["images"].as_bool().unwrap(),input["opening"].as_bool().unwrap_or(false))})
         }
         "projection" => {
             let p: imagine_server::video::contract::VideoProject =

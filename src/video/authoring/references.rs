@@ -7,6 +7,7 @@ pub fn enhancement_user_prompt(
     instruction: &str,
     source: &str,
     images: bool,
+    opening: bool,
 ) -> String {
     let context = context.pytrim();
     let task = if section {
@@ -14,7 +15,9 @@ pub fn enhancement_user_prompt(
     } else {
         "scene field (description)"
     };
-    let rule = if images {
+    let rule = if images && opening {
+        "Images are supplied. Treat them as visual truth and do not describe the visible environment in detail. The first image is the Scene's opening frame: the video starts on it, so describe what moves and changes from that frame on rather than a different opening."
+    } else if images {
         "Images are supplied. Treat them as visual truth and do not describe the visible environment in detail."
     } else {
         "No images are supplied. Add the environmental, spatial, lighting, and atmospheric detail needed for visual grounding."

@@ -1250,3 +1250,92 @@ async fn whole_scene_enhancement_reviews_rows_side_by_side_and_applies_only_incl
     worker.abort();
     let _ = worker.await;
 }
+#[tokio::test]
+async fn enhancement_tells_the_model_the_first_frame_opens_the_scene() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "opening-frame").await;
+    let (url, worker, state) = fixture::spawn().await;
+    let project = configured(&h, &url).await;
+    let (code, uploaded) = raw(
+        &h,
+        "POST",
+        "/v1/video/assets",
+        Body::from(png()),
+        "image/png",
+        true,
+    )
+    .await;
+    assert_eq!(code, 201, "{uploaded}");
+    let (code, attached) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/projects/{project}/assets"),
+        Some(json!({"schema_version":1,"expected_project_revision":0,"asset_id":uploaded["id"]})),
+    )
+    .await;
+    assert_eq!(code, 200, "{attached}");
+    let asset = attached["project"]["assets"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .next()
+        .unwrap()
+        .clone();
+    let section = |id: &str, start: u64| json!({"id":id,"start":{"num":start,"den":1},"duration":{"num":2,"den":1},"prompt":format!("Own {id} beat")});
+    let scene = json!({"id":"own_scene","start":{"num":0,"den":1},"duration":{"num":4,"den":1},
+        "description":"Own harbour at dusk","model":"project_default","settings":[],
+        "sections":[section("own_first",0),section("own_second",2)],
+        "bindings":[{"id":"own_binding","asset":asset,"role":"first_frame","enabled":true,"video":null}],
+        "continuity":null,"accepted_take":null});
+    let (code, added) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/projects/{project}/edits"),
+        Some(json!({"schema_version":1,"expected_project_revision":1,"commands":[{"operation":"add_scene","scene":scene}]})),
+    )
+    .await;
+    assert_eq!(code, 200, "{added}");
+    let hint = "The first image is the Scene's opening frame";
+    for (operation, field, section, opens) in [
+        ("enhance_scene", Some("description"), None, true),
+        ("enhance_section", None, Some("own_first"), true),
+        ("enhance_section", None, Some("own_second"), false),
+    ] {
+        let mut payload = request(&h, &project, operation, "koboldcpp").await;
+        payload["scene_id"] = json!("own_scene");
+        payload["scene_field"] = json!(field);
+        payload["section_id"] = json!(section);
+        let (code, d) = call(
+            &h,
+            "POST",
+            &format!("/v1/video/projects/{project}/authoring"),
+            Some(payload),
+        )
+        .await;
+        assert_eq!(code, 202, "{d}");
+        wait(&h, d["id"].as_str().unwrap(), "review").await;
+        let sent = state.requests.lock().unwrap().last().unwrap().clone();
+        let content = &sent["messages"][1]["content"];
+        let text = content
+            .as_str()
+            .map(str::to_owned)
+            .or_else(|| {
+                content.as_array().map(|parts| {
+                    parts
+                        .iter()
+                        .filter_map(|p| p["text"].as_str())
+                        .collect::<String>()
+                })
+            })
+            .unwrap();
+        assert_eq!(text.contains(hint), opens, "{operation} {section:?}");
+        // The frame is still supplied as an image either way.
+        assert!(
+            text.contains("Images are supplied"),
+            "{operation} {section:?}"
+        );
+    }
+    stop(h).await;
+    worker.abort();
+    let _ = worker.await;
+}

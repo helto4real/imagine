@@ -666,12 +666,17 @@ impl Service {
                 let scene = base
                     .scene(draft.request.scene_id.as_ref().unwrap())
                     .unwrap();
+                // The opening frame leads only the Scene fields and its first Section.
+                let opening = grounding.opening
+                    && (!is_section
+                        || scene.sections.first().map(|s| &s.id) == section_id.as_ref());
                 user = super::references::enhancement_user_prompt(
                     is_section,
                     &scene.description,
                     &draft.request.instruction,
                     &protected.text,
                     !images.is_empty(),
+                    opening,
                 );
             }
             let result=async {
