@@ -42,6 +42,13 @@ inventory metadata only; tensors are neither split nor fused during loading.
 MOSS uses diffusion LoRAs only, with the existing Qwen3.5 INT8 encoder, Flux.2 VAE,
 sampling defaults and preview projection.
 
+After the accepted refactor, Qwen and MOSS product adapters skip selections with
+exactly zero strength (including negative zero) before reading or binding LoRAs,
+matching ComfyUI's ordinary LoRA loader. Other selections retain their order and
+strengths. This deliberate product behavior fix leaves the locked low-level patch
+arithmetic and its zero-strength semantics unchanged. Catalog admission and file
+identity checks still apply to selected files.
+
 ## Locked delivery
 
 The existing core patch is applied first, followed by:
@@ -138,3 +145,14 @@ The local, removable evidence folder is `target/model-adapters-gpu-20261024/`,
 including `REPORT.md`, byte comparisons, source hashes and reservation receipts.
 Its outputs are not tracked. All GPU children were reaped before reservation
 release. These finite cases do not establish parity for every input or checkpoint.
+
+### Separate zero-strength product fix — 2026-10-24
+
+After refactor acceptance, the product bypass above passed two CPU selection tests,
+four existing binding/layout tests and 13 product-build regressions. The restored
+locked worker built successfully. Four trained INT8 worker comparisons passed
+bitexactly: Qwen/MOSS zero strength against no LoRA, and Qwen/MOSS active LoRA
+plus zero entries against the same active LoRA alone. Missing and malformed test
+files at zero strength were bypassed. The original failed zero-strength assumption
+remains in the refactor's historical report. Separate evidence is in
+`target/model-adapters-gpu-20261024/zero-strength/REPORT.md`.

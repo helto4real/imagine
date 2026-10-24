@@ -11,9 +11,7 @@ pub(super) fn generate(
     let pins = c::HostPins::new(rt.native.clone())?;
     let mut manager = Manager::new();
     let mut memory = c::StaticMemoryServices::new(rt.native.clone(), pins.clone());
-    let loras = r
-        .loras
-        .iter()
+    let loras = active_loras(&r.loras)
         .map(|l| {
             let state = crate::patching::read_lora(rt, aimdo, &l.path)?;
             Ok((state, l.strength, l.strength))
