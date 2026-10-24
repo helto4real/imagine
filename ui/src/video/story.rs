@@ -22,6 +22,8 @@ impl ImagineApp {
                     control(ui, "story-close", &r);
                     actions.close = r.clicked();
                     ui.label(helto::section("Story"));
+                    stage_strip(ui, state.draft.as_ref());
+                    ui.separator();
                     self.authoring_header(ui, &mut state, &mut actions);
                 });
             },
@@ -86,9 +88,10 @@ impl ImagineApp {
             ui.separator();
             self.authoring_draft_status(ui, &mut state, &document, &mut actions);
             let selected = state.selected.min(scenes.saturating_sub(1));
+            let received = &state.received;
             let draft = state.draft.as_mut().unwrap();
             for index in 0..scenes {
-                let expanded = draft.scenes[index].is_some();
+                let status = scene_status(draft, received, index);
                 let source = draft.scenes[index]
                     .as_ref()
                     .unwrap_or(&draft.outline.as_ref().unwrap().scenes[index]);
@@ -100,17 +103,16 @@ impl ImagineApp {
                         if let Some(duration) = draft.planned_durations.get(index) {
                             ui.weak(format!("{duration:.0} s"));
                         }
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            status_pill(ui, status);
+                        });
                     });
                     ui.label(source.summary.lines().next().unwrap_or(""));
-                    ui.weak(format!(
-                        "{}{}",
-                        if source.boundary_from_previous == "continuous_shot" {
-                            "Continuous shot"
-                        } else {
-                            "Hard cut"
-                        },
-                        if expanded { " · expanded" } else { "" }
-                    ));
+                    ui.weak(if source.boundary_from_previous == "continuous_shot" {
+                        "Continuous shot"
+                    } else {
+                        "Hard cut"
+                    });
                 });
                 let response = card.response.interact(egui::Sense::click());
                 if index == selected {
@@ -129,8 +131,9 @@ impl ImagineApp {
             let ready = draft.scenes.iter().filter(|s| s.is_some()).count();
             ui.weak(format!("{ready} / {scenes} scenes expanded"));
             let busy = state.busy || draft.phase.busy();
+            let confirm = &mut state.confirm_replace;
             ui.add_enabled_ui(!busy, |ui| {
-                authoring_draft_actions(ui, draft, &document, &mut actions)
+                authoring_draft_actions(ui, draft, &document, &mut actions, confirm)
             });
         });
         column(ui, "story-scene", editor, &mut |ui| {
@@ -141,9 +144,35 @@ impl ImagineApp {
                 ui.separator();
                 return;
             };
-            ui.label(helto::section(&format!("Scene {}", index + 1)));
+            let index = index.min(draft.scenes.len().saturating_sub(1));
+            let status = scene_status(draft, &state.received, index);
+            ui.horizontal(|ui| {
+                ui.label(helto::section(&format!("Scene {}", index + 1)));
+                status_pill(ui, status);
+            });
             ui.separator();
-            ui.add_enabled_ui(!busy, |ui| authoring_scene_editor(ui, draft, index));
+            // Finished Scenes stay editable while later ones expand, as in Director.
+            ui.add_enabled_ui(!busy || status.reviewable(), |ui| {
+                authoring_scene_editor(ui, draft, index)
+            });
+            if let Some(plan) = draft
+                .scenes
+                .get(index)
+                .and_then(Option::as_ref)
+                .and(draft.outline.as_ref())
+                .and_then(|o| o.scenes.get(index))
+            {
+                ui.add_space(6.);
+                let header = ui.collapsing("Outline plan", |ui| {
+                    ui.strong(&plan.title);
+                    ui.label(&plan.summary);
+                    for (i, section) in plan.sections.iter().enumerate() {
+                        ui.weak(format!("Section {}", i + 1));
+                        ui.label(&section.prompt);
+                    }
+                });
+                control(ui, "story-outline-plan", &header.header_response);
+            }
         });
         self.authoring_finish(ui.ctx(), state, actions);
     }
@@ -311,5 +340,97 @@ mod tests {
         assert!(app.timeline.authoring.draft.is_none());
         assert_eq!(app.timeline.authoring.history.len(), 1);
         assert!(!app.timeline_story_open());
+    }
+
+    #[test]
+    fn a_replacing_storyboard_shows_scene_status_and_asks_before_apply() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let project = super::super::media_picker::tests::project();
+        let mut d = draft(&project);
+        d.request.destination = imagine_video_contract::authoring::Destination::Replace;
+        d.phase = imagine_video_contract::authoring::Phase::Review;
+        d.scenes = d
+            .outline
+            .as_ref()
+            .unwrap()
+            .scenes
+            .iter()
+            .cloned()
+            .map(Some)
+            .collect();
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.authoring.received = d.scenes.clone();
+        app.timeline.authoring.draft = Some(d);
+        app.timeline.authoring.open = true;
+        app.timeline.document = Some(Snapshot::with(project, json!({})));
+        let frame = |app: &mut ImagineApp, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 800.),
+                    )),
+                    events,
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            output.textures_delta.clear();
+            output.platform_output.accesskit_update.unwrap().nodes
+        };
+        let has = |nodes: &[(egui::accesskit::NodeId, egui::accesskit::Node)], text: &str| {
+            nodes
+                .iter()
+                .any(|(_, n)| n.label().or(n.value()).is_some_and(|t| t == text))
+        };
+        let click = |app: &mut ImagineApp, label: &str| {
+            let mut nodes = vec![];
+            for _ in 0..2 {
+                nodes = frame(app, vec![]);
+            }
+            let b = nodes
+                .iter()
+                .find(|(_, n)| n.label().is_some_and(|t| t == label))
+                .and_then(|(_, n)| n.bounds())
+                .unwrap_or_else(|| panic!("{label}"));
+            let pos = egui::pos2(((b.x0 + b.x1) / 2.) as f32, ((b.y0 + b.y1) / 2.) as f32);
+            for pressed in [true, false] {
+                frame(
+                    app,
+                    vec![
+                        egui::Event::PointerMoved(pos),
+                        egui::Event::PointerButton {
+                            pos,
+                            button: egui::PointerButton::Primary,
+                            pressed,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                );
+            }
+        };
+        let mut nodes = vec![];
+        for _ in 0..3 {
+            nodes = frame(&mut app, vec![]);
+        }
+        for text in ["3 Storyboard", "1 Story brief ✓", "Ready", "Ready to apply"] {
+            assert!(has(&nodes, text), "{text}");
+        }
+        click(&mut app, "Apply reviewed proposal");
+        assert!(app.timeline.authoring.confirm_replace);
+        assert!(!app.timeline.authoring.busy, "nothing is applied yet");
+        click(&mut app, "Keep the timeline");
+        assert!(!app.timeline.authoring.confirm_replace);
+        assert!(!app.timeline.authoring.busy);
+        click(&mut app, "Apply reviewed proposal");
+        click(&mut app, "Replace timeline");
+        assert!(!app.timeline.authoring.confirm_replace);
+        assert!(app.timeline.authoring.busy, "the apply request was sent");
     }
 }

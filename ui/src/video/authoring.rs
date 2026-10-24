@@ -2,6 +2,8 @@
 use super::*;
 use imagine_video_contract::authoring::*;
 mod inline;
+mod review;
+pub(super) use review::*;
 #[derive(Clone, Copy)]
 pub(in crate::app) enum Reply {
     Catalog,
@@ -48,6 +50,10 @@ pub(super) struct State {
     show_options: bool,
     /// The proposal, or none for a starting card, last scrolled into view.
     scrolled_to: Option<Option<String>>,
+    /// The storyboard Scenes as the server last returned them.
+    pub(super) received: Vec<Option<StoryScene>>,
+    /// Apply was pressed for a proposal that replaces the timeline.
+    pub(super) confirm_replace: bool,
 }
 fn provider_transport(state: &State) -> String {
     if state.transport_override {
@@ -101,6 +107,8 @@ impl Default for State {
             shown_in_pass: None,
             show_options: false,
             scrolled_to: None,
+            received: vec![],
+            confirm_replace: false,
         }
     }
 }
@@ -190,6 +198,7 @@ pub(super) fn authoring_draft_actions(
     draft: &mut Draft,
     document: &Option<Snapshot>,
     actions: &mut Actions,
+    confirm_replace: &mut bool,
 ) {
     let stale = authoring_stale(draft, document);
     let editable = draft.phase != Phase::Applied;
@@ -274,6 +283,27 @@ pub(super) fn authoring_draft_actions(
                 json!({"schema_version":1,"outline":draft.outline,"scenes":draft.scenes,"text":draft.text,"then_expand":index}),
             ),
         ));
+    }
+    // Replacing removes every Scene and audio track, so it is asked first.
+    if apply && draft.request.destination == Destination::Replace && !*confirm_replace {
+        *confirm_replace = true;
+        apply = false;
+    }
+    if *confirm_replace {
+        let confirm = helto::confirm(
+            ui,
+            "Replace the whole timeline with this storyboard? Its Scenes and audio tracks are removed.",
+            (crate::icons::Icon::Check, "Replace timeline"),
+            "Keep the timeline",
+            None,
+        );
+        control(ui, "story-replace-confirm", &confirm.yes);
+        if confirm.yes.clicked() {
+            apply = true;
+        }
+        if confirm.yes.clicked() || confirm.no.clicked() {
+            *confirm_replace = false;
+        }
     }
     if apply {
         actions.call = Some(apply_call(draft));
@@ -669,8 +699,10 @@ impl ImagineApp {
                     {
                         self.timeline_refresh(ctx);
                     }
-                    self.timeline.authoring.draft = Some(draft);
-                    self.timeline.authoring.poll_at = Some(std::time::Instant::now());
+                    let state = &mut self.timeline.authoring;
+                    let draft = merge_received(state.draft.as_ref(), &mut state.received, draft);
+                    state.draft = Some(draft);
+                    state.poll_at = Some(std::time::Instant::now());
                 } else {
                     self.timeline.authoring.failure =
                         Some("Could not read the proposal. Reconnect to this draft.".into());
@@ -865,7 +897,7 @@ impl ImagineApp {
         };
         let busy = busy_flag || draft.phase.busy();
         ui.horizontal_wrapped(|ui| {
-            ui.strong(format!("{:?}", draft.phase));
+            ui.strong(phase_label(draft.phase));
             ui.weak(format!(
                 "{} · {}",
                 draft.prompt_profile_id,
