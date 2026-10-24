@@ -13,7 +13,7 @@ struct Projection {
 }
 fn projection(model: &str) -> Result<Projection, Error> {
     match model {
-        "moss-image-sft-int8" => Ok(Projection {
+        id if super::model_spec::is_moss(id) => Ok(Projection {
             weights: &factors::FLUX2_RGB,
             bias: factors::FLUX2_BIAS,
             pack: 2,

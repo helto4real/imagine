@@ -16,6 +16,7 @@ mod backend_triton_rowwise;
 pub mod block_scales;
 pub mod boxed_aten;
 pub mod checkpoint;
+pub mod components;
 pub mod conditioning;
 pub mod conditioning_preprocess;
 pub mod context_windows;

@@ -238,7 +238,10 @@ impl PipeBackend {
     async fn run(&mut self, request: &ImagePass) -> Result<Vec<u8>> {
         if !(matches!(request.model.as_str(), contract::MODEL | contract::TURBO)
             || self.rust_runtime.is_some()
-                && matches!(request.model.as_str(), contract::BF16 | contract::MOSS))
+                && matches!(
+                    request.model.as_str(),
+                    contract::BF16 | contract::MOSS | contract::MOSS_BF16
+                ))
         {
             bail!(EngineError("unsupported_model"));
         }
@@ -345,7 +348,7 @@ impl PipeBackend {
                 }
                 Event::Result { id: event_id } if event_id == id => {
                     let body = if self.rust_runtime.is_some() {
-                        let channels = if request.model == contract::MOSS {
+                        let channels = if crate::model_spec::is_moss(&request.model) {
                             3
                         } else {
                             4
@@ -696,29 +699,33 @@ pub fn model_metadata(mut value: Value, backend: &str) -> Value {
     if backend == "rust"
         && matches!(
             model,
-            Some(contract::MODEL | contract::BF16 | contract::TURBO | contract::MOSS)
+            Some(
+                contract::MODEL
+                    | contract::BF16
+                    | contract::TURBO
+                    | contract::MOSS
+                    | contract::MOSS_BF16
+            )
         )
     {
         value["engine"] = json!("Imagine Rust");
         value["attention"] = json!("checkpoint_preferences");
         value["availability"] = json!("requires_local_rust_runtime_and_weights");
         value["live_validated"] = json!(false);
-        value["constraints"]["samplers"] = if model == Some(contract::MOSS) {
-            json!(["euler"])
-        } else {
-            json!(["er_sde", "euler"])
-        };
-        value["constraints"]["schedulers"] = if model == Some(contract::MOSS) {
-            json!(["normal", "sgm_uniform"])
-        } else {
-            json!(["beta", "simple"])
-        };
+        let spec = crate::model_spec::model(model.unwrap()).unwrap();
+        value["constraints"]["samplers"] = json!(spec.architecture.samplers());
+        value["constraints"]["schedulers"] = json!(spec.architecture.schedulers());
         value["constraints"]["validated_resolutions"] = json!([]);
         value["constraints"]["resolution_note"] = json!(
             "Selected inference components validated; server integration validation is separate"
         );
     }
-    if backend != "rust" && matches!(model, Some(contract::BF16 | contract::MOSS)) {
+    if backend != "rust"
+        && matches!(
+            model,
+            Some(contract::BF16 | contract::MOSS | contract::MOSS_BF16)
+        )
+    {
         value["availability"] = json!("requires_rust_backend");
         value["available"] = json!(false);
         value["problem"] = json!("requires_rust_backend");

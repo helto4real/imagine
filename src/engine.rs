@@ -647,12 +647,16 @@ pub fn validate_selection(
     model: &str,
     sampling: &crate::contract::Sampling,
 ) -> Result<()> {
-    if matches!(model, crate::contract::BF16 | crate::contract::MOSS) && backend != "rust" {
+    if matches!(
+        model,
+        crate::contract::BF16 | crate::contract::MOSS | crate::contract::MOSS_BF16
+    ) && backend != "rust"
+    {
         bail!(EngineError("unsupported_model"))
     }
     if backend == "rust"
         && (!matches!(sampling.sampler.as_str(), "euler" | "er_sde")
-            || (model == crate::contract::MOSS
+            || (crate::model_spec::is_moss(model)
                 && (sampling.sampler != "euler"
                     || !matches!(sampling.scheduler.as_str(), "normal" | "sgm_uniform"))))
     {

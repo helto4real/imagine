@@ -137,6 +137,14 @@ def native_source(root, lock, cache, verifier):
     """Restore core from Git, then overlay ONLY the enumerated main adapter paths."""
     core = {k: lock[k] for k in ('source_base', 'core_revision', 'core_files', 'core_patches', 'product_files')}
     verifier.files({str(root / p): h for p, h in lock['core_patches'].items()})
+    patched = set()
+    for patch in lock['core_patches']:
+        for record in git(root, 'apply', '--numstat', '-z', str(root / patch)).split(b'\0'):
+            if record:
+                patched.add(record.split(b'\t', 2)[2].decode())
+    overlap = patched.intersection(lock['product_files'])
+    if overlap:
+        raise ValueError(f'Product overlay would overwrite core patch: {sorted(overlap)}')
     dest = cache / ('native-source-' + key(core)[:20])
     receipt = dest.with_suffix('.json')
     # A cached source is checked in full, including unexpected files, before reuse.

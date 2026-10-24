@@ -55,6 +55,7 @@ pub unsafe fn patch_weight(
     }
 }
 pub struct PatchOwner {
+    pub report: super::PatchReport,
     pub patches: PatchMap,
     pub key_prefix: String,
     pub(crate) backup: BTreeMap<String, Value>,
@@ -68,6 +69,7 @@ impl Default for PatchOwner {
 impl PatchOwner {
     pub fn new() -> Self {
         Self {
+            report: Default::default(),
             patches: BTreeMap::new(),
             key_prefix: String::new(),
             backup: BTreeMap::new(),

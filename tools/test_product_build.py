@@ -123,6 +123,21 @@ class BuildTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'protocol differs'):
             build.validate_protocol(build.ROOT, lock)
 
+    def test_core_patch_hash_and_product_overlap_fail_before_restoration(self):
+        patch_path = self.put('native/core.patch',
+            'diff --git a/inference/core.rs b/inference/core.rs\n'
+            '--- a/inference/core.rs\n+++ b/inference/core.rs\n'
+            '@@ -1 +1 @@\n-old\n+new\n')
+        lock = dict(source_base='unused', core_revision='unused', core_files={},
+                    core_patches={'native/core.patch': '0' * 64}, product_files=[])
+        with build.build_context(self.root) as (cache, verifier):
+            with self.assertRaisesRegex(ValueError, 'Pinned artifact changed'):
+                build.native_source(self.root, lock, cache, verifier)
+            lock['core_patches']['native/core.patch'] = build.digest(patch_path)
+            lock['product_files'] = ['inference/core.rs']
+            with self.assertRaisesRegex(ValueError, 'overwrite core patch'):
+                build.native_source(self.root, lock, cache, verifier)
+
     def test_help_and_explicit_backend_do_not_prepare_native(self):
         for args in (['--help'], ['--backend', 'comfy'], ['--backend', 'native'],
                      ['--rust-runtime', '/synthetic/custom.json']):

@@ -53,3 +53,6 @@ pub mod short_av;
 
 #[path = "../shared/video_destination.rs"]
 pub mod video_destination;
+
+#[path = "../shared/model_spec.rs"]
+pub mod model_spec;

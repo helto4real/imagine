@@ -583,7 +583,7 @@ pub fn make_request(
     if prompt.trim().is_empty() {
         bail!("Enter a prompt.");
     }
-    if metadata["model"] == "moss-image-sft-int8" && !refs.is_empty() {
+    if metadata["constraints"]["reference_images"]["max_count"] == 0 && !refs.is_empty() {
         bail!("MOSS currently supports text-to-image only. Remove reference images.");
     }
     if refs.len() > 10 {

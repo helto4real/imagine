@@ -4,6 +4,8 @@
 pub mod component_error;
 mod image_preview;
 mod load_error;
+#[path = "../../../shared/model_spec.rs"]
+pub mod model_spec;
 mod moss;
 mod preview_callback;
 mod qwen;
@@ -79,13 +81,41 @@ pub(super) fn load(
     aimdo: &Aimdo,
     path: &std::path::Path,
     role: &str,
-    moss: bool,
+    model: &str,
 ) -> Result<PreparedParameters, Error> {
+    let moss = model_spec::is_moss(model);
     let state = Safetensors::load_aimdo(path, aimdo, &rt.native)?;
     if state.metadata.get("_quantization_metadata").is_some() {
         return Err(Error::Native(
             "Unsupported legacy checkpoint metadata".into(),
         ));
+    }
+    if role == "dit" {
+        let header = state
+            .tensors
+            .iter()
+            .map(|(name, value)| {
+                let dtype = match value.tensor.kind() {
+                    Kind::BFloat16 => "BF16",
+                    Kind::Float => "F32",
+                    Kind::Int8 => "I8",
+                    _ => "OTHER",
+                };
+                (
+                    name.clone(),
+                    serde_json::json!({"shape":value.tensor.size(),"dtype":dtype}),
+                )
+            })
+            .collect::<serde_json::Map<_, _>>();
+        let detected = model_spec::detect(&serde_json::Value::Object(header))
+            .map_err(|e| Error::Native(e.into()))?;
+        let selected =
+            model_spec::model(model).ok_or_else(|| Error::Native("Unsupported model".into()))?;
+        if detected.model(selected.profile) != Ok(model) {
+            return Err(Error::Native(
+                "Checkpoint does not match selected architecture or weight format".into(),
+            ));
+        }
     }
     let state = state
         .tensors
@@ -120,13 +150,8 @@ pub fn generate(
     images: &[Tensor],
     observer: &mut Observer<'_>,
 ) -> Result<Tensor, Error> {
-    let moss = r.model == "moss-image-sft-int8";
-    if !(moss
-        || matches!(
-            r.model.as_str(),
-            "qwen-image-2.1-int8" | "qwen-image-2.1-bf16" | "qwen-image-2.1-turbo"
-        ))
-    {
+    let moss = model_spec::is_moss(&r.model);
+    if model_spec::model(&r.model).is_none() {
         return Err(Error::Native("Unsupported model".into()));
     }
     if !sampling_values::valid(r.sampling.steps, r.sampling.cfg_scale)
@@ -147,8 +172,7 @@ pub fn generate(
         || moss
             && (r.sampling.sampler != "euler"
                 || !matches!(r.sampling.scheduler.as_str(), "normal" | "sgm_uniform")
-                || !images.is_empty()
-                || !r.loras.is_empty())
+                || !images.is_empty())
     {
         return Err(Error::Native("Unsupported inference selection".into()));
     }

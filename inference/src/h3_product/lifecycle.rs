@@ -1,6 +1,6 @@
 use crate::{
+    components::{ComponentBuffers, StaticModel},
     memory::{Handle, Manager},
-    models::qwen_image21::{ComponentBuffers, StaticModel},
     native::Error,
 };
 use std::rc::Rc;

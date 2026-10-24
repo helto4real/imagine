@@ -49,7 +49,9 @@ while True:
  if h['prompt']=='load_vae':
   emit(dict(type='error',id=h['id'],code='model_component_load_failed',diagnostic=dict(component='vae',reason='invalid_checkpoint')));break
  emit(dict(type='progress',id=h['id'],completed=h['sampling']['steps'],total=h['sampling']['steps'],elapsed_seconds=1))
- channels=3 if h['model']=='moss-image-sft-int8' else 4
+ channels=3 if h['model'] in ('moss-image-sft-int8','moss-image-sft-bf16') else 4
+ if channels==3:
+  assert len(h['loras'])==1 and h['loras'][0]['strength']==0.5
  emit(dict(type='result',id=h['id']),bytes([32,64,96,255][:channels])*h['width']*h['height'])
 "##).unwrap();
     std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).unwrap();
@@ -111,6 +113,37 @@ async fn native_frames_preserve_raw_references_progress_png_and_persistent_child
     assert_eq!(state.borrow().pid, Some(pid));
     engine.stop().await.unwrap();
     assert!(!Path::new(&format!("/proc/{pid}")).exists());
+}
+
+#[tokio::test]
+async fn moss_int8_and_bf16_preserve_loras_and_rgb_worker_protocol() {
+    let (_dir, mut engine, _) = fake();
+    for model in [contract::MOSS, contract::MOSS_BF16] {
+        let defaults = contract::model(model).unwrap()["defaults"].clone();
+        let mut r = request();
+        r.model = model.into();
+        r.model_options = serde_json::from_value(defaults["model_options"].clone()).unwrap();
+        r.sampling = serde_json::from_value(defaults["sampling"].clone()).unwrap();
+        r.model_options
+            .moss_image
+            .as_mut()
+            .unwrap()
+            .loras
+            .push(contract::Lora {
+                path: "synthetic/style.safetensors".into(),
+                strength: 0.5,
+            });
+        let bytes = engine.generate(&r).await.unwrap();
+        assert_eq!(
+            image::load_from_memory(&bytes)
+                .unwrap()
+                .to_rgb8()
+                .get_pixel(0, 0)
+                .0,
+            [32, 64, 96]
+        );
+    }
+    engine.stop().await.unwrap();
 }
 #[tokio::test]
 async fn cancel_reaps_before_release_and_worker_failures_are_sanitized() {

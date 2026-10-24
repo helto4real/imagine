@@ -210,6 +210,19 @@ impl Catalog {
         };
         let id = selected.as_str().ok_or(invalid("invalid_profile"))?;
         let profile = self.profiles.get(id).ok_or(invalid("unknown_profile"))?;
+        // Changing an alias must not silently keep another representation's
+        // default checkpoint. Explicit component overrides are checked by the loader.
+        if object
+            .get("model")
+            .is_some_and(|m| m != &profile.defaults["model"])
+            && object.get("model_options").is_none_or(|o| {
+                o["qwen_image_2_1"]["generation"]["diffusion_model"].is_null()
+                    && o["qwen_image_2_1"]["workflow"]["diffusion_model"].is_null()
+                    && o["moss_image"]["diffusion_model"].is_null()
+            })
+        {
+            return Err(invalid("model_settings_mismatch"));
+        }
         if let Some(version) = version
             && version.as_u64() != Some(u64::from(profile.version))
         {

@@ -60,7 +60,7 @@ fn bf16_selection_retains_precision_loras_and_backend_admission() {
     fixture::write(
         &dir.path().join("models"),
         &format!("diffusion_models/nested/{BF16_DIFFUSION}"),
-        json!({"txt_in.text_norm.weight":fixture::tensor(&[4096]),"img_in.weight":fixture::tensor(&[4096,64])}),
+        fixture::diffusion(false, false, true),
     );
     library.scan().unwrap();
     let snapshot = library.snapshot();
@@ -70,7 +70,7 @@ fn bf16_selection_retains_precision_loras_and_backend_admission() {
         .find(|m| m["model"] == contract::BF16)
         .unwrap();
     assert_eq!(model["group"], QWEN_GROUP);
-    assert_eq!(model["name"], "Qwen Image 2.1 · BF16");
+    assert_eq!(model["name"], BF16_DIFFUSION);
     assert_eq!(model["available"], true);
     assert_eq!(
         model["defaults"]["sampling"],
@@ -95,7 +95,11 @@ fn bf16_selection_retains_precision_loras_and_backend_admission() {
     }
     let mut mismatched = typed;
     mismatched.model = contract::MODEL.into();
-    assert_eq!(mismatched.validate(), Err("model_settings_mismatch"));
+    mismatched.validate().unwrap(); // Syntax validation no longer trusts filenames.
+    assert_eq!(
+        library.pin_explicit(&mismatched).unwrap_err().code,
+        "model_settings_mismatch"
+    );
 }
 #[test]
 fn discovery_uses_recursive_comfy_paths_aliases_and_bounded_headers() {
@@ -410,7 +414,7 @@ fn moss_defaults_keep_its_encoder_and_vae_but_explicit_cross_family_choices_are_
     fixture::write(
         &root,
         "diffusion_models/moss/moss_image_sft_int8_convrot.safetensors",
-        json!({"video_embedder.weight":fixture::tensor(&[1]),"layers.41.proj.qkv.weight":fixture::tensor(&[1])}),
+        fixture::diffusion(true, true, false),
     );
     fixture::write(
         &root,
@@ -570,4 +574,133 @@ fn encoders_and_vaes_are_uninspected_selectable_and_persist_without_family_restr
             .code,
         "model_file_missing"
     );
+}
+
+#[test]
+fn arbitrary_checkpoint_names_are_identified_by_content_and_profiles_persist() {
+    let (dir, mut library) = setup();
+    let root = dir.path().join("models");
+    fixture::write(
+        &root,
+        "diffusion_models/my-finetune.weights",
+        fixture::diffusion(false, false, true),
+    );
+    fixture::write(
+        &root,
+        "diffusion_models/moss-merge",
+        fixture::diffusion(true, false, true),
+    );
+    // An official-looking filename must not grant admission to wrong shapes.
+    let mut wrong = fixture::diffusion(false, false, true);
+    wrong["img_in.weight"]["shape"] = json!([128, 64]);
+    fixture::write(&root, &format!("diffusion_models/{BF16_DIFFUSION}"), wrong);
+    library.scan().unwrap();
+    let qwen = id(&library, "my-finetune.weights");
+    let moss = id(&library, "moss-merge");
+    assert_eq!(
+        library
+            .file(&qwen, "diffusion_models")
+            .unwrap()
+            .model
+            .as_deref(),
+        Some(contract::BF16)
+    );
+    assert_eq!(
+        library
+            .file(&moss, "diffusion_models")
+            .unwrap()
+            .model
+            .as_deref(),
+        Some(contract::MOSS_BF16)
+    );
+    assert!(
+        !library
+            .files
+            .iter()
+            .find(|f| f.path == format!("diffusion_models/{BF16_DIFFUSION}"))
+            .unwrap()
+            .supported
+    );
+    let mut settings = library.settings.clone();
+    settings
+        .execution_profiles
+        .insert(qwen.clone(), "turbo".into());
+    library.update(settings).unwrap();
+    assert_eq!(
+        library
+            .file(&qwen, "diffusion_models")
+            .unwrap()
+            .model
+            .as_deref(),
+        Some(contract::TURBO)
+    );
+    let restored = Library::load(root, dir.path().join("settings/library.json")).unwrap();
+    assert_eq!(
+        restored
+            .file(&qwen, "diffusion_models")
+            .unwrap()
+            .model
+            .as_deref(),
+        Some(contract::TURBO)
+    );
+    let (value, _) = restored.prepare(json!({"model":contract::TURBO,"operation":"text_to_image","model_selection":{"diffusion":qwen},"sampling":{"steps":17,"cfg_scale":2.5,"sampler":"euler","scheduler":"simple"}})).unwrap();
+    assert_eq!(value["sampling"]["steps"], 17);
+    let (moss_value, _) = restored.prepare(json!({"model":contract::MOSS_BF16,
+        "operation":"text_to_image","prompt":"Synthetic BF16",
+        "model_selection":{"diffusion":moss,"loras":[{"id":id(&restored,"style.safetensors"),"strength":0.5}]},
+        "sampling":{"steps":7,"cfg_scale":3.,"sampler":"euler","scheduler":"normal"}})).unwrap();
+    let moss_request: contract::JobRequest = serde_json::from_value(moss_value).unwrap();
+    moss_request.validate().unwrap();
+    assert_eq!(
+        moss_request.model_options.moss_image.unwrap().loras[0].strength,
+        0.5
+    );
+    let metadata = contract::model(contract::MOSS_BF16).unwrap();
+    assert_eq!(metadata["defaults"]["model"], contract::MOSS_BF16);
+}
+
+#[test]
+fn header_detection_distinguishes_layout_precision_and_unsupported_architectures() {
+    use crate::model_spec::*;
+    for (int8, format) in [
+        (true, WeightFormat::Int8ConvRot),
+        (false, WeightFormat::Bf16),
+    ] {
+        for (separate, qkv) in [(true, QkvLayout::Separate), (false, QkvLayout::Fused)] {
+            let mut header = fixture::diffusion(true, int8, separate);
+            header["aux.weight"] = fixture::tensor(&[1]);
+            assert_eq!(
+                detect(&header).unwrap(),
+                CheckpointSpec {
+                    architecture: Architecture::MossImage,
+                    format,
+                    qkv
+                }
+            );
+            header["layers.0.proj.q.weight"] = fixture::tensor(&[1]);
+            assert_eq!(detect(&header), Err("unsupported_qkv_layout"));
+        }
+    }
+    assert_eq!(detect(&json!({})), Err("unsupported_model_architecture"));
+    let mut bad = fixture::diffusion(false, false, true);
+    bad["img_in.weight"]["dtype"] = json!("F8_E4M3");
+    assert_eq!(detect(&bad), Err("unsupported_weight_format"));
+    bad = fixture::diffusion(false, false, true);
+    bad["transformer_blocks.32.attn.to_q.weight"] = fixture::tensor(&[4096, 4096]);
+    assert_eq!(detect(&bad), Err("unsupported_model_configuration"));
+}
+
+#[test]
+fn legacy_turbo_filename_does_not_restrict_other_checkpoint_contents() {
+    let (dir, mut library) = setup();
+    let path = format!("diffusion_models/renamed/{TURBO_DIFFUSION}");
+    fixture::write(
+        &dir.path().join("models"),
+        &path,
+        fixture::diffusion(true, false, false),
+    );
+    library.scan().unwrap();
+    let file = library.files.iter().find(|f| f.path == path).unwrap();
+    assert!(file.supported);
+    assert_eq!(file.model.as_deref(), Some(contract::MOSS_BF16));
 }

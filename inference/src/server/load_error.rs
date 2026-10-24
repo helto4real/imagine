@@ -55,6 +55,17 @@ pub fn classify(role: &str, path: &Path, error: &Error) -> LoadDiagnostic {
         Reason::FileNotFound
     } else if lower.contains("permission denied") {
         Reason::PermissionDenied
+    } else if text == "unsupported_model_architecture" {
+        Reason::UnsupportedArchitecture
+    } else if matches!(
+        text.as_str(),
+        "unsupported_model_configuration" | "unsupported_qkv_layout"
+    ) {
+        Reason::TensorShapeMismatch
+    } else if text == "unsupported_weight_format" {
+        Reason::UnsupportedQuantization
+    } else if text == "invalid_checkpoint" {
+        Reason::InvalidCheckpoint
     } else if let Some(key) = missing {
         tensor = Some(key.to_owned());
         Reason::MissingTensor
@@ -145,6 +156,23 @@ mod tests {
                 None,
             ),
             ("private sentinel", Reason::LoadFailed, None),
+            (
+                "unsupported_model_architecture",
+                Reason::UnsupportedArchitecture,
+                None,
+            ),
+            (
+                "unsupported_model_configuration",
+                Reason::TensorShapeMismatch,
+                None,
+            ),
+            ("unsupported_qkv_layout", Reason::TensorShapeMismatch, None),
+            (
+                "unsupported_weight_format",
+                Reason::UnsupportedQuantization,
+                None,
+            ),
+            ("invalid_checkpoint", Reason::InvalidCheckpoint, None),
         ] {
             let mut emitted = None;
             let mut observer = |event| {

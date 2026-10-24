@@ -23,6 +23,7 @@ pub struct Components {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct LibrarySettings {
+    pub execution_profiles: BTreeMap<String, String>,
     pub root: PathBuf,
     pub components: BTreeMap<String, Components>,
     // Retained for reading older settings; LoRA lists are owned by UI model groups.

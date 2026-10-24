@@ -1,0 +1,360 @@
+diff --git a/inference/src/models/qwen_image21/patching.rs b/inference/src/models/qwen_image21/patching.rs
+--- a/inference/src/models/qwen_image21/patching.rs
++++ b/inference/src/models/qwen_image21/patching.rs
+@@ -34,27 +34,5 @@
+             .map(|p| format!("qwen3vl_8b.transformer.{}", p.name))
+             .collect::<Vec<_>>(),
+     ));
+-    let mut owner = PatchOwner::new();
+-    owner.key_prefix = prefix.into();
+-    for (lora, model_strength, text_strength) in loras {
+-        let mut loaded = patching::load_lora(lora, &mapping)?;
+-        loaded.patches.retain_mut(|(target, _)| {
+-            if let Some(key) = target.key.strip_prefix(prefix) {
+-                target.key = key.to_owned();
+-                true
+-            } else {
+-                false
+-            }
+-        });
+-        owner.add(
+-            state,
+-            &loaded,
+-            if component == "dit" {
+-                *model_strength
+-            } else {
+-                *text_strength
+-            },
+-        );
+-    }
+-    Ok(owner)
++    patching::bind_component(prefix, state, loras, &mapping, component == "text")
+ }
+diff --git a/inference/src/patching/mod.rs b/inference/src/patching/mod.rs
+--- a/inference/src/patching/mod.rs
++++ b/inference/src/patching/mod.rs
+@@ -287,3 +287,6 @@
+ 
+ pub mod hook_patches;
+ pub mod hooks;
++
++mod binding;
++pub use binding::*;
+diff --git a/inference/src/patching/owner.rs b/inference/src/patching/owner.rs
+--- a/inference/src/patching/owner.rs
++++ b/inference/src/patching/owner.rs
+@@ -55,6 +55,7 @@
+     }
+ }
+ pub struct PatchOwner {
++    pub report: super::PatchReport,
+     pub patches: PatchMap,
+     pub key_prefix: String,
+     pub(crate) backup: BTreeMap<String, Value>,
+@@ -68,6 +69,7 @@
+ impl PatchOwner {
+     pub fn new() -> Self {
+         Self {
++            report: Default::default(),
+             patches: BTreeMap::new(),
+             key_prefix: String::new(),
+             backup: BTreeMap::new(),
+diff --git a/inference/src/patching/binding.rs b/inference/src/patching/binding.rs
+new file mode 100644
+--- /dev/null
++++ b/inference/src/patching/binding.rs
+@@ -0,0 +1,98 @@
++//! Shared LoRA binding. Parsing and application order are owned by the caller.
++use super::{PatchOwner, Target, load_lora};
++use crate::{
++    checkpoint::{Aimdo, PreparedParameters, Safetensors},
++    execution::Runtime,
++    execution_value::Value,
++    native::Error,
++};
++use std::{
++    collections::{BTreeMap, BTreeSet},
++    path::Path,
++};
++pub type LoraState = BTreeMap<String, Value>;
++pub type SelectedLora = (LoraState, f64, f64);
++#[derive(Clone, Debug, Default, PartialEq, Eq)]
++pub struct FilePatchReport {
++    pub consumed: BTreeSet<String>,
++    pub unmatched: BTreeSet<String>,
++    pub parsed_targets: Vec<Target>,
++    pub accepted_targets: Vec<Target>,
++}
++#[derive(Clone, Debug, Default, PartialEq, Eq)]
++pub struct PatchReport {
++    pub files: Vec<FilePatchReport>,
++}
++impl PatchReport {
++    /// Components refer to the same ordered selection; never classify per-component misses as file failures.
++    pub fn merge(&mut self, other: &Self) {
++        self.files
++            .resize_with(self.files.len().max(other.files.len()), Default::default);
++        for (a, b) in self.files.iter_mut().zip(&other.files) {
++            a.consumed.extend(b.consumed.iter().cloned());
++            a.unmatched.extend(b.unmatched.iter().cloned());
++            a.unmatched.retain(|k| !a.consumed.contains(k));
++            for (targets, more) in [
++                (&mut a.parsed_targets, &b.parsed_targets),
++                (&mut a.accepted_targets, &b.accepted_targets),
++            ] {
++                for target in more {
++                    if !targets.contains(target) {
++                        targets.push(target.clone());
++                    }
++                }
++            }
++        }
++    }
++}
++pub fn read_lora(rt: &Runtime, aimdo: &Aimdo, path: &Path) -> Result<LoraState, Error> {
++    Ok(Safetensors::load_aimdo(path, aimdo, &rt.native)?
++        .tensors
++        .into_iter()
++        .map(|(n, t)| (n, Value::tensor(t.tensor)))
++        .collect())
++}
++pub fn bind_component(
++    prefix: &str,
++    state: &PreparedParameters,
++    loras: &[SelectedLora],
++    mapping: &[(String, Target)],
++    text_strength: bool,
++) -> Result<PatchOwner, Error> {
++    let mut owner = PatchOwner::new();
++    owner.key_prefix = prefix.into();
++    for (lora, model_strength, clip_strength) in loras {
++        let mut loaded = load_lora(lora, mapping)?;
++        let mut report = FilePatchReport {
++            consumed: loaded.loaded_keys.clone(),
++            unmatched: loaded.missing_keys.iter().cloned().collect(),
++            parsed_targets: loaded.patches.iter().map(|(t, _)| t.clone()).collect(),
++            ..Default::default()
++        };
++        loaded.patches.retain_mut(|(target, _)| {
++            if let Some(key) = target.key.strip_prefix(prefix) {
++                target.key = key.to_owned();
++                true
++            } else {
++                false
++            }
++        });
++        let accepted = owner.add(
++            state,
++            &loaded,
++            if text_strength {
++                *clip_strength
++            } else {
++                *model_strength
++            },
++        );
++        report
++            .accepted_targets
++            .extend(accepted.iter().map(|t| Target {
++                key: format!("{prefix}{}", t.key),
++                offset: t.offset,
++            }));
++        owner.report.files.push(report);
++    }
++    Ok(owner)
++}
+diff --git a/inference/src/models/moss_image/mod.rs b/inference/src/models/moss_image/mod.rs
+--- a/inference/src/models/moss_image/mod.rs
++++ b/inference/src/models/moss_image/mod.rs
+@@ -22,3 +22,6 @@
+ pub use managed_vae::*;
+ mod vae_checkpoint;
+ pub use vae_checkpoint::*;
++
++mod patching;
++pub use patching::{component_patch_owner, moss_key_map};
+diff --git a/inference/src/models/moss_image/checkpoint.rs b/inference/src/models/moss_image/checkpoint.rs
+--- a/inference/src/models/moss_image/checkpoint.rs
++++ b/inference/src/models/moss_image/checkpoint.rs
+@@ -1,12 +1,12 @@
+-//! Original constructor/schema and static component inventory for local MOSS.
++use crate::models::qwen_image21::normalized_text_key;
++// Original constructor/schema and static component inventory for local MOSS.
+ use crate::{
+     checkpoint::PreparedParameters,
++    components::{
++        ComponentBuffers, ComponentInventory, ComponentLoad, ConstructorSchema, StaticOffload,
++        prepare_resident_component_with_options, static_component_from_inventory,
++    },
+     execution::Runtime,
+-    models::qwen_image21::{
+-        ComponentBuffers, ComponentInventory, ComponentLoad, ConstructorSchema, StaticOffload,
+-        normalized_text_key, prepare_resident_component_with_options,
+-        static_component_from_inventory,
+-    },
+     native::Error,
+ };
+ use std::collections::BTreeMap;
+@@ -22,7 +22,12 @@
+             crate::execution_value::Value::tensor(super::MossSampling::moss()?.sigmas),
+         );
+     }
+-    static_component_from_inventory(rt, parameters, moss_component_inventory(component)?)
++    let fused = component != "dit" || parameters.contains_key("layers.0.proj.qkv.weight");
++    static_component_from_inventory(
++        rt,
++        parameters,
++        moss_component_inventory_for_layout(component, fused)?,
++    )
+ }
+ pub fn moss_constructor_schema() -> Result<ConstructorSchema, Error> {
+     serde_json::from_str(include_str!("../../../resources/moss-schema.json"))
+@@ -52,7 +57,11 @@
+     device: Device,
+     options: ComponentLoad,
+ ) -> Result<PreparedParameters, Error> {
+-    let schema = moss_constructor_schema()?;
++    let fused = component != "dit"
++        || state
++            .iter()
++            .any(|(name, _)| name == "layers.0.proj.qkv.weight");
++    let schema = moss_constructor_schema_for_layout(fused)?;
+     let spec = schema
+         .models
+         .get(component)
+@@ -77,3 +86,64 @@
+     };
+     prepare_resident_component_with_options(rt, component, spec, state, device, options)
+ }
++
++/// Alternate constructor metadata only; checkpoint tensors are never fused or split.
++pub fn moss_constructor_schema_for_layout(fused_qkv: bool) -> Result<ConstructorSchema, Error> {
++    let mut schema = moss_constructor_schema()?;
++    if !fused_qkv {
++        let dit = schema
++            .models
++            .get_mut("dit")
++            .ok_or_else(|| Error::Native("Missing MOSS DiT schema".into()))?;
++        dit.parameters = std::mem::take(&mut dit.parameters)
++            .into_iter()
++            .flat_map(|p| {
++                if let Some(stem) = p.name.strip_suffix(".proj.qkv.weight") {
++                    ["q", "k", "v"]
++                        .iter()
++                        .map(|projection| {
++                            let mut separate = p.clone();
++                            separate.name = format!("{stem}.proj.{projection}.weight");
++                            separate.shape[0] /= 3;
++                            separate
++                        })
++                        .collect::<Vec<_>>()
++                } else {
++                    vec![p]
++                }
++            })
++            .collect();
++    }
++    Ok(schema)
++}
++pub fn moss_component_inventory_for_layout(
++    component: &str,
++    fused_qkv: bool,
++) -> Result<ComponentInventory, Error> {
++    let mut inventory = moss_component_inventory(component)?;
++    if component == "dit" && !fused_qkv {
++        inventory.modules = inventory
++            .modules
++            .into_iter()
++            .flat_map(|m| {
++                if let Some(stem) = m.name.strip_suffix(".proj.qkv") {
++                    ["q", "k", "v"]
++                        .iter()
++                        .map(|projection| {
++                            let name = format!("{stem}.proj.{projection}");
++                            let mut separate = m.clone();
++                            separate.parameters = vec![format!("{name}.weight")];
++                            separate.name = name;
++                            separate.module_bytes /= 3;
++                            separate.offload_bytes /= 3;
++                            separate
++                        })
++                        .collect::<Vec<_>>()
++                } else {
++                    vec![m]
++                }
++            })
++            .collect();
++    }
++    Ok(inventory)
++}
+diff --git a/inference/src/models/moss_image/patching.rs b/inference/src/models/moss_image/patching.rs
+new file mode 100644
+--- /dev/null
++++ b/inference/src/models/moss_image/patching.rs
+@@ -0,0 +1,67 @@
++//! MOSS aliases from the pinned ComfyUI model_lora_keys_unet, using logical shapes.
++use crate::{
++    checkpoint::PreparedParameters,
++    native::Error,
++    patching::{self, PatchOwner, SelectedLora, Target},
++};
++pub fn moss_key_map(weights: &[(String, Vec<i64>)]) -> Vec<(String, Target)> {
++    let mut mapping = Vec::new();
++    for (key, _) in weights {
++        if let Some(name) = key.strip_prefix("diffusion_model.") {
++            let target = Target {
++                key: key.clone(),
++                offset: None,
++            };
++            if let Some(stem) = name.strip_suffix(".weight") {
++                mapping.push((
++                    format!("lora_unet_{}", stem.replace('.', "_")),
++                    target.clone(),
++                ));
++                mapping.push((key.trim_end_matches(".weight").into(), target));
++            } else {
++                mapping.push((key.clone(), target));
++            }
++        }
++    }
++    for (key, shape) in weights {
++        if let Some(stem) = key.strip_suffix(".proj.qkv.weight") {
++            let third = shape[0] / 3;
++            for (i, projection) in ["q", "k", "v"].iter().enumerate() {
++                let name = format!("{stem}.proj.{projection}");
++                let target = Target {
++                    key: key.clone(),
++                    offset: Some([0, i as i64 * third, third]),
++                };
++                mapping.push((name.clone(), target.clone()));
++                mapping.push((
++                    format!(
++                        "lora_unet_{}",
++                        name.trim_start_matches("diffusion_model.")
++                            .replace('.', "_")
++                    ),
++                    target,
++                ));
++            }
++        }
++    }
++    mapping
++}
++pub fn component_patch_owner(
++    state: &PreparedParameters,
++    loras: &[SelectedLora],
++) -> Result<PatchOwner, Error> {
++    let fused = state.contains_key("layers.0.proj.qkv.weight");
++    let schema = super::moss_constructor_schema_for_layout(fused)?;
++    let weights = schema.models["dit"]
++        .parameters
++        .iter()
++        .map(|p| (format!("diffusion_model.{}", p.name), p.shape.clone()))
++        .collect::<Vec<_>>();
++    patching::bind_component(
++        "diffusion_model.",
++        state,
++        loras,
++        &moss_key_map(&weights),
++        false,
++    )
++}

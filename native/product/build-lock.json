@@ -14,7 +14,9 @@
     "inference/src/models/qwen_image21/vision_encoder.rs": "036371550ab80fd82714332e57981b5071ad3970e0cee6d349f2b3cf6be66c80"
   },
   "core_patches": {
-    "native/h3-product/checkpoint.patch": "e5261bf46f995be3626c919dec89b7156b78da90aa8b6cb7f38fee159faefe15"
+    "native/h3-product/checkpoint.patch": "e5261bf46f995be3626c919dec89b7156b78da90aa8b6cb7f38fee159faefe15",
+    "native/product/patches/components.patch": "1102ead95f580639c77cab4ae9e6bd35ed385a14582e7514efea8bb91a05c408",
+    "native/product/patches/model-lora.patch": "a7d8851e2d16e61ea9761d08bc3bb87acc1ea949ff9ef026fda3cfbb29a60dc8"
   },
   "product_files": [
     "design/h3-i2v-model-lock.json",
@@ -55,7 +57,8 @@
     "shared/h3_reference_cache.rs",
     "shared/h3_references.rs",
     "shared/h3_sampling.rs",
-    "shared/image_preview_rgb.rs"
+    "shared/image_preview_rgb.rs",
+    "shared/model_spec.rs"
   ],
   "related_source_locks": [
     "native/upstream-lock.json",

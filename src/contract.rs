@@ -2,7 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-pub const MOSS: &str = "moss-image-sft-int8";
+pub use crate::model_spec::{MOSS_BF16, MOSS_INT8 as MOSS};
 pub const MODEL: &str = "qwen-image-2.1-int8";
 pub const BF16: &str = "qwen-image-2.1-bf16";
 pub const TURBO: &str = "qwen-image-2.1-turbo";
@@ -107,7 +107,7 @@ pub struct ModelOptions {
 }
 impl ModelOptions {
     pub fn generation(&self, model: &str) -> Option<&WorkflowOptions> {
-        if model == MOSS {
+        if crate::model_spec::is_moss(model) {
             self.moss_image.as_ref()
         } else {
             self.qwen_image_2_1.workflow.as_ref()
@@ -192,7 +192,7 @@ impl JobRequest {
         if self.model == "minimax-h3" {
             return crate::video::job::request(self).map(|_| ());
         }
-        if !matches!(self.model.as_str(), MODEL | BF16 | TURBO | MOSS) {
+        if crate::model_spec::model(&self.model).is_none() {
             return Err("unknown_model");
         }
         if !matches!(
@@ -242,8 +242,9 @@ impl JobRequest {
         } else if self.character_sheet.is_some() || self.inputs.pose_guide.is_some() {
             return Err("unexpected_character_sheet_input");
         }
-        if (self.model == MOSS && self.model_options.qwen_image_2_1.workflow.is_some())
-            || (self.model != MOSS && self.model_options.moss_image.is_some())
+        if (crate::model_spec::is_moss(&self.model)
+            && self.model_options.qwen_image_2_1.workflow.is_some())
+            || (!crate::model_spec::is_moss(&self.model) && self.model_options.moss_image.is_some())
         {
             return Err("model_settings_mismatch");
         }
@@ -300,15 +301,14 @@ impl JobRequest {
         if self.seed.is_some_and(|seed| seed > MAX_SEED) {
             return Err("invalid_seed");
         }
-        if self.model == MOSS
+        if crate::model_spec::is_moss(&self.model)
             && (self.operation != Operation::TextToImage
                 || !self.inputs.reference_images.is_empty()
                 || workflow.is_none()
                 || self.sampling.sampler != "euler"
                 || !matches!(self.sampling.scheduler.as_str(), "normal" | "sgm_uniform")
                 || workflow.is_some_and(|w| {
-                    !w.loras.is_empty()
-                        || w.zero_negative_conditioning
+                    w.zero_negative_conditioning
                         || w.color_match_strength != 0.
                         || w.brightness_strength != 0.
                         || w.contrast_strength != 0.
@@ -316,7 +316,7 @@ impl JobRequest {
         {
             return Err("unsupported_moss_configuration");
         }
-        if self.model != MOSS
+        if !crate::model_spec::is_moss(&self.model)
             && matches!(self.sampling.scheduler.as_str(), "normal" | "sgm_uniform")
         {
             return Err("unsupported_sampling");
@@ -333,22 +333,6 @@ impl JobRequest {
                     .any(|l| !relative_model_path(&l.path) || !l.strength.is_finite())
             {
                 return Err("invalid_model_path");
-            }
-            let expected = if self.model == MOSS {
-                "moss_image_sft_int8_convrot.safetensors"
-            } else if self.model == TURBO {
-                "qwen_image_2.1_turbo_bf16.safetensors"
-            } else if self.model == BF16 {
-                "qwen_image_2.1_bf16.safetensors"
-            } else {
-                "qwen_image_2.1_int8_convrot.safetensors"
-            };
-            if std::path::Path::new(&w.diffusion_model)
-                .file_name()
-                .and_then(|p| p.to_str())
-                != Some(expected)
-            {
-                return Err("model_settings_mismatch");
             }
             if [
                 w.color_match_strength,
@@ -445,7 +429,7 @@ impl JobRequest {
 }
 
 pub fn models() -> Value {
-    json!({"models":[model(MODEL).unwrap(), model(TURBO).unwrap(), model(MOSS).unwrap(), model(BF16).unwrap(), model("minimax-h3").unwrap()]})
+    json!({"models":[model(MODEL).unwrap(), model(TURBO).unwrap(), model(MOSS).unwrap(), model(MOSS_BF16).unwrap(), model(BF16).unwrap(), model("minimax-h3").unwrap()]})
 }
 pub fn model(id: &str) -> Option<Value> {
     match id {
@@ -461,21 +445,28 @@ pub fn model(id: &str) -> Option<Value> {
             v["constraints"]["validated_resolutions"] = json!([]);
             Some(v)
         }
-        MOSS => {
-            let mut v = model(MODEL)?;
-            v["id"] = json!(MOSS);
-            v["engine"] = json!("Imagine Rust");
-            v["availability"] = json!("requires_rust_backend_and_weights");
-            v["operations"] = json!(["text_to_image"]);
-            v.as_object_mut()?.remove("character_sheet");
-            v["constraints"]["samplers"] = json!(["euler"]);
-            v["constraints"]["schedulers"] = json!(["normal", "sgm_uniform"]);
-            v["constraints"]["loras"] = json!(false);
-            v["constraints"]["reference_images"]["max_count"] = json!(0);
-            v["constraints"]["validated_resolutions"] = json!([]);
+        MOSS | MOSS_BF16 => {
+            let spec = crate::model_spec::model(id)?;
+            let mut v = json!({
+                "id": id, "available": true, "engine":"Imagine Rust",
+                "availability":"requires_rust_backend_and_weights", "profile_revision":PROFILE,
+                "operations":spec.architecture.operations(),
+                "constraints": {
+                    "dimensions":{"min":128,"max":4096,"multiple":32,"min_max_side":256},
+                    "validated_resolutions":[], "steps":{"min":1}, "cfg_scale":{"finite":true},
+                    "samplers":spec.architecture.samplers(), "schedulers":spec.architecture.schedulers(),
+                    "output_formats":["png"],"max_output_count":1,"loras":true,
+                    "reference_images":{"max_count":0}
+                }, "request_schema":schemars::schema_for!(JobRequest)
+            });
             v["defaults"] = serde_yaml::from_str::<Value>(include_str!("../profiles/moss.yaml"))
                 .ok()?["defaults"]
                 .clone();
+            v["defaults"]["model"] = json!(id);
+            if id == MOSS_BF16 {
+                v["defaults"]["model_options"]["moss_image"]["diffusion_model"] =
+                    json!("diffusion_models/moss/moss_image_sft_bf16.safetensors");
+            }
             Some(v)
         }
         TURBO => Some(

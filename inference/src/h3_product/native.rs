@@ -4,6 +4,7 @@ use super::{
     protocol::{self as p, ErrorCode, Event, Phase, Request},
     wire::{self, Emit, Generator},
 };
+use crate::components as c;
 use crate::{
     attention::{Attention, AttentionInput, AttentionMethod},
     checkpoint::{
@@ -191,7 +192,7 @@ impl TextEncoderExecution for Exec<'_> {
 impl VideoExecution for Exec<'_> {
     fn free_memory(&mut self, device: Device) -> NResult<u64> {
         let Device::Cuda(i) = device else {
-            return q::host_available_memory();
+            return c::host_available_memory();
         };
         let [free, _, active, reserved] = self.native.cuda_memory(i)?;
         Ok(free + reserved - active)
@@ -292,7 +293,7 @@ fn component<T>(
         } else {
             BTreeMap::new()
         };
-        let pins = q::HostPins::new(rt.native.clone())?;
+        let pins = c::HostPins::new(rt.native.clone())?;
         let patches = if role == Component::Dit {
             Some(
                 super::loras::owner(&parameters, &models.root, &models.options.loras)
@@ -321,7 +322,7 @@ fn component<T>(
         )
     })?;
     let (owner, pins, mut sampling) = setup;
-    let model = q::StaticModel::new(
+    let model = c::StaticModel::new(
         owner,
         rt,
         if role == Component::Dit {
@@ -332,7 +333,7 @@ fn component<T>(
     );
     let patcher = model.patcher();
     let mut manager = Manager::new();
-    let mut memory = q::StaticMemoryServices::new(rt.native.clone(), pins.clone());
+    let mut memory = c::StaticMemoryServices::new(rt.native.clone(), pins.clone());
     let result = (|| -> Result<T, ErrorCode> {
         manager
             .load(

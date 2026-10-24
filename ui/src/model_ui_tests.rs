@@ -246,9 +246,9 @@ fn model_picker_roundtrip_keeps_cold_and_switched_requests_identical() {
     desk.frame(vec![]);
     let normal = request(&desk);
     for _ in 0..2 {
-        choose(&mut desk, "Qwen Image 2.1 · Turbo");
+        choose(&mut desk, "qwen_image_2.1_turbo_bf16.safetensors");
         assert_eq!(request(&desk), turbo);
-        choose(&mut desk, "Qwen Image 2.1 · INT8");
+        choose(&mut desk, "qwen_image_2.1_int8_convrot.safetensors");
         assert_eq!(request(&desk), normal);
     }
 }
@@ -838,7 +838,7 @@ fn moss_model_switch_uses_its_group_defaults_and_preserves_qwen_loras() {
     assert_eq!(desk.app.prefs.model_group, crate::model_catalog::MOSS_GROUP);
     assert_eq!(desk.app.prefs.generation.steps, 50);
     assert_eq!(desk.app.prefs.generation.cfg_scale, 3.);
-    assert!(!desk.app.models.open);
+    assert!(desk.app.models.open); // MOSS now accepts diffusion LoRAs.
     assert!(desk.app.model_selection().unwrap().loras.is_empty());
 
     desk.app.select_model(qwen);
@@ -860,7 +860,7 @@ fn bf16_variant_switch_preserves_qwen_loras_and_request_precision() {
     fixture::write(
         &desk._root.path().join("models"),
         "diffusion_models/nested/qwen_image_2.1_bf16.safetensors",
-        json!({"txt_in.text_norm.weight":fixture::tensor(&[4096]),"img_in.weight":fixture::tensor(&[4096,64])}),
+        fixture::diffusion(false, false, true),
     );
     let library = catalog(desk._root.path());
     let bf16 = library

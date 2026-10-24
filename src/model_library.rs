@@ -17,10 +17,14 @@ use std::{
 #[path = "../shared/model_catalog.rs"]
 mod types;
 pub use types::*;
+#[cfg(test)]
 const DIFFUSION: &str = "qwen_image_2.1_int8_convrot.safetensors";
+#[cfg(test)]
 const BF16_DIFFUSION: &str = "qwen_image_2.1_bf16.safetensors";
 const TURBO_DIFFUSION: &str = "qwen_image_2.1_turbo_bf16.safetensors";
+#[cfg(test)]
 const ENCODER: &str = "qwen3vl_8b_int8_convrot.safetensors";
+#[cfg(test)]
 const VAE: &str = "qwen_image_2.1_vae_bf16.safetensors";
 
 #[derive(Default)]
@@ -29,6 +33,7 @@ pub struct Library {
     files: Vec<ModelFile>,
     scanned: BTreeMap<String, FileStamp>,
     warnings: Vec<String>,
+    specs: BTreeMap<String, crate::model_spec::CheckpointSpec>,
     settings_path: PathBuf,
     settings_runtime: Option<PathBuf>,
 }
@@ -151,15 +156,25 @@ impl Library {
                 meta["id"] = json!(file.id);
                 meta["model"] = json!(model);
                 meta["group"] = json!(file.group);
-                meta["name"] = json!(if model == contract::MOSS {
-                    "MOSS Image · SFT INT8"
-                } else if model == contract::TURBO {
-                    "Qwen Image 2.1 · Turbo"
-                } else if model == contract::BF16 {
-                    "Qwen Image 2.1 · BF16"
-                } else {
-                    "Qwen Image 2.1 · INT8"
-                });
+                meta["name"] = json!(
+                    Path::new(&file.path)
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or(&file.path)
+                );
+                if let Some(spec) = self.specs.get(&file.id) {
+                    meta["checkpoint"] = json!(spec);
+                    meta["architecture"] = json!(spec.architecture.label());
+                    let profile = crate::model_spec::model(model).unwrap().profile;
+                    meta["execution_profile"] = json!(profile);
+                    meta["execution_profiles"] = json!(
+                        spec.architecture
+                            .profiles()
+                            .iter()
+                            .filter(|p| spec.model(**p).is_ok())
+                            .collect::<Vec<_>>()
+                    );
+                }
                 meta["path"] = json!(file.path);
                 meta["available"] = json!(problem.is_none());
                 meta["problem"] = json!(problem);
@@ -246,6 +261,52 @@ impl Library {
                 }
             }
         }
+        let mut specs = BTreeMap::new();
+        for file in files.iter_mut().filter(|f| f.kind == "diffusion_models") {
+            let detected = read_header(&file.absolute)
+                .map_err(|_| "invalid_checkpoint")
+                .and_then(|header| crate::model_spec::detect(&header));
+            match detected {
+                Ok(spec) => {
+                    let legacy_turbo = Path::new(&file.path).file_name().and_then(|n| n.to_str())
+                        == Some(TURBO_DIFFUSION)
+                        && spec
+                            .model(crate::model_spec::ExecutionProfile::Turbo)
+                            .is_ok();
+                    let profile = self
+                        .settings
+                        .execution_profiles
+                        .get(&file.id)
+                        .map(|p| {
+                            serde_json::from_value(json!(p))
+                                .map_err(|_| "unsupported_execution_profile")
+                        })
+                        .unwrap_or(Ok(if legacy_turbo {
+                            crate::model_spec::ExecutionProfile::Turbo
+                        } else {
+                            crate::model_spec::ExecutionProfile::Standard
+                        }));
+                    match profile.and_then(|p| spec.model(p)) {
+                        Ok(model) => {
+                            file.model = Some(model.into());
+                            file.supported = true;
+                        }
+                        Err(reason) => return Err(anyhow::anyhow!(reason)),
+                    }
+                    file.group = Some(spec.architecture.group().into());
+                    specs.insert(file.id.clone(), spec);
+                }
+                Err(reason) => {
+                    file.supported = false;
+                    if let Some(previous) = self.files.iter().find(|p| p.id == file.id) {
+                        file.model = previous.model.clone();
+                        file.group = previous.group.clone();
+                    }
+                    warnings.push(format!("{reason}: {}", file.path));
+                }
+            }
+        }
+        self.specs = specs;
         files.sort_by(|a, b| a.path.cmp(&b.path));
         let scanned = files
             .iter()
@@ -335,6 +396,26 @@ impl Library {
                 .map(|key| w[key].as_str().expect("shipped component").to_owned())
                 .collect()
         };
+        // Admission reads headers, so enforce the same relative-path boundary
+        // even when this method is called outside the validated HTTP path.
+        if paths.iter().any(|p| {
+            p.is_empty()
+                || Path::new(p)
+                    .components()
+                    .any(|c| !matches!(c, std::path::Component::Normal(_)))
+        }) {
+            return Err(Fault::new(422, "invalid_model_path"));
+        }
+        if request.model_options.generation(&request.model).is_some() {
+            let header = read_header(&self.settings.root.join(&paths[0]))
+                .map_err(|_| Fault::new(422, "invalid_checkpoint"))?;
+            let detected = crate::model_spec::detect(&header).map_err(|e| Fault::new(422, e))?;
+            let expected =
+                crate::model_spec::model(&request.model).ok_or(Fault::new(422, "unknown_model"))?;
+            if detected.model(expected.profile) != Ok(request.model.as_str()) {
+                return Err(Fault::new(422, "model_settings_mismatch"));
+            }
+        }
         let files = paths
             .iter()
             .map(|path| FileStamp::read(&self.settings.root.join(path)))
@@ -423,7 +504,7 @@ impl Library {
             .entry("model_options")
             .or_insert_with(|| json!({}));
         let options = options.as_object_mut().ok_or(invalid("invalid_request"))?;
-        if model == contract::MOSS {
+        if crate::model_spec::is_moss(model) {
             options.insert("moss_image".into(), json!(workflow));
         } else {
             let qwen = options.entry("qwen_image_2_1").or_insert_with(|| json!({}));
@@ -453,7 +534,7 @@ impl Library {
 }
 
 pub fn model_metadata(model: &str) -> Value {
-    if model == contract::MOSS {
+    if crate::model_spec::is_moss(model) {
         let mut v = contract::model(model).unwrap();
         v["defaults"]["model_options"]
             .as_object_mut()
@@ -524,9 +605,10 @@ fn scan_dir(
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
-        if !(["safetensors", "gguf", "ckpt", "pt", "pth", "bin", "sft"]
-            .contains(&extension.as_str())
-            || kind == "loras" && extension == "safetensor")
+        if kind != "diffusion_models"
+            && !(["safetensors", "gguf", "ckpt", "pt", "pth", "bin", "sft"]
+                .contains(&extension.as_str())
+                || kind == "loras" && extension == "safetensor")
         {
             continue;
         }
@@ -534,39 +616,20 @@ fn scan_dir(
             continue;
         };
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-        let model = match (kind, name) {
-            ("diffusion_models", DIFFUSION) => Some(contract::MODEL.into()),
-            ("diffusion_models", BF16_DIFFUSION) => Some(contract::BF16.into()),
-            ("diffusion_models", TURBO_DIFFUSION) => Some(contract::TURBO.into()),
-            ("diffusion_models", "moss_image_sft_int8_convrot.safetensors") => {
-                Some(contract::MOSS.into())
-            }
-            _ => None,
-        };
-        let moss = model.as_deref() == Some(contract::MOSS)
-            || kind == "text_encoders" && name == "qwen3.5_9b_int8_convrot.safetensors"
-            || kind == "vae" && name == "flux2-vae.safetensors";
-        let known = moss
-            || model.is_some()
-            || (kind == "text_encoders" && name == ENCODER)
-            || (kind == "vae" && name == VAE);
-        let mut group = known.then(|| if moss { MOSS_GROUP } else { QWEN_GROUP }.to_owned());
-        let uninspected = matches!(kind, "loras" | "text_encoders" | "vae");
-        let mut supported = known || uninspected;
-        if known && !uninspected {
-            supported = if moss {
-                moss_header_matches(&path, kind)
-            } else {
-                model_header_matches(&path, kind)
-            }
-            .unwrap_or(false);
-            if !supported {
-                warnings.push(format!(
-                    "Model header does not match the supported component: {relative}"
-                ));
-                group = None;
-            }
-        }
+        let model = None;
+        // Component names remain default hints only. Diffusion admission happens by header.
+        let group = [
+            crate::model_spec::Architecture::QwenImage21,
+            crate::model_spec::Architecture::MossImage,
+        ]
+        .into_iter()
+        .find_map(|architecture| {
+            let components = architecture.components();
+            ((kind == "text_encoders" && name == components.default_text_file)
+                || (kind == "vae" && name == components.default_vae_file))
+                .then(|| architecture.group().into())
+        });
+        let supported = matches!(kind, "loras" | "text_encoders" | "vae");
         let absolute = path.canonicalize()?;
         if files
             .iter()
@@ -619,25 +682,6 @@ fn read_header(path: &Path) -> Result<Value> {
     }
     Ok(header)
 }
-fn model_header_matches(path: &Path, kind: &str) -> Result<bool> {
-    let header = read_header(path)?;
-    let keys: Vec<_> = header.as_object().unwrap().keys().collect();
-    let has = |suffix: &str| keys.iter().any(|k| k.ends_with(suffix));
-    // Match native architecture indicators as well as the supported weight filenames.
-    Ok(match kind {
-        "diffusion_models" => has("txt_in.text_norm.weight") && has("img_in.weight"),
-        _ => false,
-    })
-}
-fn moss_header_matches(path: &Path, kind: &str) -> Result<bool> {
-    let h = read_header(path)?;
-    let has = |suffix: &str| h.as_object().unwrap().keys().any(|k| k.ends_with(suffix));
-    Ok(match kind {
-        "diffusion_models" => has("video_embedder.weight") && has("layers.41.proj.qkv.weight"),
-        _ => false,
-    })
-}
-
 #[cfg(test)]
 #[path = "model_library_tests.rs"]
 mod tests;

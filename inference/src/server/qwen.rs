@@ -1,5 +1,5 @@
 use super::*;
-use crate::execution_value::Value;
+use crate::components as c;
 pub(super) fn generate(
     rt: &Runtime,
     aimdo: &Aimdo,
@@ -8,21 +8,18 @@ pub(super) fn generate(
     observer: &mut Observer<'_>,
 ) -> Result<Tensor, Error> {
     let dev = Device::Cuda(0);
-    let pins = q::HostPins::new(rt.native.clone())?;
+    let pins = c::HostPins::new(rt.native.clone())?;
     let mut manager = Manager::new();
-    let mut memory = q::StaticMemoryServices::new(rt.native.clone(), pins.clone());
+    let mut memory = c::StaticMemoryServices::new(rt.native.clone(), pins.clone());
     let loras = r
         .loras
         .iter()
         .map(|l| {
-            let state = Safetensors::load_aimdo(&l.path, aimdo, &rt.native)?
-                .tensors
-                .into_iter()
-                .map(|(n, t)| (n, Value::tensor(t.tensor)))
-                .collect();
+            let state = crate::patching::read_lora(rt, aimdo, &l.path)?;
             Ok((state, l.strength, l.strength))
         })
         .collect::<Result<Vec<_>, Error>>()?;
+    let mut patch_report = crate::patching::PatchReport::default();
     observer(Event::Phase("preparing_inputs"))?;
     let references = if images.is_empty() {
         None
@@ -34,8 +31,8 @@ pub(super) fn generate(
             ))
         }?;
         let vae = observe_load("vae", &r.vae, observer, || {
-            Ok(q::StaticModel::new(
-                q::static_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", false)?)?
+            Ok(c::StaticModel::new(
+                q::static_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", &r.model)?)?
                     .with_shared_pins(pins.clone()),
                 rt,
                 None,
@@ -68,9 +65,10 @@ pub(super) fn generate(
         ..Default::default()
     };
     let text = observe_load("text", &r.text_encoder, observer, || {
-        let params = load(rt, aimdo, &r.text_encoder, "text", false)?;
+        let params = load(rt, aimdo, &r.text_encoder, "text", &r.model)?;
         let patches = q::component_patch_owner("text", &params, &loras)?;
-        Ok(q::StaticModel::new(
+        patch_report.merge(&patches.report);
+        Ok(c::StaticModel::new(
             q::static_component(rt, "text", params)?
                 .with_shared_pins(pins.clone())
                 .with_patches(patches)?,
@@ -133,9 +131,10 @@ pub(super) fn generate(
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("loading_model"))?;
     let model = observe_load("dit", &r.diffusion_model, observer, || {
-        let params = load(rt, aimdo, &r.diffusion_model, "dit", false)?;
+        let params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
         let patches = q::component_patch_owner("dit", &params, &loras)?;
-        Ok(q::StaticModel::new(
+        patch_report.merge(&patches.report);
+        Ok(c::StaticModel::new(
             q::StaticOffload::new(params, rt.native.clone())?
                 .with_shared_pins(pins.clone())
                 .with_patches(patches)?,
@@ -261,8 +260,8 @@ pub(super) fn generate(
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("saving_output"))?;
     let vae = observe_load("vae", &r.vae, observer, || {
-        Ok(q::StaticModel::new(
-            q::static_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", false)?)?
+        Ok(c::StaticModel::new(
+            q::static_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", &r.model)?)?
                 .with_shared_pins(pins.clone()),
             rt,
             None,

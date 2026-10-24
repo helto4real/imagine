@@ -1,4 +1,5 @@
 use super::*;
+use crate::components as c;
 pub(super) fn generate(
     rt: &Runtime,
     aimdo: &Aimdo,
@@ -6,14 +7,29 @@ pub(super) fn generate(
     observer: &mut Observer<'_>,
 ) -> Result<Tensor, Error> {
     let dev = Device::Cuda(0);
-    let pins = q::HostPins::new(rt.native.clone())?;
+    let pins = c::HostPins::new(rt.native.clone())?;
     let mut manager = Manager::new();
-    let mut memory = q::StaticMemoryServices::new(rt.native.clone(), pins.clone());
+    let mut memory = c::StaticMemoryServices::new(rt.native.clone(), pins.clone());
+    let loras = r
+        .loras
+        .iter()
+        .map(|l| {
+            Ok((
+                crate::patching::read_lora(rt, aimdo, &l.path)?,
+                l.strength,
+                l.strength,
+            ))
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
     observer(Event::Phase("encoding"))?;
     let text = observe_load("text", &r.text_encoder, observer, || {
-        Ok(q::StaticModel::new(
-            m::static_moss_component(rt, "text", load(rt, aimdo, &r.text_encoder, "text", true)?)?
-                .with_shared_pins(pins.clone()),
+        Ok(c::StaticModel::new(
+            m::static_moss_component(
+                rt,
+                "text",
+                load(rt, aimdo, &r.text_encoder, "text", &r.model)?,
+            )?
+            .with_shared_pins(pins.clone()),
             rt,
             None,
         ))
@@ -58,9 +74,20 @@ pub(super) fn generate(
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("loading_model"))?;
     let model = observe_load("dit", &r.diffusion_model, observer, || {
-        Ok(q::StaticModel::new(
-            m::static_moss_component(rt, "dit", load(rt, aimdo, &r.diffusion_model, "dit", true)?)?
-                .with_shared_pins(pins.clone()),
+        let params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
+        let patches = if loras.is_empty() {
+            None
+        } else {
+            Some(m::component_patch_owner(&params, &loras)?)
+        };
+        let component = m::static_moss_component(rt, "dit", params)?.with_shared_pins(pins.clone());
+        let component = if let Some(patches) = patches {
+            component.with_patches(patches)?
+        } else {
+            component
+        };
+        Ok(c::StaticModel::new(
+            component,
             rt,
             Some(tch::Kind::BFloat16),
         ))
@@ -160,8 +187,8 @@ pub(super) fn generate(
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("saving_output"))?;
     let model = observe_load("vae", &r.vae, observer, || {
-        Ok(q::StaticModel::new(
-            m::static_moss_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", true)?)?
+        Ok(c::StaticModel::new(
+            m::static_moss_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", &r.model)?)?
                 .with_shared_pins(pins.clone()),
             rt,
             None,

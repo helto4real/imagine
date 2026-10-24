@@ -21,7 +21,7 @@ pub fn models(root: &Path) {
         write(
             root,
             &format!("diffusion_models/nested/{name}"),
-            json!({"txt_in.text_norm.weight":tensor(&[4096]),"img_in.weight":tensor(&[4096,64])}),
+            diffusion(false, name.contains("int8"), true),
         );
     }
     write(
@@ -49,4 +49,54 @@ pub fn models(root: &Path) {
         "loras/other.safetensors",
         json!({"__metadata__":{"ss_base_model_version":"sdxl"},"transformer.lora_down.weight":tensor(&[1])}),
     );
+}
+
+/// Complete admission signatures with a tiny synthetic payload (never loaded as model weights).
+pub fn diffusion(moss: bool, int8: bool, separate: bool) -> Value {
+    let mut h = serde_json::Map::new();
+    let mut add = |key: String, shape: &[u64]| {
+        let mut value = tensor(shape);
+        value["dtype"] = json!("BF16");
+        h.insert(key, value);
+    };
+    if moss {
+        add("video_embedder.weight".into(), &[3072, 128]);
+        add("shared_block_modulation.weight".into(), &[18432, 3072]);
+        for i in 0..42 {
+            if separate {
+                for p in ["q", "k", "v"] {
+                    add(format!("layers.{i}.proj.{p}.weight"), &[3072, 3072]);
+                }
+            } else {
+                add(format!("layers.{i}.proj.qkv.weight"), &[9216, 3072]);
+            }
+            add(
+                format!("layers.{i}.proj.ffn_up_gate.weight"),
+                &[16384, 3072],
+            );
+        }
+    } else {
+        add("txt_in.text_norm.weight".into(), &[4096]);
+        add("img_in.weight".into(), &[4096, 64]);
+        for i in 0..32 {
+            for p in ["q", "k", "v"] {
+                add(
+                    format!("transformer_blocks.{i}.attn.to_{p}.weight"),
+                    &[4096, 4096],
+                );
+            }
+            add(
+                format!("transformer_blocks.{i}.img_mlp.gate_up.weight"),
+                &[24576, 4096],
+            );
+        }
+    }
+    if int8 {
+        let primary = if moss { "video_embedder" } else { "img_in" };
+        h.get_mut(&format!("{primary}.weight")).unwrap()["dtype"] = json!("I8");
+        let mut metadata = tensor(&[4]);
+        metadata["dtype"] = json!("U8");
+        h.insert(format!("{primary}.comfy_quant"), metadata);
+    }
+    Value::Object(h)
 }

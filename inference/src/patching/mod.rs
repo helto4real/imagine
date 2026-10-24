@@ -287,3 +287,6 @@ pub mod options;
 
 pub mod hook_patches;
 pub mod hooks;
+
+mod binding;
+pub use binding::*;

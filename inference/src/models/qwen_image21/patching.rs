@@ -34,27 +34,5 @@ pub fn component_patch_owner(
             .map(|p| format!("qwen3vl_8b.transformer.{}", p.name))
             .collect::<Vec<_>>(),
     ));
-    let mut owner = PatchOwner::new();
-    owner.key_prefix = prefix.into();
-    for (lora, model_strength, text_strength) in loras {
-        let mut loaded = patching::load_lora(lora, &mapping)?;
-        loaded.patches.retain_mut(|(target, _)| {
-            if let Some(key) = target.key.strip_prefix(prefix) {
-                target.key = key.to_owned();
-                true
-            } else {
-                false
-            }
-        });
-        owner.add(
-            state,
-            &loaded,
-            if component == "dit" {
-                *model_strength
-            } else {
-                *text_strength
-            },
-        );
-    }
-    Ok(owner)
+    patching::bind_component(prefix, state, loras, &mapping, component == "text")
 }

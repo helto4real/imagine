@@ -351,23 +351,29 @@ impl ImagineApp {
         ui.add_enabled_ui(enabled, |ui| {
             ui.horizontal(|ui| {
                 let width = (ui.available_width() - 65.).max(100.);
-                egui::ComboBox::from_id_salt("model-selection")
-                    .width(width)
-                    .truncate()
-                    .selected_text(self.selected_model_name())
-                    .show_ui(ui, |ui| {
-                        for model in &library.models {
-                            let id = model["id"].as_str().unwrap_or_default();
-                            let name = model["name"].as_str().unwrap_or_default();
-                            let label = if model["available"] == true {
-                                name.to_owned()
-                            } else {
-                                format!("{name} · Setup required")
-                            };
-                            ui.selectable_value(&mut selected, id.into(), label)
-                                .on_hover_text(model["path"].as_str().unwrap_or_default());
-                        }
-                    });
+                ui.allocate_ui_with_layout(
+                    egui::vec2(width, ui.spacing().interact_size.y),
+                    egui::Layout::left_to_right(egui::Align::Center),
+                    |ui| {
+                        egui::ComboBox::from_id_salt("model-selection")
+                            .width(width)
+                            .truncate()
+                            .selected_text(self.selected_model_name())
+                            .show_ui(ui, |ui| {
+                                for model in &library.models {
+                                    let id = model["id"].as_str().unwrap_or_default();
+                                    let name = model["name"].as_str().unwrap_or_default();
+                                    let label = if model["available"] == true {
+                                        name.to_owned()
+                                    } else {
+                                        format!("{name} · Setup required")
+                                    };
+                                    ui.selectable_value(&mut selected, id.into(), label)
+                                        .on_hover_text(model["path"].as_str().unwrap_or_default());
+                                }
+                            })
+                    },
+                );
                 let count = self
                     .group_settings()
                     .loras
@@ -392,6 +398,20 @@ impl ImagineApp {
             });
         });
         self.select_model(selected);
+        if let Some(model) = &self.metadata {
+            if let (Some(architecture), Some(format)) = (
+                model["architecture"].as_str(),
+                model["checkpoint"]["format"].as_str(),
+            ) {
+                ui.label(
+                    RichText::new(format!(
+                        "{architecture} · {}",
+                        if format == "bf16" { "BF16" } else { "INT8" }
+                    ))
+                    .small(),
+                );
+            }
+        }
         if let Err(error) = self.model_selection() {
             ui.label(RichText::new(error.to_string()).small().color(helto::ERROR));
         }
@@ -425,6 +445,30 @@ impl ImagineApp {
         }
         if let Some(model) = self.selected_model().cloned() {
             let id = model["id"].as_str().unwrap().to_owned();
+            if let Some(profiles) = model["execution_profiles"]
+                .as_array()
+                .filter(|p| p.len() > 1)
+            {
+                let mut profile = model["execution_profile"]
+                    .as_str()
+                    .unwrap_or("standard")
+                    .to_owned();
+                let before = profile.clone();
+                ui.add_enabled_ui(!self.models.loading, |ui| {
+                    egui::ComboBox::from_id_salt("checkpoint-execution-profile")
+                        .selected_text(&profile)
+                        .show_ui(ui, |ui| {
+                            for value in profiles.iter().filter_map(Value::as_str) {
+                                ui.selectable_value(&mut profile, value.to_owned(), value);
+                            }
+                        });
+                });
+                if profile != before {
+                    let mut settings = library.settings.clone();
+                    settings.execution_profiles.insert(id.clone(), profile);
+                    self.load_library(ui.ctx(), Some(settings));
+                }
+            }
             let mut components = library
                 .settings
                 .components
