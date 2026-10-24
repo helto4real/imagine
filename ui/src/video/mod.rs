@@ -138,6 +138,8 @@ pub(super) struct Timeline {
     section_selection: Vec<SectionId>,
     audio_selection_order: Vec<AudioClipId>,
     boundary: bool,
+    /// Scenes whose carried motion needs H3 Reference, awaiting the user's answer.
+    model_switch: Vec<SceneId>,
     audio_selected: BTreeSet<AudioClipId>,
     audio_primary: Option<AudioClipId>,
     audio_draft: Option<AudioClip>,

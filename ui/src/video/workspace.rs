@@ -301,6 +301,7 @@ impl ImagineApp {
         self.timeline_assembly_window(ui.ctx());
         self.timeline_replace_window(ui.ctx());
         self.timeline_cleanup_window(ui.ctx());
+        self.timeline_model_switch(ui.ctx());
     }
     /// Shelf media dropped on the Timeline: images and videos become inputs of
     /// the scene or Section, audio a clip at the scene start, as their pickers

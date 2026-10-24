@@ -309,6 +309,10 @@ impl ImagineApp {
             if let Some(continuity) =
                 linked_continuity(&d.project, scene, &left.id, &before.mode, &boundary.mode)
             {
+                // Carried motion runs on H3 Reference; offer to switch once it is set.
+                if continuity.is_some() {
+                    self.timeline.model_switch = vec![scene.id.clone()];
+                }
                 commands.extend(self.timeline.draft_edits());
                 commands.push(Edit::SetContinuity {
                     scene_id: scene.id.clone(),

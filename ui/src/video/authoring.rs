@@ -872,6 +872,18 @@ impl ImagineApp {
             Reply::Applied => {
                 if let Some(d) = &mut self.timeline.authoring.draft {
                     d.phase = Phase::Applied;
+                    // A Story's continuous shots carry motion, which runs on H3 Reference.
+                    if d.request.operation == Operation::Outline {
+                        let prefix = format!("scene_{}_", d.id);
+                        self.timeline.model_switch = value["project"]["scenes"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|s| s["id"].as_str())
+                            .filter(|id| id.starts_with(&prefix))
+                            .map(|id| SceneId(id.into()))
+                            .collect();
+                    }
                 }
                 // A used enhancement is now the field's text; its card closes.
                 if self.authoring_operation() != Operation::Outline {

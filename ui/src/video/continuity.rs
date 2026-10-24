@@ -189,26 +189,12 @@ impl ImagineApp {
                 #[cfg(feature = "ui-preview")]
                 super::qa::control(ui, "continuity-i2v".into(), &response);
                 if response.clicked() {
-                    let model = ModelSelection {
-                        adapter: "h3".into(),
-                        model: "minimax-h3".into(),
-                        variant: if motion { "reference" } else { "i2v" }.into(),
-                        profile: if motion {
-                            "h3-av-noref-v2"
-                        } else {
-                            "h3-fl2va-i2va-v1"
-                        }
-                        .into(),
-                        profile_revision: "2".into(),
-                    };
                     commands.extend(self.timeline.draft_edits());
-                    if !scene.settings.iter().any(|slot| slot.model == model) {
-                        commands.push(Edit::SetModelSettings { scene_id: scene.id.clone(), settings: SettingsSlot { model: model.clone(), schema_version: 1, values: json!({"stage_one":{"steps":20,"sampler":"res_multistep","scheduler":"simple"},"stage_two":null}) } });
-                    }
-                    commands.push(Edit::SetSceneModel {
-                        scene_id: scene.id.clone(),
-                        model: ModelChoice::Override(model),
-                    });
+                    commands.extend(model_edits(
+                        &d.project,
+                        scene,
+                        if motion { "reference" } else { "i2v" },
+                    ));
                 }
             }
             if scene
@@ -227,6 +213,110 @@ impl ImagineApp {
             });
         }
     }
+}
+/// Edits that put `scene` on H3 `variant`: Reference for carried motion,
+/// I2V for a last frame. The project's settings for that model are inherited
+/// when it has them; otherwise the Scene gets that model's defaults.
+pub(super) fn model_edits(project: &VideoProject, scene: &Scene, variant: &str) -> Vec<Edit> {
+    let model = imagine_video_contract::generation::h3_model(variant);
+    let mut edits = vec![];
+    if project.settings_for(scene, &model).is_none() {
+        edits.push(Edit::SetModelSettings {
+            scene_id: scene.id.clone(),
+            settings: SettingsSlot {
+                model: model.clone(),
+                schema_version: 1,
+                values: serde_json::to_value(imagine_video_contract::generation::h3_defaults_for(
+                    variant,
+                ))
+                .expect("finite defaults"),
+            },
+        });
+    }
+    edits.push(Edit::SetSceneModel {
+        scene_id: scene.id.clone(),
+        model: ModelChoice::Override(model),
+    });
+    edits
+}
+impl ImagineApp {
+    /// Asks whether Scenes whose continuity carries motion should move to
+    /// H3 Reference, which motion needs; it waits for the edit that set it.
+    pub(super) fn timeline_model_switch(&mut self, ctx: &egui::Context) {
+        if self.timeline.model_switch.is_empty() || self.timeline.busy {
+            return;
+        }
+        let Some(project) = self.timeline.document.as_ref().map(|d| d.project.clone()) else {
+            self.timeline.model_switch.clear();
+            return;
+        };
+        let scenes = need_reference(&project, &self.timeline.model_switch);
+        if scenes.is_empty() {
+            self.timeline.model_switch.clear();
+            return;
+        }
+        let numbers = scenes
+            .iter()
+            .filter_map(|id| project.scenes.iter().position(|s| &s.id == id))
+            .map(|i| (i + 1).to_string())
+            .collect::<Vec<_>>();
+        let (mut switch, mut keep) = (false, false);
+        let modal = egui::Modal::new(egui::Id::new("model-switch")).show(ctx, |ui| {
+            ui.set_max_width(420.);
+            ui.label(helto::section("Switch to H3 Reference?"));
+            ui.label(format!(
+                "A Continuous shot carries the previous Scene's motion, which needs H3 Reference. {} {} on another model.",
+                if numbers.len() == 1 { "Scene" } else { "Scenes" },
+                numbers.join(", ")
+            ));
+            ui.add_space(6.);
+            ui.horizontal(|ui| {
+                let r = helto::action(
+                    ui,
+                    crate::icons::Icon::Check,
+                    "Switch to H3 Reference",
+                    true,
+                    None,
+                );
+                #[cfg(feature = "ui-preview")]
+                super::qa::control(ui, "model-switch-yes".into(), &r);
+                switch = r.clicked();
+                let r = helto::icon_button(ui, crate::icons::Icon::Close, "Keep the current model", false);
+                #[cfg(feature = "ui-preview")]
+                super::qa::control(ui, "model-switch-no".into(), &r);
+                keep = r.clicked();
+            });
+        });
+        // Escape or a click outside keeps the model, as Keep does.
+        keep |= modal.should_close();
+        if switch {
+            let mut commands = self.timeline.draft_edits();
+            for scene in scenes.iter().filter_map(|id| project.scene(id).ok()) {
+                commands.extend(model_edits(&project, scene, "reference"));
+            }
+            self.timeline_edit(ctx, commands, 0);
+        }
+        if switch || keep {
+            self.timeline.model_switch.clear();
+        }
+    }
+}
+/// Of `scenes`, those whose continuity carries motion while they are not on
+/// H3 Reference, which motion needs.
+pub(super) fn need_reference(project: &VideoProject, scenes: &[SceneId]) -> Vec<SceneId> {
+    scenes
+        .iter()
+        .filter_map(|id| project.scene(id).ok())
+        .filter(|s| {
+            s.continuity.as_ref().is_some_and(|c| {
+                matches!(
+                    c.method,
+                    ContinuityMethod::MotionContext | ContinuityMethod::MotionContextExp
+                )
+            }) && project.effective_model(s).variant != "reference"
+        })
+        .map(|s| s.id.clone())
+        .collect()
 }
 fn method_label(method: &ContinuityMethod) -> &'static str {
     match method {
@@ -268,6 +358,151 @@ fn boundary_video_ready(
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn motion_project(generation: bool) -> VideoProject {
+        let mut p = VideoProject::create(CreateProject {
+            schema_version: 1,
+            generation: generation.then(imagine_video_contract::generation::Defaults::default),
+            default_model: imagine_video_contract::generation::h3_model("i2v"),
+            delivery: DeliverySettings {
+                width: 416,
+                height: 224,
+                fps: Time { num: 24, den: 1 },
+            },
+        })
+        .unwrap();
+        for (i, id) in ["own-first", "own-second"].into_iter().enumerate() {
+            p.scenes.push(Scene {
+                id: SceneId(id.into()),
+                start: Time {
+                    num: 2 * i as u64,
+                    den: 1,
+                },
+                duration: Time { num: 2, den: 1 },
+                description: String::new(),
+                model: ModelChoice::ProjectDefault,
+                settings: vec![],
+                sections: vec![],
+                bindings: vec![],
+                continuity: (i == 1).then(|| Continuity {
+                    source_scene: SceneId("own-first".into()),
+                    method: ContinuityMethod::MotionContextExp,
+                    include_audio: false,
+                }),
+                accepted_take: None,
+            });
+        }
+        p
+    }
+    #[test]
+    fn carried_motion_off_reference_asks_and_the_switch_inherits_project_settings() {
+        let p = motion_project(true);
+        let ids = [SceneId("own-first".into()), SceneId("own-second".into())];
+        assert_eq!(need_reference(&p, &ids), [ids[1].clone()]);
+        let scene = p.scene(&ids[1]).unwrap();
+        // The project has Reference settings, so the Scene only changes model.
+        let edits = model_edits(&p, scene, "reference");
+        assert!(
+            matches!(edits.as_slice(), [Edit::SetSceneModel { model: ModelChoice::Override(m), .. }] if m.variant == "reference")
+        );
+        // Without them the Scene gets Reference's defaults, with its locked file.
+        let bare = motion_project(false);
+        let edits = model_edits(&bare, bare.scene(&ids[1]).unwrap(), "reference");
+        let [
+            Edit::SetModelSettings { settings, .. },
+            Edit::SetSceneModel { .. },
+        ] = edits.as_slice()
+        else {
+            panic!("{edits:?}");
+        };
+        assert_eq!(
+            settings.values["components"]["model"],
+            "diffusion_models/minimax_h3/minimax_h3_ref2va_pruned_int8_convrot.safetensors"
+        );
+        let mut switched = p.clone();
+        switched.scenes[1].model =
+            ModelChoice::Override(imagine_video_contract::generation::h3_model("reference"));
+        assert!(need_reference(&switched, &ids).is_empty());
+    }
+    #[test]
+    fn the_switch_popup_asks_once_the_continuity_is_set_and_either_answer_closes_it() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        // Nothing listens there: an edit is either still out or has failed.
+        app.client = Some(
+            crate::client::Client::connect(&crate::settings::Connection {
+                url: "http://127.0.0.1:1".into(),
+            })
+            .unwrap(),
+        );
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.document = Some(Snapshot::with(motion_project(true), json!({})));
+        let frame = |app: &mut ImagineApp, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 900.),
+                    )),
+                    events,
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            output.textures_delta.clear();
+            output.platform_output.accesskit_update.unwrap().nodes
+        };
+        let click = |app: &mut ImagineApp, label: &str| {
+            let mut nodes = vec![];
+            for _ in 0..2 {
+                nodes = frame(app, vec![]);
+            }
+            let b = nodes
+                .iter()
+                .find(|(_, n)| n.label() == Some(label))
+                .and_then(|(_, n)| n.bounds())
+                .unwrap_or_else(|| panic!("{label}"));
+            let pos = egui::pos2(((b.x0 + b.x1) / 2.) as f32, ((b.y0 + b.y1) / 2.) as f32);
+            for pressed in [true, false] {
+                frame(
+                    app,
+                    vec![
+                        egui::Event::PointerMoved(pos),
+                        egui::Event::PointerButton {
+                            pos,
+                            button: egui::PointerButton::Primary,
+                            pressed,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                );
+            }
+        };
+        // A Scene without carried motion asks nothing.
+        app.timeline.model_switch = vec![SceneId("own-first".into())];
+        frame(&mut app, vec![]);
+        assert!(app.timeline.model_switch.is_empty());
+        app.timeline.model_switch = vec![SceneId("own-second".into())];
+        let nodes = frame(&mut app, vec![]);
+        assert!(nodes.iter().any(|(_, n)| {
+            n.value()
+                .or(n.label())
+                .is_some_and(|t| t.contains("Scene 2 on another model"))
+        }));
+        click(&mut app, "Keep the current model");
+        assert!(app.timeline.model_switch.is_empty() && !app.timeline.busy);
+        app.timeline.model_switch = vec![SceneId("own-second".into())];
+        click(&mut app, "Switch to H3 Reference");
+        assert!(app.timeline.model_switch.is_empty());
+        assert!(
+            app.timeline.busy || app.timeline.error.is_some(),
+            "the switch edit was sent"
+        );
+    }
     fn resources(value: serde_json::Value) -> Vec<snapshot::ResourceView> {
         serde_json::from_value(value).unwrap()
     }
