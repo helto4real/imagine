@@ -90,6 +90,25 @@ mod tests {
         assert_eq!(a.as_deref(), Some("/own/compatible alternative.bin"));
     }
     #[test]
+    fn a_source_canvas_changes_size_in_the_image_shape_and_back() {
+        use imagine_video_contract::generation::Canvas;
+        let mut canvas = Canvas {
+            ratio: "Source".into(),
+            portrait: false,
+            quality: "Standard".into(),
+        };
+        // As Animate resolves a portrait image.
+        let standard = canvas_size(&canvas, Some((320, 480))).unwrap();
+        assert!(standard.1 > standard.0);
+        // Without the shape it fails, which used to put Standard back.
+        canvas.quality = "Draft".into();
+        assert!(canvas_size(&canvas, None).is_err());
+        let draft = canvas_size(&canvas, Some(standard)).unwrap();
+        assert!(draft.0 < standard.0 && draft.1 < standard.1 && draft.1 > draft.0);
+        canvas.quality = "Standard".into();
+        assert_eq!(canvas_size(&canvas, Some(standard)).unwrap(), standard);
+    }
+    #[test]
     fn project_mode_switch_retains_invalid_raw_text_and_independent_settings() {
         let mut d = Draft {
             session: egui::Id::new("own-draft"),
@@ -102,6 +121,7 @@ mod tests {
                 fps: Time { num: 24, den: 1 },
             },
             generation: Defaults::default(),
+            source: None,
             seed: "0".into(),
             sampling: SamplingDraft::new(h3_defaults()),
             error: None,
@@ -193,9 +213,26 @@ struct Draft {
     model: ModelSelection,
     delivery: DeliverySettings,
     generation: Defaults,
+    /// The image shape a "Source" canvas was made from, kept while the ratio
+    /// changes so Source can be chosen again.
+    source: Option<(u32, u32)>,
     seed: String,
     sampling: SamplingDraft,
     error: Option<String>,
+}
+/// The output size for `canvas`; a "Source" canvas keeps `source`'s shape.
+fn canvas_size(
+    canvas: &imagine_video_contract::generation::Canvas,
+    source: Option<(u32, u32)>,
+) -> Result<(u32, u32), &'static str> {
+    let shape = crate::h3_protocol::Selection {
+        ratio: canvas.ratio.clone(),
+        portrait: canvas.portrait,
+        quality: canvas.quality.clone(),
+        seconds: 5.,
+    }
+    .resolve_with_source(source)?;
+    Ok((shape.width, shape.height))
 }
 impl Draft {
     fn switch_mode(&mut self, previous: ModelSelection) -> Result<(), String> {
@@ -575,6 +612,12 @@ impl ImagineApp {
         };
         let model = d.project.default_model.clone();
         let generation = defaults(&d.project);
+        // The delivery was resolved from the source image, so it has its shape.
+        let source = generation
+            .canvas
+            .as_ref()
+            .filter(|c| c.ratio == "Source")
+            .map(|_| (d.project.delivery.width, d.project.delivery.height));
         let value = generation
             .settings
             .iter()
@@ -591,6 +634,7 @@ impl ImagineApp {
                     delivery: d.project.delivery.clone(),
                     seed: generation.seed.to_string(),
                     generation,
+                    source,
                     sampling: SamplingDraft::new(value.unwrap_or_else(h3_defaults)),
                     error: None,
                 })
@@ -659,7 +703,12 @@ impl ImagineApp {
                         let r = egui::ComboBox::from_id_salt("ratio")
                             .selected_text(&canvas.ratio)
                             .show_ui(ui, |ui| {
-                                for ratio in crate::h3_protocol::geometry::RATIOS {
+                                for ratio in draft
+                                    .source
+                                    .map(|_| "Source")
+                                    .into_iter()
+                                    .chain(crate::h3_protocol::geometry::RATIOS)
+                                {
                                     let r =
                                         ui.selectable_value(&mut canvas.ratio, ratio.into(), ratio);
                                     control(ui, &format!("project-ratio-{ratio}"), &r);
@@ -667,21 +716,19 @@ impl ImagineApp {
                                 }
                             });
                         control(ui, "project-ratio", &r.response);
-                        let r = ui.checkbox(&mut canvas.portrait, "Portrait");
+                        // Source already has the image's orientation.
+                        let r = ui.add_enabled(
+                            canvas.ratio != "Source",
+                            egui::Checkbox::new(&mut canvas.portrait, "Portrait"),
+                        );
                         control(ui, "project-portrait", &r);
                         canvas_changed |= r.changed();
                     });
                     if canvas_changed {
-                        let selection = crate::h3_protocol::Selection {
-                            ratio: canvas.ratio.clone(),
-                            portrait: canvas.portrait,
-                            quality: canvas.quality.clone(),
-                            seconds: 5.,
-                        };
-                        match selection.resolve() {
-                            Ok(s) => {
-                                draft.delivery.width = s.width;
-                                draft.delivery.height = s.height;
+                        match canvas_size(&canvas, draft.source) {
+                            Ok((width, height)) => {
+                                draft.delivery.width = width;
+                                draft.delivery.height = height;
                                 draft.generation.canvas = Some(canvas);
                                 draft.error = None;
                             }
