@@ -128,6 +128,43 @@ impl ImagineApp {
                     state.selected = index;
                 }
             }
+            if outline_editable(draft) {
+                let r = ui
+                    .add_enabled_ui(scenes < 128, |ui| {
+                        helto::action(ui, crate::icons::Icon::Plus, "Add Scene", false, None)
+                    })
+                    .inner;
+                control(ui, "story-scene-add", &r);
+                if r.clicked() {
+                    state.selected = edit_outline(draft, OutlineEdit::AddScene, selected);
+                }
+            } else if !draft.phase.busy()
+                && draft.phase != imagine_video_contract::authoring::Phase::Applied
+                && draft.scenes.iter().any(Option::is_some)
+            {
+                // Changing the outline discards the storyboard, as in Director.
+                if state.confirm_edit_outline {
+                    let confirm = helto::confirm(
+                        ui,
+                        "Edit the outline? The expanded Scenes are discarded.",
+                        (crate::icons::Icon::Edit, "Discard storyboard"),
+                        "Keep the storyboard",
+                        None,
+                    );
+                    control(ui, "story-edit-outline-confirm", &confirm.yes);
+                    if confirm.yes.clicked() {
+                        discard_storyboard(draft);
+                    }
+                    if confirm.yes.clicked() || confirm.no.clicked() {
+                        state.confirm_edit_outline = false;
+                    }
+                } else {
+                    let r =
+                        helto::action(ui, crate::icons::Icon::Edit, "Edit outline", false, None);
+                    control(ui, "story-edit-outline", &r);
+                    state.confirm_edit_outline = r.clicked();
+                }
+            }
             let ready = draft.scenes.iter().filter(|s| s.is_some()).count();
             ui.weak(format!("{ready} / {scenes} scenes expanded"));
             let busy = state.busy || draft.phase.busy();
@@ -146,10 +183,56 @@ impl ImagineApp {
             };
             let index = index.min(draft.scenes.len().saturating_sub(1));
             let status = scene_status(draft, &state.received, index);
+            let count = draft.scenes.len();
+            let mut edit = None;
             ui.horizontal(|ui| {
                 ui.label(helto::section(&format!("Scene {}", index + 1)));
                 status_pill(ui, status);
+                if outline_editable(draft) {
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        // Right to left: Remove is the outermost.
+                        let buttons = [
+                            (
+                                crate::icons::Icon::Trash,
+                                "Remove Scene",
+                                count > 1,
+                                OutlineEdit::RemoveScene(index),
+                            ),
+                            (
+                                crate::icons::Icon::Down,
+                                "Move Scene later",
+                                index + 1 < count,
+                                OutlineEdit::MoveScene(index, true),
+                            ),
+                            (
+                                crate::icons::Icon::Up,
+                                "Move Scene earlier",
+                                index > 0,
+                                OutlineEdit::MoveScene(index, false),
+                            ),
+                        ];
+                        for (icon, name, enabled, action) in buttons {
+                            let r = ui
+                                .add_enabled_ui(enabled, |ui| {
+                                    helto::icon_button(ui, icon, name, false)
+                                })
+                                .inner;
+                            control(
+                                ui,
+                                &format!("story-{}", name.to_lowercase().replace(' ', "-")),
+                                &r,
+                            );
+                            if r.clicked() {
+                                edit = Some(action);
+                            }
+                        }
+                    });
+                }
             });
+            if let Some(edit) = edit {
+                state.selected = edit_outline(draft, edit, index);
+            }
+            let index = state.selected.min(draft.scenes.len().saturating_sub(1));
             ui.separator();
             // Finished Scenes stay editable while later ones expand, as in Director.
             ui.add_enabled_ui(!busy || status.reviewable(), |ui| {
@@ -340,6 +423,112 @@ mod tests {
         assert!(app.timeline.authoring.draft.is_none());
         assert_eq!(app.timeline.authoring.history.len(), 1);
         assert!(!app.timeline_story_open());
+    }
+
+    #[test]
+    fn the_outline_gains_moves_and_loses_scenes_and_an_expanded_one_asks_first() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        ctx.enable_accesskit();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let project = super::super::media_picker::tests::project();
+        let mut d = draft(&project);
+        d.phase = imagine_video_contract::authoring::Phase::Outline;
+        for scene in &mut d.outline.as_mut().unwrap().scenes {
+            scene
+                .sections
+                .push(imagine_video_contract::authoring::StorySection {
+                    id: format!("{}-1", scene.id),
+                    prompt: "Own beat".into(),
+                    weight: 1.,
+                    image_ids: vec![],
+                    first_frame_id: String::new(),
+                    last_frame_id: String::new(),
+                    dialogue_intent: None,
+                });
+        }
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.authoring.received = d.scenes.clone();
+        app.timeline.authoring.draft = Some(d);
+        app.timeline.authoring.open = true;
+        app.timeline.document = Some(Snapshot::with(project, json!({})));
+        let frame = |app: &mut ImagineApp, events: Vec<egui::Event>| {
+            let mut output = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 800.),
+                    )),
+                    events,
+                    focused: true,
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            );
+            output.textures_delta.clear();
+            output.platform_output.accesskit_update.unwrap().nodes
+        };
+        let click = |app: &mut ImagineApp, label: &str| {
+            let mut nodes = vec![];
+            for _ in 0..2 {
+                nodes = frame(app, vec![]);
+            }
+            let b = nodes
+                .iter()
+                .find(|(_, n)| n.label().is_some_and(|t| t == label))
+                .and_then(|(_, n)| n.bounds())
+                .unwrap_or_else(|| panic!("{label}"));
+            let pos = egui::pos2(((b.x0 + b.x1) / 2.) as f32, ((b.y0 + b.y1) / 2.) as f32);
+            for pressed in [true, false] {
+                frame(
+                    app,
+                    vec![
+                        egui::Event::PointerMoved(pos),
+                        egui::Event::PointerButton {
+                            pos,
+                            button: egui::PointerButton::Primary,
+                            pressed,
+                            modifiers: egui::Modifiers::NONE,
+                        },
+                    ],
+                );
+            }
+        };
+        let titles = |app: &ImagineApp| {
+            let d = app.timeline.authoring.draft.as_ref().unwrap();
+            d.outline
+                .as_ref()
+                .unwrap()
+                .scenes
+                .iter()
+                .map(|s| s.title.clone())
+                .collect::<Vec<_>>()
+        };
+        click(&mut app, "Add Scene");
+        assert_eq!(titles(&app), ["Own arrival", "Own signal", "Scene 3"]);
+        assert_eq!(app.timeline.authoring.selected, 2);
+        let d = app.timeline.authoring.draft.as_ref().unwrap();
+        assert_eq!(d.planned_durations.len(), 3);
+        // The new Scene's empty Section blocks Expand until it has a beat.
+        assert!(outline_blocker(d).is_some());
+        click(&mut app, "Move Scene earlier");
+        assert_eq!(titles(&app), ["Own arrival", "Scene 3", "Own signal"]);
+        click(&mut app, "Remove Scene");
+        assert_eq!(titles(&app), ["Own arrival", "Own signal"]);
+        // Once a Scene is expanded, the outline changes only after confirming.
+        let d = app.timeline.authoring.draft.as_mut().unwrap();
+        d.scenes[0] = Some(d.outline.as_ref().unwrap().scenes[0].clone());
+        click(&mut app, "Edit outline");
+        assert!(app.timeline.authoring.confirm_edit_outline);
+        click(&mut app, "Keep the storyboard");
+        assert!(app.timeline.authoring.draft.as_ref().unwrap().scenes[0].is_some());
+        click(&mut app, "Edit outline");
+        click(&mut app, "Discard storyboard");
+        let d = app.timeline.authoring.draft.as_ref().unwrap();
+        assert!(d.scenes.iter().all(Option::is_none));
+        assert!(outline_editable(d));
     }
 
     #[test]

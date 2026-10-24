@@ -133,6 +133,148 @@ pub(in crate::app) fn stage_strip(ui: &mut egui::Ui, draft: Option<&Draft>) {
         ui.label(text);
     }
 }
+/// A change to the outline's structure, as Director's outline cards offer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::app) enum OutlineEdit {
+    AddScene,
+    /// Moves a Scene one place earlier (`false`) or later (`true`).
+    MoveScene(usize, bool),
+    RemoveScene(usize),
+    AddSection(usize),
+    MoveSection(usize, usize, bool),
+    RemoveSection(usize, usize),
+}
+fn fresh_id(prefix: &str) -> String {
+    format!(
+        "{prefix}_{}",
+        &uuid::Uuid::new_v4().simple().to_string()[..12]
+    )
+}
+/// Whether the outline's structure can change: nothing expanded and nothing running.
+pub(in crate::app) fn outline_editable(draft: &Draft) -> bool {
+    draft.outline.is_some()
+        && !draft.phase.busy()
+        && draft.phase != Phase::Applied
+        && draft.scenes.iter().all(Option::is_none)
+}
+/// Applies `edit` and returns the Scene to select. Limits as the server checks
+/// them: 1–128 Scenes, 1–12 Sections each.
+pub(in crate::app) fn edit_outline(draft: &mut Draft, edit: OutlineEdit, selected: usize) -> usize {
+    let Some(outline) = &mut draft.outline else {
+        return selected;
+    };
+    let scenes = &mut outline.scenes;
+    let mut selected = selected.min(scenes.len().saturating_sub(1));
+    match edit {
+        OutlineEdit::AddScene if scenes.len() < 128 => {
+            scenes.push(StoryScene {
+                id: fresh_id("scene"),
+                title: format!("Scene {}", scenes.len() + 1),
+                summary: String::new(),
+                description: String::new(),
+                ambient_sound: String::new(),
+                non_diegetic_music: String::new(),
+                weight: 1.,
+                boundary_from_previous: "hard_cut".into(),
+                sections: vec![StorySection {
+                    id: fresh_id("section"),
+                    prompt: String::new(),
+                    weight: 1.,
+                    image_ids: vec![],
+                    first_frame_id: String::new(),
+                    last_frame_id: String::new(),
+                    dialogue_intent: None,
+                }],
+                image_ids: vec![],
+            });
+            selected = scenes.len() - 1;
+        }
+        OutlineEdit::MoveScene(i, later) => {
+            let j = if later { i + 1 } else { i.wrapping_sub(1) };
+            if i < scenes.len() && j < scenes.len() {
+                scenes.swap(i, j);
+                selected = j;
+            }
+        }
+        OutlineEdit::RemoveScene(i) if scenes.len() > 1 && i < scenes.len() => {
+            scenes.remove(i);
+            selected = i.min(scenes.len() - 1);
+        }
+        OutlineEdit::AddSection(i) => {
+            if let Some(scene) = scenes.get_mut(i).filter(|s| s.sections.len() < 12) {
+                scene.sections.push(StorySection {
+                    id: fresh_id("section"),
+                    prompt: String::new(),
+                    weight: 1.,
+                    image_ids: vec![],
+                    first_frame_id: String::new(),
+                    last_frame_id: String::new(),
+                    dialogue_intent: None,
+                });
+            }
+        }
+        OutlineEdit::MoveSection(i, k, later) => {
+            if let Some(scene) = scenes.get_mut(i) {
+                let j = if later { k + 1 } else { k.wrapping_sub(1) };
+                if k < scene.sections.len() && j < scene.sections.len() {
+                    scene.sections.swap(k, j);
+                }
+            }
+        }
+        OutlineEdit::RemoveSection(i, k) => {
+            if let Some(scene) = scenes
+                .get_mut(i)
+                .filter(|s| s.sections.len() > 1 && k < s.sections.len())
+            {
+                scene.sections.remove(k);
+            }
+        }
+        _ => {}
+    }
+    draft.scenes = vec![None; scenes.len()];
+    draft.failed_index = None;
+    replan(draft);
+    selected
+}
+/// The planned Scene lengths for the outline's current weights, or none when
+/// they cannot fit the requested duration.
+pub(in crate::app) fn replan(draft: &mut Draft) {
+    let Some(outline) = &draft.outline else {
+        return;
+    };
+    let weights = outline.scenes.iter().map(|s| s.weight).collect::<Vec<_>>();
+    draft.planned_durations =
+        durations(&weights, draft.request.duration_seconds, 15.).unwrap_or_default();
+}
+/// Why the outline cannot be expanded yet, as the server would refuse it.
+pub(in crate::app) fn outline_blocker(draft: &Draft) -> Option<String> {
+    let outline = draft.outline.as_ref()?;
+    if outline
+        .scenes
+        .iter()
+        .flat_map(|s| &s.sections)
+        .any(|s| s.prompt.trim().is_empty())
+    {
+        return Some("Write a beat for every Section first.".into());
+    }
+    let weights = outline.scenes.iter().map(|s| s.weight).collect::<Vec<_>>();
+    durations(&weights, draft.request.duration_seconds, 15.)
+        .err()
+        .map(|_| {
+            format!(
+                "{} Scenes cannot hold {:.0} s at 15 s each. Add a Scene.",
+                outline.scenes.len(),
+                draft.request.duration_seconds
+            )
+        })
+}
+/// Back to the outline: the storyboard is discarded, as any outline edit does.
+pub(in crate::app) fn discard_storyboard(draft: &mut Draft) {
+    draft.scenes = vec![None; draft.scenes.len()];
+    draft.failed_index = None;
+    draft.failure = None;
+    draft.phase = Phase::Outline;
+}
 /// What a draft is doing, in words.
 pub(in crate::app) fn phase_label(phase: Phase) -> &'static str {
     match phase {
@@ -193,6 +335,77 @@ mod tests {
         d.failed_index = Some(1);
         assert_eq!(status(&d, 1), SceneStatus::Failed);
         assert_eq!(status(&d, 2), SceneStatus::Outline);
+    }
+    #[test]
+    fn outline_edits_keep_limits_and_unique_ids_and_replan_lengths() {
+        let mut d = draft(vec![None, None, None], Phase::Outline);
+        for s in &mut d.outline.as_mut().unwrap().scenes {
+            s.sections.push(StorySection {
+                id: format!("{}-1", s.id),
+                prompt: "Own beat".into(),
+                weight: 1.,
+                image_ids: vec![],
+                first_frame_id: String::new(),
+                last_frame_id: String::new(),
+                dialogue_intent: None,
+            });
+        }
+        assert!(outline_editable(&d));
+        let ids = |d: &Draft| {
+            d.outline
+                .as_ref()
+                .unwrap()
+                .scenes
+                .iter()
+                .map(|s| s.id.clone())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(edit_outline(&mut d, OutlineEdit::MoveScene(0, true), 0), 1);
+        assert_eq!(ids(&d), ["b", "a", "c"]);
+        assert_eq!(edit_outline(&mut d, OutlineEdit::MoveScene(0, false), 0), 0);
+        assert_eq!(
+            ids(&d),
+            ["b", "a", "c"],
+            "the first Scene cannot move earlier"
+        );
+        assert_eq!(edit_outline(&mut d, OutlineEdit::AddScene, 0), 3);
+        assert_eq!(d.scenes.len(), 4);
+        assert_eq!(d.planned_durations, vec![6.; 4]);
+        // A new Scene's Section has no beat yet, which blocks expansion.
+        assert!(outline_blocker(&d).is_some());
+        let new = d.outline.as_ref().unwrap().scenes[3].clone();
+        assert!(!["a", "b", "c"].contains(&new.id.as_str()) && new.sections.len() == 1);
+        d.outline.as_mut().unwrap().scenes[3].sections[0].prompt = "Own new beat".into();
+        assert_eq!(outline_blocker(&d), None);
+        edit_outline(&mut d, OutlineEdit::AddSection(3), 3);
+        edit_outline(&mut d, OutlineEdit::MoveSection(3, 0, true), 3);
+        let scene = &d.outline.as_ref().unwrap().scenes[3];
+        assert_eq!(scene.sections[1].prompt, "Own new beat");
+        edit_outline(&mut d, OutlineEdit::RemoveSection(3, 0), 3);
+        edit_outline(&mut d, OutlineEdit::RemoveSection(3, 0), 3);
+        assert_eq!(
+            d.outline.as_ref().unwrap().scenes[3].sections.len(),
+            1,
+            "one Section stays"
+        );
+        assert_eq!(edit_outline(&mut d, OutlineEdit::RemoveScene(3), 3), 2);
+        edit_outline(&mut d, OutlineEdit::RemoveScene(0), 0);
+        // One Scene cannot hold the 24 s requested.
+        edit_outline(&mut d, OutlineEdit::RemoveScene(0), 0);
+        assert_eq!(d.outline.as_ref().unwrap().scenes.len(), 1);
+        assert!(outline_blocker(&d).is_some_and(|b| b.contains("Add a Scene")));
+        assert!(d.planned_durations.is_empty());
+        edit_outline(&mut d, OutlineEdit::RemoveScene(0), 0);
+        assert_eq!(
+            d.outline.as_ref().unwrap().scenes.len(),
+            1,
+            "one Scene stays"
+        );
+        // Expanded Scenes lock the structure until the storyboard is discarded.
+        d.scenes[0] = Some(d.outline.as_ref().unwrap().scenes[0].clone());
+        assert!(!outline_editable(&d));
+        discard_storyboard(&mut d);
+        assert!(outline_editable(&d) && d.phase == Phase::Outline);
     }
     #[test]
     fn a_poll_keeps_edits_to_finished_scenes_and_takes_new_ones() {

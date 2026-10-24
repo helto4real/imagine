@@ -54,6 +54,8 @@ pub(super) struct State {
     pub(super) received: Vec<Option<StoryScene>>,
     /// Apply was pressed for a proposal that replaces the timeline.
     pub(super) confirm_replace: bool,
+    /// Edit outline was pressed while Scenes are expanded.
+    pub(super) confirm_edit_outline: bool,
 }
 fn provider_transport(state: &State) -> String {
     if state.transport_override {
@@ -109,6 +111,7 @@ impl Default for State {
             scrolled_to: None,
             received: vec![],
             confirm_replace: false,
+            confirm_edit_outline: false,
         }
     }
 }
@@ -202,6 +205,7 @@ pub(super) fn authoring_draft_actions(
 ) {
     let stale = authoring_stale(draft, document);
     let editable = draft.phase != Phase::Applied;
+    let blocker = outline_blocker(draft);
     let mut expand = None;
     let mut apply = false;
     let mut again = None;
@@ -220,7 +224,11 @@ pub(super) fn authoring_draft_actions(
                     "Expand scenes"
                 },
                 true,
-                (!editable).then_some("Wait for the current proposal."),
+                if editable {
+                    blocker.as_deref()
+                } else {
+                    Some("Wait for the current proposal.")
+                },
             );
             control(ui, "story-expand", &r);
             if r.clicked() {
@@ -408,6 +416,12 @@ fn generate_call(state: &State, d: &Snapshot) -> Call {
 }
 /// The editable source of one outline scene and its Sections.
 pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index: usize) {
+    let structure = outline_editable(draft);
+    let mut edit = None;
+    if structure {
+        // Weights change the planned lengths shown on the cards.
+        replan(draft);
+    }
     let Some(outline) = &mut draft.outline else {
         return;
     };
@@ -478,6 +492,7 @@ pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index
             egui::TextEdit::singleline(&mut source.non_diegetic_music).desired_width(f32::INFINITY),
         );
         control(ui, "story-scene-music", &r);
+        let count = source.sections.len();
         for (i, section) in source.sections.iter_mut().enumerate() {
             ui.horizontal(|ui| {
                 ui.label(format!("Section {}", i + 1));
@@ -485,6 +500,44 @@ pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index
                     ui.label("Relative weight");
                     let r = ui.add(egui::DragValue::new(&mut section.weight).speed(0.1));
                     control(ui, &format!("story-section-weight-{i}"), &r);
+                }
+                if structure {
+                    let buttons = [
+                        (
+                            crate::icons::Icon::Up,
+                            "Move Section earlier",
+                            i > 0,
+                            OutlineEdit::MoveSection(index, i, false),
+                        ),
+                        (
+                            crate::icons::Icon::Down,
+                            "Move Section later",
+                            i + 1 < count,
+                            OutlineEdit::MoveSection(index, i, true),
+                        ),
+                        (
+                            crate::icons::Icon::Trash,
+                            "Remove Section",
+                            count > 1,
+                            OutlineEdit::RemoveSection(index, i),
+                        ),
+                    ];
+                    for (icon, name, enabled, action) in buttons {
+                        let r = ui
+                            .add_enabled_ui(enabled, |ui| helto::icon_button(ui, icon, name, false))
+                            .inner;
+                        control(
+                            ui,
+                            &format!(
+                                "story-section-{}-{i}",
+                                name.to_lowercase().replace(' ', "-")
+                            ),
+                            &r,
+                        );
+                        if r.clicked() {
+                            edit = Some(action);
+                        }
+                    }
                 }
             });
             let r = ui.add(
@@ -518,7 +571,21 @@ pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index
                 ui.text_edit_singleline(&mut intent.purpose);
             }
         }
+        if structure {
+            let r = ui
+                .add_enabled_ui(count < 12, |ui| {
+                    helto::action(ui, crate::icons::Icon::Plus, "Add Section", false, None)
+                })
+                .inner;
+            control(ui, "story-section-add", &r);
+            if r.clicked() {
+                edit = Some(OutlineEdit::AddSection(index));
+            }
+        }
     });
+    if let Some(edit) = edit {
+        edit_outline(draft, edit, index);
+    }
 }
 impl ImagineApp {
     pub(super) fn timeline_open_authoring(&mut self, ctx: &egui::Context, operation: Operation) {

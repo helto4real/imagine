@@ -94,54 +94,6 @@ pub fn expansion(text: &str, source: &StoryScene) -> Result<StoryScene> {
     }
     Ok(scene)
 }
-/// Director ordinary-UI allocator: 250ms minimum when possible; weighted remainder and cap redistribution.
-pub fn durations(weights: &[f64], duration: f64, cap: f64) -> Result<Vec<f64>> {
-    if weights.is_empty()
-        || !duration.is_finite()
-        || duration <= 0.
-        || weights.iter().any(|w| !w.is_finite() || *w <= 0.)
-    {
-        return Err("invalid_story_duration");
-    }
-    if duration > weights.len() as f64 * cap + 1e-9 {
-        return Err("story_scene_duration_capacity");
-    }
-    let minimum = if duration >= weights.len() as f64 * 0.25 {
-        0.25
-    } else {
-        duration / weights.len() as f64
-    };
-    let mut out = vec![minimum; weights.len()];
-    let mut active = (0..weights.len()).collect::<Vec<_>>();
-    let mut remaining = (duration - minimum * weights.len() as f64).max(0.);
-    while remaining > 1e-12 && !active.is_empty() {
-        let sum = active.iter().map(|&i| weights[i].max(0.001)).sum::<f64>();
-        let saturated = active
-            .iter()
-            .copied()
-            .filter(|&i| out[i] + remaining * weights[i].max(0.001) / sum > cap + 1e-12)
-            .collect::<Vec<_>>();
-        if saturated.is_empty() {
-            for &i in &active {
-                out[i] += remaining * weights[i].max(0.001) / sum;
-            }
-            remaining = 0.;
-        } else {
-            for i in saturated {
-                remaining -= (cap - out[i]).max(0.);
-                out[i] = cap;
-                active.retain(|&j| j != i);
-            }
-            remaining = remaining.max(0.);
-        }
-    }
-    if remaining > 1e-9 {
-        return Err("story_scene_duration_capacity");
-    }
-    let last = out.len() - 1;
-    out[last] = duration - out[..last].iter().sum::<f64>();
-    Ok(out)
-}
 fn time(seconds: f64) -> Time {
     Time {
         num: (seconds * 1_000_000.).round() as u64,
