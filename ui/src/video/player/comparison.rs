@@ -293,7 +293,7 @@ impl Comparison {
             self.pause();
             return Err(error);
         }
-        let revealed = helto::revealed(ui, ui.available_rect_before_wrap(), privacy);
+        let revealed = helto::shown(ui, privacy);
         if !revealed {
             self.pause();
         }

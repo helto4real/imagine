@@ -688,6 +688,7 @@ impl ImagineApp {
             .max_height((ctx.content_rect().height() - 70.).max(250.))
             .vscroll(true)
             .show(ctx, |ui| {
+let _canvas = helto::window_canvas(ui);
                 #[cfg(feature = "ui-preview")]
                 {
                     let r = ui.interact(
@@ -697,8 +698,7 @@ impl ImagineApp {
                     );
                     control(ui, "generation-scroll", &r);
                 }
-                let hidden = !helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
-                helto::private_scope(ui, hidden, |ui| {
+                ui.scope(|ui| {
                     preset = self.timeline_default_preset(ui);
                     ui.label("Default scene mode");
                     let previous = draft.model.clone();

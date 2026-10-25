@@ -14,6 +14,8 @@ mod media_health_tests;
 mod project_location_tests;
 #[path = "support/storage_links.rs"]
 mod storage_links;
+#[path = "support/workspaces.rs"]
+mod workspace_tests;
 use axum::{
     Router,
     body::{Body, to_bytes},

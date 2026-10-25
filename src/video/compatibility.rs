@@ -106,7 +106,7 @@ pub fn project(source: &ProjectDocument) -> Result<(ProjectDocument, Report), St
         return Err(StorageError::new("older_format_captures_not_representable"));
     }
     copy.captures.clear();
-    copy.project.id = ProjectId(format!("project_{}", uuid::Uuid::new_v4().simple()));
+    copy.project.id = ProjectId::generate();
     let mut report = Report {
         retained_private_layout_in_original: source.storage_layout.is_some(),
         retained_timeline_duration_in_original: source.project.creative.timeline_duration.is_some(),

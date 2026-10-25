@@ -30,11 +30,13 @@ if present, are unused and are not read or removed by the server.
   to ordinary logs or persistent job history. Prompt-based troubleshooting can
   be handled explicitly by the client.
 
-MCP export files must remain readable by the client for byte-size/SHA-256 checks
-and copying. They stay at `/run/media/veracrypt1/mcp-images`, on the user's
-VeraCrypt volume. Imagine does not encrypt MCP exports itself. The output directory
-is exclusively disposable: startup removes all previous contents, including
-registered reference previews. A lock prevents two proxies from sharing it.
+Agent files live in workspaces under `/run/media/veracrypt1/mcp-root`, one
+folder per workspace in its creation date folder, on the user's VeraCrypt volume
+(see [MCP-WORKSPACES-DESIGN.md](MCP-WORKSPACES-DESIGN.md)). Agents never see
+these paths: files move through MCP tools and the proxy's HTTP file routes, and a
+workspace is reached only with its key, stored in plain text in the folder's
+`AGENT-KEY.txt` and as a SHA-256 in `workspace.json`. Workspace files are not
+disposable. Local agents' sandboxes deny reads of the whole encrypted volume.
 
 The proxy monitors the Imagine session once per second. Losing
 that session, or seeing a new session ID, stops old MCP tasks and removes their
@@ -42,10 +44,9 @@ history, reference previews and unconfirmed exports. Requests fail closed while
 Imagine is unavailable. MCP API requests carry `X-Imagine-Session`; the server
 rejects requests from an old session before they can mutate the new session. Network probes time out after two seconds; an in-flight
 admission operation can delay cleanup by at most five additional seconds, plus
-local filesystem work. `confirm_saved` still removes confirmed staging files
-immediately. Proxy shutdown also clears the entire staging area.
+local filesystem work. Proxy shutdown also clears the entire staging area.
 
-Original files under `mcp-inputs`, images copied to client project directories,
+Agent workspaces under `mcp-root`, older agent folders under `mcp-inputs`, images copied to client project directories,
 UI-saved images (including `.imagine/images`), UI preferences, profiles, unused legacy API
 credential files, native builds and baseline evidence are not disposable history.
 They are not removed or encrypted by this lifecycle.

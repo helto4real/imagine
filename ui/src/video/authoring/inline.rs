@@ -70,7 +70,7 @@ impl ImagineApp {
             .inner_margin(6.)
             .show(ui, |ui| {
                 ui.set_width(ui.available_width());
-                let reveal = helto::reveal_in_viewport(ui, privacy);
+                let reveal = helto::shown(ui, privacy);
                 helto::private_scope(ui, !reveal, |ui| {
                     self.authoring_inline_body(ui, &mut state, &document, &mut actions)
                 });

@@ -907,13 +907,14 @@ fn bf16_variant_switch_preserves_qwen_loras_and_request_precision() {
 }
 
 #[test]
-fn lora_window_hides_file_names_in_hide_mode() {
+fn lora_window_shows_file_names_in_hide_mode() {
     let root = tempfile::tempdir().unwrap();
     let ctx = egui::Context::default();
     ctx.enable_accesskit();
     let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
     app.accept_library(catalog(root.path()));
-    for (privacy, expected) in [(false, true), (true, false)] {
+    // LoRA file names are not private.
+    for (privacy, expected) in [(false, true), (true, true)] {
         app.prefs.privacy_mode = privacy;
         let mut output = ctx.run_ui(
             egui::RawInput {

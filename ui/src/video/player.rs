@@ -142,8 +142,7 @@ impl Player {
         self.advance();
         let size = egui::vec2(ui.available_width(), (ui.available_height() - 38.).max(40.));
         let (rect, _response) = ui.allocate_exact_size(size, egui::Sense::hover());
-        let boundary = egui::Rect::from_min_max(rect.min, rect.max + egui::vec2(0., 38.));
-        let revealed = helto::revealed(ui, boundary, privacy);
+        let revealed = helto::shown(ui, privacy);
         if !revealed {
             self.pause();
             ui.painter().text(
@@ -452,6 +451,7 @@ impl ImagineApp {
             self.timeline.comparison_selection = [None, None];
         }
         chrome::panel(ui, rect, true);
+        let _canvas = helto::panel_canvas(ui, "timeline-viewer", rect);
         let inner = rect.shrink(10.);
         chrome::region(
             ui,
@@ -501,9 +501,8 @@ impl ImagineApp {
                     self.timeline.error = Some(error);
                 }
             } else {
-                let (rect, response) = ui.allocate_exact_size(ui.available_size(), Sense::hover());
-                let reveal =
-                    !self.prefs.privacy_mode || (response.hovered() && ui.input(|i| i.focused));
+                let (rect, _) = ui.allocate_exact_size(ui.available_size(), Sense::hover());
+                let reveal = helto::shown(ui, self.prefs.privacy_mode);
                 let text = if !reveal {
                     "Preview hidden"
                 } else if self.timeline.loading.is_some() {
@@ -558,6 +557,7 @@ impl ImagineApp {
         let mut zoomed = false;
         let response =
             egui::Modal::new(egui::Id::new("timeline-comparison-dialog")).show(ctx, |ui| {
+                let _canvas = helto::window_canvas(ui);
                 ui.set_width((bounds.width() - 48.).clamp(260., 1100.));
                 ui.set_height((bounds.height() - 80.).max(240.));
                 if let Some(comparison) = &mut self.timeline.comparison {
@@ -583,7 +583,7 @@ impl ImagineApp {
                     self.timeline.comparison_selection = pair;
                     // Recipe metadata follows Hide previews like the pictures.
                     ui.collapsing("Differences", |ui| {
-                        if helto::reveal_in_viewport(ui, self.prefs.privacy_mode) {
+                        if helto::shown(ui, self.prefs.privacy_mode) {
                             let takes = comparison
                                 .ids
                                 .each_ref()

@@ -749,6 +749,7 @@ impl ImagineApp {
             .vscroll(true)
             .resizable(true)
             .show(ctx, |ui| {
+                let _canvas = helto::window_canvas(ui);
                 ui.set_max_width((ctx.content_rect().width() - 48.).max(216.));
                 #[cfg(feature = "ui-preview")]
                 {
@@ -759,8 +760,7 @@ impl ImagineApp {
                     );
                     control(ui, "assembly-scroll", &r);
                 }
-                let hidden = !helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
-                helto::private_scope(ui, hidden, |ui| {
+                ui.scope(|ui| {
                     ui.horizontal_wrapped(|ui| {
                         let r = helto::action(
                             ui,

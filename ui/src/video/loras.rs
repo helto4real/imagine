@@ -162,6 +162,7 @@ impl ImagineApp {
         let mut apply = false;
         let mut cancel = false;
         let response = egui::Modal::new(egui::Id::new("h3-loras")).show(ctx,|ui| {
+let _canvas = helto::window_canvas(ui);
             ui.set_width((ctx.content_rect().width()-48.).clamp(240.,540.));
             ui.set_height((ctx.content_rect().height()-120.).max(260.));
             ui.horizontal(|ui| {
@@ -170,8 +171,7 @@ impl ImagineApp {
             });
             egui::ScrollArea::vertical().id_salt("h3-loras-scroll").auto_shrink([false,false]).max_height((ui.available_height()-44.).max(120.)).show(ui,|ui| {
                 let r=ui.interact(ui.clip_rect(),ui.id().with("lora-scroll"),egui::Sense::hover());control(ui,"lora-scroll",&r);
-            let hidden=!helto::reveal_in_viewport(ui,self.prefs.privacy_mode);
-            helto::private_scope(ui,hidden,|ui| {
+            ui.scope(|ui| {
                 ui.label("MiniMax H3 · main model target");
                 if draft.scene.is_some() {
                     let r=ui.checkbox(&mut draft.local.enabled,"Override project LoRAs");control(ui,"lora-override",&r);
@@ -218,7 +218,7 @@ impl ImagineApp {
                             }
                         });
                         ui.horizontal_wrapped(|ui| {
-                            let r=catalog::picker(ui,index,&mut row.name,choices.as_ref(),self.prefs.privacy_mode);
+                            let r=catalog::picker(ui,index,&mut row.name,choices.as_ref());
                             control(ui,&format!("lora-{index}-catalog"),&r);
                             let r=ui.add_enabled_ui(!row.name.trim().is_empty(),|ui|helto::icon_button(ui,crate::icons::Icon::Eye,"LoRA information",false)).inner;control(ui,&format!("lora-{index}-info"),&r);
                             if r.clicked(){inspect=Some(row.name.clone());}
@@ -250,7 +250,7 @@ impl ImagineApp {
         self.timeline
             .loras
             .catalog
-            .info_window(ctx, self.prefs.privacy_mode, self.client.as_ref());
+            .info_window(ctx, self.client.as_ref());
         if apply {
             // Typed or pasted paths inside the LoRA folder become relative too.
             for row in draft

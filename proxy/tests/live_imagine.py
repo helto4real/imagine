@@ -32,7 +32,7 @@ async def main():
     except OSError:pass
     await asyncio.sleep(.1)
    else:raise RuntimeError('Imagine did not start')
-   proxy=await asyncio.create_subprocess_exec(str(ROOT/'target/release/st-proxy'),'--chat-port',str(cp),'--image-port',str(pp),'--llm-backend','sc117','--llm-url',f'http://127.0.0.1:{fakeport}','--comfy-url',f'http://127.0.0.1:{fakeport}','--coordinator-socket',str(sock),'--imagine-url',base,'--mcp-port',str(mp),'--mcp-input-dir',str(out),'--mcp-output-dir',str(out/'output'),'--poll-interval','0.1',env=env,stdout=proxylog,stderr=proxylog);processes.append(proxy)
+   proxy=await asyncio.create_subprocess_exec(str(ROOT/'target/release/st-proxy'),'--chat-port',str(cp),'--image-port',str(pp),'--llm-backend','sc117','--llm-url',f'http://127.0.0.1:{fakeport}','--comfy-url',f'http://127.0.0.1:{fakeport}','--coordinator-socket',str(sock),'--imagine-url',base,'--mcp-port',str(mp),'--mcp-output-dir',str(out/'output'),'--poll-interval','0.1',env=env,stdout=proxylog,stderr=proxylog);processes.append(proxy)
    for _ in range(200):
     try:
      async with client.get(f'http://127.0.0.1:{cp}/broker/status') as r:
@@ -43,19 +43,22 @@ async def main():
    async def call(name,args):
     async with client.post(mcp,headers={'Accept':'application/json, text/event-stream'},json={'jsonrpc':'2.0','id':1,'method':'tools/call','params':{'name':name,'arguments':args}}) as r:
      text=await r.text();assert r.status==200,(r.status,text);event=json.loads(next(line[6:] for line in text.splitlines() if line.startswith('data: ')));return event['result']['structuredContent']
+   # Files move through the agent's workspace, by file ID.
+   key=(await call('workspace_create',{'title':'live profile test'}))['workspace_key']
    references=[]
    if a.reference_image:
-    shutil.copyfile(a.reference_image,out/'selected-reference.png');references.append(str(out/'selected-reference.png'))
+    async with client.put(f'http://127.0.0.1:{mp}/v1/workspace/files?name=selected-reference.png',headers={'Authorization':'Bearer '+key},data=a.reference_image.read_bytes()) as r:
+     assert r.status==201,await r.text();references.append((await r.json())['file_id'])
    for label,profile,params in [('standard','qwen',{'prompt':'A blue ceramic teapot on a wooden table, studio photograph.','width':256,'height':256,'seed':42}),('quick-draft','quick-draft',{'prompt':'A blue ceramic teapot on a wooden table, studio photograph.','width':256,'height':256,'seed':9007199254740991}),('lora','quick-draft',{'prompt':'A blue ceramic teapot on a wooden table, studio photograph.','width':256,'height':256,'seed':42,'nsfw':True}),('upscale','image_upscale',{'max_side':512,'seed':42})]:
     if label not in a.cases:continue
-    args={'job_id':label,'profile':profile,'parameters':params}
+    args={'workspace_key':key,'job_id':label,'profile':profile,'parameters':params}
     if profile=='image_upscale':
-     registered=await call('register_image',{'profile':profile,'path':references[0]});assert 'image_id' in registered,registered;args['references']=[registered['image_id']]
+     registered=await call('register_image',{'workspace_key':key,'profile':profile,'file_id':references[0]});assert 'image_id' in registered,registered;args['references']=[registered['image_id']]
     started=time.monotonic();result=await call('generate',args);record={'case':label,'seconds':round(time.monotonic()-started,3),'result':result};evidence['cases'].append(record);(out/'evidence.json').write_text(json.dumps(evidence,indent=2));print(json.dumps(record),flush=True)
     assert result['status']=='succeeded',result
     assert result['parameters']['resolved_profile']['id']==profile
     assert 'prompt' not in result['parameters'] and 'negative_prompt' not in result['parameters']
-    references.append(result['images'][0]['path']);assert await call('generate',args)==result
+    references.append(result['images'][0]['file_id']);assert await call('generate',args)==result
    async with client.post(base+'/v1/runtime/yield') as r:assert (await r.json())['released']
  finally:
   for proc in reversed(processes):

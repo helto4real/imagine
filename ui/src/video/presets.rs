@@ -138,7 +138,7 @@ impl State {
         control(ui, name, &r.response);
         chosen
     }
-    fn window(&mut self, ctx: &egui::Context, privacy: bool) -> bool {
+    fn window(&mut self, ctx: &egui::Context) -> bool {
         if !self.open {
             return false;
         }
@@ -150,7 +150,7 @@ impl State {
             .default_width(560.)
             .default_height(440.)
             .show(ctx, |ui| {
-                let hidden = !helto::reveal_in_viewport(ui, privacy);
+                let _canvas = helto::window_canvas(ui);
                 egui::ScrollArea::vertical()
                     .id_salt("video-presets-scroll")
                     .auto_shrink([false, true])
@@ -163,12 +163,10 @@ impl State {
                             ui.colored_label(helto::ERROR, error);
                         }
                         Some(Ok(catalog)) => {
-                            helto::private_scope(ui, hidden, |ui| {
-                                for entry in &catalog.presets {
-                                    row(ui, entry);
-                                    ui.separator();
-                                }
-                            });
+                            for entry in &catalog.presets {
+                                row(ui, entry);
+                                ui.separator();
+                            }
                         }
                     });
                 if let Some(Ok(catalog)) = &self.catalog {
@@ -176,7 +174,7 @@ impl State {
                         ui.colored_label(helto::ERROR, client::error_message(code));
                     }
                     if let Some(file) = &catalog.file {
-                        helto::private_scope(ui, hidden, |ui| ui.weak(file));
+                        ui.weak(file);
                     }
                 }
                 let r = helto::icon_button(ui, crate::icons::Icon::Retry, "Reload", false);
@@ -306,12 +304,9 @@ impl ImagineApp {
         } else {
             "Preset".into()
         });
-        let hidden = !helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
         let mut chosen = None;
         ui.horizontal_wrapped(|ui| {
-            helto::private_scope(ui, hidden, |ui| {
-                chosen = self.timeline.presets.picker(ui, "scene-preset", &text);
-            });
+            chosen = self.timeline.presets.picker(ui, "scene-preset", &text);
             if modified {
                 ui.colored_label(helto::WARN, "Modified");
                 let known = key
@@ -427,7 +422,7 @@ impl ImagineApp {
         }
     }
     pub(super) fn timeline_presets_window(&mut self, ctx: &egui::Context) {
-        if self.timeline.presets.window(ctx, self.prefs.privacy_mode) {
+        if self.timeline.presets.window(ctx) {
             self.timeline_presets_fetch(ctx);
         }
     }
@@ -612,7 +607,7 @@ mod tests {
         );
     }
     #[test]
-    fn presets_window_shows_values_and_problems_and_hides_names_in_privacy_mode() {
+    fn presets_window_shows_values_and_problems_with_hide_previews_on() {
         let ctx = egui::Context::default();
         helto::install(&ctx);
         let mut state = State {
@@ -622,7 +617,7 @@ mod tests {
         };
         let mut shapes = vec![];
         for _ in 0..3 {
-            shapes = run(&ctx, |ui| assert!(!state.window(ui.ctx(), false)));
+            shapes = run(&ctx, |ui| assert!(!state.window(ui.ctx())));
         }
         for text in [
             "SYNTHETIC_PRIVATE tuned",
@@ -640,9 +635,10 @@ mod tests {
             &client::error_message("preset_file_missing")
         ));
         for _ in 0..3 {
-            shapes = run(&ctx, |ui| assert!(!state.window(ui.ctx(), true)));
+            shapes = run(&ctx, |ui| assert!(!state.window(ui.ctx())));
         }
-        assert!(!painted(&shapes, "SYNTHETIC_PRIVATE"));
+        // Preset names and files are not private.
+        assert!(painted(&shapes, "SYNTHETIC_PRIVATE tuned"));
         assert!(state.open);
     }
     #[test]

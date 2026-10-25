@@ -2,18 +2,161 @@
 use crate::icons::{self, Icon};
 use eframe::egui::{self, Color32, Stroke};
 
-/// The one Hide previews rule: private content shows only while the pointer
-/// is over its visible part of `rect` in a focused window.
-pub fn revealed(ui: &egui::Ui, rect: egui::Rect, privacy_mode: bool) -> bool {
-    let visible = rect.intersect(ui.clip_rect());
-    // The live pointer position also covers a pointer that left the window.
-    !privacy_mode
-        || ui.rect_contains_pointer(visible)
-            && ui.input(|i| i.focused && i.pointer.hover_pos().is_some_and(|p| visible.contains(p)))
+/// Hide previews follows canvases: each framed panel of the main window and
+/// each window or modal. All private content on a canvas (images, creative
+/// writing, scene titles, character and media names) shows while the pointer
+/// is anywhere on that canvas, or on a popup it opened, in a focused window.
+#[derive(Clone, Default)]
+struct Canvases {
+    pass: u64,
+    /// Canvases drawing now, innermost last, with whether each is revealed.
+    stack: Vec<(egui::Id, bool)>,
+    revealed: std::collections::HashSet<egui::Id>,
+    revealed_last: std::collections::HashSet<egui::Id>,
+    /// Layers of window and modal canvases; any other popup layer belongs to
+    /// the canvas that opened it.
+    roots: std::collections::HashSet<egui::LayerId>,
+    roots_last: std::collections::HashSet<egui::LayerId>,
+    #[cfg(test)]
+    outside: std::collections::BTreeSet<String>,
 }
-pub fn reveal_in_viewport(ui: &egui::Ui, privacy_mode: bool) -> bool {
-    // Content coordinates move with scrolling; hover belongs to the visible viewport.
-    revealed(ui, ui.clip_rect(), privacy_mode)
+fn canvases<R>(ctx: &egui::Context, f: impl FnOnce(&mut Canvases) -> R) -> R {
+    let pass = ctx.cumulative_pass_nr();
+    ctx.data_mut(|data| {
+        let state = data.get_temp_mut_or_default::<Canvases>(egui::Id::new("helto-canvases"));
+        if state.pass != pass {
+            state.pass = pass;
+            state.stack.clear();
+            state.revealed_last = std::mem::take(&mut state.revealed);
+            state.roots_last = std::mem::take(&mut state.roots);
+        }
+        f(state)
+    })
+}
+/// Whether the pointer is on `rect` of `layer`, or on a popup or tooltip while
+/// this canvas was revealed the frame before (the popup it opened).
+fn hovered(ui: &egui::Ui, id: egui::Id, rect: egui::Rect, root: bool) -> bool {
+    let ctx = ui.ctx();
+    let Some(pos) = ctx.input(|i| i.pointer.hover_pos().filter(|_| i.focused)) else {
+        return false;
+    };
+    let layer = ui.layer_id();
+    let under = ctx.layer_id_at(pos);
+    if under == Some(layer) {
+        // A panel inside a scroll area counts only where it is visible.
+        let visible = if root {
+            rect
+        } else {
+            rect.intersect(ui.clip_rect())
+        };
+        return visible.contains(pos);
+    }
+    canvases(ctx, |c| {
+        under.is_some_and(|under| {
+            matches!(under.order, egui::Order::Foreground | egui::Order::Tooltip)
+                && !c.roots_last.contains(&under)
+                && !c.roots.contains(&under)
+        }) && c.revealed_last.contains(&id)
+    })
+}
+/// Marks content drawn while it lives as belonging to one canvas.
+#[must_use = "the canvas ends when this scope is dropped"]
+pub struct CanvasScope {
+    ctx: egui::Context,
+    id: egui::Id,
+}
+impl Drop for CanvasScope {
+    fn drop(&mut self) {
+        // While unwinding the context may be locked; the stack resets next pass.
+        if std::thread::panicking() {
+            return;
+        }
+        let id = self.id;
+        canvases(&self.ctx, |c| {
+            if let Some(index) = c.stack.iter().rposition(|(top, _)| *top == id) {
+                c.stack.truncate(index);
+            }
+        });
+    }
+}
+fn enter(ui: &egui::Ui, id: egui::Id, rect: egui::Rect, root: bool) -> CanvasScope {
+    let revealed = hovered(ui, id, rect, root);
+    let layer = ui.layer_id();
+    canvases(ui.ctx(), |c| {
+        if root {
+            c.roots.insert(layer);
+        }
+        if revealed {
+            c.revealed.insert(id);
+        }
+        c.stack.push((id, revealed));
+    });
+    CanvasScope {
+        ctx: ui.ctx().clone(),
+        id,
+    }
+}
+/// A framed panel of the main window as one privacy canvas, from here to the
+/// end of the returned scope.
+pub fn panel_canvas(
+    ui: &egui::Ui,
+    id: impl std::hash::Hash + std::fmt::Debug,
+    rect: egui::Rect,
+) -> CanvasScope {
+    enter(ui, egui::Id::new(("helto-canvas", id)), rect, false)
+}
+/// A framed panel of the main window as one privacy canvas.
+pub fn canvas<R>(
+    ui: &mut egui::Ui,
+    id: impl std::hash::Hash + std::fmt::Debug,
+    rect: egui::Rect,
+    body: impl FnOnce(&mut egui::Ui) -> R,
+) -> R {
+    let _canvas = panel_canvas(ui, id, rect);
+    body(ui)
+}
+/// A window's or modal's body as one privacy canvas; enter it first inside
+/// the `show` closure. A window counts with its title bar; a modal is its
+/// dialog, not the backdrop.
+pub fn window_canvas(ui: &egui::Ui) -> CanvasScope {
+    let layer = ui.layer_id();
+    let rect = match layer.order {
+        egui::Order::Middle => ui
+            .ctx()
+            .memory(|m| m.area_rect(layer.id))
+            .unwrap_or(ui.max_rect()),
+        _ => ui.max_rect().expand(8.),
+    };
+    enter(
+        ui,
+        egui::Id::new(("helto-window-canvas", layer.id)),
+        rect,
+        true,
+    )
+}
+/// Whether private content drawn here shows: always without Hide previews;
+/// otherwise while its canvas is revealed. Outside any canvas it stays hidden.
+#[track_caller]
+pub fn shown(ui: &egui::Ui, privacy_mode: bool) -> bool {
+    if !privacy_mode {
+        return true;
+    }
+    #[cfg(test)]
+    let caller = std::panic::Location::caller();
+    canvases(ui.ctx(), |c| {
+        #[cfg(test)]
+        if c.stack.is_empty() {
+            c.outside
+                .insert(format!("{}:{}", caller.file(), caller.line()));
+        }
+        c.stack.last().is_some_and(|(_, r)| *r)
+    })
+}
+/// Callers that asked about private content outside every canvas; such
+/// content could never be revealed.
+#[cfg(test)]
+pub fn outside_canvas(ctx: &egui::Context) -> std::collections::BTreeSet<String> {
+    canvases(ctx, |c| c.outside.clone())
 }
 /// A section title inside a panel or window.
 pub fn section(title: &str) -> egui::RichText {
@@ -623,7 +766,7 @@ pub fn textarea(
         .with_stroke(false)
         .show(ui, |ui| {
             let rect = ui.available_rect_before_wrap();
-            let hidden = !revealed(ui, rect, privacy_mode);
+            let hidden = !shown(ui, privacy_mode);
             ui.painter().rect_filled(rect, 5, FIELD);
             let mut response = egui::ScrollArea::vertical()
                 .id_salt((id, "text-scroll"))
@@ -1055,40 +1198,177 @@ mod tests {
         assert!(node("Own yes").is_disabled());
         assert!(!node("Own no").is_disabled());
     }
+    fn frame(
+        ctx: &egui::Context,
+        events: Vec<egui::Event>,
+        focused: bool,
+        ui: impl FnMut(&mut egui::Ui),
+    ) {
+        let mut ui = ui;
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(900., 700.),
+                )),
+                focused,
+                events,
+                ..Default::default()
+            },
+            |root| ui(root),
+        );
+        output.textures_delta.clear();
+    }
     #[test]
-    fn viewport_privacy_still_hides_on_leave_and_lost_focus() {
-        for (privacy, focused, inside, expected) in [
-            (true, true, true, true),
-            (true, true, false, false),
-            (true, false, true, false),
-            (false, false, false, true),
+    fn a_canvas_reveals_while_hovered_in_a_focused_window_and_outside_fails_closed() {
+        let canvas = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400., 700.));
+        for (privacy, focused, pos, expected) in [
+            (true, true, egui::pos2(380., 650.), true),
+            (true, true, egui::pos2(600., 100.), false),
+            (true, false, egui::pos2(380., 650.), false),
+            (false, false, egui::pos2(600., 100.), true),
         ] {
             let ctx = egui::Context::default();
-            let mut actual = false;
-            let mut output = ctx.run_ui(
-                egui::RawInput {
-                    screen_rect: Some(egui::Rect::from_min_size(
-                        egui::Pos2::ZERO,
-                        egui::vec2(900., 700.),
-                    )),
-                    focused,
-                    events: vec![egui::Event::PointerMoved(if inside {
-                        egui::pos2(100., 100.)
-                    } else {
-                        egui::pos2(950., 750.)
-                    })],
-                    ..Default::default()
-                },
-                |ui| {
-                    actual = super::reveal_in_viewport(ui, privacy);
-                },
-            );
-            output.textures_delta.clear();
+            let (mut inside, mut outside) = (false, true);
+            frame(&ctx, vec![egui::Event::PointerMoved(pos)], focused, |ui| {
+                super::canvas(ui, "own-panel", canvas, |ui| {
+                    inside = super::shown(ui, privacy);
+                });
+                outside = super::shown(ui, privacy);
+            });
             assert_eq!(
-                actual, expected,
-                "privacy={privacy}, focused={focused}, inside={inside}"
+                inside, expected,
+                "privacy={privacy} focused={focused} {pos:?}"
             );
+            // Private content outside any canvas only shows without Hide
+            // previews, and tests report where it was drawn.
+            assert_eq!(outside, !privacy);
+            assert_eq!(super::outside_canvas(&ctx).is_empty(), !privacy);
         }
+    }
+    struct Seen {
+        left: bool,
+        right: bool,
+        popup: Option<bool>,
+        combo: egui::Rect,
+        list: egui::Rect,
+        window: Option<bool>,
+        modal: Option<bool>,
+    }
+    impl Seen {
+        fn new() -> Self {
+            Self {
+                left: false,
+                right: false,
+                popup: None,
+                combo: egui::Rect::NOTHING,
+                list: egui::Rect::NOTHING,
+                window: None,
+                modal: None,
+            }
+        }
+    }
+    /// A left panel with a dropdown, a right panel, and optionally a window
+    /// over the right panel or a modal over everything.
+    fn observe(ctx: &egui::Context, events: Vec<egui::Event>, window: bool, modal: bool) -> Seen {
+        let left = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400., 700.));
+        let right = egui::Rect::from_min_max(egui::pos2(400., 0.), egui::pos2(900., 700.));
+        let mut seen = Seen::new();
+        frame(ctx, events, true, |ui| {
+            super::canvas(ui, "own-left", left, |ui| {
+                seen.left = super::shown(ui, true);
+                let r = egui::ComboBox::from_id_salt("own-combo")
+                    .selected_text("Own")
+                    .show_ui(ui, |ui| {
+                        seen.popup = Some(super::shown(ui, true));
+                        for i in 0..12 {
+                            ui.label(format!("Own choice {i}"));
+                        }
+                        seen.list = ui.min_rect();
+                    });
+                seen.combo = r.response.rect;
+            });
+            super::canvas(ui, "own-right", right, |ui| {
+                seen.right = super::shown(ui, true);
+            });
+            if window {
+                egui::Window::new("Own window")
+                    .fixed_pos(egui::pos2(500., 100.))
+                    .fixed_size(egui::vec2(200., 200.))
+                    .show(ui.ctx(), |ui| {
+                        let _canvas = super::window_canvas(ui);
+                        ui.set_min_size(egui::vec2(200., 200.));
+                        seen.window = Some(super::shown(ui, true));
+                    });
+            }
+            if modal {
+                egui::Modal::new(egui::Id::new("own-modal")).show(ui.ctx(), |ui| {
+                    let _canvas = super::window_canvas(ui);
+                    ui.set_min_size(egui::vec2(200., 120.));
+                    seen.modal = Some(super::shown(ui, true));
+                });
+            }
+        });
+        seen
+    }
+    #[test]
+    fn a_popup_belongs_to_its_canvas_and_a_window_or_modal_covers_the_panels_below() {
+        let ctx = egui::Context::default();
+        let moved = |pos| vec![egui::Event::PointerMoved(pos)];
+        observe(&ctx, vec![], false, false);
+        let combo = observe(&ctx, vec![], false, false).combo;
+        let center = combo.center();
+        observe(
+            &ctx,
+            [true, false]
+                .map(|pressed| egui::Event::PointerButton {
+                    pos: center,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    modifiers: egui::Modifiers::NONE,
+                })
+                .into_iter()
+                .chain([egui::Event::PointerMoved(center)])
+                .collect(),
+            false,
+            false,
+        );
+        let mut seen = Seen::new();
+        for _ in 0..3 {
+            seen = observe(&ctx, moved(center), false, false);
+        }
+        assert_eq!(seen.popup, Some(true), "the list did not open");
+        // On the open list, which reaches past the panel, its panel stays revealed.
+        let below = egui::pos2(seen.list.center().x, seen.list.bottom() - 4.);
+        assert!(below.y > combo.bottom());
+        for _ in 0..2 {
+            seen = observe(&ctx, moved(below), false, false);
+        }
+        assert_eq!(
+            (seen.left, seen.popup, seen.right),
+            (true, Some(true), false)
+        );
+        // On the other panel, the first panel and its list hide.
+        let other = egui::pos2(850., 650.);
+        seen = observe(&ctx, moved(other), false, false);
+        assert!(seen.right && !seen.left && seen.popup != Some(true));
+        // A window over a panel is its own canvas.
+        for _ in 0..3 {
+            seen = observe(&ctx, moved(egui::pos2(600., 200.)), true, false);
+        }
+        assert_eq!((seen.window, seen.right), (Some(true), false));
+        // A modal's backdrop reveals neither the modal nor the panels behind it.
+        for _ in 0..3 {
+            seen = observe(&ctx, moved(other), false, true);
+        }
+        assert_eq!(
+            (seen.modal, seen.right, seen.left),
+            (Some(false), false, false)
+        );
+        for _ in 0..2 {
+            seen = observe(&ctx, moved(egui::pos2(450., 350.)), false, true);
+        }
+        assert_eq!(seen.modal, Some(true));
     }
     #[test]
     fn moving_pointer_inside_scrolled_viewport_does_not_hide_or_reset_content() {
@@ -1123,8 +1403,9 @@ mod tests {
                         .fixed_size(egui::vec2(500., 320.))
                         .vscroll(true)
                         .show(ui.ctx(), |ui| {
+                            let _canvas = super::window_canvas(ui);
                             viewport = ui.clip_rect();
-                            if !super::reveal_in_viewport(ui, true) {
+                            if !super::shown(ui, true) {
                                 ui.label("Hidden");
                                 return;
                             }
@@ -1182,7 +1463,9 @@ mod tests {
         for name in ["prompt", "negative-prompt"] {
             let ctx = egui::Context::default();
             let mut text = "Synthetic private prompt: åäö".to_owned();
-            let inside = egui::pos2(24., 24.);
+            // Anywhere on the field's panel reveals it, not only the field.
+            let panel = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400., 600.));
+            let inside = egui::pos2(380., 560.);
             let outside = egui::pos2(500., 400.);
             for (events, focused, privacy, visible) in [
                 (vec![], true, true, false),
@@ -1206,8 +1489,10 @@ mod tests {
                         ..Default::default()
                     },
                     |ui| {
-                        ui.set_width(300.);
-                        response = Some(textarea(ui, &mut text, 8, name, privacy, true));
+                        super::canvas(ui, "own-prompt-panel", panel, |ui| {
+                            ui.set_width(300.);
+                            response = Some(textarea(ui, &mut text, 8, name, privacy, true));
+                        });
                     },
                 );
                 output.textures_delta.clear();

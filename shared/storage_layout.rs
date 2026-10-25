@@ -4,8 +4,25 @@ use std::path::{Component, Path, PathBuf};
 pub const PRIVATE_ROOT: &str = "/run/media/veracrypt1/imagine";
 pub const PRIVATE_MOUNT: &str = "/run/media/veracrypt1";
 /// Approved roots for agent-selected project folders, besides the private root.
+/// Older agent projects live here; new agent work uses the MCP root.
 pub const DEFAULT_PROJECT_ROOTS: &[&str] = &["/run/media/veracrypt1/mcp-inputs"];
+/// Agent workspaces, each in its creation date folder.
+pub const MCP_ROOT: &str = "/run/media/veracrypt1/mcp-root";
 
+/// The date folder named by a `project_YYYYMMDD_…` ID (see the video
+/// contract's `ProjectId::generate`); older IDs have none.
+pub fn date_folder(id: &str) -> Option<String> {
+    let date = id.strip_prefix("project_")?.split('_').next()?;
+    if date.len() != 8 || !date.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    let (month, day) = (
+        date[4..6].parse::<u32>().ok()?,
+        date[6..8].parse::<u32>().ok()?,
+    );
+    ((1..=12).contains(&month) && (1..=31).contains(&day))
+        .then(|| format!("{}-{}-{}", &date[..4], &date[4..6], &date[6..8]))
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Layout {
     root: PathBuf,
@@ -41,7 +58,21 @@ impl Layout {
         if !matches!(parts.next(), Some(Component::Normal(_))) || parts.next().is_some() {
             return Err("invalid_project_id");
         }
-        Ok(Self::at(self.root.join("projects").join(id)))
+        // New IDs carry their creation date and live in that date folder;
+        // older IDs keep their folder directly under `projects`.
+        let projects = self.root.join("projects");
+        Ok(Self::at(match date_folder(id) {
+            Some(date) => projects.join(date).join(id),
+            None => projects.join(id),
+        }))
+    }
+    /// Whether `path` is the ID-named folder of a project in this root, with or
+    /// without its date folder.
+    pub fn is_named_project(&self, path: &Path) -> bool {
+        path.file_name()
+            .and_then(|id| id.to_str())
+            .and_then(|id| self.project(id).ok())
+            .is_some_and(|project| project.root == path)
     }
     /// The same project classes at a folder bound by an explicit location.
     pub fn project_at(&self, path: &Path) -> Result<Project, &'static str> {
@@ -137,6 +168,25 @@ mod tests {
         );
         for id in ["", ".", "..", "/absolute", "one/two", "one/../two"] {
             assert!(layout.project(id).is_err(), "{id}");
+        }
+        // New IDs carry their creation date and live in its folder.
+        let dated = layout.project("project_20261025_own").unwrap();
+        assert_eq!(
+            dated.root,
+            Path::new(PRIVATE_ROOT).join("projects/2026-10-25/project_20261025_own")
+        );
+        assert!(layout.is_named_project(&dated.root));
+        assert!(layout.is_named_project(&project.root));
+        assert!(
+            !layout
+                .is_named_project(&Path::new(PRIVATE_ROOT).join("projects/project_20261025_own"))
+        );
+        for id in [
+            "project_2026102_own",
+            "project_20261325_own",
+            "project_image_own",
+        ] {
+            assert_eq!(date_folder(id), None, "{id}");
         }
         let elsewhere = Path::new("/own-volume/own-inputs/own-project");
         let named = layout.project("own-project").unwrap();

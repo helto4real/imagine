@@ -144,9 +144,21 @@ pub(super) fn private_volume(
     (root, environment)
 }
 pub(super) async fn setup_private(root: &imagine_server::private_storage::Root) -> Harness {
-    let store = Store::open_private(root.clone(), "own-image-workspace".into())
+    setup_private_mcp(root, None).await
+}
+/// A private harness whose MCP root holds agent workspaces.
+pub(super) async fn setup_private_mcp(
+    root: &imagine_server::private_storage::Root,
+    mcp: Option<&Path>,
+) -> Harness {
+    let mut store = Store::open_private(root.clone(), "own-image-workspace".into())
         .await
         .unwrap();
+    store.workspaces = mcp.map(|path| {
+        Arc::new(imagine_server::workspaces::Workspaces::open(
+            root.rooted_at(path).unwrap(),
+        ))
+    });
     let (control, scheduler) = scheduler::start(store.clone(), Box::new(NoInference))
         .await
         .unwrap();

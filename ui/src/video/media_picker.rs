@@ -445,7 +445,8 @@ impl ImagineApp {
             .default_width(560.)
             .max_height((ctx.content_rect().height() - 80.).max(180.))
             .show(ctx, |ui| {
-                if !helto::reveal_in_viewport(ui, self.prefs.privacy_mode) {
+let _canvas = helto::window_canvas(ui);
+                if !helto::shown(ui, self.prefs.privacy_mode) {
                     ui.label("Hidden media · hover to reveal");
                     return;
                 }

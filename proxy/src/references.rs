@@ -10,6 +10,8 @@ use std::{
 #[derive(Clone)]
 pub struct Reference {
     pub workflow: String,
+    /// The workspace the original belongs to; only its calls may use it.
+    pub workspace: String,
     pub path: PathBuf,
     pub asset: String,
     pub width: u32,
@@ -113,13 +115,15 @@ impl Reference {
         Ok(())
     }
     pub fn result(&self, id: &str) -> Value {
-        json!({"image_id":id,"width":self.width,"height":self.height,"mime_type":self.mime_type,"preview_path":self.path,"source_path":self.path,"preview_storage":"memory"})
+        json!({"image_id":id,"width":self.width,"height":self.height,"mime_type":self.mime_type,"preview_storage":"memory"})
     }
 }
-/// Expose the existing persistent Imagine output without a duplicate media file.
-pub fn persistent_result(
-    storage: &crate::mcp_storage::Storage,
+/// A published Imagine image inside the workspace, as the agent sees it: a
+/// file ID and download URL, never its path.
+pub(crate) fn workspace_result(
+    workspace: &crate::mcp::Bound,
     asset: &Value,
+    download_url: impl Fn(&str) -> String,
 ) -> Result<Vec<Value>> {
     let path = asset["saved_path"]
         .as_str()
@@ -131,11 +135,18 @@ pub fn persistent_result(
     {
         bail!("Imagine persistent image metadata is missing");
     }
-    storage.validate_saved_path(path)?;
-    let id = uuid::Uuid::new_v4().simple().to_string();
+    let relative = path
+        .strip_prefix(&workspace.folder)
+        .ok()
+        .and_then(|r| r.to_str())
+        .filter(|_| std::fs::symlink_metadata(path).is_ok_and(|m| m.is_file()))
+        .ok_or_else(|| anyhow!("Imagine saved the image outside the workspace"))?;
+    let file_id = crate::workspace_ids::file_id(&workspace.id, relative);
     Ok(vec![
-        json!({"image_id":id,"path":path,"saved_path":path,"mime_type":asset["mime_type"],
-        "bytes":asset["bytes"],"sha256":asset["sha256"],"storage":"saved","persistent":true,"persistent_root":storage.persistent_root()}),
+        json!({"image_id":uuid::Uuid::new_v4().simple().to_string(),
+        "file_id":file_id,"name":path.file_name().and_then(|n| n.to_str()),
+        "mime_type":asset["mime_type"],"bytes":asset["bytes"],"sha256":asset["sha256"],
+        "download_url":download_url(&file_id)}),
     ])
 }
 
@@ -184,6 +195,7 @@ mod tests {
         std::fs::write(&source, &original).unwrap();
         let (preview, width, height) = normalize(&original).unwrap();
         let reference = Reference {
+            workspace: "ws_own".into(),
             workflow: "own".into(),
             path: source.clone(),
             asset: "own-linked".into(),

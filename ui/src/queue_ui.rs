@@ -7,8 +7,11 @@ impl ImagineApp {
     pub(super) fn queue_panel(&mut self, ui: &mut egui::Ui, rect: Rect) {
         self.expand_queue_for_new_work();
         workspace::panel(ui, rect, false);
+        helto::canvas(ui, "queue", rect, |ui| self.queue_panel_body(ui, rect));
+    }
+    fn queue_panel_body(&mut self, ui: &mut egui::Ui, rect: Rect) {
         // A single reveal boundary for the entire dock, including headers and gaps.
-        let revealed = helto::revealed(ui, rect, self.prefs.privacy_mode);
+        let revealed = helto::shown(ui, self.prefs.privacy_mode);
         let header = Rect::from_min_max(
             rect.min + egui::vec2(10., 6.),
             egui::pos2(rect.right() - 10., rect.top() + 38.),
@@ -182,8 +185,8 @@ impl ImagineApp {
                                 }
                             });
                             if let Some(error) = &job.error {
-                                // Error details can contain file names. They share the panel's reveal boundary.
-                                ui.label(helto::error_text(error, revealed).small());
+                                // Job errors are fixed messages and never quote prompts.
+                                ui.label(helto::error_text(error, true).small());
                             }
                             ui.separator();
                         });
@@ -416,6 +419,7 @@ impl ImagineApp {
             .open(&mut open)
             .default_width(480.)
             .show(ctx, |ui| {
+                let _canvas = helto::window_canvas(ui);
                 egui::ScrollArea::vertical()
                     .id_salt("batch-prompts")
                     .max_height(340.)

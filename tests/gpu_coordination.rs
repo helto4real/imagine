@@ -1,15 +1,19 @@
 #[path = "../ui/tests/support/destination.rs"]
+#[allow(dead_code)]
 mod destination;
 use axum::{
     Json, Router,
     routing::{get, post},
 };
+use destination::task_fixtures;
 use imagine_server::{
     api::{self, App},
     contract::MODEL,
     engine::{Backend, EngineFuture, EngineState},
+    private_storage::Root,
     scheduler::{self, Action},
     storage::Store,
+    video_destination as d,
 };
 use serde_json::{Value, json};
 use std::{
@@ -75,12 +79,40 @@ async fn serve(router: Router) -> (String, tokio::task::JoinHandle<()>) {
     });
     (u, task)
 }
+/// A private root on the owned task volume with an MCP root for workspaces.
+fn private_root(dir: &std::path::Path) -> (Root, std::path::PathBuf) {
+    let root = dir.join("own-imagine");
+    let mcp = dir.join("own-mcp-root");
+    let runtime = dir.join("own-runtime");
+    for path in [&root, &mcp, &runtime] {
+        std::fs::create_dir(path).unwrap();
+    }
+    let config = d::Config {
+        fsid: d::fsid(&d::directory(&root).unwrap()).unwrap(),
+        root,
+        mount: task_fixtures::MOUNT.into(),
+        source: task_fixtures::SOURCE.into(),
+        filesystem: task_fixtures::FILESYSTEM.into(),
+    };
+    let (root, ignored) = Root::with_environment(config, Arc::new(d::System))
+        .unwrap()
+        .with_runtime_directory(runtime)
+        .unwrap()
+        .with_project_roots(std::slice::from_ref(&mcp));
+    assert!(ignored.is_empty());
+    (root, mcp)
+}
 #[tokio::test]
 async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     let dir = tempfile::tempdir().unwrap();
-    let mut store = Store::open(dir.path()).await.unwrap();
-    store.videos.destination = Some(destination::destination(dir.path()));
-    let proof = destination::proof(dir.path());
+    assert!(task_fixtures::is_owned(dir.path()));
+    let (root, mcp_root) = private_root(dir.path());
+    let mut store = Store::open_private(root.clone(), "own-image-workspace".into())
+        .await
+        .unwrap();
+    store.workspaces = Some(Arc::new(imagine_server::workspaces::Workspaces::open(
+        root.rooted_at(&mcp_root).unwrap(),
+    )));
     let probe = Arc::new(Probe::default());
     let socket = dir.path().join("gpu.sock");
     let (control, scheduler) = scheduler::start_coordinated(
@@ -94,8 +126,9 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     let (_, engine) = watch::channel(EngineState::default());
     let (imagine, imagine_task) = serve(api::router(App {
         video: control.video.clone(),
-        enhancement: imagine_server::enhancement::Service::open(
-            dir.path().join("enhancement-profiles.json"),
+        enhancement: imagine_server::enhancement::Service::open_private(
+            root.clone(),
+            "library/enhancement-profiles.json".into(),
         )
         .unwrap(),
         library: Default::default(),
@@ -158,7 +191,6 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     let config = st_proxy::config::Config {
         mcp_port: Some(0),
         mcp_workflows_dir: "/nonexistent/no-comfy-graphs-needed".into(),
-        mcp_input_dir: dir.path().to_string_lossy().into(),
         mcp_output_dir: Some(dir.path().join("output").to_string_lossy().into()),
         chat_port: 0,
         image_port: 0,
@@ -200,8 +232,19 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
             .is_success()
     );
     assert!(probe.llm.load(Ordering::SeqCst));
+    // The agent's workspace; every image call carries its key.
+    let key = mcp(
+        &client,
+        &mcp_url,
+        "workspace_create",
+        json!({"title":"Own Images"}),
+    )
+    .await["workspace_key"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     let unloads = probe.unloads.load(Ordering::SeqCst);
-    for (tool, args) in [
+    for (tool, mut args) in [
         (
             "generate",
             json!({"job_id":"bad-size","profile":"qwen","parameters":{"negative_prompt":"synthetic negative","prompt":"synthetic","max_side":4128}}),
@@ -223,6 +266,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
             json!({"job_id":"bad-batch","profile":"qwen","items":[{"prompt":"valid","negative_prompt":"synthetic negative"},{"prompt":"invalid","negative_prompt":"synthetic negative","max_side":4128}]}),
         ),
     ] {
+        args["workspace_key"] = json!(key);
         let rejected = mcp(&client, &mcp_url, tool, args).await;
         assert_eq!(rejected["error"]["category"], "validation", "{rejected}");
         assert!(probe.llm.load(Ordering::SeqCst));
@@ -246,7 +290,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     let submit = || {
         client
             .post(format!("{imagine}/v1/jobs"))
-            .json(&json!({"model":MODEL,"operation":"text_to_image","prompt":"synthetic","client_metadata":{"video_destination":proof}}))
+            .json(&json!({"model":MODEL,"operation":"text_to_image","prompt":"synthetic"}))
     };
     let first: Value = submit().send().await.unwrap().json().await.unwrap();
     until(|| probe.calls.load(Ordering::SeqCst) == 1).await;
@@ -305,28 +349,39 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     .await;
     assert_eq!(described["defaults"]["sampling"]["steps"], 8);
     assert!(described["defaults"].get("prompt").is_none());
-    let invalid = mcp(&client, &mcp_url, "generate_batch", json!({"job_id":"invalid-profile-batch","profile":"qwen","items":[{"prompt":"valid","negative_prompt":"synthetic negative"},{"prompt":"bad","negative_prompt":"synthetic negative","sampling":{"steps":0}}]})).await;
+    let invalid = mcp(&client, &mcp_url, "generate_batch", json!({"workspace_key":key,"job_id":"invalid-profile-batch","profile":"qwen","items":[{"prompt":"valid","negative_prompt":"synthetic negative"},{"prompt":"bad","negative_prompt":"synthetic negative","sampling":{"steps":0}}]})).await;
     assert_eq!(invalid["error"]["category"], "validation");
     let missing = mcp(
         &client,
         &mcp_url,
         "get_job",
-        json!({"job_id":"invalid-profile-batch","wait":false}),
+        json!({"workspace_key":key,"job_id":"invalid-profile-batch","wait":false}),
     )
     .await;
     assert_eq!(missing["error"]["category"], "not_found");
     assert_eq!(probe.calls.load(Ordering::SeqCst), 2);
-    let image_path = dir.path().join("synthetic.png");
-    image::RgbImage::new(64, 64).save(&image_path).unwrap();
+    let mut synthetic = Cursor::new(Vec::new());
+    image::RgbImage::new(64, 64)
+        .write_to(&mut synthetic, image::ImageFormat::Png)
+        .unwrap();
+    use base64::Engine as _;
+    let uploaded = mcp(
+        &client,
+        &mcp_url,
+        "workspace_upload",
+        json!({"workspace_key":key,"name":"synthetic.png",
+            "content_base64":base64::engine::general_purpose::STANDARD.encode(synthetic.get_ref())}),
+    )
+    .await;
     let registered = mcp(
         &client,
         &mcp_url,
         "register_image",
-        json!({"profile":"quick-draft","path":image_path}),
+        json!({"workspace_key":key,"profile":"quick-draft","file_id":uploaded["file_id"]}),
     )
     .await;
     assert!(registered["image_id"].is_string(), "{registered}");
-    let args = json!({"job_id":"batch-synthetic","profile":"quick-draft","items":[{"parameters":{"prompt":"synthetic one","seed":9007199254740991u64},"references":[registered["image_id"]]},{"prompt":"synthetic two","nsfw":true}]});
+    let args = json!({"workspace_key":key,"job_id":"batch-synthetic","profile":"quick-draft","items":[{"parameters":{"prompt":"synthetic one","seed":9007199254740991u64},"references":[registered["image_id"]]},{"prompt":"synthetic two","nsfw":true}]});
     let c = client.clone();
     let u = mcp_url.clone();
     let a = args.clone();
@@ -377,35 +432,27 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
         "quick-draft"
     );
     assert!(result["items"][1]["parameters"]["seed"].is_u64());
-    // Outputs are already published on the persistent destination; confirmation
-    // acknowledges them in place and never copies, moves or unlinks them.
-    let mut acknowledgements = Vec::new();
-    let mut paths = Vec::new();
+    // Outputs are published in the workspace's image folder and named by file ID.
+    let workspace = store.workspaces.as_ref().unwrap().resolve(&key).unwrap();
+    let mut ids = Vec::new();
     for item in result["items"].as_array().unwrap() {
         let image = &item["images"][0];
-        let path = std::path::PathBuf::from(image["path"].as_str().unwrap());
-        let metadata = std::fs::metadata(&path).unwrap();
-        assert!(metadata.is_file());
-        let digest = st_proxy::references::hash(&std::fs::read(&path).unwrap());
-        assert_eq!(image["bytes"], metadata.len());
+        assert!(image.get("path").is_none() && image.get("saved_path").is_none());
+        let entry = store
+            .workspaces
+            .as_ref()
+            .unwrap()
+            .file(&workspace, image["file_id"].as_str().unwrap())
+            .unwrap();
+        assert!(entry.path.starts_with(workspace.images()));
+        let digest = st_proxy::references::hash(&std::fs::read(&entry.path).unwrap());
+        assert_eq!(image["bytes"], entry.bytes);
         assert_eq!(image["sha256"], digest);
-        assert_eq!(image["storage"], "saved");
-        assert_eq!(image["saved_path"], json!(path));
-        acknowledgements.push(json!({"image_id":image["image_id"],"saved_path":path,"bytes":metadata.len(),"sha256":digest}));
-        paths.push(path);
+        ids.push(image["file_id"].clone());
     }
-    assert_eq!(paths[0].parent(), paths[1].parent());
-    let acknowledgement = json!({"job_id":"batch-synthetic","images":acknowledgements});
-    let confirmed = mcp(&client, &mcp_url, "confirm_saved", acknowledgement.clone()).await;
-    assert_eq!(confirmed["images"].as_array().unwrap().len(), 2);
-    assert!(paths.iter().all(|path| path.is_file()));
-    assert_eq!(
-        mcp(&client, &mcp_url, "confirm_saved", acknowledgement).await,
-        confirmed
-    );
+    assert_ne!(ids[0], ids[1]);
     let recovered = mcp(&client, &mcp_url, "generate_batch", args).await;
-    assert_eq!(recovered["items"][0]["images"][0]["path"], json!(paths[0]));
-    assert_eq!(recovered["items"][0]["images"][0]["storage"], "saved");
+    assert_eq!(recovered["items"][0]["images"][0]["file_id"], ids[0]);
     assert_eq!(probe.calls.load(Ordering::SeqCst), 4);
     assert!(after_batch.await.unwrap().status().is_success());
     // An actual inference failure is distinct from validation. Its stable code
@@ -415,7 +462,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
         &client,
         &mcp_url,
         "generate",
-        json!({"job_id":"engine-failure","profile":"qwen","parameters":{"negative_prompt":"synthetic negative","prompt":"synthetic"}}),
+        json!({"workspace_key":key,"job_id":"engine-failure","profile":"qwen","parameters":{"negative_prompt":"synthetic negative","prompt":"synthetic"}}),
     )
     .await;
     assert_eq!(failed["status"], "failed");

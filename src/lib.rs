@@ -22,6 +22,9 @@ pub mod storage_layout;
 #[cfg(test)]
 #[path = "../shared/task_fixtures.rs"]
 mod task_fixtures;
+#[path = "../shared/workspace_ids.rs"]
+pub mod workspace_ids;
+pub mod workspaces;
 
 pub mod coordination;
 

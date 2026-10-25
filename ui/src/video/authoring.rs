@@ -1425,6 +1425,7 @@ impl ImagineApp {
                 .max_height((ctx.content_rect().height() - 70.).max(200.))
                 .vscroll(true)
                 .show(ctx, |ui| {
+                    let _canvas = helto::window_canvas(ui);
                     let r =
                         helto::icon_button(ui, crate::icons::Icon::Close, "Close settings", false);
                     control(ui, "story-provider-close", &r);

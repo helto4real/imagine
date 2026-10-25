@@ -99,6 +99,10 @@ impl Client {
             .map(str::to_owned)
             .ok_or_else(|| anyhow!("Invalid Imagine session"))
     }
+    /// A raw request bound to the Imagine session, for streamed bodies.
+    pub fn request(&self, method: reqwest::Method, path: &str) -> reqwest::RequestBuilder {
+        self.bound(self.http.request(method, format!("{}{path}", self.base)))
+    }
     pub async fn json(
         &self,
         method: reqwest::Method,

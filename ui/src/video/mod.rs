@@ -211,6 +211,15 @@ pub(super) enum Event {
         epoch: u64,
         result: Result<Value, client::TimelineFailure>,
     },
+    Workspaces {
+        epoch: u64,
+        result: Result<Value, client::TimelineFailure>,
+    },
+    WorkspaceKey {
+        epoch: u64,
+        replaced: bool,
+        result: Result<Value, client::TimelineFailure>,
+    },
     Presets {
         epoch: u64,
         result: Result<Value, client::TimelineFailure>,
@@ -506,6 +515,22 @@ impl ImagineApp {
             Event::PrivateProjects { epoch, result } => {
                 if epoch == self.timeline.epoch {
                     self.timeline.private_projects.reply(result);
+                }
+            }
+            Event::Workspaces { epoch, result } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline.private_projects.workspaces_reply(result);
+                }
+            }
+            Event::WorkspaceKey {
+                epoch,
+                replaced,
+                result,
+            } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline
+                        .private_projects
+                        .key_reply(ctx, replaced, result);
                 }
             }
             Event::Presets { epoch, result } => {
@@ -1261,6 +1286,7 @@ impl ImagineApp {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
+                let _canvas = helto::window_canvas(ui);
                 let answer = helto::confirm(
                     ui,
                     match replace {

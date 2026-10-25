@@ -31,6 +31,8 @@ mod media_health;
 mod reference_cache;
 #[path = "streaming_import_api.rs"]
 mod streaming_import;
+#[path = "workspace_api.rs"]
+mod workspaces;
 
 pub struct Error {
     status: StatusCode,
@@ -102,6 +104,7 @@ fn staging(app: &App) -> Result<SessionStaging, Error> {
 }
 pub fn routes() -> Router<App> {
     Router::new()
+        .merge(workspaces::routes())
         .merge(reference_cache::routes())
         .merge(captures::routes())
         .merge(lora_catalog::routes())
@@ -273,8 +276,17 @@ async fn create_at(
             .map_err(|code| Error::new(StatusCode::UNPROCESSABLE_ENTITY, code))?,
         (None, None) => crate::video_defaults::new_project(),
     };
+    let path = app.video.lock().await.location(&request.location_id)?;
+    create_at_path(&app, &path, create).await
+}
+/// Create a project saved at once in `path`, a new or empty allowed folder.
+async fn create_at_path(
+    app: &App,
+    path: &std::path::Path,
+    create: CreateProject,
+) -> Result<(StatusCode, Json<Snapshot>), Error> {
+    let path = path.to_path_buf();
     let mut service = app.video.lock().await;
-    let path = service.location(&request.location_id)?;
     // A retried create finds the project this session already bound there.
     if let Some(id) = service.projects.at_location(&path)? {
         return Ok((StatusCode::OK, Json(service.snapshot(&id)?)));
@@ -618,44 +630,84 @@ async fn private_projects(State(app): State<App>) -> Result<Json<Value>, Error> 
             .map(|(path, document)| (path, project_summary(document)))
             .collect::<Vec<_>>()
     };
+    let workspaces = app.store.workspaces.clone();
     let projects = tokio::task::spawn_blocking(move || {
-        let roots = std::iter::once((root.layout().root().join("projects"), "imagine"))
-            .chain(root.project_roots().iter().map(|r| (r.clone(), "agent")));
-        let mut found = vec![];
-        for (parent, source) in roots {
-            let Ok(entries) = std::fs::read_dir(&parent) else {
-                continue;
-            };
-            for entry in entries.flatten() {
-                let path = entry.path();
-                // Real folders on the verified volume that hold a project document.
-                let document = path.join("project.json");
-                if !entry.file_type().is_ok_and(|t| t.is_dir())
-                    || !std::fs::symlink_metadata(&document).is_ok_and(|m| m.is_file())
-                    || !root.allows(&path)
-                {
-                    continue;
-                }
-                let saved = std::fs::metadata(&document)
-                    .and_then(|m| m.modified())
-                    .ok()
-                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map(|d| d.as_millis() as u64);
-                let open = live.iter().find(|(p, _)| p == &path);
-                let mut value = match open {
-                    Some((_, summary)) => summary.clone(),
-                    None => match ProjectSession::peek_private(&root, &path) {
-                        Ok(document) => project_summary(&document),
-                        Err(error) => json!({"error":error.code}),
-                    },
-                };
-                value["path"] = json!(path);
-                value["folder"] = json!(entry.file_name().to_string_lossy());
-                value["source"] = json!(source);
-                value["saved_at_ms"] = json!(saved);
-                value["open"] = json!(open.is_some());
-                found.push(value);
+        let is_date = |name: &str| {
+            name.len() == 10
+                && name.bytes().enumerate().all(|(i, b)| {
+                    if i == 4 || i == 7 {
+                        b == b'-'
+                    } else {
+                        b.is_ascii_digit()
+                    }
+                })
+        };
+        let children = |parent: &std::path::Path| {
+            std::fs::read_dir(parent)
+                .into_iter()
+                .flatten()
+                .flatten()
+                .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
+                .map(|e| e.path())
+                .collect::<Vec<_>>()
+        };
+        // (folder, source, workspace) for every candidate project folder.
+        let mut candidates: Vec<(PathBuf, &str, Option<Value>)> = vec![];
+        for path in children(&root.layout().root().join("projects")) {
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(is_date)
+            {
+                candidates.extend(children(&path).into_iter().map(|p| (p, "imagine", None)));
+            } else {
+                candidates.push((path, "imagine", None));
             }
+        }
+        let mcp_root = workspaces.as_ref().map(|w| w.root().to_path_buf());
+        for parent in root.project_roots() {
+            if Some(parent) != mcp_root.as_ref() {
+                candidates.extend(children(parent).into_iter().map(|p| (p, "agent", None)));
+            }
+        }
+        for workspace in workspaces.iter().flat_map(|w| w.list()) {
+            let summary = json!({"workspace_id":workspace.meta.id,"title":workspace.meta.title,
+                "folder":workspace.relative,"created_ms":workspace.meta.created_ms});
+            candidates.extend(
+                children(&workspace.videos())
+                    .into_iter()
+                    .map(|p| (p, "agent", Some(summary.clone()))),
+            );
+        }
+        let mut found = vec![];
+        for (path, source, workspace) in candidates {
+            // Real folders on the verified volume that hold a project document.
+            let document = path.join("project.json");
+            if !std::fs::symlink_metadata(&document).is_ok_and(|m| m.is_file())
+                || !root.allows(&path)
+            {
+                continue;
+            }
+            let saved = std::fs::metadata(&document)
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64);
+            let open = live.iter().find(|(p, _)| p == &path);
+            let mut value = match open {
+                Some((_, summary)) => summary.clone(),
+                None => match ProjectSession::peek_private(&root, &path) {
+                    Ok(document) => project_summary(&document),
+                    Err(error) => json!({"error":error.code}),
+                },
+            };
+            value["path"] = json!(path);
+            value["folder"] = json!(path.file_name().map(|n| n.to_string_lossy()));
+            value["source"] = json!(source);
+            value["saved_at_ms"] = json!(saved);
+            value["open"] = json!(open.is_some());
+            value["workspace"] = workspace.unwrap_or(Value::Null);
+            found.push(value);
         }
         found.sort_by_key(|v| std::cmp::Reverse(v["saved_at_ms"].as_u64().unwrap_or(0)));
         found

@@ -30,6 +30,7 @@ impl ImagineApp {
         let mut open = state.open;
         let mut request = None;
         egui::Window::new("Timeline settings").id(egui::Id::new("project-timing")).open(&mut open).collapsible(false).resizable(false).default_width(360.).show(ctx,|ui|{
+let _canvas = helto::window_canvas(ui);
             ui.add_enabled_ui(!self.timeline.busy,|ui|{
                 ui.label("Duration (seconds)");
                 let r=ui.add(egui::TextEdit::singleline(&mut state.text).desired_width(ui.available_width()));

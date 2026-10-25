@@ -306,7 +306,7 @@ impl ImagineApp {
                 }
                 let menu = helto::icon_button(ui, crate::icons::Icon::Info, "Differences", false);
                 egui::Popup::menu(&menu).show(|ui| {
-                    let reveal = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+                    let reveal = helto::shown(ui, self.prefs.privacy_mode);
                     if !reveal {
                         ui.label("Hidden metadata");
                         return;

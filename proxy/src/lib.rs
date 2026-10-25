@@ -30,6 +30,8 @@ pub mod mcp_protocol;
 pub mod connection_limit;
 
 mod mcp_storage;
+#[path = "../../shared/workspace_ids.rs"]
+pub mod workspace_ids;
 
 mod coordinator_socket;
 

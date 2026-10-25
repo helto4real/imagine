@@ -32,6 +32,14 @@ struct Probe {
     seen: Mutex<Vec<Seen>>,
     run_polls: AtomicUsize,
     image: Mutex<(PathBuf, String, usize)>,
+    /// The workspace folder Imagine reports for KEY.
+    folder: Mutex<PathBuf>,
+    /// Where this fake's projects live instead, when set.
+    elsewhere: Mutex<Option<PathBuf>>,
+}
+const KEY: &str = "imk-ownownownownownownownownow";
+fn cast_file() -> String {
+    st_proxy::workspace_ids::file_id("ws_own", "uploads/own-cast.png")
 }
 impl Probe {
     fn seen(&self) -> Vec<Seen> {
@@ -61,7 +69,7 @@ fn snapshot(revision: u64, attached: bool) -> Value {
     json!({"schema_version":1,"storage_layout":1,
     "project":{"schema_version":1,"id":"p1","project_revision":revision,"default_model":{"adapter":"h3"},
         "delivery":{"fps":time(24),"width":1280,"height":720},"global_prompt":"GLOBAL SYNTHETIC",
-        "creative":{"references":[{"id":"reference_x","name":"Keeper","alias":"keeper","enabled":true,"description":"LONG CAST TEXT",
+        "creative":{"scene_presets":{"scene_1":{"key":"Default ref2v","fingerprint":"FINGERPRINT"}},"references":[{"id":"reference_x","name":"Keeper","alias":"keeper","enabled":true,"description":"LONG CAST TEXT",
             "images":[{"id":"i1","asset":"project_asset_old","enabled":true,"preview":true}]}],
             "sections":{"s1":{"images":[]}},"scene_prompts":{"scene_1":{"title":"Opening","summary":"SUMMARY TEXT"}}},
         "assets":assets,
@@ -75,7 +83,7 @@ fn snapshot(revision: u64, attached: bool) -> Value {
     "authoring":[{"id":"d1","phase":"review","request":{"brief":"BRIEF TEXT"}}],
     "persistence":{"state":"saved","saved_revision":revision,"error_code":null},
     "runtime_assets":runtime,"runtime_takes":{"take_1":"session_take"},
-    "take_states":{"take_1":{"accepted":true,"outdated":false}}})
+    "take_states":{"take_1":{"accepted":true,"outdated":false}},"preset_states":{"scene_1":"applied"}})
 }
 fn draft() -> Value {
     json!({"schema_version":1,"id":"d1","project_id":"p1","phase":"outline",
@@ -99,10 +107,47 @@ async fn imagine(
         key: header("Idempotency-Key"),
         body: body.clone(),
     });
-    let ok = |v: Value| (StatusCode::OK, Json(v)).into_response();
+    let folder = p.folder.lock().unwrap().clone();
+    let elsewhere = p.elsewhere.lock().unwrap().clone();
+    // Every project of this fake lives in the workspace's project folder.
+    let ok = |mut v: Value| {
+        let location = json!(
+            elsewhere
+                .clone()
+                .unwrap_or_else(|| folder.join("videos/own-film"))
+        );
+        for pointer in ["/persistence", "/snapshot/persistence"] {
+            if let Some(persistence) = v.pointer_mut(pointer).and_then(Value::as_object_mut) {
+                persistence.insert("location".into(), location.clone());
+            }
+        }
+        (StatusCode::OK, Json(v)).into_response()
+    };
     let fail =
         |status: u16, v: Value| (StatusCode::from_u16(status).unwrap(), Json(v)).into_response();
     match (method.as_str(), uri.path()) {
+        ("POST", "/v1/workspaces/resolve") => {
+            if body["key"] == KEY {
+                ok(json!({"workspace_id":"ws_own","path":folder}))
+            } else {
+                fail(404, json!({"error":{"code":"workspace_unknown"}}))
+            }
+        }
+        ("POST", "/v1/workspaces/ws_own/video-projects") => ok(snapshot(1, false)),
+        ("GET", path)
+            if path.starts_with("/v1/workspaces/ws_own/files/") && path.ends_with("/info") =>
+        {
+            let (image, _, _) = p.image.lock().unwrap().clone();
+            if path.contains(&cast_file()) {
+                ok(json!({"file_id":cast_file(),"kind":"image","path":image}))
+            } else {
+                fail(404, json!({"error":{"code":"file_not_found"}}))
+            }
+        }
+        (
+            "GET",
+            "/v1/video/projects/bad" | "/v1/video/projects/odd" | "/v1/video/projects/flat",
+        ) => ok(snapshot(1, false)),
         ("GET", "/v1/video/authoring/profiles") => ok(json!({"profiles":[{"id":"nsfw"}]})),
         ("GET", "/v1/video/authoring/profiles/nsfw") => {
             ok(json!({"id":"nsfw","guidance":"SHARED"}))
@@ -144,9 +189,11 @@ async fn imagine(
             json!({"error":"story_expansion_count_mismatch","at":"expansions[3]","detail":"3 of 4"}),
         ),
         ("POST", "/v1/video/projects/p1/save") => ok(snapshot(2, false)),
-        ("GET", "/v1/video/runs/run_failed") => ok(json!({"id":"run_failed","status":"failed",
+        ("GET", "/v1/video/runs/run_failed") => ok(
+            json!({"id":"run_failed","status":"failed","project_id":"p1",
             "failure":"run_job_failed","current_job":"job_failed",
-            "targets":[{"scene_id":"s1","job_id":"job_ok","completed_take_id":"t1"},{"scene_id":"s2","job_id":"job_failed","completed_take_id":null}]})),
+            "targets":[{"scene_id":"s1","job_id":"job_ok","completed_take_id":"t1"},{"scene_id":"s2","job_id":"job_failed","completed_take_id":null}]}),
+        ),
         ("GET", "/v1/jobs/job_failed") => ok(json!({"id":"job_failed","status":"failed",
             "error":{"code":"h3_generation_failed","stage":"sampling","kind":"shape_mismatch","exception":"RuntimeError",
                 "sizes":[7,8],"message":"PRIVATE /home/x prompt","stage_text":"LEAK"}})),
@@ -163,12 +210,14 @@ async fn imagine(
             ok(json!({"valid":true,"scene_map":[],"snapshot":snapshot(4, false)}))
         }
         ("GET" | "POST", "/v1/video/authoring/d1" | "/v1/video/authoring/d1/review") => {
-            ok(json!({"id":"d1","phase":"review"}))
+            ok(json!({"id":"d1","phase":"review","project_id":"p1"}))
         }
         ("POST", "/v1/video/runs") => ok(json!({"id":"run_1","status":"running"})),
         ("GET", "/v1/video/runs/run_1") => {
             let n = p.run_polls.fetch_add(1, Ordering::SeqCst);
-            ok(json!({"id":"run_1","status":if n < 2 {"running"} else {"completed"}}))
+            ok(
+                json!({"id":"run_1","project_id":"p1","status":if n < 2 {"running"} else {"completed"}}),
+            )
         }
         ("POST", "/v1/video/runs/run_1/stop") => ok(json!({"id":"run_1","status":"stopping"})),
         ("POST", "/v1/video/projects/p1/assembly") => ok(json!({"id":"assembly_1"})),
@@ -176,11 +225,11 @@ async fn imagine(
             ok(json!({"id":"job_9","reused":false}))
         }
         ("GET", "/v1/video/assemblies/assembly_1") => ok(
-            json!({"plan":{"id":"assembly_1"},"progress":{"phase":"done","completed":1,"total":1},"job_id":"job_9","rendered_result_available":false}),
+            json!({"plan":{"id":"assembly_1","project_id":"p1"},"progress":{"phase":"done","completed":1,"total":1},"job_id":"job_9","rendered_result_available":false}),
         ),
         ("GET", "/v1/jobs/job_9") => ok(
             json!({"id":"job_9","status":"succeeded","request":{"secret":"REQUEST BODY"},"error":null,
-            "output":{"format":"mp4","saved_path":"/own/final.mp4","persistent":true,
+            "output":{"format":"mp4","saved_path":folder.join("videos/own-film/outputs/videos/final.mp4"),"persistent":true,
                 "assets":[{"id":"asset_final","role":"video","mime_type":"video/mp4","bytes":10,"sha256":"ab"}],
                 "video":{"duration_seconds":5.0},"delivery":{"blob":"DELIVERY PLAN"}}}),
         ),
@@ -198,10 +247,22 @@ impl Harness {
         let dir = tempfile::tempdir().unwrap();
         let published = dir.path().join("outputs/images");
         std::fs::create_dir_all(&published).unwrap();
-        std::fs::create_dir_all(dir.path().join("projects")).unwrap();
+        let folder = dir
+            .path()
+            .canonicalize()
+            .unwrap()
+            .join("own-mcp-root/2026-10-25/1432-own");
+        std::fs::create_dir_all(folder.join("uploads")).unwrap();
+        std::fs::create_dir_all(folder.join("videos/own-film/outputs/videos")).unwrap();
+        std::fs::write(
+            folder.join("videos/own-film/outputs/videos/final.mp4"),
+            b"own",
+        )
+        .unwrap();
         let proof = destination::proof(&published);
         let probe = Arc::new(Probe::default());
         *probe.session.lock().unwrap() = "session-a".into();
+        *probe.folder.lock().unwrap() = folder;
         let session = probe.clone();
         let router = Router::new()
             .route(
@@ -226,8 +287,8 @@ impl Harness {
         let mcp = Mcp::new(Config {
             imagine_url: url,
             coordinator_socket: Some(dir.path().join("gpu.sock").to_string_lossy().into()),
-            mcp_input_dir: dir.path().to_string_lossy().into(),
             mcp_output_dir: Some(dir.path().join("old-cache").to_string_lossy().into()),
+            mcp_port: Some(8190),
             poll_interval: 0.01,
             ..Default::default()
         })
@@ -243,7 +304,19 @@ impl Harness {
     fn root(&self) -> PathBuf {
         self.dir.path().canonicalize().unwrap()
     }
-    async fn call(&self, name: &str, args: Value) -> Value {
+    fn folder(&self) -> PathBuf {
+        self.probe.folder.lock().unwrap().clone()
+    }
+    /// A tool call with the workspace key, as an agent makes it.
+    async fn call(&self, name: &str, mut args: Value) -> Value {
+        let catalog = [
+            "list_video_profiles",
+            "describe_video_profile",
+            "video_capabilities",
+        ];
+        if !catalog.contains(&name) && args.get("workspace_key").is_none() {
+            args["workspace_key"] = json!(KEY);
+        }
         let args = st_proxy::mcp_protocol::tool_arguments(name, &args).unwrap();
         self.mcp.call(name, &args).await
     }
@@ -276,10 +349,15 @@ fn png(path: &Path) -> (String, usize) {
 #[tokio::test]
 async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
     let h = Harness::new().await;
-    let source = h.root().join("own-cast.png");
+    let source = h.folder().join("uploads/own-cast.png");
     let (digest, bytes) = png(&source);
     *h.probe.image.lock().unwrap() = (source.clone(), digest, bytes);
-    let project = h.root().join("projects/own-film");
+    let file = cast_file();
+    let info = format!("GET /v1/workspaces/ws_own/files/{file}/info");
+    const RESOLVE: &str = "POST /v1/workspaces/resolve";
+    const PROJECT: &str = "GET /v1/video/projects/p1";
+    const DRAFT: &str = "GET /v1/video/authoring/d1";
+    const PLAN: &str = "GET /v1/video/assemblies/assembly_1";
     let cases: Vec<(&str, Value, Vec<&str>)> = vec![
         (
             "list_video_profiles",
@@ -298,33 +376,33 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
         ),
         (
             "video_project",
-            json!({"action":"create","path":project}),
-            vec![
-                "POST /v1/video/locations",
-                "POST /v1/video/projects/at-location",
-            ],
+            json!({"action":"create","title":"Own Film"}),
+            vec![RESOLVE, "POST /v1/workspaces/ws_own/video-projects"],
         ),
         (
             "video_project",
             json!({"action":"get","project_id":"p1"}),
-            vec!["GET /v1/video/projects/p1"],
+            vec![RESOLVE, PROJECT],
         ),
         (
             "video_project",
             json!({"action":"edit","project_id":"p1","request":{"expected_project_revision":1,"commands":[{"operation":"set_global_prompt","prompt":"x"}]}}),
-            vec!["POST /v1/video/projects/p1/edits"],
+            vec![RESOLVE, PROJECT, "POST /v1/video/projects/p1/edits"],
         ),
         (
             "video_project",
             json!({"action":"save","project_id":"p1","expected_project_revision":2}),
-            vec!["POST /v1/video/projects/p1/save"],
+            vec![RESOLVE, PROJECT, "POST /v1/video/projects/p1/save"],
         ),
         (
             "video_register_reference",
-            json!({"project_id":"p1","path":source,"expected_project_revision":1,"cast":{"name":"Keeper","alias":"@Keeper","description":"Tall"}}),
+            json!({"project_id":"p1","file_id":file,"expected_project_revision":1,"cast":{"name":"Keeper","alias":"@Keeper","description":"Tall"}}),
             vec![
+                RESOLVE,
+                PROJECT,
+                &info,
                 "POST /v1/video/assets/link",
-                "GET /v1/video/projects/p1",
+                PROJECT,
                 "POST /v1/video/projects/p1/assets",
                 "POST /v1/video/projects/p1/edits",
             ],
@@ -332,54 +410,80 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
         (
             "video_storyboard",
             json!({"action":"start","project_id":"p1","request":{"expected_project_revision":3,"provider":"koboldcpp","provider_profile_id":"local","operation":"enhance_scene","brief":"b"}}),
-            vec!["POST /v1/video/projects/p1/authoring"],
+            vec![RESOLVE, PROJECT, "POST /v1/video/projects/p1/authoring"],
         ),
         (
             "video_storyboard",
             json!({"action":"submit","draft_id":"d1","submission":{"expected_project_revision":3,"dry_run":true}}),
-            vec!["POST /v1/video/authoring/d1/submission"],
+            vec![
+                RESOLVE,
+                DRAFT,
+                PROJECT,
+                "POST /v1/video/authoring/d1/submission",
+            ],
         ),
         (
             "video_storyboard",
             json!({"action":"get","draft_id":"d1"}),
-            vec!["GET /v1/video/authoring/d1"],
+            vec![RESOLVE, DRAFT, PROJECT, DRAFT],
         ),
         (
             "video_storyboard",
             json!({"action":"review","draft_id":"d1","review":{"outline":null}}),
-            vec!["POST /v1/video/authoring/d1/review"],
+            vec![
+                RESOLVE,
+                DRAFT,
+                PROJECT,
+                "POST /v1/video/authoring/d1/review",
+            ],
         ),
         (
             "video_run",
             json!({"action":"start","job_id":"render-1","request":{"project_id":"p1","expected_project_revision":4,"mode":"missing_only","selected_scene":null}}),
-            vec!["POST /v1/video/runs"],
+            vec![RESOLVE, PROJECT, "POST /v1/video/runs"],
         ),
         (
             "video_run",
             json!({"action":"get","run_id":"run_1"}),
-            vec!["GET /v1/video/runs/run_1"],
+            vec![RESOLVE, "GET /v1/video/runs/run_1", PROJECT],
         ),
         (
             "video_run",
             json!({"action":"stop","run_id":"run_1","cancel_current":true}),
-            vec!["POST /v1/video/runs/run_1/stop"],
+            vec![
+                RESOLVE,
+                "GET /v1/video/runs/run_1",
+                PROJECT,
+                "POST /v1/video/runs/run_1/stop",
+            ],
         ),
         (
             "video_assembly",
             json!({"action":"plan","project_id":"p1","request":{"options":{}}}),
-            vec!["POST /v1/video/projects/p1/assembly"],
+            vec![RESOLVE, PROJECT, "POST /v1/video/projects/p1/assembly"],
         ),
         (
             "video_assembly",
             json!({"action":"submit","plan_id":"assembly_1","job_id":"assemble-1"}),
-            vec!["POST /v1/video/assemblies/assembly_1/jobs"],
+            vec![
+                RESOLVE,
+                PLAN,
+                PROJECT,
+                "POST /v1/video/assemblies/assembly_1/jobs",
+            ],
         ),
         (
             "video_assembly",
             json!({"action":"get","plan_id":"assembly_1"}),
-            vec!["GET /v1/video/assemblies/assembly_1", "GET /v1/jobs/job_9"],
+            vec![RESOLVE, PLAN, PROJECT, PLAN, "GET /v1/jobs/job_9"],
         ),
     ];
+    // Capabilities report the canvas MCP projects default to.
+    let capabilities = h.call("video_capabilities", json!({})).await;
+    assert_eq!(
+        ok(&capabilities)["canvas"]["default"],
+        json!({"ratio":"16:9","portrait":false,"quality":"Draft"})
+    );
     for (name, args, routes) in cases {
         h.probe.clear();
         let result = h.call(name, args.clone()).await;
@@ -392,56 +496,52 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
     }
     // Request bodies: forced external authoring, namespaced keys, typed cast edit.
     h.probe.clear();
-    h.call(
-        "video_project",
-        json!({"action":"create","path":project,"project":{"schema_version":1}}),
-    )
-    .await;
-    let seen = h.probe.seen();
-    assert_eq!(
-        seen[0].body,
-        json!({"schema_version":1,"path":project,"create":true})
-    );
-    assert_eq!(
-        seen[1].body,
-        json!({"schema_version":1,"location_id":"location_1","project":{"schema_version":1},"canvas":null})
-    );
-    h.probe.clear();
-    // Without project or canvas, MCP productions default to Draft.
-    h.call("video_project", json!({"action":"create","path":project}))
+    let created = h
+        .call(
+            "video_project",
+            json!({"action":"create","title":"Own Film","project":{"schema_version":1}}),
+        )
         .await;
     assert_eq!(
         h.probe.seen()[1].body,
-        json!({"schema_version":1,"location_id":"location_1","project":null,
+        json!({"schema_version":1,"title":"Own Film","project":{"schema_version":1},"canvas":null})
+    );
+    // The projection names the project, never its folder.
+    assert_eq!(ok(&created)["project_id"], "p1");
+    assert!(!created.to_string().contains("own-mcp-root"), "{created}");
+    h.probe.clear();
+    // Without project or canvas, MCP productions default to Draft.
+    h.call("video_project", json!({"action":"create"})).await;
+    assert_eq!(
+        h.probe.seen()[1].body,
+        json!({"schema_version":1,"title":"","project":null,
             "canvas":{"ratio":"16:9","portrait":false,"quality":"Draft"}})
     );
     h.probe.clear();
     let canvas = json!({"ratio":"16:9","portrait":false,"quality":"Standard"});
-    h.call(
-        "video_project",
-        json!({"action":"create","path":project,"canvas":canvas}),
-    )
-    .await;
+    h.call("video_project", json!({"action":"create","canvas":canvas}))
+        .await;
     assert_eq!(
         h.probe.seen()[1].body,
-        json!({"schema_version":1,"location_id":"location_1","project":null,"canvas":canvas})
+        json!({"schema_version":1,"title":"","project":null,"canvas":canvas})
     );
     h.probe.clear();
     let both = h
         .call(
             "video_project",
-            json!({"action":"create","path":project,"project":{"schema_version":1},"canvas":canvas}),
+            json!({"action":"create","project":{"schema_version":1},"canvas":canvas}),
         )
         .await;
     assert_eq!(fault(&both)["category"], "validation");
-    assert!(h.probe.seen().is_empty());
+    assert_eq!(h.probe.routes(), [RESOLVE]);
+    h.probe.clear();
     h.call("video_storyboard", json!({"action":"start","project_id":"p1","request":{"expected_project_revision":3,"provider":"koboldcpp","provider_profile_id":"local","operation":"enhance_scene","brief":"b"}})).await;
     assert_eq!(
-        h.probe.seen()[0].body,
+        h.probe.seen()[2].body,
         json!({"expected_project_revision":3,"provider":"external","provider_profile_id":"","operation":"outline","brief":"b","schema_version":1})
     );
     h.probe.clear();
-    let registered = h.call("video_register_reference", json!({"project_id":"p1","path":source,"expected_project_revision":1,"name":"Keeper face","cast":{"name":"Keeper","alias":"@Keeper","description":"Tall"}})).await;
+    let registered = h.call("video_register_reference", json!({"project_id":"p1","file_id":file,"expected_project_revision":1,"name":"Keeper face","cast":{"name":"Keeper","alias":"@Keeper","description":"Tall"}})).await;
     let registered = ok(&registered);
     assert_eq!(registered["asset_id"], "project_asset_new");
     assert_eq!(registered["project_revision"], 3);
@@ -449,10 +549,10 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
     assert_eq!(registered["cast"]["tag"], "@Keeper");
     let seen = h.probe.seen();
     assert_eq!(
-        seen[2].body,
+        seen[5].body,
         json!({"schema_version":1,"expected_project_revision":1,"asset_id":"session_asset_1","name":"Keeper face"})
     );
-    let command = &seen[3].body["commands"][0];
+    let command = &seen[6].body["commands"][0];
     assert_eq!(command["operation"], "upsert_visual_reference");
     let reference = &command["reference"];
     assert_eq!(reference["id"], registered["cast"]["reference_id"]);
@@ -463,7 +563,7 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
     );
     // The same alias always maps to the same reference, so a re-registration replaces it.
     h.probe.clear();
-    let again = h.call("video_register_reference", json!({"project_id":"p1","path":source,"expected_project_revision":1,"cast":{"name":"Keeper","alias":"Keeper"}})).await;
+    let again = h.call("video_register_reference", json!({"project_id":"p1","file_id":file,"expected_project_revision":1,"cast":{"name":"Keeper","alias":"Keeper"}})).await;
     assert_eq!(
         ok(&again)["cast"]["reference_id"],
         registered["cast"]["reference_id"]
@@ -476,6 +576,8 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
     let view = ok(&view);
     assert_eq!(view["project_id"], "p1");
     assert_eq!(view["scenes"][0]["title"], "Opening");
+    assert_eq!(view["scenes"][0]["preset"], "Default ref2v");
+    assert_eq!(view["scenes"][0]["preset_state"], "applied");
     assert_eq!(view["scenes"][0]["sections"][0]["prompt"], "Section prompt");
     assert_eq!(view["scenes"][0]["accepted_take"]["id"], "take_1");
     assert_eq!(view["persistence"]["state"], "saved");
@@ -510,7 +612,14 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
     let assembly = ok(&assembly);
     assert_eq!(assembly["terminal"], true);
     assert_eq!(assembly["job"]["status"], "succeeded");
-    assert_eq!(assembly["job"]["output"]["saved_path"], "/own/final.mp4");
+    // The final video is a workspace file, named by ID.
+    let output = &assembly["job"]["output"];
+    assert!(output.get("saved_path").is_none());
+    assert_eq!(
+        output["file_id"],
+        st_proxy::workspace_ids::file_id("ws_own", "videos/own-film/outputs/videos/final.mp4")
+    );
+    assert!(!assembly.to_string().contains("own-mcp-root"));
     assert!(!assembly.to_string().contains("REQUEST BODY"));
     assert!(!assembly.to_string().contains("DELIVERY PLAN"));
     h.probe.clear();
@@ -520,7 +629,7 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
     )
     .await;
     assert_eq!(
-        h.probe.seen()[0].body,
+        h.probe.seen()[2].body,
         json!({"options":{},"schema_version":1,"project_id":"p1"})
     );
     let unknown = h
@@ -589,14 +698,14 @@ async fn idempotency_keys_are_namespaced_by_session_and_follow_a_session_reset()
         .probe
         .seen()
         .into_iter()
-        .map(|s| s.key)
+        .filter_map(|s| s.key)
         .collect::<Vec<_>>();
     assert_eq!(
         keys,
         [
-            Some("mcp-session-a-render-1".into()),
-            Some("mcp-session-a-render-1".into()),
-            Some("mcp-session-a-assemble-1".into())
+            "mcp-session-a-render-1",
+            "mcp-session-a-render-1",
+            "mcp-session-a-assemble-1"
         ]
     );
     // Reads and non-admission writes never carry a key.
@@ -604,7 +713,7 @@ async fn idempotency_keys_are_namespaced_by_session_and_follow_a_session_reset()
     ok(&h
         .call("video_run", json!({"action":"get","run_id":"run_1"}))
         .await);
-    assert_eq!(h.probe.seen()[0].key, None);
+    assert!(h.probe.seen().iter().all(|s| s.key.is_none()));
     for bad in ["../x", "", "has space", &"x".repeat(65)] {
         let mut args = start.clone();
         args["job_id"] = json!(bad);
@@ -613,15 +722,16 @@ async fn idempotency_keys_are_namespaced_by_session_and_follow_a_session_reset()
             fault(&h.call("video_run", args).await)["category"],
             "validation"
         );
-        assert!(h.probe.seen().is_empty());
+        assert!(!h.probe.routes().contains(&"POST /v1/video/runs".to_owned()));
     }
     // A new Imagine session discards proxy session state; video keys and headers follow it.
     *h.probe.session.lock().unwrap() = "session-b".into();
     h.probe.clear();
     ok(&h.call("video_run", start).await);
     let seen = h.probe.seen();
-    assert_eq!(seen[0].session, "session-b");
-    assert_eq!(seen[0].key.as_deref(), Some("mcp-session-b-render-1"));
+    assert!(seen.iter().all(|s| s.session == "session-b"));
+    let admitted = seen.iter().find(|s| s.path == "/v1/video/runs").unwrap();
+    assert_eq!(admitted.key.as_deref(), Some("mcp-session-b-render-1"));
     h.close().await;
 }
 
@@ -657,66 +767,54 @@ async fn imagine_errors_forward_only_stable_code_field_path_and_detail() {
 }
 
 #[tokio::test]
-async fn project_folders_and_references_stay_inside_mcp_roots() {
+async fn projects_and_references_stay_inside_the_workspace() {
     let h = Harness::new().await;
-    let root = h.root();
+    let file = cast_file();
+    // An unknown key reaches nothing.
+    let unknown = h
+        .call(
+            "video_project",
+            json!({"action":"get","project_id":"p1","workspace_key":"imk-cccccccccccccccccccccccccc"}),
+        )
+        .await;
+    assert_eq!(fault(&unknown)["category"], "not_found");
+    assert_eq!(h.probe.routes(), ["POST /v1/workspaces/resolve"]);
+    // A file Imagine places outside the workspace is never read or linked.
     let outside = tempfile::tempdir().unwrap();
-    let outside_path = outside.path().canonicalize().unwrap();
-    std::os::unix::fs::symlink(&outside_path, root.join("projects/escape")).unwrap();
-    std::fs::write(root.join("projects/file"), b"own").unwrap();
-    for path in [
-        json!(outside_path.join("film")),
-        json!("relative/film"),
-        json!(root.join("projects/../projects/film")),
-        json!(root.join("missing-parent/film")),
-        json!(root),
-        json!(root.join("projects/escape")),
-        json!(root.join("projects/escape/film")),
-        json!(root.join("projects/file")),
-    ] {
-        let result = h
-            .call("video_project", json!({"action":"create","path":path}))
-            .await;
-        assert_eq!(fault(&result)["category"], "validation", "{path}");
-    }
-    assert!(h.probe.seen().is_empty());
-    // An existing empty folder and a symlinked parent inside the root resolve canonically.
-    std::fs::create_dir(root.join("projects/empty")).unwrap();
-    std::os::unix::fs::symlink(root.join("projects"), root.join("alias")).unwrap();
-    for (path, expected) in [
-        (root.join("projects/empty"), root.join("projects/empty")),
-        (root.join("alias/new-film"), root.join("projects/new-film")),
-    ] {
-        h.probe.clear();
-        let result = h
-            .call("video_project", json!({"action":"create","path":path}))
-            .await;
-        assert_eq!(ok(&result)["path"], json!(expected));
-        assert_eq!(h.probe.seen()[0].body["path"], json!(expected));
-    }
+    let outside_image = outside.path().join("own.png");
+    let (digest, bytes) = png(&outside_image);
+    *h.probe.image.lock().unwrap() = (outside_image, digest, bytes);
     h.probe.clear();
-    let outside_image = outside_path.join("own.png");
-    png(&outside_image);
-    let not_image = root.join("own.txt");
-    std::fs::write(&not_image, b"own synthetic text").unwrap();
-    for path in [json!(outside_image), json!("own.png"), json!(not_image)] {
-        let result = h
-            .call(
-                "video_register_reference",
-                json!({"project_id":"p1","path":path,"expected_project_revision":1}),
-            )
-            .await;
-        assert_eq!(fault(&result)["category"], "validation", "{path}");
-    }
-    assert!(h.probe.seen().is_empty());
+    let refused = h
+        .call(
+            "video_register_reference",
+            json!({"project_id":"p1","file_id":file,"expected_project_revision":1}),
+        )
+        .await;
+    assert_eq!(fault(&refused)["category"], "imagine");
+    assert!(
+        !h.probe
+            .routes()
+            .contains(&"POST /v1/video/assets/link".to_owned())
+    );
+    // A file ID of no workspace file is not found.
+    let other = st_proxy::workspace_ids::file_id("ws_other", "uploads/own-cast.png");
+    let missing = h
+        .call(
+            "video_register_reference",
+            json!({"project_id":"p1","file_id":other,"expected_project_revision":1}),
+        )
+        .await;
+    assert_eq!(fault(&missing)["category"], "not_found");
     // A changed file between hashing and linking is rejected before attaching.
-    let source = root.join("own.png");
+    let source = h.folder().join("uploads/own-cast.png");
     png(&source);
-    *h.probe.image.lock().unwrap() = (source.clone(), "0".repeat(64), 1);
+    *h.probe.image.lock().unwrap() = (source, "0".repeat(64), 1);
+    h.probe.clear();
     let changed = h
         .call(
             "video_register_reference",
-            json!({"project_id":"p1","path":source,"expected_project_revision":1}),
+            json!({"project_id":"p1","file_id":file,"expected_project_revision":1}),
         )
         .await;
     assert!(
@@ -725,7 +823,19 @@ async fn project_folders_and_references_stay_inside_mcp_roots() {
             .unwrap()
             .contains("has changed")
     );
-    assert_eq!(h.probe.routes(), ["POST /v1/video/assets/link"]);
+    assert_eq!(
+        h.probe.routes().last().map(String::as_str),
+        Some("POST /v1/video/assets/link")
+    );
+    // A project of another folder is not this workspace's project.
+    *h.probe.elsewhere.lock().unwrap() = Some(
+        h.root()
+            .join("own-mcp-root/2026-10-25/1433-other/videos/own-film"),
+    );
+    let foreign = h
+        .call("video_project", json!({"action":"get","project_id":"p1"}))
+        .await;
+    assert_eq!(fault(&foreign)["category"], "not_found");
     h.close().await;
 }
 
@@ -823,6 +933,12 @@ fn catalog_schemas_are_strict_objects() {
         }
     }
     for name in [
+        "imagine_guide",
+        "workspace_create",
+        "workspace_open",
+        "workspace_files",
+        "workspace_upload",
+        "workspace_view",
         "list_video_profiles",
         "describe_video_profile",
         "video_capabilities",
@@ -846,15 +962,29 @@ fn catalog_schemas_are_strict_objects() {
     assert!(
         protocol(
             "video_project",
-            &json!({"action":"create","path":"/x","project":null})
+            &json!({"action":"create","workspace_key":KEY,"title":"x","project":null})
         )
         .is_ok()
     );
+    assert!(protocol("video_project", &json!({"action":"create","path":"/x"})).is_err());
+    // Clients cap server instructions (Claude Code near 4,000 characters):
+    // they stay short and send the agent to the full guide.
     let instructions = include_str!("../mcp/instructions.txt");
-    assert!(instructions.contains("Do not open, render, visually inspect or analyze images"));
-    assert!(instructions.contains("video_run start (the first and only GPU handover)"));
-    assert!(instructions.contains("i2v only to animate one specific start image"));
-    assert!(instructions.contains("No music unless the user asks (add_music false)"));
+    assert!(
+        instructions.len() <= 3500,
+        "{} characters",
+        instructions.len()
+    );
+    assert!(instructions.contains("call imagine_guide"));
+    assert!(instructions.contains("save the returned workspace_key at once"));
+    assert!(instructions.contains("reuse the same job_id"));
+    let guide = include_str!("../mcp/guide.txt");
+    assert!(guide.contains("Imagine never lists workspaces or shows host paths"));
+    assert!(guide.contains("video_run start (the first and only GPU handover)"));
+    assert!(guide.contains("i2v only to animate one specific start image"));
+    assert!(guide.contains("No music unless the user asks (add_music false)"));
+    assert!(guide.contains("The video profile never enables the image nsfw switch"));
+    assert!(guide.contains("## Reporting"));
 }
 #[tokio::test]
 async fn failed_run_names_the_scene_and_only_bounded_job_diagnostics() {

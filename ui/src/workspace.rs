@@ -558,11 +558,17 @@ impl ImagineApp {
         panel(ui, references, false);
         panel(ui, viewer, true);
         panel(ui, prompt, false);
-        region(ui, "references", references.shrink(10.), |ui| {
-            self.reference_panel(ui)
+        helto::canvas(ui, "references", references, |ui| {
+            region(ui, "references", references.shrink(10.), |ui| {
+                self.reference_panel(ui)
+            })
         });
-        region(ui, "viewer", viewer.shrink(10.), |ui| self.viewer(ui));
-        region(ui, "prompt", prompt.shrink(12.), |ui| self.prompt_panel(ui));
+        helto::canvas(ui, "viewer", viewer, |ui| {
+            region(ui, "viewer", viewer.shrink(10.), |ui| self.viewer(ui))
+        });
+        helto::canvas(ui, "prompt", prompt, |ui| {
+            region(ui, "prompt", prompt.shrink(12.), |ui| self.prompt_panel(ui))
+        });
         if wide {
             let gap = |a: Rect, b: Rect| {
                 Rect::from_min_max(
@@ -619,7 +625,14 @@ impl ImagineApp {
             );
             self.pane_divider(ui, Pane::EditInspector, gap, inspector.width(), -1., true);
         }
-        region(ui, "edit-viewer", viewer.shrink(10.), |ui| self.viewer(ui));
+        helto::canvas(ui, "edit-viewer", viewer, |ui| {
+            region(ui, "edit-viewer", viewer.shrink(10.), |ui| self.viewer(ui))
+        });
+        helto::canvas(ui, "edit-inspector", inspector, |ui| {
+            self.edit_inspector(ui, inspector)
+        });
+    }
+    fn edit_inspector(&mut self, ui: &mut Ui, inspector: Rect) {
         region(ui, "edit-inspector", inspector.shrink(12.), |ui| {
             egui::ScrollArea::vertical()
                 .id_salt("edit-inspector-scroll")
@@ -1498,9 +1511,8 @@ impl ImagineApp {
                         .id_salt("generation-error")
                         .max_height(38.)
                         .show(ui, |ui| {
-                            // Error details can name files; they reveal on hover like the queue.
-                            let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
-                            ui.label(helto::error_text(&error, revealed));
+                            // Errors are fixed messages and never quote prompts.
+                            ui.label(helto::error_text(&error, true));
                         });
                 });
             }
@@ -1698,8 +1710,7 @@ impl ImagineApp {
                     });
                     if let Some(error) = &self.settings_error {
                         ui.add_space(14.);
-                        let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
-                        ui.label(helto::error_text(error, revealed));
+                        ui.label(helto::error_text(error, true));
                     }
                 });
         });

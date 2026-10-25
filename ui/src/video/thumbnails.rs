@@ -47,7 +47,7 @@ impl ImagineApp {
         path: Option<String>,
     ) {
         let (rect, _) = ui.allocate_exact_size(egui::vec2(112., 80.), egui::Sense::hover());
-        if !helto::reveal_in_viewport(ui, self.prefs.privacy_mode) {
+        if !helto::shown(ui, self.prefs.privacy_mode) {
             ui.painter().rect_filled(rect, 4., helto::FIELD);
             ui.painter().text(
                 rect.center(),

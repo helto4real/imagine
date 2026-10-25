@@ -341,7 +341,7 @@ impl State {
             error: self.filter_error.map(|error| error.message().to_owned()),
         }
     }
-    pub fn info_window(&mut self, ctx: &egui::Context, privacy: bool, client: Option<&Client>) {
+    pub fn info_window(&mut self, ctx: &egui::Context, client: Option<&Client>) {
         let Some(view) = self.info.as_ref() else {
             return;
         };
@@ -349,6 +349,7 @@ impl State {
         let mut open = true;
         let mut retry = false;
         let response = egui::Modal::new(egui::Id::new("h3-lora-info")).show(ctx, |ui| {
+            let _canvas = helto::window_canvas(ui);
             ui.set_width((ctx.content_rect().width() - 48.).clamp(180., 460.));
             ui.set_height((ctx.content_rect().height() - 180.).max(240.));
             ui.horizontal(|ui| {
@@ -369,8 +370,7 @@ impl State {
                 .auto_shrink([false, false])
                 .max_height(ui.available_height().max(150.))
                 .show(ui, |ui| {
-                    let hidden = !helto::reveal_in_viewport(ui, privacy);
-                    helto::private_scope(ui, hidden, |ui| {
+                    ui.scope(|ui| {
                         field(ui, "File", &view.file);
                         if view.loading {
                             ui.label("Reading file information…");
@@ -436,30 +436,25 @@ fn all_entries(catalog: &Catalog) -> Vec<&Entry> {
         .filter(|entry| !entry.file.is_empty())
         .collect()
 }
-/// Popups paint in their own layer, so they protect their contents
-/// independently and reveal them while the pointer is over the list itself.
+/// LoRA names are not private; they show with Hide previews on.
 pub(super) fn picker(
     ui: &mut egui::Ui,
     index: usize,
     name: &mut String,
     choices: Option<&Filter<'_>>,
-    privacy: bool,
 ) -> egui::Response {
     egui::ComboBox::from_id_salt("catalog-choice")
         .selected_text("Choose file…")
         .width((ui.available_width() - 64.).max(100.))
         .show_ui(ui, |ui| {
-            let hidden = !helto::reveal_in_viewport(ui, privacy);
-            helto::private_scope(ui, hidden, |ui| {
+            ui.scope(|ui| {
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                 if let Some(choices) = choices {
                     for entry in &choices.entries {
                         let r = ui
                             .selectable_label(*name == entry.file, short_name(&entry.file))
                             .on_hover_ui(|ui| {
-                                helto::private_scope(ui, hidden, |ui| {
-                                    ui.add(egui::Label::new(&entry.file).wrap());
-                                });
+                                ui.add(egui::Label::new(&entry.file).wrap());
                             });
                         super::control(ui, &format!("lora-{index}-choice-{}", entry.file), &r);
                         if r.clicked() {
@@ -688,25 +683,27 @@ mod tests {
         assert!(!message("private/path/secret").contains("secret"));
     }
     #[test]
-    fn info_window_hides_paths_metadata_and_accessibility_in_privacy_mode() {
-        fn private_text(shape: &egui::Shape) -> bool {
+    fn info_window_shows_paths_and_metadata_without_hover() {
+        // LoRA names and metadata are not private: they show with Hide
+        // previews on, in an unfocused window, without the pointer.
+        fn painted(shape: &egui::Shape) -> bool {
             match shape {
                 egui::Shape::Text(t) => {
-                    t.opacity_factor > 0. && t.galley.text().contains("SYNTHETIC_PRIVATE")
+                    t.opacity_factor > 0. && t.galley.text().contains("SYNTHETIC_NAME")
                 }
-                egui::Shape::Vec(shapes) => shapes.iter().any(private_text),
+                egui::Shape::Vec(shapes) => shapes.iter().any(painted),
                 _ => false,
             }
         }
         let ctx = egui::Context::default();
         helto::install(&ctx);
-        ctx.enable_accesskit();
+        helto::set_privacy_mode(&ctx, true);
         let mut state = State {
             info: Some(InfoView {
-                file: "SYNTHETIC_PRIVATE/own.weights".into(),
+                file: "SYNTHETIC_NAME/own.weights".into(),
                 value: Some(Info {
-                    name: "SYNTHETIC_PRIVATE metadata".into(),
-                    trained_words: vec!["SYNTHETIC_PRIVATE trigger".into()],
+                    name: "SYNTHETIC_NAME metadata".into(),
+                    trained_words: vec!["SYNTHETIC_NAME trigger".into()],
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -714,42 +711,21 @@ mod tests {
             ..Default::default()
         };
         for width in [600., 960.] {
-            for privacy in [false, true, false, true] {
-                for frame in 0..3 {
-                    let mut output = ctx.run_ui(
-                        egui::RawInput {
-                            screen_rect: Some(egui::Rect::from_min_size(
-                                egui::Pos2::ZERO,
-                                egui::vec2(width, 600.),
-                            )),
-                            focused: false,
-                            ..Default::default()
-                        },
-                        |ui| state.info_window(ui.ctx(), privacy, None),
-                    );
-                    output.textures_delta.clear();
-                    if frame < 2 {
-                        continue;
-                    }
-                    assert_eq!(
-                        output.shapes.iter().any(|s| private_text(&s.shape)),
-                        !privacy
-                    );
-                    if privacy {
-                        assert!(
-                            !output
-                                .platform_output
-                                .accesskit_update
-                                .unwrap()
-                                .nodes
-                                .iter()
-                                .any(|(_, node)| node
-                                    .value()
-                                    .into_iter()
-                                    .chain(node.label())
-                                    .any(|s| s.contains("SYNTHETIC_PRIVATE")))
-                        );
-                    }
+            for frame in 0..3 {
+                let mut output = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(width, 600.),
+                        )),
+                        focused: false,
+                        ..Default::default()
+                    },
+                    |ui| state.info_window(ui.ctx(), None),
+                );
+                output.textures_delta.clear();
+                if frame == 2 {
+                    assert!(output.shapes.iter().any(|s| painted(&s.shape)));
                 }
             }
         }
@@ -840,22 +816,22 @@ mod tests {
         task.abort();
     }
     #[test]
-    fn open_catalog_popup_hides_its_separate_layer_when_concealed() {
-        fn private_text(shape: &egui::Shape) -> bool {
+    fn open_catalog_popup_shows_lora_names_with_hide_previews_on() {
+        fn painted(shape: &egui::Shape) -> bool {
             match shape {
                 egui::Shape::Text(t) => {
-                    t.opacity_factor > 0. && t.galley.text().contains("PRIVATE_CHOICE")
+                    t.opacity_factor > 0. && t.galley.text().contains("OWN_CHOICE")
                 }
-                egui::Shape::Vec(s) => s.iter().any(private_text),
+                egui::Shape::Vec(s) => s.iter().any(painted),
                 _ => false,
             }
         }
         let ctx = egui::Context::default();
-        ctx.enable_accesskit();
         helto::install(&ctx);
+        helto::set_privacy_mode(&ctx, true);
         let c = Catalog {
             files: vec![Entry {
-                file: "own/PRIVATE_CHOICE.weights".into(),
+                file: "own/OWN_CHOICE.weights".into(),
                 size: 1,
             }],
             warnings: vec![],
@@ -863,9 +839,7 @@ mod tests {
         };
         let f = State::default().filtered(&c, "", &ctx);
         let mut name = String::new();
-        let mut rect = egui::Rect::NOTHING;
-        // As in the LoRA window: the window body follows its own hover.
-        let mut draw = |events: Vec<egui::Event>, privacy: bool| {
+        let mut draw = |events: Vec<egui::Event>| {
             let mut output = ctx.run_ui(
                 egui::RawInput {
                     screen_rect: Some(egui::Rect::from_min_size(
@@ -876,76 +850,34 @@ mod tests {
                     ..Default::default()
                 },
                 |ui| {
-                    let hidden = !helto::reveal_in_viewport(ui, privacy);
-                    helto::private_scope(ui, hidden, |ui| {
-                        rect = picker(ui, 0, &mut name, Some(&f), privacy).rect;
-                    });
+                    picker(ui, 0, &mut name, Some(&f));
                 },
             );
             output.textures_delta.clear();
             output
         };
-        draw(vec![], false);
-        draw(vec![], false);
-        // Open through real egui pointer input rather than manipulating popup memory.
+        draw(vec![]);
+        draw(vec![]);
         let pos = egui::pos2(50., 18.);
-        draw(
-            vec![
-                egui::Event::PointerMoved(pos),
-                egui::Event::PointerButton {
-                    pos,
-                    button: egui::PointerButton::Primary,
-                    pressed: true,
-                    modifiers: egui::Modifiers::NONE,
-                },
-            ],
-            false,
-        );
-        draw(
-            vec![egui::Event::PointerButton {
+        draw(vec![
+            egui::Event::PointerMoved(pos),
+            egui::Event::PointerButton {
                 pos,
                 button: egui::PointerButton::Primary,
-                pressed: false,
+                pressed: true,
                 modifiers: egui::Modifiers::NONE,
-            }],
-            false,
-        );
-        let visible = draw(vec![], false);
-        assert!(
-            visible.shapes.iter().any(|s| private_text(&s.shape)),
-            "catalog popup did not open"
-        );
-        // With the pointer on the dropdown button, the open list stays hidden.
-        let concealed = draw(vec![], true);
-        assert!(!concealed.shapes.iter().any(|s| private_text(&s.shape)));
-        assert!(
-            !concealed
-                .platform_output
-                .accesskit_update
-                .unwrap()
-                .nodes
-                .iter()
-                .any(|(_, node)| node
-                    .value()
-                    .into_iter()
-                    .chain(node.label())
-                    .any(|s| s.contains("PRIVATE_CHOICE")))
-        );
-        // Moving onto the list reveals it, so a file can be chosen; this used
-        // to follow the window behind the list and hide it.
-        let choice = ctx
-            .data(|d| {
-                d.get_temp::<egui::Response>(egui::Id::new((
-                    "lora-test-control",
-                    "lora-0-choice-own/PRIVATE_CHOICE.weights",
-                )))
-            })
-            .unwrap()
-            .rect
-            .center();
-        draw(vec![egui::Event::PointerMoved(choice)], true);
-        let revealed = draw(vec![], true);
-        assert!(revealed.shapes.iter().any(|s| private_text(&s.shape)));
-        assert!(rect.is_positive());
+            },
+        ]);
+        draw(vec![egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed: false,
+            modifiers: egui::Modifiers::NONE,
+        }]);
+        draw(vec![]);
+        // Moving off the list and the window keeps the names readable.
+        draw(vec![egui::Event::PointerMoved(egui::pos2(590., 590.))]);
+        let output = draw(vec![]);
+        assert!(output.shapes.iter().any(|s| painted(&s.shape)));
     }
 }

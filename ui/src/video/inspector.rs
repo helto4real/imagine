@@ -70,6 +70,7 @@ impl ImagineApp {
         commands: &mut Vec<Edit>,
     ) {
         chrome::panel(ui, rect, false);
+        let _canvas = helto::panel_canvas(ui, "timeline-references", rect);
         let blocked = (!enabled).then(|| {
             self.timeline_blocked(true)
                 .unwrap_or("Wait for the current timeline operation.")
@@ -158,7 +159,7 @@ impl ImagineApp {
         }
         const TILE: f32 = 120.;
         let columns = ((ui.available_width() + 8.) / (TILE + 16.)).floor().max(1.) as usize;
-        let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+        let revealed = helto::shown(ui, self.prefs.privacy_mode);
         let scene = self.timeline.scene().cloned();
         let mut kind_counts = std::collections::BTreeMap::new();
         egui::Grid::new("project-asset-grid")
@@ -296,7 +297,7 @@ impl ImagineApp {
             ui.weak("No cast yet. Add characters and references with Cast & references.");
             return;
         }
-        let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+        let revealed = helto::shown(ui, self.prefs.privacy_mode);
         for (i, reference) in cast.iter().enumerate() {
             ui.horizontal(|ui| {
                 if revealed {
@@ -331,6 +332,7 @@ impl ImagineApp {
         commands: &mut Vec<Edit>,
     ) {
         chrome::panel(ui, rect, false);
+        let _canvas = helto::panel_canvas(ui, "timeline-inspector", rect);
         let inner = rect.shrink2(egui::vec2(10., 6.));
         let single = self.timeline.project_audio || self.timeline.audio_primary.is_some();
         let scene = (!single).then(|| self.timeline.scene().cloned()).flatten();
@@ -516,7 +518,7 @@ impl ImagineApp {
             .map(|p| p.title.trim())
             .filter(|t| !t.is_empty())
             .map(str::to_owned);
-        let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+        let revealed = helto::shown(ui, self.prefs.privacy_mode);
         let place = match (&title, revealed) {
             (Some(title), true) => format!("Scene {number} · {title}"),
             _ => format!("Scene {number}"),

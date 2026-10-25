@@ -707,7 +707,7 @@ fn preferences_survive_folder_change_and_app_restart() {
 }
 
 #[test]
-fn privacy_reveals_only_hovered_images_in_a_focused_window() {
+fn privacy_reveals_the_hovered_canvas_only_in_a_focused_window() {
     for size in [egui::vec2(64., 48.), egui::vec2(320., 180.)] {
         let ctx = egui::Context::default();
         let sample = Preview {
@@ -717,8 +717,12 @@ fn privacy_reveals_only_hovered_images_in_a_focused_window() {
         };
         let image = texture(&ctx, &sample, "private-test");
         let other = texture(&ctx, &sample, "other-private-test");
-        let inside = egui::pos2(24., 24.);
+        // Anywhere on the left panel, not over its image, reveals that panel.
+        let inside = egui::pos2(300., 500.);
         let outside = egui::pos2(600., 400.);
+        let left = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400., 600.));
+        // The other panel stays hidden throughout; the pointer never enters it.
+        let right = egui::Rect::from_min_max(egui::pos2(400., 0.), egui::pos2(800., 300.));
         for (name, events, focused, clipped, expected) in [
             ("initial", vec![], true, false, false),
             (
@@ -772,13 +776,21 @@ fn privacy_reveals_only_hovered_images_in_a_focused_window() {
                 },
                 |ui| {
                     if clipped {
+                        // A panel scrolled partly out of view counts only
+                        // where it is visible; the pointer is below that.
                         ui.set_clip_rect(egui::Rect::from_min_max(
-                            egui::pos2(100., 100.),
-                            egui::pos2(800., 600.),
+                            egui::Pos2::ZERO,
+                            egui::pos2(800., 400.),
                         ));
                     }
-                    private_image(ui, &image, size, true);
-                    private_image(ui, &other, size, true);
+                    helto::canvas(ui, "own-left", left, |ui| {
+                        private_image(ui, &image, size, true);
+                    });
+                    helto::canvas(ui, "own-right", right, |ui| {
+                        ui.scope_builder(egui::UiBuilder::new().max_rect(right), |ui| {
+                            private_image(ui, &other, size, true);
+                        });
+                    });
                 },
             );
             output.textures_delta.clear();
@@ -789,7 +801,7 @@ fn privacy_reveals_only_hovered_images_in_a_focused_window() {
                 })
             };
             assert_eq!(draws_texture(image.id()), expected, "{name} at {size:?}");
-            assert!(!draws_texture(other.id()), "neighbor revealed: {name}");
+            assert!(!draws_texture(other.id()), "other canvas revealed: {name}");
         }
     }
 }
@@ -1747,4 +1759,62 @@ fn image_files_dropped_on_the_window_upload_as_references() {
     );
     output.textures_delta.clear();
     assert!(desk.app.image.uploading);
+}
+
+#[test]
+fn hide_previews_reveals_the_hovered_panel_and_keeps_every_private_surface_on_a_canvas() {
+    fn painted(output: &egui::FullOutput, needle: &str) -> bool {
+        fn find(shape: &egui::Shape, needle: &str) -> bool {
+            match shape {
+                egui::Shape::Text(t) => t.opacity_factor > 0. && t.galley.text().contains(needle),
+                egui::Shape::Vec(shapes) => shapes.iter().any(|s| find(s, needle)),
+                _ => false,
+            }
+        }
+        output.shapes.iter().any(|s| find(&s.shape, needle))
+    }
+    for workspace in [
+        Workspace::Image,
+        Workspace::ImageEdit,
+        Workspace::CharacterSheet,
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        helto::install(&ctx);
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.prefs.privacy_mode = true;
+        app.workspace = workspace;
+        app.image.prompt = "SYNTHETIC_PROMPT desk".into();
+        let mut frame = |pos: egui::Pos2| {
+            let mut output = egui::FullOutput::default();
+            for _ in 0..3 {
+                output = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(1280., 800.),
+                        )),
+                        focused: true,
+                        events: vec![egui::Event::PointerMoved(pos)],
+                        ..Default::default()
+                    },
+                    |ui| app.content(ui),
+                );
+                output.textures_delta.clear();
+            }
+            output
+        };
+        // The right-hand prompt panel's margin, away from the field itself.
+        let on_prompt_panel = frame(egui::pos2(1266., 140.));
+        let on_viewer = frame(egui::pos2(640., 300.));
+        if workspace == Workspace::Image {
+            assert!(painted(&on_prompt_panel, "SYNTHETIC_PROMPT"));
+            assert!(!painted(&on_viewer, "SYNTHETIC_PROMPT"));
+        }
+        assert!(
+            helto::outside_canvas(&ctx).is_empty(),
+            "{workspace:?}: private content outside a canvas at {:?}",
+            helto::outside_canvas(&ctx)
+        );
+    }
 }

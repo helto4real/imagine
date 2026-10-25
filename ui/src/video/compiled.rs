@@ -198,7 +198,8 @@ impl ImagineApp {
             !self.timeline.draft_edits().is_empty(),
         );
         egui::Window::new("Plan Review").id(egui::Id::new("video-compiled")).open(&mut open).default_width(810.).default_height(590.).max_height((ctx.content_rect().height()-70.).max(200.)).vscroll(true).show(ctx,|ui|{
-            if !helto::reveal_in_viewport(ui,self.prefs.privacy_mode){ui.label("Hidden plan · hover to reveal");return;}
+let _canvas = helto::window_canvas(ui);
+            if !helto::shown(ui,self.prefs.privacy_mode){ui.label("Hidden plan · hover to reveal");return;}
             ui.weak("Prepared source · generation has not started");
             ui.horizontal_wrapped(|ui|{let r=ui.add_enabled_ui(!self.timeline.busy,|ui|helto::icon_button(ui,crate::icons::Icon::Retry,"Refresh plan",false)).inner;control(ui,"compiled-refresh",&r);refresh=r.clicked();let r=helto::icon_button(ui,crate::icons::Icon::Close,"Close review",false);control(ui,"compiled-close",&r);close=r.clicked();let r=helto::action(ui,crate::icons::Icon::Generate,"Approve and Generate",true,if stale{Some("The plan changed. Refresh the review.")}else if state.value.is_none(){Some("Loading the plan.")}else{(self.timeline.busy||self.timeline.admitting||self.timeline.pending.is_some()).then_some("Wait for the current timeline operation.")});control(ui,"compiled-approve",&r);approve=r.clicked();});
             if let Some(error)=&state.error{ui.colored_label(helto::ERROR,error);}

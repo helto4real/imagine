@@ -581,10 +581,10 @@ impl Scheduler {
             return Err(Fault::new(503, "coordinator_unavailable"));
         }
         // API clients without a local-folder selection use the configured server destination.
-        // UI clients send a proof, which must match; no client path becomes authoritative.
-        if self.store.private_root().is_some()
-            || (request.model != "minimax-h3"
-                && !request.client_metadata.contains_key("video_destination"))
+        // Clients that send a proof (the UI, or the MCP proxy for an agent workspace) are
+        // checked against the approved output folders; no client path becomes authoritative.
+        if !request.client_metadata.contains_key("video_destination")
+            && (self.store.private_root().is_some() || request.model != "minimax-h3")
         {
             let proof = self
                 .store

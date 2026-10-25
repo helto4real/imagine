@@ -141,11 +141,9 @@ image workspace is idle. Editing and upscaling use the selected full image.
 generation/model settings while retaining the current output folder. Edited and
 upscaled images also appear in the result strip.
 
-The dock uses one privacy boundary: with **Hide previews** enabled, hovering
-anywhere inside the focused dock reveals all its thumbnails and prompt excerpts.
-Leaving the entire panel or losing focus hides them together. Thumbnail hover
-does not independently reveal images. Main images and reference fields retain
-their existing privacy behavior.
+The dock follows the same **Hide previews** canvas rule as every other panel
+(see below): hovering anywhere inside the focused dock reveals all its
+thumbnails and prompt excerpts together.
 
 The UI job list, result index and captured prompts exist only for this UI session;
 closing the client does not cancel server-accepted jobs. No history is restored
@@ -214,16 +212,28 @@ Restart both the API and UI after updating to enable the new dimensions contract
 Reference count is limited to ten. The existing server upload limits apply.
 The prompt field has a bottom-right drag handle for changing its height; longer
 text scrolls inside the field. Its height is kept for the current UI session.
-The eye icon and **Hide previews** switch toggle visual privacy for the result,
-reference images, prompt and negative prompt. It is on by default and the choice
-is saved immediately. Each image or text field reveals only while the pointer is
-over it and the window has focus. Leaving the area or losing window focus hides
-it immediately, including selected text and the caret. Editing focus alone
-(Ctrl+P, Tab or a click) does not reveal text. Once you type, paste or delete in
-the focused field, that field alone stays revealed, also inside windows such as
-Story or Cast, until it loses focus or the window loses focus. This is visual
-concealment only: prompt content, clipboard operations and saved PNGs are
-unchanged.
+The eye icon and **Hide previews** switch toggle visual privacy. It is on by
+default and the choice is saved immediately. Only private content is hidden:
+images and video frames, creative writing (prompts, negative prompts, scene and
+section prompts, descriptions, story text, dialogue, character descriptions,
+enhancement and plan text), scene titles, character names and media file names,
+and error text that may quote them. Models, LoRAs, presets, settings, project
+folder names and fixed error messages always show.
+
+Private content reveals per **canvas**: each framed panel of the main window
+(references, viewer, prompt, edit inspector, queue dock; in Video the viewer,
+inspector, media bin, timeline, story and enhance panels) and each window or
+dialog. While the pointer is anywhere on a canvas, or on a dropdown or menu it
+opened, and Imagine's window has focus, all private content on that canvas shows
+together; other canvases stay hidden. Leaving the canvas or losing window focus
+hides it in the same frame, including selected text and the caret. A dialog's
+dimmed backdrop belongs to no canvas. Editing focus alone (Ctrl+P, Tab or a
+click) does not reveal text. Once you type, paste or delete in the focused
+field, that field stays revealed until it loses focus or the window loses
+focus. Hidden images keep their size behind an opaque cover and hidden text
+keeps its layout, so nothing moves on reveal. This is visual concealment only:
+prompt content, clipboard operations and saved PNGs are unchanged.
+See [PRIVACY-UI-REDESIGN.md](PRIVACY-UI-REDESIGN.md).
 Uploading does not resize the source file: server preprocessing controls the
 VAE and vision inputs, with further native resizing disabled. The client creates
 small thumbnails only for display. The
@@ -444,8 +454,12 @@ inference backend. It covers defaults, ordered uploads, generated PNG saving,
 idempotent retries and recovery to another folder after a post-generation write
 failure. Headless egui tests cover wide/narrow rendering and pending-job recovery.
 Privacy tests inspect actual paint meshes for both viewport and thumbnail sizes:
-initial concealment, pointer entry/exit, leaving the window, focus loss, clipped
-areas and isolation from neighboring images. Hidden images submit no image mesh.
+initial concealment, pointer entry/exit anywhere on the canvas, leaving the
+window, focus loss, clipped canvases and isolation from other canvases. Hidden
+images submit no image mesh. Further tests cover dropdowns that reach past
+their panel, windows over panels and dialog backdrops, and run the real image
+and Video layouts (with their windows open) to check that no private content is
+drawn outside a canvas.
 Synthetic software previews inspect geometry and tokens, not native compositor
 rendering. Native window interaction and XDG file-dialog acceptance require a
 separate manual check; no desktop-control tools are used by these tests.

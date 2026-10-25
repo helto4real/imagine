@@ -2,7 +2,6 @@ usage: st-proxy [-h] [--listen-host LISTEN_HOST] [--chat-port CHAT_PORT]
                 [--image-port IMAGE_PORT] [--mcp-port MCP_PORT]
                 [--mcp-workflows-dir MCP_WORKFLOWS_DIR]
                 [--mcp-output-dir MCP_OUTPUT_DIR]
-                [--mcp-input-dir MCP_INPUT_DIR]
                 [--model-profiles MODEL_PROFILES]
                 [--llm-backend {koboldcpp,ollama,sc117,orca,sc117_128k,orca_128k,prism,tabbyapi,all}]
                 [--llm-url LLM_URL] [--comfy-url COMFY_URL]
@@ -48,7 +47,6 @@ options:
   --mcp-port MCP_PORT   enable local MCP on this port
   --mcp-workflows-dir MCP_WORKFLOWS_DIR
   --mcp-output-dir MCP_OUTPUT_DIR
-  --mcp-input-dir MCP_INPUT_DIR
   --model-profiles MODEL_PROFILES
                         JSON model defaults; empty string disables profiles
   --llm-backend {koboldcpp,ollama,sc117,orca,sc117_128k,orca_128k,prism,tabbyapi,all}

@@ -86,17 +86,14 @@ impl ImagineApp {
         if !bar.intersects(ui.clip_rect()) {
             return;
         }
-        let reveal = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+        // Waveforms are not private and show with Hide previews on.
         #[cfg(feature = "ui-preview")]
         ui.ctx().data_mut(|d| {
             d.insert_temp(
                 egui::Id::new(("waveform-painted", &clip.id.0)),
-                json!({"visible":false,"hidden":!reveal}),
+                json!({"visible":false,"hidden":false}),
             )
         });
-        if !reveal {
-            return;
-        }
         let Some(asset) = clip.asset.as_ref().and_then(|id| project.assets.get(id)) else {
             return;
         };

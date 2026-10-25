@@ -41,8 +41,9 @@ impl ImagineApp {
         let column =
             |ui: &mut egui::Ui, id: &str, rect: Rect, add: &mut dyn FnMut(&mut egui::Ui)| {
                 chrome::panel(ui, rect, false);
+                let _canvas = helto::panel_canvas(ui, id, rect);
                 chrome::region(ui, id, rect.shrink(10.), |ui| {
-                    let hidden = !helto::revealed(ui, rect, privacy);
+                    let hidden = !helto::shown(ui, privacy);
                     egui::ScrollArea::vertical()
                         .id_salt((id, "scroll"))
                         .auto_shrink([false, false])

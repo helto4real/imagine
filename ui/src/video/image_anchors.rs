@@ -82,7 +82,7 @@ impl ImagineApp {
                 ui.group(|ui| {
                     if let Some(asset) = d.project.assets.get(&image.asset) {
                         self.timeline_thumbnail(ui, d, asset);
-                        let reveal = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+                        let reveal = helto::shown(ui, self.prefs.privacy_mode);
                         ui.add(
                             egui::Label::new(if !reveal {
                                 "Image"
@@ -218,7 +218,7 @@ impl ImagineApp {
                                             == anchor.relationship.target_reference_id.as_ref()
                                     })
                                     .map_or("Choose target…", |r| {
-                                        if helto::reveal_in_viewport(ui, self.prefs.privacy_mode) {
+                                        if helto::shown(ui, self.prefs.privacy_mode) {
                                             r.name.as_str()
                                         } else {
                                             "Hidden target"
@@ -235,7 +235,7 @@ impl ImagineApp {
                                     ui.selectable_value(
                                         &mut anchor.relationship.target_reference_id,
                                         Some(reference.id.clone()),
-                                        if helto::reveal_in_viewport(ui, self.prefs.privacy_mode) {
+                                        if helto::shown(ui, self.prefs.privacy_mode) {
                                             reference.name.as_str()
                                         } else {
                                             "Hidden target"

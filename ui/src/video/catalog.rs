@@ -462,9 +462,10 @@ impl ImagineApp {
             .max_height((ctx.content_rect().height() - 70.).max(250.))
             .vscroll(true)
             .show(ctx, |ui| {
+let _canvas = helto::window_canvas(ui);
                 #[cfg(feature="ui-preview")]
                 {let r=ui.interact(ui.clip_rect(),ui.make_persistent_id("catalog-scroll"),egui::Sense::hover());control(ui,"catalog-scroll",&r);}
-                let hidden = !helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+                let hidden = !helto::shown(ui, self.prefs.privacy_mode);
                 helto::private_scope(ui, hidden, |ui| {
                     ui.horizontal_wrapped(|ui| {
                         for (value, label) in [

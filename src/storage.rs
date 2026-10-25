@@ -26,6 +26,8 @@ pub struct Store {
     /// outputs there instead of under the project ID.
     project_locations: std::sync::Arc<std::sync::Mutex<std::collections::HashMap<String, PathBuf>>>,
     pub session: std::sync::Arc<crate::session::Session>,
+    /// Agent workspaces under the MCP root, when it is available.
+    pub workspaces: Option<std::sync::Arc<crate::workspaces::Workspaces>>,
 }
 #[derive(Clone)]
 struct Original {
@@ -136,12 +138,20 @@ impl Store {
                             .any(|path| Some(path.as_path()) == outputs.parent())
                     })
             });
-            let parts = output
-                .strip_prefix(root.layout().root())
-                .map(|relative| relative.iter().collect::<Vec<_>>())
-                .unwrap_or_default();
-            let named = parts.len() == 4 && parts[0] == "projects" && parts[2] == "outputs";
-            if !(named || located) || !matches!(class, Some("images" | "videos" | "audio")) {
+            let named = output.parent().is_some_and(|outputs| {
+                outputs.file_name() == Some("outputs".as_ref())
+                    && outputs
+                        .parent()
+                        .is_some_and(|project| root.layout().is_named_project(project))
+            });
+            // A workspace's own image folder, for agent image jobs.
+            let workspace = self
+                .workspaces
+                .as_ref()
+                .is_some_and(|w| w.is_image_folder(output));
+            if !(named || located || workspace)
+                || !matches!(class, Some("images" | "videos" | "audio"))
+            {
                 return Err("video_destination_invalid");
             }
             let destination = crate::video::output::Destination::private(root, &proof.config.root)?;
@@ -208,6 +218,7 @@ impl Store {
             videos,
             private,
             project_locations: Default::default(),
+            workspaces: None,
         })
     }
     pub async fn close(&self) -> Result<()> {

@@ -100,9 +100,13 @@ struct Imagine {
 }
 impl Imagine {
     async fn start(root: &Root, address: SocketAddr, socket: &Path, probe: &Arc<Probe>) -> Self {
-        let store = Store::open_private(root.clone(), "own-image-workspace".into())
+        let mut store = Store::open_private(root.clone(), "own-image-workspace".into())
             .await
             .unwrap();
+        // Agent workspaces live in the approved MCP root.
+        store.workspaces = Some(Arc::new(imagine_server::workspaces::Workspaces::open(
+            root.rooted_at(&root.project_roots()[0]).unwrap(),
+        )));
         let (control, scheduler) = scheduler::start_coordinated(
             store.clone(),
             Box::new(Fake(probe.clone())),
@@ -248,6 +252,8 @@ fn private_root(dir: &Path, inputs: &Path) -> Root {
 struct Agent {
     client: reqwest::Client,
     url: String,
+    /// No response may contain this host folder or anything below it.
+    hidden: String,
 }
 impl Agent {
     /// One `tools/call` exactly as an MCP client sends it: structured result and extra blocks.
@@ -262,6 +268,10 @@ impl Agent {
             .unwrap();
         assert!(response.status().is_success());
         let body = response.text().await.unwrap();
+        assert!(
+            !body.contains(&self.hidden),
+            "{name} leaked a host path: {body}"
+        );
         let data = body
             .lines()
             .find_map(|line| line.strip_prefix("data: "))
@@ -337,10 +347,10 @@ fn files(path: &Path) -> Vec<PathBuf> {
         .unwrap_or_default()
 }
 #[tokio::test]
-async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_folder() {
+async fn agent_produces_a_video_in_its_workspace_and_resumes_with_the_key() {
     let dir = tempfile::tempdir().unwrap();
     assert!(task_fixtures::is_owned(dir.path()));
-    let inputs = dir.path().join("own-inputs");
+    let inputs = dir.path().join("own-mcp-root");
     let root = private_root(dir.path(), &inputs);
     let probe = Arc::new(Probe::default());
     let (llm_url, llm_task) = llm(probe.clone()).await;
@@ -367,7 +377,6 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let running = st_proxy::service::Service::start(st_proxy::config::Config {
         mcp_port: Some(0),
         mcp_workflows_dir: "/nonexistent/no-comfy-graphs-needed".into(),
-        mcp_input_dir: inputs.to_string_lossy().into(),
         mcp_output_dir: Some(dir.path().join("own-output").to_string_lossy().into()),
         chat_port: 0,
         image_port: 0,
@@ -382,9 +391,11 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     })
     .await
     .unwrap();
+    let port = running.mcp_port.unwrap();
     let agent = Agent {
         client: reqwest::Client::new(),
-        url: format!("http://127.0.0.1:{}/mcp", running.mcp_port.unwrap()),
+        url: format!("http://127.0.0.1:{port}/mcp"),
+        hidden: dir.path().to_string_lossy().into_owned(),
     };
     let untouched = |stage: &str| {
         assert_eq!(probe.completions.load(Ordering::SeqCst), 0, "{stage}");
@@ -422,42 +433,102 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     );
     assert_eq!(described["limits"], capabilities["authoring"]);
 
-    // A new folder inside the approved root; the project is saved there at once.
-    let folder = inputs.join("own-agent-film");
+    // A workspace, reachable only with its key; Imagine keeps it in a dated folder.
+    let opened = agent
+        .ok("workspace_create", json!({"title":"Own Agent Film"}))
+        .await;
+    let key = opened["workspace_key"].as_str().unwrap().to_owned();
+    let workspace = imagine
+        .store
+        .workspaces
+        .as_ref()
+        .unwrap()
+        .resolve(&key)
+        .unwrap();
+    assert!(workspace.folder.starts_with(&inputs));
+    assert!(workspace.folder.join("AGENT-KEY.txt").is_file());
+    let error = agent
+        .rejected(
+            "workspace_files",
+            json!({"workspace_key":"imk-aaaaaaaaaaaaaaaaaaaaaaaaaa"}),
+        )
+        .await;
+    assert_eq!(error["category"], "not_found");
+
+    // Uploads: HTTP with the key as bearer, or the tool for a small file.
+    let keeper = png(24, 16, [200, 150, 120]);
+    let harbour = png(32, 20, [40, 90, 160]);
+    let http = reqwest::Client::new();
+    let uploaded: Value = http
+        .put(format!(
+            "http://127.0.0.1:{port}/v1/workspace/files?name=own-keeper.png"
+        ))
+        .header("Authorization", format!("Bearer {key}"))
+        .body(keeper.clone())
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert!(!uploaded.to_string().contains(&agent.hidden));
+    let keeper_file = uploaded["file_id"].as_str().unwrap().to_owned();
+    use base64::Engine;
+    let harbour_file = agent
+        .ok(
+            "workspace_upload",
+            json!({"workspace_key":key,"name":"own-harbour.png",
+                "content_base64":base64::engine::general_purpose::STANDARD.encode(&harbour)}),
+        )
+        .await["file_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let listed = agent
+        .ok("workspace_files", json!({"workspace_key":key}))
+        .await;
+    assert_eq!(listed["files"].as_array().unwrap().len(), 2, "{listed}");
+    assert!(workspace.folder.join("uploads/own-keeper.png").is_file());
+
+    // A project in the workspace, saved there at once.
     let mut create = json!(imagine_server::video_defaults::new_project());
     create["delivery"]["width"] = json!(32);
     create["delivery"]["height"] = json!(32);
     let created = agent
         .ok(
             "video_project",
-            json!({"action":"create","path":folder,"project":create}),
+            json!({"workspace_key":key,"action":"create","workspace_key":key,"title":"Own agent film","project":create}),
         )
         .await;
-    assert_eq!(created["path"], json!(folder));
-    assert_eq!(created["persistence"]["location"], json!(folder));
+    let folder = workspace.folder.join("videos/own-agent-film");
     saved(&created);
     assert!(folder.join("project.json").is_file());
     let project = created["project_id"].as_str().unwrap().to_owned();
-    // A create retried after a timeout returns the project already bound there.
+    // A create retried after a timeout returns the project already there.
     let retried = agent
         .ok(
             "video_project",
-            json!({"action":"create","path":folder,"project":create}),
+            json!({"workspace_key":key,"action":"create","workspace_key":key,"title":"Own agent film","project":create}),
         )
         .await;
     assert_eq!(retried["project_id"], project.as_str());
     assert_eq!(retried["project_revision"], created["project_revision"]);
     assert!(!root.layout().project(&project).unwrap().root.exists());
+    // Another workspace's key cannot reach this project.
+    let other = agent.ok("workspace_create", json!({})).await;
+    let error = agent
+        .rejected(
+            "video_project",
+            json!({"workspace_key":key,"action":"get","workspace_key":other["workspace_key"],"project_id":project}),
+        )
+        .await;
+    assert_eq!(error["category"], "not_found");
 
-    // Two linked originals: a cast identity image and a setting reference.
-    let keeper = png(24, 16, [200, 150, 120]);
-    let harbour = png(32, 20, [40, 90, 160]);
-    std::fs::write(inputs.join("own-keeper.png"), &keeper).unwrap();
-    std::fs::write(inputs.join("own-harbour.png"), &harbour).unwrap();
+    // Two workspace images: a cast identity image and a setting reference.
     let cast = agent
         .ok(
             "video_register_reference",
-            json!({"project_id":project,"path":inputs.join("own-keeper.png"),"expected_project_revision":created["project_revision"],
+            json!({"workspace_key":key,"project_id":project,"file_id":keeper_file,"expected_project_revision":created["project_revision"],
                 "cast":{"name":"Keeper","alias":"@keeper","description":"Own fictional adult harbour keeper"}}),
         )
         .await;
@@ -466,7 +537,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let setting = agent
         .ok(
             "video_register_reference",
-            json!({"project_id":project,"path":inputs.join("own-harbour.png"),"expected_project_revision":cast["project_revision"],"name":"Own harbour"}),
+            json!({"workspace_key":key,"project_id":project,"file_id":harbour_file,"expected_project_revision":cast["project_revision"],"name":"Own harbour"}),
         )
         .await;
     saved(&setting);
@@ -474,7 +545,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let view = agent
         .ok(
             "video_project",
-            json!({"action":"get","project_id":project}),
+            json!({"workspace_key":key,"action":"get","project_id":project}),
         )
         .await;
     assert_eq!(view["cast"][0]["alias"], "keeper");
@@ -492,7 +563,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let (started, blocks) = agent
         .call(
             "video_storyboard",
-            json!({"action":"start","project_id":project,"request":request}),
+            json!({"workspace_key":key,"action":"start","project_id":project,"request":request}),
         )
         .await;
     assert!(started.get("error").is_none(), "{started}");
@@ -504,7 +575,6 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let images = bundle["images"].as_array().unwrap();
     assert_eq!(images.len(), 2);
     assert_eq!(blocks.len(), 2);
-    use base64::Engine;
     for (i, (image, original)) in images.iter().zip([&harbour, &keeper]).enumerate() {
         assert_eq!(image["index"], i);
         assert_eq!(blocks[i]["type"], "image");
@@ -552,7 +622,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let listed = agent
         .ok(
             "video_storyboard",
-            json!({"action":"list","project_id":project}),
+            json!({"workspace_key":key,"action":"list","project_id":project}),
         )
         .await;
     assert_eq!(
@@ -562,7 +632,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let (rebuilt, again) = agent
         .call(
             "video_storyboard",
-            json!({"action":"bundle","draft_id":draft}),
+            json!({"workspace_key":key,"action":"bundle","draft_id":draft}),
         )
         .await;
     assert_eq!(rebuilt["bundle"], started["bundle"]);
@@ -602,7 +672,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let error = agent
         .rejected(
             "video_storyboard",
-            json!({"action":"submit","draft_id":draft,"submission":short}),
+            json!({"workspace_key":key,"action":"submit","draft_id":draft,"submission":short}),
         )
         .await;
     assert_eq!(error["category"], "validation");
@@ -611,7 +681,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let checked = agent
         .ok(
             "video_storyboard",
-            json!({"action":"submit","draft_id":draft,"submission":submission(true)}),
+            json!({"workspace_key":key,"action":"submit","draft_id":draft,"submission":submission(true)}),
         )
         .await;
     assert_eq!(checked["valid"], true, "{checked}");
@@ -642,7 +712,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let view = agent
         .ok(
             "video_project",
-            json!({"action":"get","project_id":project}),
+            json!({"workspace_key":key,"action":"get","project_id":project}),
         )
         .await;
     assert_eq!(
@@ -653,7 +723,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let applied = agent
         .ok(
             "video_storyboard",
-            json!({"action":"submit","draft_id":draft,"submission":submission(false)}),
+            json!({"workspace_key":key,"action":"submit","draft_id":draft,"submission":submission(false)}),
         )
         .await;
     saved(&applied);
@@ -668,7 +738,10 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     assert_eq!(scenes[1]["continuity"]["source_scene"], scenes[0]["id"]);
     assert_eq!(applied["authoring"][0]["phase"], "applied");
     let stored = agent
-        .ok("video_storyboard", json!({"action":"get","draft_id":draft}))
+        .ok(
+            "video_storyboard",
+            json!({"workspace_key":key,"action":"get","draft_id":draft}),
+        )
         .await;
     assert_eq!(stored["phase"], "applied");
     assert_eq!(stored["production"], production);
@@ -680,7 +753,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let run = agent
         .ok(
             "video_run",
-            json!({"action":"start","job_id":"own-run-1","request":run_request}),
+            json!({"workspace_key":key,"action":"start","job_id":"own-run-1","request":run_request}),
         )
         .await;
     assert_ne!(run["reused"], true, "{run}");
@@ -688,7 +761,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let again = agent
         .ok(
             "video_run",
-            json!({"action":"start","job_id":"own-run-1","request":run_request}),
+            json!({"workspace_key":key,"action":"start","job_id":"own-run-1","request":run_request}),
         )
         .await;
     assert_eq!(again["id"], run_id.as_str());
@@ -698,7 +771,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let error = agent
         .rejected(
             "video_run",
-            json!({"action":"start","job_id":"own-run-1","request":changed}),
+            json!({"workspace_key":key,"action":"start","job_id":"own-run-1","request":changed}),
         )
         .await;
     assert_eq!(error["category"], "conflict");
@@ -708,7 +781,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
         done = agent
             .ok(
                 "video_run",
-                json!({"action":"get","run_id":run_id,"wait":true,"wait_seconds":20}),
+                json!({"workspace_key":key,"action":"get","run_id":run_id,"wait":true,"wait_seconds":20}),
             )
             .await;
         if done["status"] != "running" {
@@ -732,7 +805,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let view = agent
         .ok(
             "video_project",
-            json!({"action":"get","project_id":project}),
+            json!({"workspace_key":key,"action":"get","project_id":project}),
         )
         .await;
     saved(&view);
@@ -755,21 +828,21 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let plan = agent
         .ok(
             "video_assembly",
-            json!({"action":"plan","project_id":project,"request":{"schema_version":1,"expected_project_revision":view["project_revision"]}}),
+            json!({"workspace_key":key,"action":"plan","project_id":project,"request":{"schema_version":1,"expected_project_revision":view["project_revision"]}}),
         )
         .await;
     let plan_id = plan["id"].as_str().unwrap().to_owned();
     let job = agent
         .ok(
             "video_assembly",
-            json!({"action":"submit","plan_id":plan_id,"job_id":"own-assembly-1"}),
+            json!({"workspace_key":key,"action":"submit","plan_id":plan_id,"job_id":"own-assembly-1"}),
         )
         .await;
     assert_eq!(job["reused"], false);
     let again = agent
         .ok(
             "video_assembly",
-            json!({"action":"submit","plan_id":plan_id,"job_id":"own-assembly-1"}),
+            json!({"workspace_key":key,"action":"submit","plan_id":plan_id,"job_id":"own-assembly-1"}),
         )
         .await;
     assert_eq!((&again["id"], &again["reused"]), (&job["id"], &json!(true)));
@@ -778,7 +851,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
         assembled = agent
             .ok(
                 "video_assembly",
-                json!({"action":"get","plan_id":plan_id,"wait":true,"wait_seconds":20}),
+                json!({"workspace_key":key,"action":"get","plan_id":plan_id,"wait":true,"wait_seconds":20}),
             )
             .await;
         if assembled["terminal"] == true {
@@ -786,14 +859,37 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
         }
     }
     assert_eq!(assembled["job"]["status"], "succeeded", "{assembled}");
-    let published = PathBuf::from(assembled["job"]["output"]["saved_path"].as_str().unwrap());
-    assert_eq!(published.parent(), Some(outputs.as_path()));
-    assert!(published.is_file());
+    // The final video is a workspace file the agent downloads with its key.
+    let output = &assembled["job"]["output"];
+    assert!(output.get("saved_path").is_none());
+    let final_file = output["file_id"].as_str().unwrap().to_owned();
     assert_eq!(rendered(&outputs), 3);
+    let downloaded = http
+        .get(output["download_url"].as_str().unwrap())
+        .header("Authorization", format!("Bearer {key}"))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(downloaded.status(), 200);
+    let bytes = downloaded.bytes().await.unwrap();
+    let on_disk = files(&outputs)
+        .into_iter()
+        .find(|p| std::fs::read(p).is_ok_and(|b| b == bytes.as_ref()));
+    assert!(on_disk.is_some(), "downloaded the published final video");
+    let refused = http
+        .get(output["download_url"].as_str().unwrap())
+        .header(
+            "Authorization",
+            format!("Bearer {}", other["workspace_key"].as_str().unwrap()),
+        )
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(refused.status(), 404);
     let view = agent
         .ok(
             "video_project",
-            json!({"action":"get","project_id":project}),
+            json!({"workspace_key":key,"action":"get","project_id":project}),
         )
         .await;
     saved(&view);
@@ -801,7 +897,7 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     let explicit = agent
         .ok(
             "video_project",
-            json!({"action":"save","project_id":project,"expected_project_revision":view["project_revision"]}),
+            json!({"workspace_key":key,"action":"save","project_id":project,"expected_project_revision":view["project_revision"]}),
         )
         .await;
     saved(&explicit);
@@ -813,42 +909,34 @@ async fn agent_produces_a_video_through_mcp_and_the_project_reopens_from_its_fol
     );
     let final_revision = view["project_revision"].clone();
 
-    // Session restart: the proxy drops its session state; the saved project reopens.
+    // Session restart: the proxy drops its session state; with the saved key
+    // the agent finds its workspace and the project reopens from its folder.
     imagine.stop().await;
     let imagine = Imagine::start(&root, address, &tickets, &probe).await;
     let error = agent
-        .rejected("video_run", json!({"action":"get","run_id":run_id}))
-        .await;
-    assert_eq!(error["category"], "not_found", "{error}");
-    let error = agent
         .rejected(
-            "video_project",
-            json!({"action":"get","project_id":project}),
+            "video_run",
+            json!({"workspace_key":key,"action":"get","run_id":run_id}),
         )
         .await;
     assert_eq!(error["category"], "not_found", "{error}");
-    let (status, location) = imagine
-        .http(
-            reqwest::Method::POST,
-            format!("{base}/v1/video/locations"),
-            json!({"schema_version":1,"path":folder}),
-        )
+    let resumed = agent
+        .ok("workspace_open", json!({"workspace_key":key}))
         .await;
-    assert_eq!(status, 201, "{location}");
-    let (status, opened) = imagine
-        .http(
-            reqwest::Method::POST,
-            format!("{base}/v1/video/projects/open"),
-            json!({"schema_version":1,"location_id":location["location_id"]}),
-        )
-        .await;
-    assert_eq!(status, 200, "{opened}");
-    assert_eq!(opened["project"]["id"], project.as_str());
-    assert_eq!(opened["persistence"]["location"], json!(folder));
+    assert_eq!(resumed["video_projects"][0]["project_id"], project.as_str());
+    assert!(
+        agent
+            .ok("workspace_files", json!({"workspace_key":key}))
+            .await["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f["file_id"] == final_file.as_str())
+    );
     let reopened = agent
         .ok(
             "video_project",
-            json!({"action":"get","project_id":project}),
+            json!({"workspace_key":key,"action":"get","project_id":project}),
         )
         .await;
     assert_eq!(reopened["project_revision"], final_revision);

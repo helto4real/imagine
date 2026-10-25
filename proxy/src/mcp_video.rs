@@ -1,11 +1,8 @@
-//! Video production tools: argument shapes, path confinement and endpoint mapping only.
-//! Imagine owns projects, Drafts, runs and assemblies; the proxy keeps no video state.
+//! Video production tools: argument shapes, workspace confinement and endpoint mapping
+//! only. Imagine owns projects, Drafts, runs and assemblies; the proxy keeps no video state.
 use super::*;
 use reqwest::Method;
-use std::{
-    path::{Component, Path},
-    time::Instant,
-};
+use std::time::Instant;
 const TOOLS: &[&str] = &[
     "list_video_profiles",
     "describe_video_profile",
@@ -17,6 +14,10 @@ const TOOLS: &[&str] = &[
     "video_assembly",
 ];
 const DEFAULT_WAIT: u64 = 30;
+/// MCP productions start on Draft; the UI's own default is smaller.
+fn default_canvas() -> Value {
+    json!({"ratio":"16:9","portrait":false,"quality":"Draft"})
+}
 const MAX_WAIT: u64 = 60;
 /// Per-call limit for a video tool, or None for any other tool. Long work stays async in Imagine.
 pub(super) fn limit(name: &str, args: &Value) -> Option<Duration> {
@@ -32,6 +33,13 @@ pub(super) fn limit(name: &str, args: &Value) -> Option<Duration> {
         _ => 15,
     };
     Some(Duration::from_secs(seconds))
+}
+fn check_wait(args: &Value) -> std::result::Result<(), Fault> {
+    if !args["wait_seconds"].is_null() && args["wait_seconds"].as_u64().is_none_or(|s| s > MAX_WAIT)
+    {
+        return Err(validation("wait_seconds must be an integer from 0 to 60"));
+    }
+    Ok(())
 }
 fn wait(args: &Value) -> Duration {
     if args["wait"].as_bool() != Some(true) {
@@ -117,43 +125,9 @@ fn read_failure(e: anyhow::Error) -> Fault {
         validation(e)
     }
 }
-/// A new or empty project folder inside the MCP input directory; the folder may not exist yet.
-fn project_path(path: &str, roots: &[PathBuf]) -> std::result::Result<PathBuf, Fault> {
-    let path = Path::new(path);
-    let name = path
-        .file_name()
-        .filter(|_| {
-            path.is_absolute()
-                && !path
-                    .components()
-                    .any(|c| matches!(c, Component::ParentDir | Component::CurDir))
-        })
-        .ok_or_else(|| {
-            validation("path must be an absolute project folder path without . or ..")
-        })?;
-    let parent = path
-        .parent()
-        .and_then(|p| p.canonicalize().ok())
-        .ok_or_else(|| validation("the project folder's parent directory must exist"))?;
-    let resolved = match std::fs::symlink_metadata(path) {
-        Ok(_) => path
-            .canonicalize()
-            .map_err(|_| validation("project folder could not be inspected"))?,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => parent.join(name),
-        Err(_) => return Err(validation("project folder could not be inspected")),
-    };
-    if !roots
-        .iter()
-        .any(|root| resolved.starts_with(root) && resolved != *root)
-    {
-        return Err(validation(
-            "project folder must be inside the configured MCP input directory",
-        ));
-    }
-    if resolved.exists() && !resolved.is_dir() {
-        return Err(validation("path must name a new or empty folder"));
-    }
-    Ok(resolved)
+/// The call's workspace; every workspace-scoped action has one.
+fn own(workspace: Option<&Bound>) -> std::result::Result<&Bound, Fault> {
+    workspace.ok_or_else(|| validation("workspace_key is required"))
 }
 fn short_hash(text: &str) -> String {
     references::hash(text.as_bytes())[..16].to_owned()
@@ -174,7 +148,10 @@ fn project_view(snapshot: &Value) -> Value {
             .unwrap_or_default()
     };
     let scenes = list(&p["scenes"], &|s| {
-        json!({"id":s["id"],"title":creative["scene_prompts"][s["id"].as_str().unwrap_or("")]["title"],
+        let id = s["id"].as_str().unwrap_or("");
+        json!({"id":s["id"],"title":creative["scene_prompts"][id]["title"],
+        // The preset the scene was set to, and whether it was changed since.
+        "preset":creative["scene_presets"][id]["key"],"preset_state":snapshot["preset_states"][id],
         "start":s["start"],"duration":s["duration"],"description":s["description"],"model":s["model"],
         "continuity":s["continuity"],"accepted_take":s["accepted_take"].as_object().map(|t| json!({"id":t["id"],"model":t["model"]})),
         "sections":list(&s["sections"],&|x| json!({"id":x["id"],"start":x["start"],"duration":x["duration"],"prompt":x["prompt"]}))})
@@ -287,6 +264,12 @@ impl Mcp {
             return Err(Fault::new("shutdown", "broker is shutting down"));
         }
         let action = args["action"].as_str().unwrap_or("");
+        // Everything but the catalog tools works inside one workspace.
+        let workspace = match name {
+            "list_video_profiles" | "describe_video_profile" | "video_capabilities" => None,
+            _ => Some(self.bound(args).await?),
+        };
+        let ws = workspace.as_ref();
         let value = match (name, action) {
             ("list_video_profiles", _) => {
                 self.call_video(Method::GET, "/v1/video/authoring/profiles", None, None)
@@ -307,16 +290,23 @@ impl Mcp {
                 self.call_video(Method::GET, &path, None, None).await?
             }
             ("video_capabilities", _) => {
-                self.call_video(Method::GET, "/v1/video/capabilities", None, None)
-                    .await?
+                let mut value = self
+                    .call_video(Method::GET, "/v1/video/capabilities", None, None)
+                    .await?;
+                // Report the default that video_project create applies.
+                value["canvas"]["default"] = default_canvas();
+                value
             }
-            ("video_project", "create") => self.create_project(args).await?,
-            ("video_project", "get") => {
-                let path = format!("/v1/video/projects/{}", ident(args, "project_id")?);
-                project_view(&self.call_video(Method::GET, &path, None, None).await?)
-            }
+            ("video_project", "create") => self.create_project(own(ws)?, args).await?,
+            ("video_project", "get") => project_view(
+                &self
+                    .owned_project(own(ws)?, ident(args, "project_id")?)
+                    .await?,
+            ),
             ("video_project", "edit") => {
-                let path = format!("/v1/video/projects/{}/edits", ident(args, "project_id")?);
+                let project = ident(args, "project_id")?;
+                self.owned_project(own(ws)?, project).await?;
+                let path = format!("/v1/video/projects/{project}/edits");
                 let request = body(args, "request")?;
                 project_view(
                     &self
@@ -325,7 +315,9 @@ impl Mcp {
                 )
             }
             ("video_project", "save") => {
-                let path = format!("/v1/video/projects/{}/save", ident(args, "project_id")?);
+                let project = ident(args, "project_id")?;
+                self.owned_project(own(ws)?, project).await?;
+                let path = format!("/v1/video/projects/{project}/save");
                 let request =
                     json!({"schema_version":1,"expected_project_revision":revision(args)?});
                 saved(
@@ -334,12 +326,13 @@ impl Mcp {
                         .await?,
                 )
             }
-            ("video_register_reference", _) => self.register_video_reference(args).await?,
+            ("video_register_reference", _) => {
+                self.register_video_reference(own(ws)?, args).await?
+            }
             ("video_storyboard", "start") => {
-                let path = format!(
-                    "/v1/video/projects/{}/authoring",
-                    ident(args, "project_id")?
-                );
+                let project = ident(args, "project_id")?;
+                self.owned_project(own(ws)?, project).await?;
+                let path = format!("/v1/video/projects/{project}/authoring");
                 let mut request = body(args, "request")?;
                 // The MCP path never starts the local authoring provider or the GPU.
                 request["provider"] = json!("external");
@@ -349,10 +342,8 @@ impl Mcp {
                     .await?
             }
             ("video_storyboard", "submit") => {
-                let path = format!(
-                    "/v1/video/authoring/{}/submission",
-                    ident(args, "draft_id")?
-                );
+                let draft = self.owned_draft(own(ws)?, args).await?;
+                let path = format!("/v1/video/authoring/{draft}/submission");
                 let request = body(args, "submission")?;
                 let value = self
                     .call_video(Method::POST, &path, Some(&request), None)
@@ -367,22 +358,24 @@ impl Mcp {
                 }
             }
             ("video_storyboard", "list") => {
-                let path = format!(
-                    "/v1/video/projects/{}/authoring",
-                    ident(args, "project_id")?
-                );
+                let project = ident(args, "project_id")?;
+                self.owned_project(own(ws)?, project).await?;
+                let path = format!("/v1/video/projects/{project}/authoring");
                 self.call_video(Method::GET, &path, None, None).await?
             }
             ("video_storyboard", "bundle") => {
-                let path = format!("/v1/video/authoring/{}/bundle", ident(args, "draft_id")?);
+                let draft = self.owned_draft(own(ws)?, args).await?;
+                let path = format!("/v1/video/authoring/{draft}/bundle");
                 self.call_video(Method::GET, &path, None, None).await?
             }
             ("video_storyboard", "get") => {
-                let path = format!("/v1/video/authoring/{}", ident(args, "draft_id")?);
+                let draft = self.owned_draft(own(ws)?, args).await?;
+                let path = format!("/v1/video/authoring/{draft}");
                 self.call_video(Method::GET, &path, None, None).await?
             }
             ("video_storyboard", "review") => {
-                let path = format!("/v1/video/authoring/{}/review", ident(args, "draft_id")?);
+                let draft = self.owned_draft(own(ws)?, args).await?;
+                let path = format!("/v1/video/authoring/{draft}/review");
                 let request = body(args, "review")?;
                 self.call_video(Method::POST, &path, Some(&request), None)
                     .await?
@@ -390,18 +383,28 @@ impl Mcp {
             ("video_run", "start") => {
                 let key = self.video_key(args)?;
                 let request = body(args, "request")?;
+                let project = ident(&request, "project_id")?;
+                self.owned_project(own(ws)?, project).await?;
                 self.call_video(Method::POST, "/v1/video/runs", Some(&request), Some(&key))
                     .await?
             }
             ("video_run", "get") => {
                 let path = format!("/v1/video/runs/{}", ident(args, "run_id")?);
-                let mut run = self
-                    .poll(
+                check_wait(args)?;
+                // The first read checks the run's project and counts as the first poll.
+                let first = self.call_video(Method::GET, &path, None, None).await?;
+                self.owned_project(own(ws)?, ident(&first, "project_id")?)
+                    .await?;
+                let mut run = if args["wait"].as_bool() == Some(true) && !terminal_run(&first) {
+                    self.poll(
                         args,
                         || self.call_video(Method::GET, &path, None, None),
                         terminal_run,
                     )
-                    .await?;
+                    .await?
+                } else {
+                    first
+                };
                 // A failed run names the scene and its job's bounded diagnostics.
                 if run["status"] == "failed"
                     && let Some(job) = run["current_job"].as_str().map(str::to_owned)
@@ -420,7 +423,13 @@ impl Mcp {
                 run
             }
             ("video_run", "stop") => {
-                let path = format!("/v1/video/runs/{}/stop", ident(args, "run_id")?);
+                let run = ident(args, "run_id")?;
+                let current = self
+                    .call_video(Method::GET, &format!("/v1/video/runs/{run}"), None, None)
+                    .await?;
+                self.owned_project(own(ws)?, ident(&current, "project_id")?)
+                    .await?;
+                let path = format!("/v1/video/runs/{run}/stop");
                 let cancel = args["cancel_current"]
                     .as_bool()
                     .ok_or_else(|| validation("cancel_current must be true or false"))?;
@@ -430,6 +439,7 @@ impl Mcp {
             }
             ("video_assembly", "plan") => {
                 let project = ident(args, "project_id")?;
+                self.owned_project(own(ws)?, project).await?;
                 let path = format!("/v1/video/projects/{project}/assembly");
                 let mut request = body(args, "request")?;
                 if let Some(request) = request.as_object_mut() {
@@ -439,13 +449,16 @@ impl Mcp {
                     .await?
             }
             ("video_assembly", "submit") => {
-                let path = format!("/v1/video/assemblies/{}/jobs", ident(args, "plan_id")?);
+                let plan = ident(args, "plan_id")?;
+                self.owned_plan(own(ws)?, plan).await?;
+                let path = format!("/v1/video/assemblies/{plan}/jobs");
                 let key = self.video_key(args)?;
                 self.call_video(Method::POST, &path, None, Some(&key))
                     .await?
             }
             ("video_assembly", "get") => {
                 let plan = ident(args, "plan_id")?;
+                self.owned_plan(own(ws)?, plan).await?;
                 self.poll(args, || self.assembly(plan), |a| a["terminal"] == true)
                     .await?
             }
@@ -458,7 +471,45 @@ impl Mcp {
         };
         let mut value = bounded(value);
         let images = take_images(&mut value)?;
+        // Outputs inside the workspace become file references; other paths go.
+        self.scrub(&mut value, ws);
         Ok((value, images))
+    }
+    /// The Draft's ID, if its project belongs to this workspace.
+    async fn owned_draft<'a>(
+        &self,
+        workspace: &Bound,
+        args: &'a Value,
+    ) -> std::result::Result<&'a str, Fault> {
+        let draft = ident(args, "draft_id")?;
+        let value = self
+            .call_video(
+                Method::GET,
+                &format!("/v1/video/authoring/{draft}"),
+                None,
+                None,
+            )
+            .await?;
+        let project = value["project_id"]
+            .as_str()
+            .or(value["draft"]["project_id"].as_str())
+            .ok_or_else(|| Fault::new("not_found", "draft_id is not a Draft of this workspace"))?;
+        self.owned_project(workspace, project).await?;
+        Ok(draft)
+    }
+    async fn owned_plan(&self, workspace: &Bound, plan: &str) -> std::result::Result<(), Fault> {
+        let value = self
+            .call_video(
+                Method::GET,
+                &format!("/v1/video/assemblies/{plan}"),
+                None,
+                None,
+            )
+            .await?;
+        let project = value["plan"]["project_id"]
+            .as_str()
+            .ok_or_else(|| Fault::new("not_found", "plan_id is not a plan of this workspace"))?;
+        self.owned_project(workspace, project).await.map(|_| ())
     }
     /// Read until the status is terminal or the bounded wait elapses; never longer than 60 s.
     async fn poll<F>(
@@ -470,11 +521,7 @@ impl Mcp {
     where
         F: std::future::Future<Output = std::result::Result<Value, Fault>>,
     {
-        if !args["wait_seconds"].is_null()
-            && args["wait_seconds"].as_u64().is_none_or(|s| s > MAX_WAIT)
-        {
-            return Err(validation("wait_seconds must be an integer from 0 to 60"));
-        }
+        check_wait(args)?;
         let deadline = Instant::now() + wait(args);
         let epoch = self.inner.epoch.load(std::sync::atomic::Ordering::SeqCst);
         loop {
@@ -517,11 +564,12 @@ impl Mcp {
         value["job"] = summary;
         Ok(value)
     }
-    async fn create_project(&self, args: &Value) -> std::result::Result<Value, Fault> {
-        let path = args["path"]
-            .as_str()
-            .ok_or_else(|| validation("path must be an absolute project folder path"))?
-            .to_owned();
+    async fn create_project(
+        &self,
+        workspace: &Bound,
+        args: &Value,
+    ) -> std::result::Result<Value, Fault> {
+        let title = text(args, "title", 80, false)?.to_owned();
         let project = match &args["project"] {
             Value::Null => Value::Null,
             Value::Object(_) => args["project"].clone(),
@@ -529,43 +577,29 @@ impl Mcp {
         };
         let canvas = match &args["canvas"] {
             // MCP productions default to Draft; the agent changes it only when the user asks.
-            Value::Null if project.is_null() => {
-                json!({"ratio":"16:9","portrait":false,"quality":"Draft"})
-            }
+            Value::Null if project.is_null() => default_canvas(),
             Value::Null => Value::Null,
             Value::Object(_) if project.is_null() => args["canvas"].clone(),
             Value::Object(_) => return Err(validation("give either project or canvas, not both")),
             _ => return Err(validation("canvas must be an object or null")),
         };
-        // Imagine approves project folders in the MCP input directory, never in its media output.
-        let roots = self.inner.roots[..1].to_vec();
-        let path = tokio::task::spawn_blocking(move || project_path(&path, &roots))
-            .await
-            .map_err(|_| validation("project folder could not be inspected"))??;
-        let location = self
-            .call_video(
-                Method::POST,
-                "/v1/video/locations",
-                Some(&json!({"schema_version":1,"path":path,"create":true})),
-                None,
-            )
-            .await?;
-        let location = ident(&location, "location_id")
-            .map_err(|_| Fault::new("imagine", "invalid project location response"))?;
         let snapshot = self
             .call_video(
                 Method::POST,
-                "/v1/video/projects/at-location",
-                Some(&json!({"schema_version":1,"location_id":location,"project":project,"canvas":canvas})),
+                &format!("/v1/workspaces/{}/video-projects", workspace.id),
+                Some(&json!({"schema_version":1,"title":title,"project":project,"canvas":canvas})),
                 None,
             )
             .await?;
-        let mut view = project_view(&snapshot);
-        view["path"] = json!(path);
-        Ok(view)
+        Ok(project_view(&snapshot))
     }
-    async fn register_video_reference(&self, args: &Value) -> std::result::Result<Value, Fault> {
+    async fn register_video_reference(
+        &self,
+        workspace: &Bound,
+        args: &Value,
+    ) -> std::result::Result<Value, Fault> {
         let project = ident(args, "project_id")?;
+        self.owned_project(workspace, project).await?;
         let expected = revision(args)?;
         let name = text(args, "name", 128, false)?.to_owned();
         let cast = match &args["cast"] {
@@ -589,12 +623,11 @@ impl Mcp {
                 ));
             }
         };
-        let path = args["path"]
+        let file = args["file_id"]
             .as_str()
-            .filter(|p| Path::new(p).is_absolute())
-            .map(PathBuf::from)
-            .ok_or_else(|| validation("image path must be absolute"))?;
-        let roots = self.inner.roots.clone();
+            .ok_or_else(|| validation("file_id must be a file ID from this workspace"))?;
+        let (path, _) = self.file_path(workspace, file).await?;
+        let roots = vec![workspace.folder.clone()];
         let (path, digest, bytes) = tokio::task::spawn_blocking(move || {
             let path = path.canonicalize()?;
             let original = references::read_image(&path, &roots)?;

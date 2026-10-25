@@ -64,6 +64,7 @@ async fn run() -> Result<()> {
     let mut rust_runtime = None;
     let mut project_roots = vec![];
     let mut video_presets = None;
+    let mut mcp_root = PathBuf::from(imagine_server::storage_layout::MCP_ROOT);
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -92,6 +93,9 @@ async fn run() -> Result<()> {
             "--private-project-root" => project_roots.push(PathBuf::from(
                 args.next().context("--private-project-root needs a path")?,
             )),
+            "--mcp-root" => {
+                mcp_root = PathBuf::from(args.next().context("--mcp-root needs a path")?)
+            }
             "--video-presets" => {
                 video_presets = Some(PathBuf::from(
                     args.next().context("--video-presets needs a path")?,
@@ -109,7 +113,7 @@ async fn run() -> Result<()> {
             }
             "--help" => {
                 println!(
-                    "imagine-server [--project PATH] [--data PATH] [--profiles PATH] [--bind 127.0.0.1:8080] [--backend rust|native|comfy] [--rust-runtime PATH] [--comfy-root PATH --comfy-python PATH] [--private-project-root PATH ...] [--video-presets PATH]"
+                    "imagine-server [--project PATH] [--data PATH] [--profiles PATH] [--bind 127.0.0.1:8080] [--backend rust|native|comfy] [--rust-runtime PATH] [--comfy-root PATH --comfy-python PATH] [--private-project-root PATH ...] [--mcp-root PATH] [--video-presets PATH]"
                 );
                 return Ok(());
             }
@@ -146,10 +150,17 @@ async fn run() -> Result<()> {
         .and_then(|root| root.with_runtime_directory(runtime.clone()))
         .map_err(anyhow::Error::msg)?;
     let (private, warnings) =
-        imagine_server::config::private_project_roots(private, &project_roots);
+        imagine_server::config::private_project_roots(private, &project_roots, &mcp_root);
     for warning in warnings {
         eprintln!("{warning}");
     }
+    let workspaces = match private.rooted_at(&mcp_root) {
+        Ok(root) => Some(Arc::new(imagine_server::workspaces::Workspaces::open(root))),
+        Err(code) => {
+            eprintln!("MCP root unavailable ({code}): {}", mcp_root.display());
+            None
+        }
+    };
     let workspace = image_workspace(&private)?;
     let layout = private.project(&workspace).map_err(anyhow::Error::msg)?;
     if data.as_ref().is_some_and(|path| *path != layout.work) {
@@ -167,7 +178,8 @@ async fn run() -> Result<()> {
         &profiles.unwrap_or_else(|| config.project.join("profiles")),
     )?);
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
-    let store = Store::open_private(private.clone(), workspace).await?;
+    let mut store = Store::open_private(private.clone(), workspace).await?;
+    store.workspaces = workspaces;
     let (engine_tx, engine_rx) = watch::channel(EngineState {
         backend: backend.name().into(),
         phase: "unloaded".into(),

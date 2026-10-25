@@ -73,6 +73,7 @@ impl ImagineApp {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
+let _canvas = helto::window_canvas(ui);
                 let Some((revision, preview)) = &state else {
                     ui.spinner();
                     return;
@@ -182,6 +183,7 @@ impl ImagineApp {
         let mut pick = false;
         let bounds = ctx.content_rect();
         let response = egui::Modal::new(egui::Id::new("project-captures")).show(ctx, |ui| {
+let _canvas = helto::window_canvas(ui);
             let width = (bounds.width() - 48.).clamp(260., 1000.);
             ui.set_width(width);
             ui.set_max_width(width);
@@ -209,7 +211,7 @@ impl ImagineApp {
                 if answer.no.clicked() { self.timeline.captures.confirm = None; }
                 return;
             }
-            let reveal = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+            let reveal = helto::shown(ui, self.prefs.privacy_mode);
             let scroll = egui::ScrollArea::vertical().id_salt("captures-scroll").auto_shrink([false, false]).max_height((bounds.height() - 160.).max(180.)).show(ui, |ui| {
                 let takes: Vec<_> = d.view.takes.iter().collect();
                 for section in [Section::Catalog, Section::Attached, Section::Retained] {

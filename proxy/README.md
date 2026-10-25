@@ -35,11 +35,10 @@ cd /home/thhel/ChatGPT/imagine
   --coordinator-socket "$PWD/.imagine/coordinated/gpu.sock" \
   --imagine-url http://127.0.0.1:8080 \
   --mcp-port 8190 \
-  --mcp-input-dir /run/media/veracrypt1/mcp-inputs \
   --mcp-output-dir /run/media/veracrypt1/imagine/.mcp-cache
 ```
 
-`start-proxy.sh` defaults to chat port **5002**, image port **8189**, and enabled MCP on **8190**, matching `st-stack.zsh`. ComfyUI defaults to upstream port 8188 and KoboldCpp to 5001. The root launcher uses private storage and does not inject a legacy fixed MCP output directory. Reference input defaults to `/run/media/veracrypt1/mcp-inputs`. Environment variables and CLI arguments can override these defaults.
+`start-proxy.sh` defaults to chat port **5002**, image port **8189**, and enabled MCP on **8190**, matching `st-stack.zsh`. ComfyUI defaults to upstream port 8188 and KoboldCpp to 5001. The root launcher uses private storage and does not inject a legacy fixed MCP output directory. Agents exchange files through key-scoped workspaces in Imagine's MCP root (`/run/media/veracrypt1/mcp-root`, set on the Imagine server with `--mcp-root`), never through host paths; see [MCP-WORKSPACES-DESIGN.md](../docs/MCP-WORKSPACES-DESIGN.md). Environment variables and CLI arguments can override these defaults.
 
 `./start-proxy.sh` without arguments incrementally builds the local `main` binaries through the [shared product builder](../docs/PRODUCT-BUILDS.md) and runs `proxy/st-stack.zsh` in **all** mode. It starts or reuses KoboldCpp, TabbyAPI, Prism, SC117, Orca, SC117 128k and Orca 128k, waits for readiness, then starts the proxy with the combined `backend/model` catalog that Pi expects. Models are activated on demand through the shared GPU coordinator. Imagine must be started separately first. Ctrl-C or `./start-proxy.sh --stop` stops the stack; `--log` shows backend logs. Set `ST_PROXY_LLM_BACKEND` to select another stack backend.
 

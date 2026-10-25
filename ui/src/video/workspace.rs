@@ -224,7 +224,6 @@ impl ImagineApp {
                 egui::pos2(bounds.left() + 10., toolbar.bottom() + 4.),
                 egui::vec2(bounds.width() - 20., if recovering { 58. } else { 22. }),
             );
-            let reveal = helto::revealed(ui, strip, self.prefs.privacy_mode);
             chrome::region(ui, "timeline-error", strip, |ui| {
                 if recovering {
                     ui.horizontal_wrapped(|ui|{
@@ -236,7 +235,7 @@ impl ImagineApp {
                     });
                 }
                 if let Some(error) = &error {
-                    ui.add(egui::Label::new(helto::error_text(error, reveal)).truncate());
+                    ui.add(egui::Label::new(helto::error_text(error, true)).truncate());
                 }
             });
         }
@@ -1372,6 +1371,54 @@ mod tests {
                 output.textures_delta.clear();
             }
         }
+    }
+    #[test]
+    fn every_private_video_surface_and_window_is_on_a_canvas() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        helto::install(&ctx);
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.prefs.privacy_mode = true;
+        let project = super::super::media_picker::tests::project();
+        app.workspace = Workspace::Video;
+        app.timeline.session = Some("own-synthetic-session".into());
+        app.timeline.session_checked = true;
+        app.timeline.document = Some(Snapshot::with(
+            project.clone(),
+            json!({"persistence":{"state":"saved"}}),
+        ));
+        app.timeline.selected.insert(project.scenes[0].id.clone());
+        app.video.available = true;
+        app.video.checked = true;
+        app.timeline.cast.open = true;
+        app.timeline.catalog.open = true;
+        app.timeline.assembly.open = true;
+        app.timeline.library.open = true;
+        app.timeline.presets.open = true;
+        app.timeline_open_generation();
+        app.timeline_open_loras(None);
+        for pos in [egui::pos2(640., 400.), egui::pos2(1200., 700.)] {
+            for _ in 0..3 {
+                let mut output = ctx.run_ui(
+                    egui::RawInput {
+                        screen_rect: Some(Rect::from_min_size(
+                            egui::Pos2::ZERO,
+                            egui::vec2(1600., 1000.),
+                        )),
+                        focused: true,
+                        events: vec![egui::Event::PointerMoved(pos)],
+                        ..Default::default()
+                    },
+                    |ui| app.content(ui),
+                );
+                output.textures_delta.clear();
+            }
+        }
+        assert!(
+            helto::outside_canvas(&ctx).is_empty(),
+            "private content outside a canvas at {:?}",
+            helto::outside_canvas(&ctx)
+        );
     }
     #[test]
     fn toolbar_actions_do_not_overlap_at_small_and_normal_widths() {

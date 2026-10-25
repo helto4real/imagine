@@ -395,12 +395,14 @@ impl ImagineApp {
         let mut cancel = false;
         let privacy = self.prefs.privacy_mode;
         egui::Window::new("Check Media / Relink").open(&mut open).default_width(550.).max_height(620.).show(ctx,|ui|{
+let _canvas = helto::window_canvas(ui);
             #[cfg(feature="ui-preview")] {
                 let r=ui.interact(ui.clip_rect(),ui.id().with("qa-media-health-scroll"),egui::Sense::hover());
                 super::qa::control(ui,"media-health-scroll".into(),&r);
             }
-            let hidden=!helto::reveal_in_viewport(ui,privacy);
-            helto::private_scope(ui,hidden,|ui|{
+            // Media file names are private; the rest of the report is not.
+            let hidden=!helto::shown(ui,privacy);
+            ui.scope(|ui|{
                 let state=&self.timeline.media_health;
                 if stale{ui.label("Project changed. Check media again.");}
                 if let Some(error)=&state.error{ui.colored_label(helto::ERROR,error);}
@@ -417,8 +419,10 @@ impl ImagineApp {
                     let label = |asset: &Asset| if asset.name.is_empty() { asset.id.0.clone() } else { asset.name.clone() };
                     let current = value["request"]["asset_id"].as_str().and_then(|id| document.project.assets.get(&AssetId(id.into()))).map(label).unwrap_or_else(|| "Current media".into());
                     let replacement = value["replacement_label"].as_str().map(str::to_owned).or_else(|| document.project.assets.values().find(|asset| value["request"]["replacement_asset_id"].as_str().is_some_and(|r| document.runtime_asset(&asset.id.0) == Some(r))).map(label)).unwrap_or_else(|| "Selected replacement".into());
-                    ui.label(format!("Current: {current}"));
-                    ui.label(format!("Replacement: {replacement}"));
+                    if !hidden{
+                        ui.label(format!("Current: {current}"));
+                        ui.label(format!("Replacement: {replacement}"));
+                    }
                     ui.label("Asset identity and listed bindings are kept. Existing Takes keep their source revision.");
                     egui::ScrollArea::vertical().max_height(300.).show(ui,|ui|{for (index,impact) in value["impacts"].as_array().into_iter().flatten().enumerate(){if hidden{ui.label(format!("Affected binding {}",index+1));}else{ui.label(format!("{} · {} · {}",impact["kind"].as_str().unwrap_or(""),impact["owner"].as_str().unwrap_or(""),impact["binding"].as_str().unwrap_or("")));}}});
                     ui.horizontal(|ui|{let r=helto::action(ui,crate::icons::Icon::Back,"Back",false,state.pending.then_some("Checking media."));

@@ -1067,7 +1067,7 @@ impl ProjectSession {
     /// Save as switches the active location/identity only after the new bundle commits.
     pub fn save_as(&mut self, path: &Path) -> Result<(), StorageError> {
         let mut candidate = self.document.clone();
-        candidate.project.id = ProjectId(format!("project_{}", uuid::Uuid::new_v4().simple()));
+        candidate.project.id = ProjectId::generate();
         let result: Result<Store<ProjectDocument>, StorageError> = (|| {
             let mut store = Store::select(path, "project.json")?;
             store.save(&candidate, &mut self.sources)?;
@@ -1136,7 +1136,7 @@ impl ProjectSession {
         inputs: BTreeMap<BlobKey, File>,
         staging: &SessionStaging,
     ) -> Result<Self, StorageError> {
-        document.project.id = ProjectId(format!("project_{}", uuid::Uuid::new_v4().simple()));
+        document.project.id = ProjectId::generate();
         document.project.project_revision = 0;
         document.storage_layout = None;
         document.validate()?;

@@ -328,6 +328,7 @@ impl ImagineApp {
         let preview = self.timeline.drag_preview.clone();
         let project = preview.as_ref().unwrap_or(project);
         chrome::panel(ui, rect, false);
+        let _canvas = helto::panel_canvas(ui, "video-timeline-tracks", rect);
         chrome::region(ui, "video-timeline-tracks", rect.shrink(8.), |ui| {
             let whole = navigation::duration(project);
             let width = ui.available_width().max(1.);
@@ -599,7 +600,7 @@ impl ImagineApp {
                     );
                 }
                 // Scene titles are authored text and follow Hide previews.
-                let titles_revealed = helto::revealed(ui, canvas, self.prefs.privacy_mode);
+                let titles_revealed = helto::shown(ui, self.prefs.privacy_mode);
                 let states: Vec<_> = project
                     .scenes
                     .iter()
@@ -784,7 +785,7 @@ impl ImagineApp {
                         );
                         let selected = self.timeline.section_selection.contains(&section.id)
                             || self.timeline.section.as_ref() == Some(&section.id);
-                        let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+                        let revealed = helto::shown(ui, self.prefs.privacy_mode);
                         let chip =
                             self.timeline_section_block(ui, project, scene, section, r, revealed);
                         let response = ui.interact(

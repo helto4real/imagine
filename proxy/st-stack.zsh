@@ -208,7 +208,6 @@ typeset -g PROXY_IMAGE_PORT="${ST_PROXY_IMAGE_PORT:-8189}"
 typeset -g PROXY_MCP_PORT="${ST_PROXY_MCP_PORT:-8190}"
 typeset -g MCP_WORKFLOWS_DIR="${ST_PROXY_MCP_WORKFLOWS_DIR:-${SOURCE_DIR}/workflows}"
 typeset -g MCP_OUTPUT_DIR="${ST_PROXY_MCP_OUTPUT_DIR:-/run/media/veracrypt1/imagine/.mcp-cache}"
-typeset -g MCP_INPUT_DIR="${ST_PROXY_MCP_INPUT_DIR:-/run/media/veracrypt1/mcp-inputs}"
 typeset -g PROXY_IDLE_TIMEOUT="${ST_PROXY_IDLE_TIMEOUT:-60}"
 typeset -g LLM_PORT=""
 typeset -g POCKETTTS_PORT="${ST_STACK_POCKETTTS_PORT:-8008}"
@@ -803,7 +802,6 @@ ensure_service_started() {
                 --mcp-port "${PROXY_MCP_PORT}" \
                 --mcp-workflows-dir "${MCP_WORKFLOWS_DIR}" \
                 --mcp-output-dir "${MCP_OUTPUT_DIR}" \
-                --mcp-input-dir "${MCP_INPUT_DIR}" \
                 --model-profiles "${ST_PROXY_MODEL_PROFILES-${SOURCE_DIR}/config/model-profiles.json}" \
                 --idle-timeout "${PROXY_IDLE_TIMEOUT}" \
                 "${PROXY_ROUTER_ARGS[@]}" "${cache_args[@]}"

@@ -154,6 +154,64 @@ impl Root {
         }
         self.verified(path).map(|_| ())
     }
+    /// The same verified volume rooted at one approved project root, for
+    /// storage kept beside the private root (the MCP root). Creates that one
+    /// folder when its parent exists; never intermediate folders.
+    pub fn rooted_at(&self, path: &Path) -> d::Result<Self> {
+        if !self.project_roots.iter().any(|root| root == path) {
+            return Err("invalid_storage_root");
+        }
+        if std::fs::symlink_metadata(path).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
+        {
+            let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+                return Err("invalid_storage_root");
+            };
+            let parent = self.verified(parent).map_err(|_| "invalid_storage_root")?;
+            d::writable(&parent, 0)?;
+            use std::os::unix::ffi::OsStrExt;
+            let name = CString::new(name.as_bytes()).map_err(|_| "invalid_storage_root")?;
+            if unsafe { libc::mkdirat(parent.as_raw_fd(), name.as_ptr(), 0o700) } != 0
+                && std::io::Error::last_os_error().raw_os_error() != Some(libc::EEXIST)
+            {
+                return Err("video_destination_not_writable");
+            }
+        }
+        let mut config = self.config.clone();
+        config.root = path.to_path_buf();
+        let mut root = Self::with_environment(config, self.environment.clone())?;
+        root.runtime = self.runtime.clone();
+        root.project_roots = self.project_roots.clone();
+        Ok(root)
+    }
+    /// A new file at `relative`, written through the returned handle and
+    /// published by `NewFile::commit` without replacing an existing file.
+    pub fn create_new(&self, relative: &Path) -> d::Result<NewFile> {
+        let (parent, name) = self.parent(relative)?;
+        d::writable(&parent, 0)?;
+        let temporary = CString::new(format!(
+            ".private-{}.partial",
+            uuid::Uuid::new_v4().simple()
+        ))
+        .unwrap();
+        let fd = unsafe {
+            libc::openat(
+                parent.as_raw_fd(),
+                temporary.as_ptr(),
+                libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+                0o600,
+            )
+        };
+        if fd < 0 {
+            return Err("private_storage_write_failed");
+        }
+        Ok(NewFile {
+            file: Some(unsafe { File::from_raw_fd(fd) }),
+            parent,
+            temporary,
+            name,
+            root: self.clone(),
+        })
+    }
     /// Share the same mount witness with disk owners; fixtures inject only their
     /// own volume policy instead of substituting production paths.
     pub fn environment(&self) -> Arc<dyn d::Environment> {
@@ -388,6 +446,89 @@ impl Root {
             }
         }
         result
+    }
+}
+
+/// A file being written on the verified volume; removed unless committed.
+pub struct NewFile {
+    file: Option<File>,
+    parent: File,
+    temporary: CString,
+    name: CString,
+    root: Root,
+}
+impl NewFile {
+    /// The open file to write into.
+    pub fn file(&mut self) -> &mut File {
+        self.file.as_mut().expect("uncommitted file")
+    }
+    /// Flushes and publishes under the requested name; fails with
+    /// `private_storage_exists` when that name is taken.
+    pub fn commit(mut self) -> d::Result<()> {
+        let file = self.file.take().expect("uncommitted file");
+        file.sync_all()
+            .map_err(|_| "private_storage_write_failed")?;
+        drop(file);
+        self.root.proof()?;
+        let mut renamed = unsafe {
+            libc::renameat2(
+                self.parent.as_raw_fd(),
+                self.temporary.as_ptr(),
+                self.parent.as_raw_fd(),
+                self.name.as_ptr(),
+                libc::RENAME_NOREPLACE,
+            )
+        };
+        // Filesystems without RENAME_NOREPLACE: check, then rename.
+        if renamed != 0 && std::io::Error::last_os_error().raw_os_error() == Some(libc::EINVAL) {
+            let mut stat: libc::stat = unsafe { std::mem::zeroed() };
+            let taken = unsafe {
+                libc::fstatat(
+                    self.parent.as_raw_fd(),
+                    self.name.as_ptr(),
+                    &mut stat,
+                    libc::AT_SYMLINK_NOFOLLOW,
+                )
+            } == 0;
+            renamed = if taken {
+                unsafe { *libc::__errno_location() = libc::EEXIST };
+                -1
+            } else {
+                unsafe {
+                    libc::renameat(
+                        self.parent.as_raw_fd(),
+                        self.temporary.as_ptr(),
+                        self.parent.as_raw_fd(),
+                        self.name.as_ptr(),
+                    )
+                }
+            };
+        }
+        if renamed != 0 {
+            let exists = std::io::Error::last_os_error().raw_os_error() == Some(libc::EEXIST);
+            unsafe {
+                libc::unlinkat(self.parent.as_raw_fd(), self.temporary.as_ptr(), 0);
+            }
+            self.temporary = CString::default();
+            return Err(if exists {
+                "private_storage_exists"
+            } else {
+                "private_storage_write_failed"
+            });
+        }
+        self.temporary = CString::default();
+        self.parent
+            .sync_all()
+            .map_err(|_| "private_storage_write_unconfirmed")
+    }
+}
+impl Drop for NewFile {
+    fn drop(&mut self) {
+        if !self.temporary.as_bytes().is_empty() {
+            unsafe {
+                libc::unlinkat(self.parent.as_raw_fd(), self.temporary.as_ptr(), 0);
+            }
+        }
     }
 }
 

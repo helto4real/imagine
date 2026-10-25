@@ -423,7 +423,7 @@ fn textarea_inner(
     if changed && menu.context.is_none() {
         menu.dismissed = true;
     }
-    if !menu.dismissed && !menu.items.is_empty() && helto::reveal_in_viewport(ui, privacy) {
+    if !menu.dismissed && !menu.items.is_empty() && helto::shown(ui, privacy) {
         let mut pick = None;
         if let Some(popup) = egui::Popup::from_response(&response)
             .id(key.with("popup"))

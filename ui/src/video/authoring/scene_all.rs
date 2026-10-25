@@ -71,9 +71,10 @@ impl ImagineApp {
         );
         let body = Rect::from_min_max(egui::pos2(rect.left(), header.bottom() + 6.), rect.max);
         chrome::panel(ui, body, false);
+        let _canvas = helto::panel_canvas(ui, "scene-enhance-body", body);
         let privacy = self.prefs.privacy_mode;
         chrome::region(ui, "scene-enhance-body", body.shrink(10.), |ui| {
-            let hidden = !helto::revealed(ui, body, privacy);
+            let hidden = !helto::shown(ui, privacy);
             helto::private_scope(ui, hidden, |ui| {
                 self.authoring_failure(ui, &mut state, &mut actions);
                 if state.draft.is_some() {

@@ -1178,6 +1178,7 @@ impl ImagineApp {
             .max_height((ctx.content_rect().height() - 70.).max(200.))
             .vscroll(true)
             .show(ctx, |ui| {
+                let _canvas = helto::window_canvas(ui);
                 #[cfg(feature = "ui-preview")]
                 {
                     let r = ui.interact(
@@ -1187,7 +1188,7 @@ impl ImagineApp {
                     );
                     control(ui, "library-scroll", &r);
                 }
-                if !helto::reveal_in_viewport(ui, self.prefs.privacy_mode) {
+                if !helto::shown(ui, self.prefs.privacy_mode) {
                     ui.label("Hidden library · hover to reveal");
                     return;
                 }

@@ -38,7 +38,7 @@ impl ImagineApp {
         let accepted_id = scene.accepted_take.as_ref().map(|a| &a.id);
         let accepted = accepted_id == Some(&take.id);
         let outdated = d.take_state(&take.id).outdated;
-        let revealed = helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
+        let revealed = helto::shown(ui, self.prefs.privacy_mode);
         let busy = self.timeline.busy || self.timeline.admitting;
         let wait = busy.then_some("Wait for the current timeline operation.");
         let mut review = None;

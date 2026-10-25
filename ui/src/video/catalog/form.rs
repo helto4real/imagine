@@ -527,10 +527,7 @@ fn composer(ui: &mut egui::Ui, node: &mut Value, key: egui::Id, privacy: bool) -
         }
     }
     changed |= response.changed();
-    if !draft.suggestions.is_empty()
-        && response.has_focus()
-        && helto::reveal_in_viewport(ui, privacy)
-    {
+    if !draft.suggestions.is_empty() && response.has_focus() && helto::shown(ui, privacy) {
         let mut pick = None;
         egui::Popup::from_response(&response)
             .id(key.with("identities"))

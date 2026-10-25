@@ -185,6 +185,7 @@ impl State {
             .default_width(340.)
             .resizable(false)
             .show(ctx, |ui| {
+                let _canvas = helto::window_canvas(ui);
                 ui.add_enabled_ui(!self.saving, |ui| {
                     let enabled = ui.checkbox(&mut self.draft.enabled, "Sampling preview");
                     self.dirty |= enabled.changed();

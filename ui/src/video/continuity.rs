@@ -262,6 +262,7 @@ impl ImagineApp {
             .collect::<Vec<_>>();
         let (mut switch, mut keep) = (false, false);
         let modal = egui::Modal::new(egui::Id::new("model-switch")).show(ctx, |ui| {
+let _canvas = helto::window_canvas(ui);
             ui.set_max_width(420.);
             ui.label(helto::section("Switch to H3 Reference?"));
             ui.label(format!(

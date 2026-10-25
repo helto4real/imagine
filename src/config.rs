@@ -181,18 +181,19 @@ impl Config {
 pub fn private_project_roots(
     root: crate::private_storage::Root,
     configured: &[PathBuf],
+    mcp_root: &Path,
 ) -> (crate::private_storage::Root, Vec<String>) {
-    let defaults: Vec<PathBuf>;
-    let roots = if configured.is_empty() {
-        defaults = crate::storage_layout::DEFAULT_PROJECT_ROOTS
+    let mut roots: Vec<PathBuf> = if configured.is_empty() {
+        crate::storage_layout::DEFAULT_PROJECT_ROOTS
             .iter()
             .map(PathBuf::from)
-            .collect();
-        &defaults
+            .collect()
     } else {
-        configured
+        configured.to_vec()
     };
-    let (root, ignored) = root.with_project_roots(roots);
+    // Workspace video projects are bound inside the MCP root.
+    roots.push(mcp_root.to_path_buf());
+    let (root, ignored) = root.with_project_roots(&roots);
     let warnings = ignored
         .iter()
         .map(|path| {
@@ -265,19 +266,27 @@ mod tests {
         let (fixture, root, _) = private_fixture();
         let mount = fixture.path().join("own-volume");
         // The production default is outside this synthetic mount: ignored, never inspected.
-        let (defaulted, warnings) = private_project_roots(root.clone(), &[]);
+        let mcp = Path::new(crate::storage_layout::MCP_ROOT);
+        let (defaulted, warnings) = private_project_roots(root.clone(), &[], mcp);
         assert!(defaulted.project_roots().is_empty());
         assert_eq!(
             warnings,
-            [format!(
-                "Ignoring private project root outside the encrypted volume: {}",
-                crate::storage_layout::DEFAULT_PROJECT_ROOTS[0]
-            )]
+            [
+                crate::storage_layout::DEFAULT_PROJECT_ROOTS[0],
+                crate::storage_layout::MCP_ROOT
+            ]
+            .map(|root| format!(
+                "Ignoring private project root outside the encrypted volume: {root}"
+            ))
         );
         let inputs = mount.join("own-inputs");
-        let (configured, warnings) =
-            private_project_roots(root, &[inputs.clone(), fixture.path().join("outside")]);
-        assert_eq!(configured.project_roots(), [inputs]);
+        let agents = mount.join("own-mcp-root");
+        let (configured, warnings) = private_project_roots(
+            root,
+            &[inputs.clone(), fixture.path().join("outside")],
+            &agents,
+        );
+        assert_eq!(configured.project_roots(), [inputs, agents]);
         assert_eq!(warnings.len(), 1);
     }
     #[test]

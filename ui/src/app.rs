@@ -867,7 +867,7 @@ fn image_view_layers(
         },
     );
     let visible_rect = rect.intersect(ui.clip_rect());
-    let reveal = helto::revealed(ui, rect, privacy_mode);
+    let reveal = helto::shown(ui, privacy_mode);
     ui.painter().rect_filled(rect, 0, helto::MEDIA);
     if reveal {
         let original = texture.size_vec2();

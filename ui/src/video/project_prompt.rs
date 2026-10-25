@@ -23,6 +23,7 @@ impl ImagineApp {
             .default_width(540.)
             .min_size(egui::vec2(360., 220.))
             .show(ctx, |ui| {
+                let _canvas = helto::window_canvas(ui);
                 ui.add_enabled_ui(!self.timeline.busy, |ui| {
                     let options = self.timeline.global_prompt_options.get_or_insert_with(|| {
                         GlobalPromptOptions {

@@ -9,7 +9,8 @@ impl ImagineApp {
         let mut export = false;
         let mut close = false;
         egui::Window::new("Older-compatible project copy").id(egui::Id::new("compatible-project-copy")).open(&mut open).default_width(520.).show(ctx,|ui|{
-            let hidden=!helto::reveal_in_viewport(ui,self.prefs.privacy_mode);helto::private_scope(ui,hidden,|ui|{
+let _canvas = helto::window_canvas(ui);
+            ui.scope(|ui| {
                 if let Some(report)=&self.timeline.compatibility_report{
                     ui.strong("Copy exported. The original project is still active.");
                     ui.label(format!("Scene settings resolved: {}. Newer Enhance drafts kept only in the original: {}. Inactive sampling presets kept only in the original: {}. Mixed media ordering kept only in the original: {}.",report["materialized_settings"],report["retained_newer_authoring_drafts_in_original"],report["retained_sampling_drafts_in_original"],report["omitted_section_media_orders"]));

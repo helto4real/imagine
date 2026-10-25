@@ -303,16 +303,19 @@ fn comparison_clips_both_images_at_pointer_and_respects_focus_privacy_and_zoom()
                     ..Default::default()
                 },
                 |ui| {
-                    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
-                        image_view_layers(
-                            ui,
-                            (&after, Some(&before)),
-                            rect.size(),
-                            private,
-                            actual,
-                            true,
-                            &mut pan,
-                        );
+                    // The viewer panel is the image's privacy canvas.
+                    helto::canvas(ui, "own-viewer", rect, |ui| {
+                        ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+                            image_view_layers(
+                                ui,
+                                (&after, Some(&before)),
+                                rect.size(),
+                                private,
+                                actual,
+                                true,
+                                &mut pan,
+                            );
+                        });
                     });
                 },
             ));

@@ -553,6 +553,16 @@ project" window with this list; Open uses the existing location flow, and
 "Browse…" keeps the folder picker as a fallback. Names and titles are concealed
 in privacy mode.
 
+### Agent workspaces (2026-10-25)
+
+Agents no longer use host paths. Each task runs in a workspace under
+`/run/media/veracrypt1/mcp-root/<date>/<time>-<title>-<id>/`, reached only with
+its `workspace_key`; files move through `workspace_*` tools and the proxy's HTTP
+file routes, and results name files by ID. Agent project folders are
+`videos/<title>` inside the workspace. This supersedes the agent-selected
+project folders above (`video_project create` takes a title, not a path) and
+removes `confirm_saved`. See [MCP-WORKSPACES-DESIGN.md](MCP-WORKSPACES-DESIGN.md).
+
 Remaining open points: request-body deserialization errors return only
 `invalid_request` without field detail (serde messages can echo user text);
 `video_run start` omits `reused` on a first start while assembly returns

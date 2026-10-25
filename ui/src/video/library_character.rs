@@ -112,16 +112,30 @@ fn control(ui: &mut egui::Ui, name: &str, response: &egui::Response) {
     super::qa::control(ui, name.into(), response);
     let _ = (ui, name, response);
 }
-fn field(ui: &mut egui::Ui, label: &str, key: &str, value: &mut String, multiline: bool) {
+/// A text field; names and descriptive text are private, kinds, IDs and
+/// languages are not.
+fn field(
+    ui: &mut egui::Ui,
+    hidden: bool,
+    label: &str,
+    key: &str,
+    value: &mut String,
+    multiline: bool,
+) {
+    let private = !matches!(
+        label,
+        "Reference kind" | "Marker" | "Target reference ID" | "Language"
+    );
     let label = ui.label(label);
     let edit = if multiline {
         egui::TextEdit::multiline(value).desired_rows(2)
     } else {
         egui::TextEdit::singleline(value)
     };
-    let r = ui
-        .add(edit.desired_width(f32::INFINITY))
-        .labelled_by(label.id);
+    let r = helto::private_scope(ui, hidden && private, |ui| {
+        ui.add(edit.desired_width(f32::INFINITY))
+    })
+    .labelled_by(label.id);
     control(ui, key, &r);
 }
 impl ImagineApp {
@@ -160,14 +174,15 @@ impl ImagineApp {
             .max_height((ctx.content_rect().height() - 70.).max(200.))
             .vscroll(true)
             .show(ctx, |ui| {
+                let _canvas = helto::window_canvas(ui);
                 #[cfg(feature = "ui-preview")]
                 {
                     let r =
                         ui.interact(ui.clip_rect(), ui.id().with("scroll"), egui::Sense::hover());
                     control(ui, "library-character-scroll", &r);
                 }
-                let hidden = !helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
-                helto::private_scope(ui, hidden, |ui| {
+                let hidden = !helto::shown(ui, self.prefs.privacy_mode);
+                ui.scope(|ui| {
                     if self.timeline.busy {
                         ui.disable();
                     }
@@ -189,6 +204,7 @@ impl ImagineApp {
                     }
                     field(
                         ui,
+                        hidden,
                         "Name",
                         "library-character-name",
                         &mut editor.reference.name,
@@ -196,6 +212,7 @@ impl ImagineApp {
                     );
                     field(
                         ui,
+                        hidden,
                         "Alias",
                         "library-character-alias",
                         &mut editor.reference.alias,
@@ -203,6 +220,7 @@ impl ImagineApp {
                     );
                     field(
                         ui,
+                        hidden,
                         "Description",
                         "library-character-description",
                         &mut editor.reference.description,
@@ -210,6 +228,7 @@ impl ImagineApp {
                     );
                     field(
                         ui,
+                        hidden,
                         "Tags (comma separated)",
                         "library-character-tags",
                         &mut editor.tags,
@@ -224,6 +243,7 @@ impl ImagineApp {
                     });
                     field(
                         ui,
+                        hidden,
                         "Reference kind",
                         "library-character-kind",
                         &mut editor.reference.kind,
@@ -231,6 +251,7 @@ impl ImagineApp {
                     );
                     field(
                         ui,
+                        hidden,
                         "Retention",
                         "library-character-retention",
                         &mut editor.reference.retention,
@@ -248,6 +269,7 @@ impl ImagineApp {
                         };
                         field(
                             ui,
+                            hidden,
                             "Marker",
                             "library-character-relationship",
                             &mut r.marker,
@@ -255,6 +277,7 @@ impl ImagineApp {
                         );
                         field(
                             ui,
+                            hidden,
                             "Note",
                             "library-character-relationship-note",
                             &mut r.note,
@@ -263,6 +286,7 @@ impl ImagineApp {
                         let mut target = r.target_reference_id.clone().unwrap_or_default();
                         field(
                             ui,
+                            hidden,
                             "Target reference ID",
                             "library-character-target",
                             &mut target,
@@ -306,6 +330,7 @@ impl ImagineApp {
                         });
                         field(
                             ui,
+                            hidden,
                             "Contribution",
                             &format!("library-character-image-{i}-contribution"),
                             &mut image.contribution,
@@ -339,6 +364,7 @@ impl ImagineApp {
                     if let Some(voice) = &mut editor.reference.voice {
                         field(
                             ui,
+                            hidden,
                             "Language",
                             "library-character-language",
                             &mut voice.language,
@@ -346,6 +372,7 @@ impl ImagineApp {
                         );
                         field(
                             ui,
+                            hidden,
                             "Voice guidance",
                             "library-character-voice-guidance",
                             &mut voice.description,
@@ -384,6 +411,7 @@ impl ImagineApp {
                             });
                             field(
                                 ui,
+                                hidden,
                                 "Voice description",
                                 &format!("library-character-audio-{i}-description"),
                                 &mut settings.voice_description,
@@ -391,6 +419,7 @@ impl ImagineApp {
                             );
                             field(
                                 ui,
+                                hidden,
                                 "Contribution",
                                 &format!("library-character-audio-{i}-contribution"),
                                 &mut settings.contribution,
@@ -398,6 +427,7 @@ impl ImagineApp {
                             );
                             field(
                                 ui,
+                                hidden,
                                 "Relationship",
                                 &format!("library-character-audio-{i}-relationship"),
                                 &mut settings.relationship,

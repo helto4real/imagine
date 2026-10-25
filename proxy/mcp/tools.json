@@ -1,5 +1,173 @@
 [
   {
+    "name": "imagine_guide",
+    "description": "The complete guide to Imagine: workspaces and files, image generation, session privacy, video production and reporting. Call it before anything else and follow it; workspace_create and workspace_open also return it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "workspace_create",
+    "description": "Create a workspace for this task and return its workspace_key. Every file you upload and everything Imagine makes for you (images, video projects, final videos) is kept in this workspace, and only this key reaches it. Save the key at once where you keep notes for this task: Imagine cannot list or recover workspaces. When you already have a key, use workspace_open instead.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Short title for the user's overview, e.g. 'forest chase'."
+        }
+      },
+      "additionalProperties": false,
+      "required": []
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "workspace_open",
+    "description": "Check a saved workspace_key and show what the workspace holds: its file count and video projects (project_id, title). Use it when you resume earlier work.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        }
+      },
+      "required": [
+        "workspace_key"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "workspace_files",
+    "description": "List the workspace's files: uploads, generated images and video project outputs, each with file_id, name, kind (image, video, audio, other), origin (upload, generated), project, mime_type, bytes, sha256, created_ms and download_url. kind filters by kind or origin.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "image",
+            "video",
+            "audio",
+            "other",
+            "upload",
+            "generated"
+          ]
+        }
+      },
+      "required": [
+        "workspace_key"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "workspace_upload",
+    "description": "Upload a small file (up to 4 MiB) as base64 into the workspace and return its file_id. For larger files, or whenever you have a shell, use HTTP instead: PUT the raw bytes to /v1/workspace/files?name=<file name> on the same host and port as this MCP server, with the header 'Authorization: Bearer <workspace_key>' (for example curl -T ref.png -H 'Authorization: Bearer imk-…' 'http://127.0.0.1:8190/v1/workspace/files?name=ref.png'). Download with GET on a file's download_url and the same header. Images (PNG, JPEG, WebP) up to 64 MiB; video and audio up to 2 GiB; the type comes from the content.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "File name, e.g. 'hero.png'."
+        },
+        "content_base64": {
+          "type": "string",
+          "description": "The file content, base64-encoded."
+        }
+      },
+      "required": [
+        "workspace_key",
+        "name",
+        "content_base64"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "workspace_view",
+    "description": "Show an image from the workspace to you without downloading it, resized to max_side pixels on its longest edge (default 1024, at most 2048).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
+        "file_id": {
+          "type": "string",
+          "pattern": "^f[a-z2-7]{20}$",
+          "description": "A file ID from this workspace."
+        },
+        "max_side": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 2048,
+          "default": 1024
+        }
+      },
+      "required": [
+        "workspace_key",
+        "file_id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
     "name": "list_profiles",
     "description": "List approved image profiles; describe one for parameters and prompt guidance.\n\nmax_side is the longest image edge in pixels: minimum 256, maximum 4096, in multiples of 32. For image_upscale, 3200 is only the default when max_side is omitted, not the maximum.",
     "inputSchema": {
@@ -39,20 +207,28 @@
   },
   {
     "name": "register_image",
-    "description": "Register a local PNG/JPEG/WebP reference without acquiring the GPU.\n\nUse an absolute path under the configured MCP input or verified encrypted media destination.\nFor variants, register the selected result's path with the chosen reference-capable\nprofile (qwen, quick-draft or qwen_scene), even if it was generated by another profile\nwithout references. Select the profile before registering. A saved result path\nis not an image_id; reuse the returned ID across all variant batch items.\nLinks the original in place without copying it. Returns an image_id and preview_path pointing to that original; normalized previews remain in RAM only. IDs last only for the current Imagine/proxy session and\nbelong to this profile. Pass IDs in order: <image1>, <image2>, etc.\nFor upscaling, register with image_upscale and supply exactly one returned ID.\nNever send image bytes or base64 in prompts. Limit: 10 MiB per image.\nSaved paths under persistent_root can be registered directly. Never copy media to an unverified input/output path or pass a delivery image_id as a reference ID.",
+    "description": "Register a PNG/JPEG/WebP image from your workspace as a reference, without acquiring the GPU.\n\nfile_id comes from workspace_files, an upload or an earlier result. For variants, register the selected\nresult's file_id with the chosen reference-capable profile (qwen, quick-draft or qwen_scene), even if it\nwas generated by another profile without references. Select the profile before registering. A result's\nfile_id is not an image_id; reuse the returned ID across all variant batch items.\nThe original stays in place; normalized previews remain in RAM only. IDs last only for the current\nImagine/proxy session and belong to this profile and workspace. Pass IDs in order: <image1>, <image2>, etc.\nFor upscaling, register with image_upscale and supply exactly one returned ID.\nNever send image bytes or base64 in prompts. Limit: 10 MiB per image. Never pass a delivery image_id as a reference ID.",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
         "profile": {
           "type": "string"
         },
-        "path": {
-          "type": "string"
+        "file_id": {
+          "type": "string",
+          "pattern": "^f[a-z2-7]{20}$",
+          "description": "A file ID from this workspace."
         }
       },
       "required": [
+        "workspace_key",
         "profile",
-        "path"
+        "file_id"
       ],
       "additionalProperties": false
     },
@@ -65,10 +241,15 @@
   },
   {
     "name": "generate",
-    "description": "Generate or upscale and wait for saved images.\n\nPrefer generate_batch for multiple images.\n\nReferences are registered image IDs; required counts come from describe_profile.\nimage_upscale requires one reference; omit prompt to retain its stored enhancement prompt,\nand optionally override max_side and seed. max_side preserves the reference aspect ratio.\nChoose qwen for standard generation or quick-draft for Turbo via profile, not parameters.mode.\nApply the full prompt_guidance from describe_profile to parameters.prompt.\nPass only overrides in parameters, including prompt, dimensions, seed, sampling and model_options.\nNested objects merge recursively; lists replace. Omitted fields use the profile defaults.\nIf describe_profile reports nsfw_available, nsfw is an opt-in LoRA switch, default false, not a content label.\nSet true only when the user explicitly requests enabling the NSFW mode, flag or LoRA\nfor this image (e.g. 'enable NSFW mode' or 'nsfw=true'). 'Make an NSFW image' or a\nrequest for nude, erotic or explicit content does not authorize it. Never infer\nactivation from prompts, prompt guidance, references or earlier jobs.\nWithout a clear activation request, omit nsfw or set false and proceed with the image.\nOmit seed for a random default where described, or supply a fixed integer.\nThe resolved seed is returned in parameters and retained on job-ID retries.\nChoose a unique job_id before generation. After a timeout or lost response, use get_job\nwith that same ID; do not start another generation or resubmit successful work under a new ID.\n\nImagine has already saved every successful image under the verified encrypted persistent_root. Report the returned saved_path/path directly; do not copy the image into a delivery cache or another folder. confirm_saved is an optional backwards-compatible acknowledgement of that same published path and metadata; it never copies or deletes files. Do not open, render, visually inspect or analyze images, or compare them with prompts, as part of delivery acknowledgement. Output image_ids are delivery identifiers, not registered reference IDs.\n\nmax_side is the longest image edge in pixels: minimum 256, maximum 4096, in multiples of 32. For image_upscale, 3200 is only the default when max_side is omitted, not the maximum.",
+    "description": "Generate or upscale and wait for saved images.\n\nPrefer generate_batch for multiple images.\n\nReferences are registered image IDs; required counts come from describe_profile.\nimage_upscale requires one reference; omit prompt to retain its stored enhancement prompt,\nand optionally override max_side and seed. max_side preserves the reference aspect ratio.\nChoose qwen for standard generation or quick-draft for Turbo via profile, not parameters.mode.\nApply the full prompt_guidance from describe_profile to parameters.prompt.\nPass only overrides in parameters, including prompt, dimensions, seed, sampling and model_options.\nNested objects merge recursively; lists replace. Omitted fields use the profile defaults.\nIf describe_profile reports nsfw_available, nsfw is an opt-in LoRA switch, default false, not a content label.\nSet true only when the user explicitly requests enabling the NSFW mode, flag or LoRA\nfor this image (e.g. 'enable NSFW mode' or 'nsfw=true'). 'Make an NSFW image' or a\nrequest for nude, erotic or explicit content does not authorize it. Never infer\nactivation from prompts, prompt guidance, references or earlier jobs.\nWithout a clear activation request, omit nsfw or set false and proceed with the image.\nOmit seed for a random default where described, or supply a fixed integer.\nThe resolved seed is returned in parameters and retained on job-ID retries.\nChoose a unique job_id before generation. After a timeout or lost response, use get_job\nwith that same ID; do not start another generation or resubmit successful work under a new ID.\n\nImagine saves every successful image in your workspace. Each result gives file_id, name, bytes, sha256 and download_url. Report the file_id, or download the file with your workspace key when the user wants it; use workspace_view to look at it. Output image_ids are delivery identifiers, not registered reference IDs.\n\nmax_side is the longest image edge in pixels: minimum 256, maximum 4096, in multiples of 32. For image_upscale, 3200 is only the default when max_side is omitted, not the maximum.",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
         "job_id": {
           "type": "string"
         },
@@ -88,6 +269,7 @@
         }
       },
       "required": [
+        "workspace_key",
         "job_id",
         "profile",
         "parameters"
@@ -103,10 +285,15 @@
   },
   {
     "name": "generate_batch",
-    "description": "Generate or upscale multiple images without LLM reloads between items.\n\nPrefer this tool whenever multiple images are needed. Prepare all items first.\nEach item is a parameter object for the same profile, for example\n[{\"prompt\": \"a forest\"}, {\"prompt\": \"a lake\", \"max_side\": 1600, \"aspect_ratio\": \"16:9\"}].\nWith references, use {\"parameters\": {\"prompt\": \"...\"}, \"references\": [\"image_id\"]}\nper item. For image_upscale, an explicit maximum-size request is {\"parameters\": {\"max_side\": 4096},\n\"references\": [\"image_id\"]}; parameters may be empty for default size/random seed.\nReference order maps to <image1>, <image2>, etc. for that item.\nFor variants of one saved image, choose a reference-capable profile\n(qwen, quick-draft or qwen_scene) and use the same registered ID\nas the sole reference in every item (<image1>). Write each complete prompt\nusing prompt_guidance, specifying what to change and preserve. All variants\nuse that original image, not another item in this batch.\nAll items use the selected profile: qwen for standard generation or quick-draft for Turbo.\nSelect it before registering references. Use separate batches for different profiles.\nEach item supplies only overrides; nested objects merge and lists replace.\nOmitted fields use the profile defaults.\nEach item has its own nsfw flag when describe_profile reports nsfw_available: an opt-in LoRA switch, default false,\nnot a content label. Set true only when the user explicitly requests enabling the\nNSFW mode, flag or LoRA for that image or this batch (e.g. 'enable NSFW mode' or\n'nsfw=true'). 'Make NSFW images' or requests for nude, erotic or explicit content\ndo not authorize it. Never infer activation from prompts, prompt guidance, references,\nearlier jobs or another item's flag. Without a clear activation request for an item,\nomit nsfw or set false and proceed with it. It is independent of the selected profile and draft/standard quality.\nItems run consecutively in FIFO order, within the configured image queue limit\n(32 by default). All parameters are validated before anything is queued.\nResults have zero-based item indices, individual status and saved image paths;\nsuccessful items are retained if others fail. Defaults, including seed, are\ncontrolled by the profile defaults. Random-default seeds are chosen separately\nper item; explicit seeds remain fixed. Results include each resolved seed.\nChoose a unique job_id before generation. Wait for the whole batch. After timeout use get_job with the same job_id;\nnever resubmit successful items under a new ID.\n\nImagine has already saved every successful image under the verified encrypted persistent_root. Report the returned saved_path/path directly; do not copy the image into a delivery cache or another folder. confirm_saved is an optional backwards-compatible acknowledgement of that same published path and metadata; it never copies or deletes files. Do not open, render, visually inspect or analyze images, or compare them with prompts, as part of delivery acknowledgement. Output image_ids are delivery identifiers, not registered reference IDs.\n\nmax_side is the longest image edge in pixels: minimum 256, maximum 4096, in multiples of 32. For image_upscale, 3200 is only the default when max_side is omitted, not the maximum.",
+    "description": "Generate or upscale multiple images without LLM reloads between items.\n\nPrefer this tool whenever multiple images are needed. Prepare all items first.\nEach item is a parameter object for the same profile, for example\n[{\"prompt\": \"a forest\"}, {\"prompt\": \"a lake\", \"max_side\": 1600, \"aspect_ratio\": \"16:9\"}].\nWith references, use {\"parameters\": {\"prompt\": \"...\"}, \"references\": [\"image_id\"]}\nper item. For image_upscale, an explicit maximum-size request is {\"parameters\": {\"max_side\": 4096},\n\"references\": [\"image_id\"]}; parameters may be empty for default size/random seed.\nReference order maps to <image1>, <image2>, etc. for that item.\nFor variants of one saved image, choose a reference-capable profile\n(qwen, quick-draft or qwen_scene) and use the same registered ID\nas the sole reference in every item (<image1>). Write each complete prompt\nusing prompt_guidance, specifying what to change and preserve. All variants\nuse that original image, not another item in this batch.\nAll items use the selected profile: qwen for standard generation or quick-draft for Turbo.\nSelect it before registering references. Use separate batches for different profiles.\nEach item supplies only overrides; nested objects merge and lists replace.\nOmitted fields use the profile defaults.\nEach item has its own nsfw flag when describe_profile reports nsfw_available: an opt-in LoRA switch, default false,\nnot a content label. Set true only when the user explicitly requests enabling the\nNSFW mode, flag or LoRA for that image or this batch (e.g. 'enable NSFW mode' or\n'nsfw=true'). 'Make NSFW images' or requests for nude, erotic or explicit content\ndo not authorize it. Never infer activation from prompts, prompt guidance, references,\nearlier jobs or another item's flag. Without a clear activation request for an item,\nomit nsfw or set false and proceed with it. It is independent of the selected profile and draft/standard quality.\nItems run consecutively in FIFO order, within the configured image queue limit\n(32 by default). All parameters are validated before anything is queued.\nResults have zero-based item indices, individual status and saved image files;\nsuccessful items are retained if others fail. Defaults, including seed, are\ncontrolled by the profile defaults. Random-default seeds are chosen separately\nper item; explicit seeds remain fixed. Results include each resolved seed.\nChoose a unique job_id before generation. Wait for the whole batch. After timeout use get_job with the same job_id;\nnever resubmit successful items under a new ID.\n\nImagine saves every successful image in your workspace. Each result gives file_id, name, bytes, sha256 and download_url. Report the file_id, or download the file with your workspace key when the user wants it; use workspace_view to look at it. Output image_ids are delivery identifiers, not registered reference IDs.\n\nmax_side is the longest image edge in pixels: minimum 256, maximum 4096, in multiples of 32. For image_upscale, 3200 is only the default when max_side is omitted, not the maximum.",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
         "job_id": {
           "type": "string"
         },
@@ -121,6 +308,7 @@
         }
       },
       "required": [
+        "workspace_key",
         "job_id",
         "profile",
         "items"
@@ -136,10 +324,15 @@
   },
   {
     "name": "get_job",
-    "description": "Recover a job in the current Imagine/proxy session. History is discarded when either session ends. Wait by default; false returns current status.\nDuring a temporary Imagine connection failure, status may be recovering. Keep using\nthe same job_id; do not submit another generation. Jobs last until the proxy restarts.\n\nImagine has already saved every successful image under the verified encrypted persistent_root. Report the returned saved_path/path directly; do not copy the image into a delivery cache or another folder. confirm_saved is an optional backwards-compatible acknowledgement of that same published path and metadata; it never copies or deletes files. Do not open, render, visually inspect or analyze images, or compare them with prompts, as part of delivery acknowledgement. Output image_ids are delivery identifiers, not registered reference IDs.",
+    "description": "Recover a job in the current Imagine/proxy session. History is discarded when either session ends. Wait by default; false returns current status.\nDuring a temporary Imagine connection failure, status may be recovering. Keep using\nthe same job_id; do not submit another generation. Jobs last until the proxy restarts.\n\nImagine saves every successful image in your workspace. Each result gives file_id, name, bytes, sha256 and download_url. Report the file_id, or download the file with your workspace key when the user wants it; use workspace_view to look at it. Output image_ids are delivery identifiers, not registered reference IDs.",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
         "job_id": {
           "type": "string"
         },
@@ -149,61 +342,8 @@
         }
       },
       "required": [
+        "workspace_key",
         "job_id"
-      ],
-      "additionalProperties": false
-    },
-    "annotations": {
-      "readOnlyHint": true,
-      "destructiveHint": false,
-      "idempotentHint": true,
-      "openWorldHint": false
-    }
-  },
-  {
-    "name": "confirm_saved",
-    "description": "Optional backwards-compatible acknowledgement of Imagine's already persistent image outputs. Use exactly the returned image_id, saved_path, bytes and sha256. Wait until the job is terminal; successful images from partial batches can be acknowledged in subsets. The proxy validates the current destination volume, regular-file path and original result metadata. It never copies, renames or deletes any output, original reference or historical cache. Repeating an identical acknowledgement is safe and does not change get_job. Jobs and acknowledgements remain process-local; generated files remain after either session ends. Delivery acknowledgement does not require opening, rendering or analyzing images or comparing them with prompts.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "job_id": {
-          "type": "string"
-        },
-        "images": {
-          "type": "array",
-          "minItems": 1,
-          "items": {
-            "type": "object",
-            "properties": {
-              "image_id": {
-                "type": "string"
-              },
-              "saved_path": {
-                "type": "string",
-                "description": "The exact existing absolute saved_path returned by Imagine under persistent_root. No copied or remapped destination is accepted."
-              },
-              "bytes": {
-                "type": "integer",
-                "minimum": 1
-              },
-              "sha256": {
-                "type": "string",
-                "pattern": "^[0-9a-f]{64}$"
-              }
-            },
-            "required": [
-              "image_id",
-              "saved_path",
-              "bytes",
-              "sha256"
-            ],
-            "additionalProperties": false
-          }
-        }
-      },
-      "required": [
-        "job_id",
-        "images"
       ],
       "additionalProperties": false
     },
@@ -271,10 +411,20 @@
   },
   {
     "name": "video_project",
-    "description": "Create, read, edit or save a headless video project. No GPU acquisition.\ncreate: path is an absolute new or empty folder inside the MCP input directory (its parent must exist); the whole production (project document, takes, final video) lives there and Imagine saves it at creation. Size: the default is 16:9 landscape Draft. Leave canvas out unless the user asks for a specific size, quality or aspect ratio; then set canvas {ratio, portrait, quality} to what they asked for. Imagine resolves the delivery size from it. Ratios and qualities are listed by video_capabilities canvas (quality: Quick Draft, Draft, Standard, High, Native Resolution). Alternatively, project is a full CreateProject body (schema_version, default_model, delivery, generation); give either canvas or project, not both. Returns the projection below plus path.\nget: a bounded projection with project_revision, scenes (timing, model, continuity, accepted take, section IDs and prompts), assets, cast, takes, deliveries and persistence (save state). No media.\nedit: request is an EditRequest {schema_version (1), expected_project_revision, commands} of typed edits on canonical scene/section IDs; returns the same projection.\nsave: only when persistence.state is not saved; bound projects autosave after every edit, storyboard commit and accepted take.",
+    "description": "Create, read, edit or save a headless video project. No GPU acquisition.\ncreate: makes a new project in your workspace, saved at creation; title (optional) names it. The whole production (project document, takes, final videos) stays in the workspace. Size: the default is 16:9 landscape Draft. Leave canvas out unless the user asks for a specific size, quality or aspect ratio; then set canvas {ratio, portrait, quality} to what they asked for. Imagine resolves the delivery size from it. Ratios and qualities are listed by video_capabilities canvas (quality: Quick Draft, Draft, Standard, High, Native Resolution). Alternatively, project is a full CreateProject body (schema_version, default_model, delivery, generation); give either canvas or project, not both. Returns the projection below.\nget: a bounded projection (a project saved earlier in this workspace is reopened) with project_revision, scenes (timing, model, preset and preset_state: applied, or modified since, continuity, accepted take, section IDs and prompts), assets, cast, takes, deliveries and persistence (save state). No media.\nedit: request is an EditRequest {schema_version (1), expected_project_revision, commands} of typed edits on canonical scene/section IDs; returns the same projection.\nsave: only when persistence.state is not saved; bound projects autosave after every edit, storyboard commit and accepted take.",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "create: short project title, e.g. 'forest chase'."
+        },
         "action": {
           "type": "string",
           "enum": [
@@ -283,10 +433,6 @@
             "edit",
             "save"
           ]
-        },
-        "path": {
-          "type": "string",
-          "description": "create: absolute project folder path inside the MCP input directory."
         },
         "project": {
           "type": [
@@ -336,6 +482,7 @@
         }
       },
       "required": [
+        "workspace_key",
         "action"
       ],
       "additionalProperties": false
@@ -349,18 +496,24 @@
   },
   {
     "name": "video_register_reference",
-    "description": "Attach a local PNG/JPEG/WebP image to a video project without copying it, and optionally add it as a cast member. No GPU acquisition.\npath is absolute under the MCP input or verified media directory; register image MCP results by their saved_path. The original is linked in place and verified by size and SHA-256. cast {name, alias, description} adds or replaces the cast entry for that alias (stored without @) with this image as its identity image; use the returned reference_id in the storyboard request's cast and the tag (@alias) in prompts. Returns the project asset_id for storyboard images and the new project_revision.",
+    "description": "Attach a PNG/JPEG/WebP image from your workspace to a video project, and optionally add it as a cast member. No GPU acquisition.\nfile_id is any workspace image (an upload or an image result). The original stays in place and is verified by size and SHA-256. cast {name, alias, description} adds or replaces the cast entry for that alias (stored without @) with this image as its identity image; use the returned reference_id in the storyboard request's cast and the tag (@alias) in prompts. Returns the project asset_id for storyboard images and the new project_revision.",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
         "project_id": {
           "type": "string",
           "pattern": "^[A-Za-z0-9_-]{1,128}$",
           "description": "Project ID."
         },
-        "path": {
+        "file_id": {
           "type": "string",
-          "description": "Absolute image path."
+          "pattern": "^f[a-z2-7]{20}$",
+          "description": "A file ID from this workspace."
         },
         "expected_project_revision": {
           "type": "integer",
@@ -395,8 +548,9 @@
         }
       },
       "required": [
+        "workspace_key",
         "project_id",
-        "path",
+        "file_id",
         "expected_project_revision"
       ],
       "additionalProperties": false
@@ -414,6 +568,11 @@
     "inputSchema": {
       "type": "object",
       "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
         "action": {
           "type": "string",
           "enum": [
@@ -452,6 +611,7 @@
         }
       },
       "required": [
+        "workspace_key",
         "action"
       ],
       "additionalProperties": false
@@ -469,6 +629,11 @@
     "inputSchema": {
       "type": "object",
       "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
         "action": {
           "type": "string",
           "enum": [
@@ -510,6 +675,7 @@
         }
       },
       "required": [
+        "workspace_key",
         "action"
       ],
       "additionalProperties": false
@@ -523,10 +689,15 @@
   },
   {
     "name": "video_assembly",
-    "description": "Assemble accepted takes into the final video on the CPU.\nplan: request is {schema_version (1), expected_project_revision, options (optional)} for project_id, which the proxy fills in; returns a frozen plan with its id. Omit options for the defaults: {audio_mode: combined (generated plus timeline audio; or generated, timeline), generated_gain: 1.0, timeline_gain: 1.0, duck_generated: false, ducking_strength: 0.5, normalize_mix: true, continuous_tone_match: true (evens out brightness where a continuous shot joins the previous clip), bit_depth: 8 (or 10)}; if given, options must contain every field, plus optional output_filename.\nsubmit: job_id starts the assembly job for plan_id; the same job_id returns the same job.\nget: plan progress and, once submitted, the job status and its published output (saved_path, format, size, SHA-256, video metadata); wait true polls up to wait_seconds (max 60).\nReport the published saved_path directly; do not copy it.",
+    "description": "Assemble accepted takes into the final video on the CPU.\nplan: request is {schema_version (1), expected_project_revision, options (optional)} for project_id, which the proxy fills in; returns a frozen plan with its id. Omit options for the defaults: {audio_mode: combined (generated plus timeline audio; or generated, timeline), generated_gain: 1.0, timeline_gain: 1.0, duck_generated: false, ducking_strength: 0.5, normalize_mix: true, continuous_tone_match: true (evens out brightness where a continuous shot joins the previous clip), bit_depth: 8 (or 10)}; if given, options must contain every field, plus optional output_filename.\nsubmit: job_id starts the assembly job for plan_id; the same job_id returns the same job.\nget: plan progress and, once submitted, the job status and its published output (file_id, name, download_url, format, size, SHA-256, video metadata); wait true polls up to wait_seconds (max 60).\nReport the final video's file_id, or download it with your workspace key when the user wants the file.",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
         "action": {
           "type": "string",
           "enum": [
@@ -569,6 +740,7 @@
         }
       },
       "required": [
+        "workspace_key",
         "action"
       ],
       "additionalProperties": false

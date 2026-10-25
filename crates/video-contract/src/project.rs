@@ -22,12 +22,39 @@ fn model(value: &ModelSelection) -> bool {
     .into_iter()
     .all(|s| name(s))
 }
+impl ProjectId {
+    /// A new ID carrying today's local date, which also names the project's
+    /// date folder: `project_20261025_<uuid>`.
+    pub fn generate() -> Self {
+        Self(format!(
+            "project_{}_{}",
+            local_date(),
+            uuid::Uuid::new_v4().simple()
+        ))
+    }
+}
+/// Today's date in local time as `YYYYMMDD`.
+pub fn local_date() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs()) as libc::time_t;
+    let mut tm: libc::tm = unsafe { std::mem::zeroed() };
+    if unsafe { libc::localtime_r(&now, &mut tm) }.is_null() {
+        return "19700101".into();
+    }
+    format!(
+        "{:04}{:02}{:02}",
+        tm.tm_year + 1900,
+        tm.tm_mon + 1,
+        tm.tm_mday
+    )
+}
 impl VideoProject {
     pub fn create(request: CreateProject) -> Result<Self, Issue> {
         let project = Self {
             generation: request.generation,
             schema_version: request.schema_version,
-            id: ProjectId(format!("project_{}", uuid::Uuid::new_v4().simple())),
+            id: ProjectId::generate(),
             project_revision: 0,
             default_model: request.default_model,
             delivery: request.delivery,

@@ -39,6 +39,36 @@ pub async fn download(store: &Store, id: &str, headers: &HeaderMap) -> Result<Re
         .as_u64()
         .ok_or(Fault::new(500, "storage_error"))?;
     let etag = format!("\"{}\"", info["sha256"].as_str().unwrap_or_default());
+    let file = store.open_media(id)?;
+    let bytes = match file {
+        Some(_) => None,
+        None => Some(
+            store
+                .upload_bytes(id)?
+                .ok_or(Fault::new(404, "asset_not_found"))?,
+        ),
+    };
+    ranged(
+        file,
+        bytes.as_deref(),
+        size,
+        info["mime_type"]
+            .as_str()
+            .unwrap_or("application/octet-stream"),
+        &etag,
+        headers,
+    )
+    .await
+}
+/// A file (or in-memory bytes) as a response honoring one byte range.
+pub async fn ranged(
+    file: Option<std::fs::File>,
+    bytes: Option<&[u8]>,
+    size: u64,
+    mime: &str,
+    etag: &str,
+    headers: &HeaderMap,
+) -> Result<Response, Fault> {
     let requested = headers.get(header::RANGE).filter(|_| {
         headers
             .get(header::IF_RANGE)
@@ -60,8 +90,8 @@ pub async fn download(store: &Store, id: &str, headers: &HeaderMap) -> Result<Re
     };
     let (start, end) = selected.unwrap_or((0, size.saturating_sub(1)));
     let count = if size == 0 { 0 } else { end - start + 1 };
-    // Database ownership check above is the only path source; no supplied file paths.
-    let body = if let Some(file) = store.open_media(id)? {
+    // The caller resolved the file; no supplied paths reach this point.
+    let body = if let Some(file) = file {
         let mut file = tokio::fs::File::from_std(file);
         file.seek(SeekFrom::Start(start))
             .await
@@ -78,10 +108,8 @@ pub async fn download(store: &Store, id: &str, headers: &HeaderMap) -> Result<Re
         };
         Body::from_stream(stream)
     } else {
-        let bytes = store
-            .upload_bytes(id)?
-            .ok_or(Fault::new(404, "asset_not_found"))?;
         let bytes = bytes
+            .ok_or(Fault::new(404, "asset_not_found"))?
             .get(start as usize..(start + count) as usize)
             .ok_or(Fault::new(500, "storage_error"))?;
         Body::from(bytes.to_vec())
@@ -95,7 +123,8 @@ pub async fn download(store: &Store, id: &str, headers: &HeaderMap) -> Result<Re
     let h = response.headers_mut();
     h.insert(
         header::CONTENT_TYPE,
-        info["mime_type"].as_str().unwrap().parse().unwrap(),
+        mime.parse()
+            .unwrap_or(header::HeaderValue::from_static("application/octet-stream")),
     );
     h.insert(header::CONTENT_DISPOSITION, "attachment".parse().unwrap());
     h.insert(header::ACCEPT_RANGES, "bytes".parse().unwrap());

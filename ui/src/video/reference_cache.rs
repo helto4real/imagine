@@ -67,6 +67,7 @@ impl State {
         let mut open = true;
         let mut action = None;
         egui::Window::new("Reference session cache").open(&mut open).default_width(390.).show(ctx,|ui|{
+let _canvas = helto::window_canvas(ui);
             let available=self.status.as_ref().is_some_and(|v|v["available"]==true);
             if let Some(error)=&self.error{ui.colored_label(helto::ERROR,error);}
             if let Some(value)=&self.status{if available{ui.label(format!("{} of {} · {} cached encodings · {} in progress",bytes_label(value["used_bytes"].as_u64().unwrap_or(0)),bytes_label(value["limit_bytes"].as_u64().unwrap_or(0)),value["entries"],value["busy"]));}else{ui.label("Reference encoding cache unavailable.");}}

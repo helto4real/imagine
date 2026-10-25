@@ -32,7 +32,6 @@ pub struct Mcp {
 struct Inner {
     config: Config,
     client: Client,
-    roots: Vec<PathBuf>,
     references: Mutex<HashMap<String, Reference>>,
     jobs: Mutex<HashMap<String, Job>>,
     key: [u8; 32],
@@ -48,20 +47,8 @@ struct Job {
     result: watch::Sender<Value>,
     task: Option<tokio::task::JoinHandle<()>>,
     count: usize,
-}
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SavedImages {
-    job_id: String,
-    images: Vec<SavedImage>,
-}
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct SavedImage {
-    image_id: String,
-    saved_path: PathBuf,
-    bytes: u64,
-    sha256: String,
+    /// The workspace whose key started the job; only it can read the job.
+    workspace: String,
 }
 #[derive(Debug, serde::Serialize)]
 struct Fault {
@@ -141,14 +128,11 @@ impl Mcp {
             ));
         }
         let client = Client::new(&config).await?;
-        let input = PathBuf::from(&config.mcp_input_dir);
-        let input = std::fs::canonicalize(&input).unwrap_or(input);
         let proof = client
             .json(reqwest::Method::GET, "/v1/media-destination", None, None)
             .await
             .context("MCP needs a reachable Imagine with a verified encrypted media destination")?;
         let proof: crate::media_destination::Proof = serde_json::from_value(proof)?;
-        let media_root = proof.config.root.clone();
         let storage = crate::mcp_storage::Storage::open(proof)?;
         let mut key = [0u8; 32];
         use std::io::Read;
@@ -158,7 +142,6 @@ impl Mcp {
             inner: Arc::new(Inner {
                 config,
                 client,
-                roots: vec![input, media_root],
                 references: Default::default(),
                 jobs: Default::default(),
                 key,
@@ -195,6 +178,14 @@ impl Mcp {
         Router::new()
             .route("/mcp", any(handle))
             .route("/mcp/", any(handle))
+            .route(
+                "/v1/workspace/files",
+                axum::routing::get(workspace::list_files).put(workspace::upload_file),
+            )
+            .route(
+                "/v1/workspace/files/{file}",
+                axum::routing::get(workspace::download_file),
+            )
             .with_state(self.clone())
     }
     pub async fn close(&self) {
@@ -249,13 +240,7 @@ impl Mcp {
             return tool_result(error(Fault::new("privacy", failure.to_string()), None));
         }
         let id = args["job_id"].as_str();
-        let active = Self {
-            inner: self.inner.clone(),
-            client: self
-                .inner
-                .client
-                .with_session(self.inner.session.lock().unwrap().clone().unwrap()),
-        };
+        let active = self.active();
         // Video tools keep no proxy state, so their longer calls do not hold the session gate.
         let limit = video::limit(name, args);
         let guard = if limit.is_some() {
@@ -273,23 +258,25 @@ impl Mcp {
                     .await
                     .map_err(validation),
                 "describe_profile" => active.profile(args).await,
+                "imagine_guide" => Ok(json!({"guide":GUIDE})),
                 "register_image" => active.register(args).await,
                 "generate" | "generate_batch" => {
                     active.generate(args, name == "generate_batch").await
                 }
-                "confirm_saved" => {
-                    let this = active.clone();
-                    let args = args.clone();
-                    tokio::task::spawn_blocking(move || this.confirm_saved(args))
+                "get_job" => match active.bound(args).await {
+                    Ok(workspace) => active.get(id.unwrap_or(""), false, &workspace.id).await,
+                    Err(fault) => Err(fault),
+                },
+                "workspace_create" | "workspace_open" | "workspace_files" | "workspace_upload"
+                | "workspace_view" => {
+                    active
+                        .workspace_tool(name, args)
                         .await
-                        .unwrap_or_else(|_| {
-                            Err(Fault::new(
-                                "storage",
-                                "confirmation could not complete; retry the same confirmation",
-                            ))
+                        .map(|(value, images)| {
+                            blocks = images;
+                            value
                         })
                 }
-                "get_job" => active.get(id.unwrap_or(""), false).await,
                 _ if limit.is_some() => active.video(name, args).await.map(|(value, images)| {
                     blocks = images;
                     value
@@ -303,115 +290,47 @@ impl Mcp {
                 result.unwrap_or_else(|_| Err(Fault::new("connection", "Imagine did not respond; retry within the same session"))),
         };
         drop(guard);
-        let result = if result.is_ok()
+        let waits = result.is_ok()
             && (matches!(name, "generate" | "generate_batch")
-                || (name == "get_job" && args["wait"].as_bool().unwrap_or(true)))
-        {
-            self.get(id.unwrap_or(""), true).await
+                || (name == "get_job" && args["wait"].as_bool().unwrap_or(true)));
+        let result = if waits {
+            match self.job_workspace(id.unwrap_or("")) {
+                Some(workspace) => self.get(id.unwrap_or(""), true, &workspace).await,
+                None => result,
+            }
         } else {
             result
         };
         match result {
-            Ok(v) => tool_result_with(v, blocks),
+            Ok(mut v) => {
+                // No host path ever reaches the agent.
+                self.scrub(&mut v, None);
+                tool_result_with(v, blocks)
+            }
             Err(e) => tool_result(error(e, id)),
         }
     }
-    fn confirm_saved(&self, args: Value) -> std::result::Result<Value, Fault> {
-        let args: SavedImages = serde_json::from_value(args).map_err(|_| {
-            validation("expected job_id and images with image_id, saved_path, bytes and sha256")
-        })?;
-        if args.images.is_empty() {
-            return Err(validation("images must not be empty"));
+    /// This MCP handle bound to the current Imagine session.
+    fn active(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            client: self.inner.client.with_session(
+                self.inner
+                    .session
+                    .lock()
+                    .unwrap()
+                    .clone()
+                    .unwrap_or_default(),
+            ),
         }
-        let jobs = self.inner.jobs.lock().unwrap();
-        let job = jobs
-            .get(&args.job_id)
-            .ok_or_else(|| Fault::new("not_found", "job is unknown in this broker process"))?;
-        let snapshot = job.result.borrow().clone();
-        if !matches!(
-            snapshot["status"].as_str(),
-            Some("succeeded" | "partial" | "failed")
-        ) {
-            return Err(Fault::new(
-                "conflict",
-                "wait for the job to finish before confirming saved images",
-            ));
-        }
-        // Validate the whole acknowledgement without changing any file. Locations are
-        // indices into our own result, never paths supplied by the caller.
-        let mut locations = Vec::new();
-        let items: Vec<_> = if let Some(items) = snapshot["items"].as_array() {
-            items.iter().collect()
-        } else {
-            vec![&snapshot]
-        };
-        let mut ids = std::collections::HashSet::new();
-        let mut paths = std::collections::HashSet::new();
-        for saved in &args.images {
-            if !ids.insert(&saved.image_id) || !paths.insert(&saved.saved_path) {
-                return Err(validation("duplicate image_id or saved_path"));
-            }
-            if !saved.saved_path.is_absolute()
-                || saved.saved_path.file_name().is_none()
-                || saved
-                    .saved_path
-                    .components()
-                    .any(|c| matches!(c, std::path::Component::ParentDir))
-            {
-                return Err(validation(
-                    "saved_path must be the existing absolute Imagine output path, without ..",
-                ));
-            }
-            self.inner
-                .storage
-                .validate_saved_path(&saved.saved_path)
-                .map_err(validation)?;
-            let found = items.iter().enumerate().find_map(|(item_index, item)| {
-                if item["status"] != "succeeded" {
-                    return None;
-                }
-                item["images"]
-                    .as_array()?
-                    .iter()
-                    .enumerate()
-                    .find(|(_, image)| image["image_id"] == saved.image_id)
-                    .map(|(image_index, image)| (item_index, image_index, image))
-            });
-            let (item_index, image_index, image) = found.ok_or_else(|| {
-                validation("image_id does not belong to a successful image in this job")
-            })?;
-            if image["bytes"].as_u64() != Some(saved.bytes) || image["sha256"] != saved.sha256 {
-                return Err(validation(
-                    "file size or SHA-256 does not match the published Imagine output",
-                ));
-            }
-            let destination = json!(saved.saved_path);
-            if image["storage"] == "saved" && image["saved_path"] != destination {
-                return Err(Fault::new(
-                    "conflict",
-                    "image was already confirmed at a different saved_path",
-                ));
-            }
-            if items.iter().any(|item| {
-                item["images"].as_array().is_some_and(|images| {
-                    images.iter().any(|other| {
-                        other["image_id"] != saved.image_id && other["saved_path"] == destination
-                    })
-                })
-            }) {
-                return Err(validation(
-                    "saved_path already belongs to another image in this job",
-                ));
-            }
-            locations.push((item_index, image_index));
-        }
-        // Compatibility acknowledgement only. Persistent Imagine files are
-        // already saved, so confirmation never copies, renames or unlinks them.
-        let confirmed = locations
-            .into_iter()
-            .map(|(item_index, image_index)| items[item_index]["images"][image_index].clone())
-            .collect::<Vec<_>>();
-        Ok(json!({"job_id":args.job_id,"images":confirmed}))
+    }
+    fn job_workspace(&self, id: &str) -> Option<String> {
+        self.inner
+            .jobs
+            .lock()
+            .unwrap()
+            .get(id)
+            .map(|job| job.workspace.clone())
     }
     async fn profile(&self, args: &Value) -> std::result::Result<Value, Fault> {
         let id = args["profile"]
@@ -441,12 +360,12 @@ impl Mcp {
         if profile["references"]["max"].as_u64().unwrap_or(0) == 0 {
             return Err(validation("profile does not accept references"));
         }
-        let path = args["path"]
+        let workspace = self.bound(args).await?;
+        let file = args["file_id"]
             .as_str()
-            .filter(|p| std::path::Path::new(p).is_absolute())
-            .ok_or_else(|| validation("image path must be absolute"))?;
-        let path = PathBuf::from(path);
-        let roots = self.inner.roots.clone();
+            .ok_or_else(|| validation("file_id must be a file ID from this workspace"))?;
+        let (path, _) = self.file_path(&workspace, file).await?;
+        let roots = vec![workspace.folder.clone()];
         let epoch = self.inner.epoch.load(std::sync::atomic::Ordering::SeqCst);
         let prepared = tokio::task::spawn_blocking(move || {
             let path = path.canonicalize()?;
@@ -486,6 +405,7 @@ impl Mcp {
         }
         let r = Reference {
             workflow: args["profile"].as_str().unwrap().into(),
+            workspace: workspace.id.clone(),
             asset,
             path,
             width,
@@ -502,14 +422,25 @@ impl Mcp {
         self.inner.references.lock().unwrap().insert(id, r);
         Ok(result)
     }
-    async fn get(&self, id: &str, wait: bool) -> std::result::Result<Value, Fault> {
+    async fn get(
+        &self,
+        id: &str,
+        wait: bool,
+        workspace: &str,
+    ) -> std::result::Result<Value, Fault> {
         let mut rx = self
             .inner
             .jobs
             .lock()
             .unwrap()
             .get(id)
-            .ok_or_else(|| Fault::new("not_found", "job is unknown in this broker process"))?
+            .filter(|job| job.workspace == workspace)
+            .ok_or_else(|| {
+                Fault::new(
+                    "not_found",
+                    "job is unknown in this workspace and broker process",
+                )
+            })?
             .result
             .subscribe();
         loop {
@@ -548,6 +479,7 @@ impl Mcp {
                         .all(|c| c.is_ascii_alphanumeric() || b"_-".contains(&c))
             })
             .ok_or_else(|| validation("job_id must be 1-128 letters, digits, _ or -"))?;
+        let workspace = self.bound(args).await?;
         let fingerprint = self.fingerprint(batch, args);
         let existing = {
             let jobs = self.inner.jobs.lock().unwrap();
@@ -557,7 +489,7 @@ impl Mcp {
             })
         };
         match existing {
-            Some(true) => return self.get(id, false).await,
+            Some(true) => return self.get(id, false, &workspace.id).await,
             Some(false) => {
                 return Err(Fault::new(
                     "conflict",
@@ -568,6 +500,17 @@ impl Mcp {
         }
         let profile = self.profile(args).await?;
         let wid = args["profile"].as_str().unwrap();
+        // Images are saved in the workspace's own image folder.
+        let destination = self
+            .client
+            .json(
+                reqwest::Method::GET,
+                &format!("/v1/workspaces/{}/destination", workspace.id),
+                None,
+                None,
+            )
+            .await
+            .map_err(|_| Fault::new("storage", "the workspace image folder is unavailable"))?;
         let items = if batch {
             args["items"]
                 .as_array()
@@ -633,14 +576,14 @@ impl Mcp {
                     .lock()
                     .unwrap()
                     .get(id.as_str().unwrap())
-                    .filter(|r| r.workflow == wid)
+                    .filter(|r| r.workflow == wid && r.workspace == workspace.id)
                     .cloned()
                     .ok_or_else(|| {
                         validation("reference ID is unknown for this profile; register it again")
                     })?;
                 let verify = image.clone();
-                let inner = self.inner.clone();
-                tokio::task::spawn_blocking(move || verify.verify(&inner.roots))
+                let roots = vec![workspace.folder.clone()];
+                tokio::task::spawn_blocking(move || verify.verify(&roots))
                     .await
                     .map_err(|_| {
                         validation("registered reference is unavailable; register it again")
@@ -657,6 +600,10 @@ impl Mcp {
             request.insert(
                 "inputs".into(),
                 json!({"reference_images":resolved.iter().map(|r| &r.asset).collect::<Vec<_>>()}),
+            );
+            request.insert(
+                "client_metadata".into(),
+                json!({"video_destination":destination}),
             );
             let request = Value::Object(request);
             let validated = self
@@ -706,8 +653,9 @@ impl Mcp {
                 let job_id = id.to_string();
                 let sender = tx.clone();
                 let epoch = self.inner.epoch.load(std::sync::atomic::Ordering::SeqCst);
+                let owner = workspace.clone();
                 let task = tokio::spawn(async move {
-                    this.run(job_id, values, batch, sender, epoch).await;
+                    this.run(job_id, values, batch, sender, epoch, owner).await;
                 });
                 jobs.insert(
                     id.into(),
@@ -716,11 +664,12 @@ impl Mcp {
                         result: tx,
                         task: Some(task),
                         count: items.len(),
+                        workspace: workspace.id.clone(),
                     },
                 );
             }
         }
-        self.get(id, false).await
+        self.get(id, false, &workspace.id).await
     }
     async fn run(
         &self,
@@ -729,6 +678,7 @@ impl Mcp {
         batch: bool,
         tx: watch::Sender<Value>,
         epoch: u64,
+        workspace: Bound,
     ) {
         let result = async {
             let mut requests = Vec::new();
@@ -803,8 +753,9 @@ impl Mcp {
             for (index, native_id) in ids.into_iter().enumerate() {
                 let this = self.clone();
                 let tx = tx.clone();
+                let workspace = workspace.clone();
                 futures.push(async move {
-                    this.finish_item(&native_id, index, batch, &tx, epoch).await;
+                    this.finish_item(&native_id, index, batch, &tx, epoch, &workspace).await;
                 });
             }
             futures_util::future::join_all(futures).await;
@@ -867,6 +818,7 @@ impl Mcp {
         batch: bool,
         tx: &watch::Sender<Value>,
         epoch: u64,
+        workspace: &Bound,
     ) {
         let update = |status: &str, images: Option<Vec<Value>>, error: Option<Value>| {
             tx.send_modify(|v| {
@@ -944,12 +896,14 @@ impl Mcp {
                         stage = "result";
                         let asset = job["output"]["assets"][0].clone();
                         let inner = self.inner.clone();
+                        let workspace = workspace.clone();
+                        let urls = self.clone();
                         let images = tokio::task::spawn_blocking(move || {
                             let _writes = inner.writes.lock().unwrap();
                             if epoch != inner.epoch.load(std::sync::atomic::Ordering::SeqCst) {
                                 anyhow::bail!("session ended");
                             }
-                            references::persistent_result(&inner.storage, &asset)
+                            references::workspace_result(&workspace, &asset, |id| urls.download_url(id))
                         }).await
                         .map_err(|_| Fault::new("result", "image job failed during result"))?
                         .map_err(|e| Fault::new("result", e))?;
@@ -1340,8 +1294,6 @@ mod profile_tests {
         let mcp = Mcp::new(Config {
             coordinator_socket: Some(dir.path().join("gpu.sock").to_string_lossy().into()),
             imagine_url: url,
-
-            mcp_input_dir: dir.path().to_string_lossy().into(),
             mcp_output_dir: Some(dir.path().join("output").to_string_lossy().into()),
             ..Default::default()
         })
@@ -1359,6 +1311,7 @@ mod profile_tests {
                 result,
                 task: None,
                 count: 1,
+                workspace: "ws_own".into(),
             },
         );
         assert_eq!(
@@ -1369,12 +1322,18 @@ mod profile_tests {
     }
 }
 
+/// The complete agent guidance. Clients cap server instructions (Claude Code
+/// near 4,000 characters), so the instructions stay short and point here.
+pub(crate) const GUIDE: &str = include_str!("../mcp/guide.txt");
 #[path = "mcp_video.rs"]
 mod video;
+#[path = "mcp_workspace.rs"]
+mod workspace;
+pub(crate) use workspace::Bound;
 
 #[cfg(test)]
-#[path = "mcp_delivery_tests.rs"]
-mod delivery_tests;
+#[path = "mcp_workspace_tests.rs"]
+mod workspace_tests;
 
 #[cfg(test)]
 use crate::task_fixtures;

@@ -193,6 +193,7 @@ impl ImagineApp {
             .max_height((ctx.content_rect().height() - 70.).max(200.))
             .vscroll(true)
             .show(ctx, |ui| {
+                let _canvas = helto::window_canvas(ui);
                 ui.set_max_width((ctx.content_rect().width() - 48.).max(216.));
                 #[cfg(feature = "ui-preview")]
                 {
@@ -203,8 +204,9 @@ impl ImagineApp {
                     );
                     control(ui, "cast-scroll", &r);
                 }
-                let hidden = !helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
-                helto::private_scope(ui, hidden, |ui| {
+                // Names, descriptions and images are private; controls are not.
+                let hidden = !helto::shown(ui, self.prefs.privacy_mode);
+                ui.scope(|ui| {
                     if self.timeline.busy {
                         ui.disable();
                     }
@@ -290,14 +292,18 @@ impl ImagineApp {
                                     .then_some("Wait for the cast edit to save.");
                                 for (n, (id, label, added)) in characters.iter().enumerate() {
                                     ui.horizontal(|ui| {
-                                        ui.label(label);
+                                        helto::private_scope(ui, hidden, |ui| ui.label(label));
                                         ui.with_layout(
                                             egui::Layout::right_to_left(egui::Align::Center),
                                             |ui| {
                                                 let r = helto::action(
                                                     ui,
                                                     crate::icons::Icon::Plus,
-                                                    &format!("Add {label}"),
+                                                    &if hidden {
+                                                        "Add".into()
+                                                    } else {
+                                                        format!("Add {label}")
+                                                    },
                                                     false,
                                                     if *added {
                                                         Some("Already in the cast.")
@@ -326,7 +332,9 @@ impl ImagineApp {
                                 ui.horizontal_wrapped(|ui| {
                                     let r = ui.checkbox(&mut reference.enabled, "Enabled");
                                     control(ui, &format!("cast-enabled-{i}"), &r);
-                                    ui.strong(&reference.name);
+                                    helto::private_scope(ui, hidden, |ui| {
+                                        ui.strong(&reference.name)
+                                    });
                                     let r = helto::icon_button(
                                         ui,
                                         crate::icons::Icon::Save,
@@ -350,12 +358,16 @@ impl ImagineApp {
                                 });
                                 ui.horizontal_wrapped(|ui| {
                                     ui.label("Name");
-                                    let r = ui.text_edit_singleline(&mut reference.name);
+                                    let r = helto::private_scope(ui, hidden, |ui| {
+                                        ui.text_edit_singleline(&mut reference.name)
+                                    });
                                     control(ui, &format!("cast-name-{i}"), &r);
                                 });
                                 ui.horizontal_wrapped(|ui| {
                                     ui.label("Alias @");
-                                    let r = ui.text_edit_singleline(&mut reference.alias);
+                                    let r = helto::private_scope(ui, hidden, |ui| {
+                                        ui.text_edit_singleline(&mut reference.alias)
+                                    });
                                     control(ui, &format!("cast-alias-{i}"), &r);
                                 });
                                 ui.horizontal_wrapped(|ui| {
@@ -398,16 +410,22 @@ impl ImagineApp {
                                     }
                                 });
                                 ui.label("Description");
-                                let r = ui.add(
-                                    egui::TextEdit::multiline(&mut reference.description)
-                                        .desired_rows(2)
-                                        .desired_width(f32::INFINITY),
-                                );
+                                let r = helto::private_scope(ui, hidden, |ui| {
+                                    ui.add(
+                                        egui::TextEdit::multiline(&mut reference.description)
+                                            .desired_rows(2)
+                                            .desired_width(f32::INFINITY),
+                                    )
+                                });
                                 control(ui, &format!("cast-description-{i}"), &r);
                                 ui.horizontal_wrapped(|ui| {
                                     ui.label("Tags");
                                     let mut text = reference.tags.join(", ");
-                                    if ui.text_edit_singleline(&mut text).changed() {
+                                    if helto::private_scope(ui, hidden, |ui| {
+                                        ui.text_edit_singleline(&mut text)
+                                    })
+                                    .changed()
+                                    {
                                         reference.tags = text
                                             .split(',')
                                             .map(str::trim)
@@ -422,7 +440,9 @@ impl ImagineApp {
                                         egui::DragValue::new(&mut reference.strength).speed(0.05),
                                     );
                                     ui.label("Retention");
-                                    ui.text_edit_singleline(&mut reference.retention);
+                                    helto::private_scope(ui, hidden, |ui| {
+                                        ui.text_edit_singleline(&mut reference.retention)
+                                    });
                                 });
                                 let mut relationship = reference.relationship.is_some();
                                 let r = ui.checkbox(&mut relationship, "Reference relationship");
@@ -503,7 +523,9 @@ impl ImagineApp {
                                         }
                                     });
                                     ui.label("Relationship note");
-                                    let r = ui.text_edit_multiline(&mut value.note);
+                                    let r = helto::private_scope(ui, hidden, |ui| {
+                                        ui.text_edit_multiline(&mut value.note)
+                                    });
                                     control(ui, &format!("cast-relationship-note-{i}"), &r);
                                 }
                                 let mut default_preview = None;
@@ -579,8 +601,9 @@ impl ImagineApp {
                                                 }
                                             });
                                             ui.label("Image contribution");
-                                            let r =
-                                                ui.text_edit_singleline(&mut image.contribution);
+                                            let r = helto::private_scope(ui, hidden, |ui| {
+                                                ui.text_edit_singleline(&mut image.contribution)
+                                            });
                                             control(
                                                 ui,
                                                 &format!("cast-image-contribution-{i}-{ordinal}"),
@@ -625,7 +648,9 @@ impl ImagineApp {
                                         control(ui, &format!("cast-voice-language-{i}"), &r);
                                     });
                                     ui.label("Voice guidance");
-                                    let r = ui.text_edit_multiline(&mut voice.description);
+                                    let r = helto::private_scope(ui, hidden, |ui| {
+                                        ui.text_edit_multiline(&mut voice.description)
+                                    });
                                     control(ui, &format!("cast-voice-guidance-{i}"), &r);
                                     for (ordinal, asset) in document
                                         .project
@@ -661,17 +686,20 @@ impl ImagineApp {
                                                 &r,
                                             );
                                             ui.label("Voice description");
-                                            let r = ui.text_edit_singleline(
-                                                &mut settings.voice_description,
-                                            );
+                                            let r = helto::private_scope(ui, hidden, |ui| {
+                                                ui.text_edit_singleline(
+                                                    &mut settings.voice_description,
+                                                )
+                                            });
                                             control(
                                                 ui,
                                                 &format!("cast-voice-description-{i}-{ordinal}"),
                                                 &r,
                                             );
                                             ui.label("Voice contribution");
-                                            let r =
-                                                ui.text_edit_singleline(&mut settings.contribution);
+                                            let r = helto::private_scope(ui, hidden, |ui| {
+                                                ui.text_edit_singleline(&mut settings.contribution)
+                                            });
                                             control(
                                                 ui,
                                                 &format!("cast-voice-contribution-{i}-{ordinal}"),
@@ -679,7 +707,11 @@ impl ImagineApp {
                                             );
                                             ui.horizontal_wrapped(|ui| {
                                                 ui.label("Audio relationship");
-                                                ui.text_edit_singleline(&mut settings.relationship);
+                                                helto::private_scope(ui, hidden, |ui| {
+                                                    ui.text_edit_singleline(
+                                                        &mut settings.relationship,
+                                                    )
+                                                });
                                             });
                                             let mut strength = settings.strength.is_some();
                                             if ui

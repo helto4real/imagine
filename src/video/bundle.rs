@@ -364,12 +364,11 @@ impl<T: Bundle> Store<T> {
         }
     }
     fn prepared_directories(&self, document: &T) -> &'static [&'static str] {
-        if self.private_root.as_ref().is_some_and(|root| {
-            self.root
-                .path
-                .parent()
-                .is_some_and(|parent| parent == root.layout().root().join("projects"))
-        }) {
+        if self
+            .private_root
+            .as_ref()
+            .is_some_and(|root| root.layout().is_named_project(&self.root.path))
+        {
             &["outputs", "work", "tmp", "autosave"]
         } else if self
             .private_root

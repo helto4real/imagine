@@ -178,7 +178,7 @@ impl ImagineApp {
                         self.timeline.drag_edits(&before, edits, done, commands);
                     }
                 }
-                let revealed = helto::revealed(ui, bar, self.prefs.privacy_mode);
+                let revealed = helto::shown(ui, self.prefs.privacy_mode);
                 let text = if !revealed {
                     "Hidden audio".into()
                 } else if c.name.is_empty() {

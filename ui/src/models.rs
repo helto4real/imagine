@@ -584,10 +584,8 @@ impl ImagineApp {
                 }
             });
         });
-        // LoRA file names follow Hide previews, like the video LoRA catalog.
-        let hidden = !helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
         let editable = self.editable() && !self.models.loading;
-        helto::private_scope(ui, hidden, |ui| {
+        ui.scope(|ui| {
             ui.add_enabled_ui(editable, |ui| {
                 let search = ui.label("Add LoRA");
                 let search_changed = ui
@@ -733,7 +731,7 @@ impl ImagineApp {
             self.models.dirty = false;
         }
         if let Some(error) = self.models.error.as_ref().or(self.settings_error.as_ref()) {
-            ui.label(helto::error_text(error, !hidden));
+            ui.colored_label(helto::ERROR, error);
         }
     }
 }
