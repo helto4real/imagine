@@ -1245,7 +1245,17 @@ async fn dispatch_rpc(mcp: Mcp, v: Value, modern: bool) -> Value {
         Some("ping") => json!({}),
         Some("resources/list") => json!({"resources":[]}),
         Some("resources/templates/list") => json!({"resourceTemplates":[]}),
-        Some("prompts/list") => json!({"prompts":[]}),
+        Some("prompts/list") => {
+            json!({"prompts":[{"name":"video_interactive","title":"Interactive video",
+            "description":"Make a video step by step: settings, story, outline, characters and render, with your answer at each step.",
+            "arguments":[{"name":"idea","description":"Your idea for the video, if you have one.","required":false}]}]})
+        }
+        Some("prompts/get") => match prompt(&v["params"]) {
+            Some(result) => result,
+            None => {
+                return json!({"jsonrpc":"2.0","id":id,"error":{"code":-32602,"message":"Unknown prompt or invalid arguments"}});
+            }
+        },
         Some("tools/list") => {
             json!({"tools":serde_json::from_str::<Value>(include_str!("../mcp/tools.json")).unwrap()})
         }
@@ -1322,6 +1332,26 @@ mod profile_tests {
     }
 }
 
+/// An MCP prompt with its arguments filled in.
+fn prompt(params: &Value) -> Option<Value> {
+    if params["name"] != "video_interactive" {
+        return None;
+    }
+    let idea = match &params["arguments"]["idea"] {
+        Value::Null => "",
+        Value::String(text) if text.chars().count() <= 4000 => text.trim(),
+        _ => return None,
+    };
+    let idea = if idea.is_empty() {
+        "I have no idea yet: start with the settings, then propose premises.".to_owned()
+    } else {
+        format!("My idea: {idea}")
+    };
+    let text = include_str!("../mcp/prompts/video_interactive.txt").replace("{idea}", &idea);
+    Some(
+        json!({"description":"Interactive video","messages":[{"role":"user","content":{"type":"text","text":text.trim_end()}}]}),
+    )
+}
 /// The complete agent guidance. Clients cap server instructions (Claude Code
 /// near 4,000 characters), so the instructions stay short and point here.
 pub(crate) const GUIDE: &str = include_str!("../mcp/guide.txt");

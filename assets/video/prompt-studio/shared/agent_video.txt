@@ -71,6 +71,8 @@ A continuous shot planned before rendering waits for the previous Scene's accept
 
 Images with role `cast` show the selected cast members, labelled with their name and reference tag. They identify who a character is; they do not fix a frame, pose or composition. Refer to cast members by the reference tags in the outline and expansions as the profile describes.
 
+A cast identity image may be a character sheet: a portrait and full-body views of the same person on one image. It shows one character, not several people or a layout to reproduce. A character described only in text has no cast image; write their appearance in each Scene where they appear, consistently across Scenes.
+
 9. Provider settings
 
 The profile's generation settings (temperature, token limits) are reported for information only; they describe the local provider and do not apply to an external agent.

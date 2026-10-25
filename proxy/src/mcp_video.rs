@@ -14,6 +14,8 @@ const TOOLS: &[&str] = &[
     "video_assembly",
 ];
 const DEFAULT_WAIT: u64 = 30;
+/// The total video length when the user gives none.
+const DEFAULT_SECONDS: u64 = 15;
 /// MCP productions start on Draft; the UI's own default is smaller.
 fn default_canvas() -> Value {
     json!({"ratio":"16:9","portrait":false,"quality":"Draft"})
@@ -293,8 +295,31 @@ impl Mcp {
                 let mut value = self
                     .call_video(Method::GET, "/v1/video/capabilities", None, None)
                     .await?;
-                // Report the default that video_project create applies.
+                // Report the defaults MCP productions apply.
                 value["canvas"]["default"] = default_canvas();
+                let profiles = self
+                    .call_video(Method::GET, "/v1/video/authoring/profiles", None, None)
+                    .await
+                    .unwrap_or(Value::Null);
+                let profile = profiles["profiles"]
+                    .as_array()
+                    .and_then(|all| all.iter().find(|p| p["default"] == true))
+                    .map(|p| p["id"].clone())
+                    .unwrap_or(Value::Null);
+                let preset = value["authoring"]["presets"]
+                    .as_array()
+                    .and_then(|all| {
+                        all.iter()
+                            .find(|p| p["default"] == true && p["variant"] == "reference")
+                    })
+                    .map(|p| p["key"].clone())
+                    .unwrap_or(Value::Null);
+                value["mcp_defaults"] = json!({"duration_seconds":DEFAULT_SECONDS,"canvas":default_canvas(),
+                    "prompt_profile":profile,"scene_preset":preset,"add_music":false,"add_dialogue":false,
+                    "character_sheet_profile":"qwen-character-sheet",
+                    "characters_without_images":{
+                        "interactive":"ask after the outline is accepted: character sheet or described in the prompts",
+                        "headless":"character sheet when the character appears in more than one scene, otherwise described in the prompts"}});
                 value
             }
             ("video_project", "create") => self.create_project(own(ws)?, args).await?,
@@ -338,6 +363,9 @@ impl Mcp {
                 request["provider"] = json!("external");
                 request["provider_profile_id"] = json!("");
                 request["operation"] = json!("outline");
+                if request["duration_seconds"].is_null() {
+                    request["duration_seconds"] = json!(DEFAULT_SECONDS);
+                }
                 self.call_video(Method::POST, &path, Some(&request), None)
                     .await?
             }

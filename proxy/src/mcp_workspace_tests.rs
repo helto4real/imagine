@@ -396,3 +396,47 @@ async fn http_file_routes_take_the_key_as_bearer_and_check_the_host() {
     assert_eq!(body.as_ref(), f.image.as_slice());
     assert!(f.folder.join("uploads/ref.png").is_file());
 }
+
+#[tokio::test]
+async fn the_interactive_video_prompt_is_listed_and_fills_in_the_idea() {
+    let f = setup().await;
+    let rpc = |method: &str, params: Value| {
+        dispatch_rpc(
+            f.mcp.clone(),
+            json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}),
+            false,
+        )
+    };
+    let listed = rpc("prompts/list", json!({})).await;
+    assert_eq!(listed["result"]["prompts"][0]["name"], "video_interactive");
+    assert_eq!(
+        listed["result"]["prompts"][0]["arguments"][0]["required"],
+        false
+    );
+    let got = rpc(
+        "prompts/get",
+        json!({"name":"video_interactive","arguments":{"idea":"a lighthouse keeper's last night"}}),
+    )
+    .await;
+    let text = got["result"]["messages"][0]["content"]["text"]
+        .as_str()
+        .unwrap();
+    assert!(text.contains("Call imagine_guide first"), "{text}");
+    assert!(
+        text.ends_with("My idea: a lighthouse keeper's last night"),
+        "{text}"
+    );
+    let empty = rpc("prompts/get", json!({"name":"video_interactive"})).await;
+    assert!(
+        empty["result"]["messages"][0]["content"]["text"]
+            .as_str()
+            .unwrap()
+            .contains("start with the settings")
+    );
+    for params in [
+        json!({"name":"other"}),
+        json!({"name":"video_interactive","arguments":{"idea":"x".repeat(4001)}}),
+    ] {
+        assert_eq!(rpc("prompts/get", params).await["error"]["code"], -32602);
+    }
+}

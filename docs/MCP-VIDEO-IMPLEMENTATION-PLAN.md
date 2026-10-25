@@ -563,6 +563,14 @@ file routes, and results name files by ID. Agent project folders are
 project folders above (`video_project create` takes a title, not a path) and
 removes `confirm_saved`. See [MCP-WORKSPACES-DESIGN.md](MCP-WORKSPACES-DESIGN.md).
 
+### Interactive video mode (2026-10-25)
+
+Agents can plan a video with the user step by step: the `video_interactive` MCP
+prompt or plain words switch it on; `video_capabilities` reports `mcp_defaults`
+(15 s total by default); characters without images become character sheets
+generated in one batch or are described in the prompts, asked after the outline
+is accepted. See [MCP-VIDEO-INTERACTIVE-DESIGN.md](MCP-VIDEO-INTERACTIVE-DESIGN.md).
+
 Remaining open points: request-body deserialization errors return only
 `invalid_request` without field detail (serde messages can echo user text);
 `video_run start` omits `reused` on a first start while assembly returns

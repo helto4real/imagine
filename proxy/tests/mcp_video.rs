@@ -148,14 +148,18 @@ async fn imagine(
             "GET",
             "/v1/video/projects/bad" | "/v1/video/projects/odd" | "/v1/video/projects/flat",
         ) => ok(snapshot(1, false)),
-        ("GET", "/v1/video/authoring/profiles") => ok(json!({"profiles":[{"id":"nsfw"}]})),
+        ("GET", "/v1/video/authoring/profiles") => {
+            ok(json!({"profiles":[{"id":"normal","default":true},{"id":"nsfw"}]}))
+        }
         ("GET", "/v1/video/authoring/profiles/nsfw") => {
             ok(json!({"id":"nsfw","guidance":"SHARED"}))
         }
         ("GET", "/v1/video/authoring/profiles/missing") => {
             fail(404, json!({"error":{"code":"profile_not_found"}}))
         }
-        ("GET", "/v1/video/capabilities") => ok(json!({"schema_version":1,"models":[]})),
+        ("GET", "/v1/video/capabilities") => ok(json!({"schema_version":1,"models":[],
+            "authoring":{"presets":[{"key":"Default ref2v","variant":"reference","default":true},
+                {"key":"Default i2v","variant":"i2v","default":true}]}})),
         ("POST", "/v1/video/locations") => ok(json!({"location_id":"location_1"})),
         ("POST", "/v1/video/projects/at-location") => ok(snapshot(1, false)),
         ("GET", "/v1/video/projects/p1") => ok(snapshot(1, false)),
@@ -372,7 +376,10 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
         (
             "video_capabilities",
             json!({}),
-            vec!["GET /v1/video/capabilities"],
+            vec![
+                "GET /v1/video/capabilities",
+                "GET /v1/video/authoring/profiles",
+            ],
         ),
         (
             "video_project",
@@ -478,12 +485,23 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
             vec![RESOLVE, PLAN, PROJECT, PLAN, "GET /v1/jobs/job_9"],
         ),
     ];
-    // Capabilities report the canvas MCP projects default to.
+    // Capabilities report the defaults MCP productions use.
     let capabilities = h.call("video_capabilities", json!({})).await;
+    let draft = json!({"ratio":"16:9","portrait":false,"quality":"Draft"});
+    assert_eq!(ok(&capabilities)["canvas"]["default"], draft);
+    let defaults = &ok(&capabilities)["mcp_defaults"];
+    assert_eq!(defaults["duration_seconds"], 15);
+    assert_eq!(defaults["canvas"], draft);
+    assert_eq!(defaults["prompt_profile"], "normal");
+    assert_eq!(defaults["scene_preset"], "Default ref2v");
     assert_eq!(
-        ok(&capabilities)["canvas"]["default"],
-        json!({"ratio":"16:9","portrait":false,"quality":"Draft"})
+        (
+            defaults["add_music"].as_bool(),
+            defaults["add_dialogue"].as_bool()
+        ),
+        (Some(false), Some(false))
     );
+    assert_eq!(defaults["character_sheet_profile"], "qwen-character-sheet");
     for (name, args, routes) in cases {
         h.probe.clear();
         let result = h.call(name, args.clone()).await;
@@ -538,7 +556,7 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
     h.call("video_storyboard", json!({"action":"start","project_id":"p1","request":{"expected_project_revision":3,"provider":"koboldcpp","provider_profile_id":"local","operation":"enhance_scene","brief":"b"}})).await;
     assert_eq!(
         h.probe.seen()[2].body,
-        json!({"expected_project_revision":3,"provider":"external","provider_profile_id":"","operation":"outline","brief":"b","schema_version":1})
+        json!({"expected_project_revision":3,"provider":"external","provider_profile_id":"","operation":"outline","brief":"b","schema_version":1,"duration_seconds":15})
     );
     h.probe.clear();
     let registered = h.call("video_register_reference", json!({"project_id":"p1","file_id":file,"expected_project_revision":1,"name":"Keeper face","cast":{"name":"Keeper","alias":"@Keeper","description":"Tall"}})).await;
@@ -985,6 +1003,9 @@ fn catalog_schemas_are_strict_objects() {
     assert!(guide.contains("No music unless the user asks (add_music false)"));
     assert!(guide.contains("The video profile never enables the image nsfw switch"));
     assert!(guide.contains("## Reporting"));
+    assert!(guide.contains("## Interactive video"));
+    assert!(guide.contains("after the outline is accepted"));
+    assert!(guide.contains("one generate_batch call with the qwen-character-sheet profile"));
 }
 #[tokio::test]
 async fn failed_run_names_the_scene_and_only_bounded_job_diagnostics() {

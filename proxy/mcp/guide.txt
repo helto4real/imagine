@@ -16,10 +16,22 @@ Imagine saves every successful image in your workspace; results give file_id and
 Reference IDs, RAM-only normalized previews and job history exist only during the current Imagine/proxy session; workspace files remain. After a restart, register references again and use new job IDs. If Imagine or the verified media destination is unavailable, ask the user to make it available. Never ask for passwords or YubiKey PINs in chat or tool arguments.
 
 ## Video production
-Video production is headless; the user opens the project later in the Imagine UI. Read describe_video_profile agent_guidance and the video tool descriptions; they hold the full rules.
+Video production is headless unless the user asks for interactive mode (next section); the user opens the project later in the Imagine UI. Read describe_video_profile agent_guidance and the video tool descriptions; they hold the full rules. video_capabilities mcp_defaults lists the defaults: total length 15 s when the user gives none (duration_seconds), Draft 16:9, the default prompt profile, Default ref2v, no music, no dialogue.
 Order: video_capabilities; video_project create (in the workspace; Draft size unless the user asks for another); video_register_reference (cast for characters); video_storyboard start (bundle: verbatim prompts, schemas, images); write notes, outline, all expansions and the production block in one pass; submit dry_run true, fix errors by code/at/detail, submit dry_run false; video_run start (the first and only GPU handover) and get; video_assembly plan, submit, get.
 Scene preset: Default ref2v; Default i2v only to animate one specific start image; other presets only if the user names them. No music unless the user asks (add_music false). Bundle images are for viewing while writing prompts.
+Characters without a supplied image: generate a character sheet for each one that appears in more than one scene, and describe the others in the prompts, unless the user says otherwise. Generate all sheets in one generate_batch call with the qwen-character-sheet profile (follow its describe_profile guidance), one item per character, and register each whole sheet with video_register_reference as that character's cast identity image.
 Reuse the same job_id after timeouts. The video profile never enables the image nsfw switch.
+
+## Interactive video
+Use this mode when the user asks for it: the video_interactive prompt, or words like "interactive", "step by step", "let's plan it together" or "ask me first". At each step show a short summary, repeat only what changed, and wait for the user's answer. If the user says "go ahead" or "you decide", finish the rest headlessly with the current choices.
+1. Settings: show the video_capabilities mcp_defaults as a compact card, with the prompt profiles and scene presets (key and one line each). Apply the user's changes. Upload any character images the user supplies.
+2. Story: propose one or two premises of two or three sentences. The user picks, merges or rewrites one.
+3. Outline: list the scenes with title, duration, boundary (hard cut or continuous shot), the characters in each and a one-line summary, totalling the agreed length. Revise until the user accepts it.
+4. Characters: after the outline is accepted, ask for each character without a supplied image (or once for all) whether to generate a character sheet or describe the character in the prompts; say which scenes each one is in. Generate the chosen sheets in one batch, show each with workspace_view, regenerate any the user rejects, then register accepted sheets and supplied images as cast.
+5. Prompts and dry run: write the full storyboard, run the dry run, and report per scene the model, preset, continuity and warnings. Offer to show any scene's full prompt.
+6. Render: only on the user's go, video_run start, then report progress until it is done.
+7. Review: report the takes and offer to assemble the final video, regenerate a scene with a new seed, change a scene and render it again, or stop.
+Use the GPU only after the user's answer in step 4 and go in step 6.
 
 ## Reporting
 Report results by ID: image file_ids, and for video the project_id, save status and the final video's file_id. Automatic acceptance of a take is not a visual review; say so if you could not look at the result.

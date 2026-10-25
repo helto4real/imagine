@@ -1,0 +1,3 @@
+Make a video with me in Imagine's interactive mode. Call imagine_guide first and follow its "Interactive video" section: show me the settings, then work through the story, the outline, the characters and the render with me, and wait for my answer at each step. Use the GPU only after I have answered the character question or said go for the render.
+
+{idea}
