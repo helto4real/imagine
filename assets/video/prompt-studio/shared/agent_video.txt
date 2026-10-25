@@ -25,6 +25,8 @@ User messages contain slots written as {{SLOT:name}}, listed in `slots`. They st
 - `scene_json`: this Scene from your outline, as projected by the server.
 - `image_context`: the `with_images` text when the Scene uses any story image, otherwise `without_images`.
 
+Music: set `add_music: false` and leave every `non_diegetic_music` empty unless the user explicitly asks for music. Then no music is requested from the model (`non_diegetic_music: N/A`); scene sound comes only from `ambient_sound`. Do not describe a score, song or soundtrack in any other field either.
+
 3. One submission
 
 Write everything in one pass, then submit it in one call:
@@ -41,8 +43,9 @@ The server assigns Scene and Section ids and image assignments when it projects 
 
 5. Production block
 
-Each entry is {"model": "reference" | "i2v", "continuity": null | {"method", "include_audio"}, "rationale"}.
-- `model` is required.
+Each entry is {"preset": "<key>", "continuity": null | {"method", "include_audio"}, "rationale"}.
+- `preset` picks a named scene recipe (model variant, model file, sampling settings and LoRAs) from `limits.presets`. Use "Default ref2v" for reference Scenes and "Default i2v" for I2V Scenes. Use another preset only when the user explicitly names it; never choose one yourself for style or quality.
+- `model` ("reference" or "i2v") without `preset` means that variant's default preset; with a preset it must match the preset's variant.
 - `continuity` is only for a Scene whose `boundary_from_previous` is `continuous_shot`; leave it null otherwise. `method: "auto"` resolves by the target model, as `limits.continuity` reports.
 - `rationale` is a planning note; it never reaches a prompt.
 

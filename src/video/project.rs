@@ -19,6 +19,15 @@ impl ProjectService {
         }
         Ok(None)
     }
+    /// Each open session's bound folder with its current document.
+    pub(crate) fn located(
+        &self,
+    ) -> Vec<(std::path::PathBuf, &super::persistence::ProjectDocument)> {
+        self.projects
+            .values()
+            .filter_map(|session| session.location().map(|path| (path, session.document())))
+            .collect()
+    }
     /// A new project folder never lies inside another open project's folder.
     pub(crate) fn outside_projects(
         &self,

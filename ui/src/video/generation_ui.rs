@@ -4,6 +4,7 @@ use imagine_video_contract::{
     generation::{Defaults, SeedControl, h3_defaults, h3_defaults_for, h3_model},
     planning::{H3Handoff, H3SecondStage, H3Settings, H3Stage, H3StageTwoDraft},
 };
+use std::path::Path;
 #[derive(Default)]
 pub(super) struct State {
     draft: Option<Draft>,
@@ -270,6 +271,9 @@ impl State {
     pub(super) fn project_saved(&mut self) {
         self.draft = None;
     }
+    pub(super) fn is_open(&self) -> bool {
+        self.draft.is_some()
+    }
     pub(super) fn scene_edits(&self, project: &VideoProject) -> Vec<Edit> {
         self.scenes
             .iter()
@@ -512,6 +516,20 @@ pub(super) fn component_path(
     key: &str,
     value: &mut Option<String>,
 ) -> bool {
+    component_file(ui, label, key, value, None, &|path| {
+        path.to_string_lossy().into_owned()
+    })
+}
+/// A file path field whose file dialog starts in `start` and whose picked
+/// file is written as `name` makes it.
+pub(super) fn component_file(
+    ui: &mut egui::Ui,
+    label: &str,
+    key: &str,
+    value: &mut Option<String>,
+    start: Option<&Path>,
+    name: &dyn Fn(&Path) -> String,
+) -> bool {
     let picked_key = ui.make_persistent_id(("h3-component-file-result", key));
     let picked = ui.ctx().data_mut(|data| {
         let picked = data.get_temp::<Option<PathBuf>>(picked_key);
@@ -522,7 +540,7 @@ pub(super) fn component_path(
     });
     let mut changed = false;
     if let Some(Some(path)) = picked {
-        *value = Some(path.to_string_lossy().into_owned());
+        *value = Some(name(&path));
         changed = true;
     }
     ui.label(label);
@@ -545,8 +563,13 @@ pub(super) fn component_path(
         if r.clicked() {
             let ctx = ui.ctx().clone();
             let title = format!("Choose {label}");
+            let start = start.filter(|p| p.is_dir()).map(Path::to_path_buf);
             std::thread::spawn(move || {
-                let path = rfd::FileDialog::new().set_title(title).pick_file();
+                let mut dialog = rfd::FileDialog::new().set_title(title);
+                if let Some(start) = start {
+                    dialog = dialog.set_directory(start);
+                }
+                let path = dialog.pick_file();
                 ctx.data_mut(|data| data.insert_temp(picked_key, path));
                 ctx.request_repaint();
             });
@@ -657,6 +680,7 @@ impl ImagineApp {
         let mut open = true;
         let mut apply = false;
         let mut cancel = false;
+        let mut preset = None;
         egui::Window::new("Project generation")
             .id(egui::Id::new("project-generation"))
             .open(&mut open)
@@ -675,6 +699,7 @@ impl ImagineApp {
                 }
                 let hidden = !helto::reveal_in_viewport(ui, self.prefs.privacy_mode);
                 helto::private_scope(ui, hidden, |ui| {
+                    preset = self.timeline_default_preset(ui);
                     ui.label("Default scene mode");
                     let previous = draft.model.clone();
                     if mode(ui, &mut draft.model, "project-model") {
@@ -833,6 +858,9 @@ impl ImagineApp {
         if open && !cancel {
             self.timeline.generation_editor.draft = Some(draft);
         }
+        if let Some(key) = preset {
+            self.timeline_choose_project_preset(key);
+        }
     }
     pub(super) fn timeline_scene_generation(
         &mut self,
@@ -841,6 +869,7 @@ impl ImagineApp {
         scene: &Scene,
         commands: &mut Vec<Edit>,
     ) {
+        self.timeline_scene_preset(ui, d, scene);
         ui.label("Scene mode");
         let mut inherited = scene.model == ModelChoice::ProjectDefault;
         let r = ui.checkbox(&mut inherited, "Use project mode");

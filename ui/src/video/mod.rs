@@ -34,6 +34,8 @@ mod navigation;
 mod playback;
 mod player;
 mod preflight;
+mod presets;
+mod private_projects;
 mod project_prompt;
 mod project_timing;
 mod prompt_tools;
@@ -113,6 +115,8 @@ pub(super) struct Timeline {
     media_health: media_health::State,
     compatibility_open: bool,
     compatibility_report: Option<Value>,
+    private_projects: private_projects::State,
+    presets: presets::State,
     generation_editor: generation_ui::State,
     assembly: assembly::State,
     authoring: authoring::State,
@@ -201,6 +205,19 @@ pub(super) enum Event {
     },
     Capabilities {
         epoch: u64,
+        result: Result<Value, client::TimelineFailure>,
+    },
+    PrivateProjects {
+        epoch: u64,
+        result: Result<Value, client::TimelineFailure>,
+    },
+    Presets {
+        epoch: u64,
+        result: Result<Value, client::TimelineFailure>,
+    },
+    PresetPlan {
+        epoch: u64,
+        project: bool,
         result: Result<Value, client::TimelineFailure>,
     },
     Preflight {
@@ -394,6 +411,13 @@ pub(super) enum PostAction {
     SelectSection(SceneId, SectionId),
     ExportCompatible,
     GenerationSaved,
+    /// Plans and applies a preset once pending drafts are committed.
+    Preset {
+        key: String,
+        target: presets::Target,
+    },
+    /// Reloads an open Project generation window with the preset's values.
+    ProjectPresetApplied,
     EnhanceField(imagine_video_contract::authoring::SceneField),
     Compiled,
     ApproveCompiled,
@@ -477,6 +501,25 @@ impl ImagineApp {
             Event::Capabilities { epoch, result } => {
                 if epoch == self.timeline.epoch {
                     self.timeline_capabilities_reply(result);
+                }
+            }
+            Event::PrivateProjects { epoch, result } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline.private_projects.reply(result);
+                }
+            }
+            Event::Presets { epoch, result } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline.presets.reply(result);
+                }
+            }
+            Event::PresetPlan {
+                epoch,
+                project,
+                result,
+            } => {
+                if epoch == self.timeline.epoch {
+                    self.timeline_preset_planned(ctx, project, result);
                 }
             }
             Event::Preflight { epoch, key, result } => {
@@ -1030,6 +1073,12 @@ impl ImagineApp {
                 self.timeline.compatibility_open = true;
             }
             PostAction::GenerationSaved => self.timeline.generation_editor.project_saved(),
+            PostAction::Preset { key, target } => self.timeline_preset_plan(ctx, key, target),
+            PostAction::ProjectPresetApplied => {
+                if self.timeline.generation_editor.is_open() {
+                    self.timeline_open_generation();
+                }
+            }
             PostAction::Compiled => self.timeline_compiled(ctx),
             PostAction::ApproveCompiled => self.timeline_approve_compiled(ctx),
             PostAction::Library => self.timeline.library.open = true,
@@ -1085,7 +1134,7 @@ impl ImagineApp {
             }
             PostAction::Open => {
                 if !self.timeline_hold_replace(Replace::Open) {
-                    self.timeline_choose_folder(ctx, FolderMode::Open)
+                    self.timeline_open_project(ctx)
                 }
             }
             PostAction::SaveAs => self.timeline_choose_folder(ctx, FolderMode::SaveAs),
@@ -1248,7 +1297,7 @@ impl ImagineApp {
             if discard {
                 match replace {
                     Replace::New => self.timeline_new(ctx),
-                    Replace::Open => self.timeline_choose_folder(ctx, FolderMode::Open),
+                    Replace::Open => self.timeline_open_project(ctx),
                     Replace::Animate => self.animate_now(ctx),
                 }
             }

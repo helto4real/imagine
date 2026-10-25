@@ -507,6 +507,52 @@ generated and assembled 20-second videos.
   continuous shot with two cast references generated; the join is seamless and
   identities are consistent across scenes.
 
+### Scene presets (2026-10-25)
+
+MCP productions choose a named scene preset per scene instead of a bare
+variant. Presets live in `config/video-presets.yaml` (gitignored; tracked
+example `config/video-presets.example.yaml`; server flag `--video-presets`)
+and are read on each use, so edits apply without a restart. A preset has a
+readable `key`, a `variant` (reference or i2v), a `description`, `settings`
+overrides (model file and other components, sampling, shifts, reference
+quality, stage two) layered on the project's settings for that model, and
+`loras` with a `lora_merge` mode. `Default ref2v` and `Default i2v` are built
+in and keep today's behaviour. Capabilities, profile descriptions and bundles
+list presets (key, variant, description, availability; never file paths);
+invalid presets are listed with a reason. The production block takes
+`preset`; `model` alone means that variant's default preset. Dry runs block on
+missing model or LoRA files. Agents are told to use a non-default preset only
+when the user names it. A scene preset's LoRAs add to the project's global
+LoRAs unless its `lora_merge` says otherwise (default `Add To Global`).
+
+### Presets in the UI (2026-10-25)
+
+Implemented per [VIDEO-PRESETS-UI-DESIGN.md](VIDEO-PRESETS-UI-DESIGN.md).
+`GET /v1/video/presets` returns the full catalog for the local UI (settings,
+model and LoRA paths, merge mode, availability, file path and file problem).
+`POST /v1/video/projects/{id}/presets/plan` turns a preset into the edit batch
+for scenes or the project defaults with the same code as MCP; the UI submits it
+through the normal edit path, so it is one undo step and revision-checked.
+Scenes record the applied preset (`creative.scene_presets`, key and
+fingerprint); snapshots report `preset_states` (`applied` or `modified`). The
+scene inspector has a Preset dropdown (all selected scenes, Modified and
+Reapply), the Project generation window a Default preset dropdown (mode,
+project settings and global LoRAs), and the project menu a Video presets
+window with Reload.
+
+### Open private project window (2026-10-25)
+
+WP6 is implemented. `GET /v1/video/projects/private` lists saved projects in
+Imagine's private root (`projects/*`) and in the approved project roots (agent
+folders), newest first: path, folder, project ID, scene count, duration, first
+scene title, takes, deliveries, last saved time, source (`imagine` or `agent`)
+and whether a session has it open; unreadable folders are listed with an error
+code. Projects open in a session are summarized from memory; others are read
+read-only. In private storage mode, "Open project…" shows an "Open private
+project" window with this list; Open uses the existing location flow, and
+"Browse…" keeps the folder picker as a fallback. Names and titles are concealed
+in privacy mode.
+
 Remaining open points: request-body deserialization errors return only
 `invalid_request` without field detail (serde messages can echo user text);
 `video_run start` omits `reused` on a first start while assembly returns

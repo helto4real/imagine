@@ -94,7 +94,7 @@ async fn profiles() -> Result<Json<Value>, Fault> {
 }
 /// One profile exactly as requested, never a fallback, with the agent
 /// guidance and planning limits.
-async fn profile(Path(id): Path<String>) -> Result<Json<Value>, Fault> {
+async fn profile(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Fault> {
     let catalog = catalog()?;
     let profile = catalog
         .profiles
@@ -102,8 +102,16 @@ async fn profile(Path(id): Path<String>) -> Result<Json<Value>, Fault> {
         .find(|p| p.id == id)
         .ok_or(Fault::new(404, "profile_not_found"))?;
     Ok(Json(
-        json!({"profile":profile,"agent_guidance":AGENT_GUIDANCE,"limits":steps::limits()}),
+        json!({"profile":profile,"agent_guidance":AGENT_GUIDANCE,"limits":limits(&app).await}),
     ))
+}
+/// Limits with the current preset catalog.
+async fn limits(app: &App) -> Value {
+    let service = app.video.lock().await;
+    crate::video::presets::limits(
+        service.video_presets.as_deref(),
+        service.h3_model_root.as_deref(),
+    )
 }
 async fn registry(app: &App) -> std::sync::Arc<super::super::authoring::drafts::Service> {
     app.video.lock().await.authoring.clone()
@@ -142,6 +150,7 @@ async fn start(
     let mut value = json!(draft);
     if external {
         value["bundle"] = authoring.bundle(&draft.id, &identities)?;
+        value["bundle"]["limits"] = limits(&app).await;
     }
     Ok((StatusCode::ACCEPTED, Json(value)))
 }
@@ -163,8 +172,13 @@ async fn bundle(State(app): State<App>, Path(id): Path<String>) -> Result<Json<V
     }
     let session = service.projects.session(&draft.project_id)?;
     let identities = Grounding::identities(session, &draft.request).map_err(media_error)?;
+    let mut bundle = service.authoring.bundle(&id, &identities)?;
+    bundle["limits"] = crate::video::presets::limits(
+        service.video_presets.as_deref(),
+        service.h3_model_root.as_deref(),
+    );
     Ok(Json(
-        json!({"draft_id":draft.id,"phase":draft.phase,"bundle":service.authoring.bundle(&id, &identities)?}),
+        json!({"draft_id":draft.id,"phase":draft.phase,"bundle":bundle}),
     ))
 }
 async fn read(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Fault> {
@@ -284,8 +298,9 @@ fn finish(
     draft: Draft,
     dry_run: bool,
 ) -> Result<Json<Value>, Located> {
-    engine::production(current, &draft).map_err(steps::Rejection::from)?;
-    let plan = engine::apply(current, &draft).map_err(|code| match code {
+    let presets = crate::video::presets::Catalog::load(service.video_presets.as_deref());
+    engine::production(current, &draft, &presets).map_err(steps::Rejection::from)?;
+    let plan = engine::apply(current, &draft, &presets).map_err(|code| match code {
         "authoring_revision_conflict" => Fault::new(409, code).into(),
         // The Story's timing and image bindings come from the outline.
         _ if code.starts_with("story_") || code == "invalid_story_duration" => {
@@ -358,6 +373,12 @@ fn finish(
                     }
                 }
                 let mut blockers = super::super::execution::preflight(&candidate, &scene.id);
+                // A preset's model or LoRA files must exist where the worker looks.
+                if let Some(root) = &service.h3_model_root
+                    && !super::super::model_files::missing(&candidate, scene, root).is_empty()
+                {
+                    blockers.push("h3_model_file_missing".into());
+                }
                 // A continuous sequence planned before rendering waits for its
                 // source take; admission checks it.
                 if let Some(continuity) = &scene.continuity
@@ -374,7 +395,16 @@ fn finish(
                     .get(i)
                     .and_then(Option::as_ref)
                     .map(|s| s.boundary_from_previous.as_str());
-                Ok(json!({"ordinal":i+1,"model":model,"boundary":boundary,"continuity":scene.continuity,"planned_seconds":scene.duration.num as f64/scene.duration.den as f64,"blockers":blockers}))
+                let preset = draft
+                    .production
+                    .as_ref()
+                    .and_then(|p| p.scenes.get(i))
+                    .map(|choice| {
+                        choice.preset.clone().unwrap_or_else(|| {
+                            crate::video::presets::default_key(model).to_owned()
+                        })
+                    });
+                Ok(json!({"ordinal":i+1,"preset":preset,"model":model,"boundary":boundary,"continuity":scene.continuity,"planned_seconds":scene.duration.num as f64/scene.duration.den as f64,"blockers":blockers}))
             })
             .collect::<Result<Vec<_>, Issue>>()?;
         let valid = scenes.iter().all(|s| s["blockers"] == json!([]));

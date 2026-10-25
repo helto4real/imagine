@@ -67,6 +67,8 @@ fn catalog_is_nested_sorted_extension_neutral_and_does_not_parse_files() {
         vec![("a/deeper/model.bin", 3), ("a/empty", 0), ("z.odd", 12)]
     );
     assert!(found.warnings.is_empty());
+    // The folder the names are relative to, for the local UI's file picker.
+    assert_eq!(found.root.as_deref(), root.to_str());
     assert_eq!(found, catalog::scan(&root).unwrap());
 }
 #[test]

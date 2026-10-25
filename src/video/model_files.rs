@@ -44,12 +44,12 @@ pub fn selected(project: &VideoProject, scene: &Scene) -> Vec<String> {
         &project.creative.h3_loras.clone().unwrap_or_default(),
         project.creative.scene_loras.get(&scene.id),
     );
-    files.extend(
-        loras
-            .active()
-            .into_iter()
-            .map(|row| format!("loras/{}", row.name)),
-    );
+    files.extend(loras.active().into_iter().map(|row| {
+        Path::new("loras")
+            .join(&row.name)
+            .to_string_lossy()
+            .into_owned()
+    }));
     files.retain(|f| !f.trim().is_empty());
     let mut seen = std::collections::BTreeSet::new();
     files.retain(|f| seen.insert(f.clone()));
@@ -145,6 +145,13 @@ mod tests {
         assert_eq!(missing(&p, &scene, root.path()).len(), 1);
         std::fs::create_dir_all(absolute.parent().unwrap()).unwrap();
         std::fs::write(&absolute, b"own").unwrap();
+        assert!(missing(&p, &scene, root.path()).is_empty());
+        // So is an absolute LoRA file, as the worker loads it.
+        let lora = root.path().join("elsewhere/own-picked.safetensors");
+        p.creative.h3_loras.as_mut().unwrap().loras[0].name = lora.to_string_lossy().into_owned();
+        assert_eq!(missing(&p, &scene, root.path()), [lora.to_string_lossy()]);
+        std::fs::create_dir_all(lora.parent().unwrap()).unwrap();
+        std::fs::write(&lora, b"own").unwrap();
         assert!(missing(&p, &scene, root.path()).is_empty());
     }
     #[test]

@@ -269,6 +269,7 @@ pub fn apply(project: &mut VideoProject, request: EditRequest) -> Result<(), Iss
                 candidate.creative.scene_loras.remove(&scene_id);
                 candidate.creative.scene_kinds.remove(&scene_id);
                 candidate.creative.scene_prompts.remove(&scene_id);
+                candidate.creative.scene_presets.remove(&scene_id);
                 let removed = scene(&mut candidate, &scene_id)?
                     .sections
                     .iter()

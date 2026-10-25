@@ -316,9 +316,16 @@ async fn external_bundle_matches_the_provider_path_and_submission_parses_identic
         .unwrap();
     let plan = |id: &str| {
         let draft = service.authoring.read(id).unwrap();
-        serde_json::to_string(&engine::apply(&current, &draft).unwrap())
-            .unwrap()
-            .replace(id, "<draft>")
+        serde_json::to_string(
+            &engine::apply(
+                &current,
+                &draft,
+                &imagine_server::video::presets::Catalog::builtin(),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+        .replace(id, "<draft>")
     };
     assert_eq!(plan(id), plan(ready["id"].as_str().unwrap()));
     drop(service);
@@ -969,7 +976,11 @@ async fn capabilities_report_the_authoring_limits_and_continuity_table() {
             "supported_boundaries":["hard_cut","continuous_shot"],
             "continuity":{
                 "reference":{"methods":["combo","influence","motion_context","motion_context_exp"],"auto":"motion_context_exp"},
-                "i2v":{"methods":["last_frame_first_frame"],"auto":"last_frame_first_frame"}}})
+                "i2v":{"methods":["last_frame_first_frame"],"auto":"last_frame_first_frame"}},
+            "presets":[
+                {"key":"Default ref2v","variant":"reference","description":"Standard MiniMax H3 reference-to-video","default":true,"available":true,"problem":null},
+                {"key":"Default i2v","variant":"i2v","description":"Standard MiniMax H3 image-to-video","default":true,"available":true,"problem":null}],
+            "presets_problem":null})
     );
     assert_eq!(
         capabilities["authoring"]["max_scene_seconds"],
@@ -1038,5 +1049,301 @@ async fn dry_run_warns_when_an_i2v_scene_names_cast_and_reports_boundaries() {
             "hard_cut"
         ]
     );
+    stop(h).await;
+}
+#[tokio::test]
+async fn presets_apply_their_model_file_settings_and_loras_and_errors_name_the_scene() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "external-presets").await;
+    let presets = root.path().join("video-presets.yaml");
+    std::fs::write(
+        &presets,
+        "schema_version: 1\npresets:\n  - key: Own tuned ref2v\n    variant: reference\n    description: Own fine-tune\n    settings:\n      components:\n        model: diffusion_models/own_tuned.safetensors\n      stage_one:\n        steps: 24\n    loras:\n      - name: h3/own_style.safetensors\n        strength_model: 0.8\n  - key: Own broken\n    variant: reference\n    settings:\n      stage_one:\n        steps: 0\n",
+    )
+    .unwrap();
+    h.control.video.lock().await.video_presets = Some(presets);
+    let (code, capabilities) = call(&h, "GET", "/v1/video/capabilities", None).await;
+    assert_eq!(code, 200, "{capabilities}");
+    let listed = capabilities["authoring"]["presets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| {
+            (
+                p["key"].as_str().unwrap(),
+                p["available"].as_bool().unwrap(),
+                p["problem"].clone(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        listed,
+        vec![
+            ("Default ref2v", true, Value::Null),
+            ("Default i2v", true, Value::Null),
+            ("Own tuned ref2v", true, Value::Null),
+            ("Own broken", false, json!("preset_settings_invalid")),
+        ]
+    );
+    assert!(!capabilities.to_string().contains("safetensors"));
+    let (project, images) = production_project(&h).await;
+    let mut request = external(&h, &project, "nsfw").await;
+    request["images"] = images;
+    request["duration_seconds"] = json!(25);
+    let d = start(&h, &project, request).await;
+    let id = d["id"].as_str().unwrap();
+    let revision = project_revision(&h, &project).await;
+    let (outline, expansions) = story();
+    let mut scenes = planned()["scenes"].as_array().unwrap().clone();
+    scenes[0] = json!({"preset":"Own tuned ref2v","continuity":null,"rationale":"Own note"});
+    scenes[1]["preset"] = json!("Default i2v");
+    let production = |scenes: &[Value]| json!({"scenes":scenes});
+    for (scene, code) in [
+        (json!({"preset":"Own missing"}), "preset_unknown"),
+        (json!({"preset":"Own broken"}), "preset_settings_invalid"),
+        (
+            json!({"preset":"Own tuned ref2v","model":"i2v"}),
+            "production_preset_variant_mismatch",
+        ),
+        (json!({"rationale":"Own note"}), "production_model_required"),
+    ] {
+        let mut wrong = scenes.clone();
+        wrong[0] = scene;
+        let (status, error) = submit(
+            &h,
+            id,
+            body(&outline, &expansions, production(&wrong), &revision),
+        )
+        .await;
+        assert_eq!(status, 422, "{error}");
+        assert_eq!(error["error"]["code"], code);
+        assert_eq!(error["error"]["at"], "production.scenes[0]");
+    }
+    let (code, report) = submit(
+        &h,
+        id,
+        body(&outline, &expansions, production(&scenes), &revision),
+    )
+    .await;
+    assert_eq!(code, 200, "{report}");
+    let reported = report["scenes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["preset"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        reported,
+        [
+            "Own tuned ref2v",
+            "Default i2v",
+            "Default i2v",
+            "Default ref2v",
+            "Default ref2v"
+        ]
+    );
+    let mut commit = body(&outline, &expansions, production(&scenes), &revision);
+    commit["dry_run"] = json!(false);
+    let (code, applied) = submit(&h, id, commit).await;
+    assert_eq!(code, 200, "{applied}");
+    let scenes = applied["project"]["scenes"].as_array().unwrap();
+    let tuned = &scenes[0];
+    assert_eq!(tuned["model"], "project_default");
+    let values = &tuned["settings"][0]["values"];
+    assert_eq!(
+        values["components"]["model"],
+        "diffusion_models/own_tuned.safetensors"
+    );
+    assert_eq!(values["stage_one"]["steps"], 24);
+    // Unnamed values keep the project's settings for that model.
+    assert_eq!(values["stage_one"]["sampler"], "res_multistep");
+    let loras = &applied["project"]["creative"]["scene_loras"][tuned["id"].as_str().unwrap()];
+    assert_eq!(loras["merge_mode"], "Add To Global");
+    // MCP records the preset with the same fingerprint the UI would.
+    assert_eq!(
+        applied["project"]["creative"]["scene_presets"][tuned["id"].as_str().unwrap()]["key"],
+        "Own tuned ref2v"
+    );
+    let (_, snapshot) = call(&h, "GET", &format!("/v1/video/projects/{project}"), None).await;
+    for scene in scenes {
+        assert_eq!(
+            snapshot["preset_states"][scene["id"].as_str().unwrap()],
+            "applied",
+            "{snapshot}"
+        );
+    }
+    assert_eq!(
+        loras["main"]["loras"][0]["name"],
+        "h3/own_style.safetensors"
+    );
+    // Default presets keep today's behaviour: no own settings slot or LoRAs.
+    assert_eq!(scenes[1]["model"]["override"]["variant"], "i2v");
+    assert_eq!(scenes[1]["settings"], json!([]));
+    assert!(
+        applied["project"]["creative"]["scene_loras"][scenes[3]["id"].as_str().unwrap()].is_null()
+    );
+    stop(h).await;
+}
+#[tokio::test]
+async fn ui_presets_plan_undoable_edits_track_modification_and_set_project_defaults() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "ui-presets").await;
+    let presets = root.path().join("video-presets.yaml");
+    std::fs::write(
+        &presets,
+        "schema_version: 1\npresets:\n  - key: Own tuned ref2v\n    variant: reference\n    settings:\n      components:\n        model: diffusion_models/own_tuned.safetensors\n      stage_one:\n        steps: 24\n    loras:\n      - name: h3/own_style.safetensors\n        strength_model: 0.8\n",
+    )
+    .unwrap();
+    h.control.video.lock().await.video_presets = Some(presets);
+    let (_, catalog) = call(&h, "GET", "/v1/video/presets", None).await;
+    let tuned = catalog["presets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["key"] == "Own tuned ref2v")
+        .unwrap()
+        .clone();
+    assert_eq!(
+        tuned["settings"]["components"]["model"],
+        "diffusion_models/own_tuned.safetensors"
+    );
+    assert_eq!(tuned["lora_merge"], "Add To Global");
+    let (project, _) = production_project(&h).await;
+    let path = format!("/v1/video/projects/{project}");
+    // Two scenes to apply the preset to.
+    let (_, snapshot) = call(&h, "GET", &path, None).await;
+    let revision = snapshot["project"]["project_revision"].clone();
+    let add = |id: &str, start: u64| {
+        json!({"operation":"add_scene","scene":{"id":id,"start":{"num":start,"den":1},"duration":{"num":5,"den":1},
+            "description":"Own scene","model":"project_default","settings":[],"sections":[{"id":format!("{id}_s"),"start":{"num":0,"den":1},"duration":{"num":5,"den":1},"prompt":"Own beat"}],
+            "bindings":[],"continuity":null,"accepted_take":null}})
+    };
+    let (code, added) = call(&h, "POST", &format!("{path}/edits"),
+        Some(json!({"schema_version":1,"expected_project_revision":revision,"commands":[add("own_a",0),add("own_b",5)]}))).await;
+    assert_eq!(code, 200, "{added}");
+    let plan_path = format!("{path}/presets/plan");
+    let plan = |body: Value| call(&h, "POST", &plan_path, Some(body));
+    let revision = added["project"]["project_revision"].clone();
+    let (code, request) = plan(
+        json!({"schema_version":1,"expected_project_revision":revision,
+        "preset":"Own tuned ref2v","scenes":["own_a","own_b"]}),
+    )
+    .await;
+    assert_eq!(code, 200, "{request}");
+    // Planning changes nothing; the UI submits the batch through the edit path.
+    let (_, unchanged) = call(&h, "GET", &path, None).await;
+    assert_eq!(unchanged["project"]["project_revision"], revision);
+    let (code, applied) = call(&h, "POST", &format!("{path}/edits"), Some(request)).await;
+    assert_eq!(code, 200, "{applied}");
+    for id in ["own_a", "own_b"] {
+        assert_eq!(applied["preset_states"][id], "applied", "{applied}");
+        let scene = applied["project"]["scenes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["id"] == id)
+            .unwrap();
+        assert_eq!(scene["settings"][0]["values"]["stage_one"]["steps"], 24);
+        assert_eq!(
+            applied["project"]["creative"]["scene_loras"][id]["merge_mode"],
+            "Add To Global"
+        );
+    }
+    // Changing a scene's settings by hand marks it Modified; Reapply restores it.
+    let mut slot = applied["project"]["scenes"][applied["project"]["scenes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .position(|s| s["id"] == "own_a")
+        .unwrap()]["settings"][0]
+        .clone();
+    slot["values"]["stage_one"]["steps"] = json!(30);
+    let (code, edited) = call(&h, "POST", &format!("{path}/edits"),
+        Some(json!({"schema_version":1,"expected_project_revision":applied["project"]["project_revision"],
+            "commands":[{"operation":"set_model_settings","scene_id":"own_a","settings":slot}]}))).await;
+    assert_eq!(code, 200, "{edited}");
+    assert_eq!(edited["preset_states"]["own_a"], "modified");
+    assert_eq!(edited["preset_states"]["own_b"], "applied");
+    let (_, reapply) = plan(
+        json!({"schema_version":1,"expected_project_revision":edited["project"]["project_revision"],
+        "preset":"Own tuned ref2v","scenes":["own_a"]}),
+    )
+    .await;
+    let (_, restored) = call(&h, "POST", &format!("{path}/edits"), Some(reapply)).await;
+    assert_eq!(restored["preset_states"]["own_a"], "applied");
+    // A default preset inherits project settings and drops the scene LoRAs.
+    let (_, default) = plan(json!({"schema_version":1,"expected_project_revision":restored["project"]["project_revision"],
+        "preset":"Default ref2v","scenes":["own_b"]})).await;
+    let (_, plain) = call(&h, "POST", &format!("{path}/edits"), Some(default)).await;
+    let b = plain["project"]["scenes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == "own_b")
+        .unwrap();
+    assert_eq!(b["settings"], json!([]));
+    assert!(
+        plain["project"]["creative"]["scene_loras"]
+            .get("own_b")
+            .is_none()
+    );
+    assert_eq!(
+        plain["project"]["creative"]["scene_presets"]["own_b"]["key"],
+        "Default ref2v"
+    );
+    // Project defaults: mode, the project's settings for it, and the global LoRAs.
+    let (_, request) = plan(
+        json!({"schema_version":1,"expected_project_revision":plain["project"]["project_revision"],
+        "preset":"Own tuned ref2v","project":true}),
+    )
+    .await;
+    let (code, defaults) = call(&h, "POST", &format!("{path}/edits"), Some(request)).await;
+    assert_eq!(code, 200, "{defaults}");
+    let slot = defaults["project"]["generation"]["settings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["model"]["variant"] == "reference")
+        .unwrap()
+        .clone();
+    assert_eq!(
+        slot["values"]["components"]["model"],
+        "diffusion_models/own_tuned.safetensors"
+    );
+    assert_eq!(
+        defaults["project"]["creative"]["h3_loras"]["loras"][0]["name"],
+        "h3/own_style.safetensors"
+    );
+    // Errors.
+    let revision = defaults["project"]["project_revision"].clone();
+    for (body, status, code) in [
+        (
+            json!({"schema_version":1,"expected_project_revision":revision,"preset":"Own missing","scenes":["own_a"]}),
+            404,
+            "preset_unknown",
+        ),
+        (
+            json!({"schema_version":1,"expected_project_revision":0,"preset":"Default ref2v","scenes":["own_a"]}),
+            409,
+            "revision_conflict",
+        ),
+        (
+            json!({"schema_version":1,"expected_project_revision":revision,"preset":"Default ref2v"}),
+            422,
+            "invalid_request",
+        ),
+        (
+            json!({"schema_version":1,"expected_project_revision":revision,"preset":"Default ref2v","scenes":["own_missing"]}),
+            422,
+            "scene_not_found",
+        ),
+    ] {
+        let (got, error) = plan(body).await;
+        assert_eq!(
+            (got, error["error"]["code"].as_str().unwrap()),
+            (status, code),
+            "{error}"
+        );
+    }
     stop(h).await;
 }

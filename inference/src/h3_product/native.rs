@@ -238,6 +238,34 @@ fn budget(role: Component, shape: p::Shape) -> f64 {
         }
     }
 }
+/// ComfyUI full checkpoints prefix every diffusion-model key; the H3
+/// constructors use the bare names.
+const DIFFUSION_PREFIX: &str = "model.diffusion_model.";
+fn prepare(
+    rt: &Runtime,
+    role: Component,
+    state: &component::ComponentState,
+) -> NResult<PreparedParameters> {
+    if role == Component::Dit
+        && let V::Dict(weights) = state.weights.snapshot()?
+        && !weights.is_empty()
+        && weights
+            .iter()
+            .all(|(name, _)| name.starts_with(DIFFUSION_PREFIX))
+    {
+        let tensors = weights
+            .into_iter()
+            .map(|(name, value)| {
+                Ok((
+                    name[DIFFUSION_PREFIX.len()..].to_owned(),
+                    value.as_tensor()?,
+                ))
+            })
+            .collect::<NResult<BTreeMap<_, _>>>()?;
+        return h3::checkpoint::prepare(rt, role, tensors);
+    }
+    h3::checkpoint::prepare_normalized(rt, role, state)
+}
 fn component<T>(
     rt: &Runtime,
     aimdo: &Aimdo,
@@ -260,7 +288,7 @@ fn component<T>(
                     &StorageAnnotations::default(),
                 )
             }?;
-            let parameters = h3::checkpoint::prepare_normalized(rt, role, &state)?;
+            let parameters = prepare(rt, role, &state)?;
             crate::checkpoint::dynamic::prepare_text(
                 rt,
                 aimdo.path(),
@@ -307,7 +335,7 @@ fn component<T>(
         let state = unsafe {
             component::load_aimdo(rt, aimdo, &path, &Options::Atom(V::None), &annotations)
         }?;
-        let parameters = h3::checkpoint::prepare_normalized(rt, role, &state)?;
+        let parameters = prepare(rt, role, &state)?;
         let sampling =
             h3::sampling::schedule(rt, models.options.shift_video, models.options.shift_audio)?;
         let auxiliary = if role == Component::Dit {
@@ -939,10 +967,13 @@ impl Generator for Native {
                     id: request.id.clone(),
                     code: "fast_preview_failed".into(),
                 },
-                Notice::Phase(phase) => Event::Phase {
-                    id: request.id.clone(),
-                    phase,
-                },
+                Notice::Phase(phase) => {
+                    wire::stage(phase.into());
+                    Event::Phase {
+                        id: request.id.clone(),
+                        phase,
+                    }
+                }
                 Notice::Step(report) => Event::Progress {
                     id: request.id.clone(),
                     completed: report.completed,

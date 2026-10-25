@@ -147,6 +147,8 @@ pub fn project(source: &ProjectDocument) -> Result<(ProjectDocument, Report), St
         active
     });
     copy.project.creative.scene_kinds.clear();
+    // Preset provenance is a newer field; the scene settings it describes remain.
+    copy.project.creative.scene_presets.clear();
     copy.project.creative.h3_loras = None;
     copy.project.creative.scene_loras.clear();
     for scene in &mut copy.project.scenes {

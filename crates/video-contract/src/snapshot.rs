@@ -100,6 +100,7 @@ pub struct SnapshotView {
     pub resources: Vec<ResourceView>,
     pub storage_layout: Option<u32>,
     pub authoring: Vec<crate::authoring::Draft>,
+    pub preset_states: BTreeMap<SceneId, crate::creative::PresetState>,
 }
 /// A full snapshot response with its validated project.
 pub fn parse(raw: &Value) -> Option<(VideoProject, SnapshotView)> {

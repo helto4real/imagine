@@ -110,6 +110,7 @@ pub fn scan(root: &Path) -> Result<Catalog, Error> {
     catalog.files.sort_by(|a, b| a.file.cmp(&b.file));
     catalog.warnings.sort();
     catalog.warnings.dedup();
+    catalog.root = Some(root.to_string_lossy().into_owned());
     Ok(catalog)
 }
 

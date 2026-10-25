@@ -141,6 +141,8 @@ pub fn expansion(text: &str, source: &StoryScene) -> Result<StoryScene> {
 pub struct Planned {
     /// None keeps the project default.
     pub model: Option<ModelSelection>,
+    /// The scene's preset; none on the provider path without a production block.
+    pub preset: Option<crate::video::presets::Preset>,
     pub i2v: bool,
     pub continuity: Option<(ContinuityMethod, bool)>,
 }
@@ -156,6 +158,7 @@ pub struct Misplaced {
 pub fn production(
     base: &VideoProject,
     draft: &Draft,
+    presets: &crate::video::presets::Catalog,
 ) -> std::result::Result<Vec<Planned>, Misplaced> {
     let misplaced = |code, scene, section| Misplaced {
         code,
@@ -182,6 +185,7 @@ pub fn production(
             .iter()
             .map(|s| Planned {
                 model: None,
+                preset: None,
                 i2v: false,
                 continuity: (s.boundary_from_previous == "continuous_shot")
                     .then_some((ContinuityMethod::MotionContextExp, false)),
@@ -195,9 +199,25 @@ pub fn production(
     let mut out = vec![];
     for (i, (scene, choice)) in scenes.iter().zip(&production.scenes).enumerate() {
         let at = |code, section| misplaced(code, Some(i), section);
+        let preset = match (&choice.preset, choice.model) {
+            (Some(key), model) => {
+                let preset = presets.get(key).ok_or(at("preset_unknown", None))?;
+                if let Some(code) = preset.problem {
+                    return Err(at(code, None));
+                }
+                if model.is_some_and(|m| m.variant() != preset.variant) {
+                    return Err(at("production_preset_variant_mismatch", None));
+                }
+                preset
+            }
+            (None, Some(model)) => presets
+                .get(crate::video::presets::default_key(model.variant()))
+                .ok_or(at("preset_unknown", None))?,
+            (None, None) => return Err(at("production_model_required", None)),
+        };
         let (model, capabilities) = variants
             .iter()
-            .find(|(m, _)| m.variant == choice.model.variant())
+            .find(|(m, _)| m.variant == preset.variant)
             .ok_or(at("scene_runtime_unsupported", None))?;
         let i2v = model.variant == "i2v";
         let continuity = match (&choice.continuity, scene.boundary_from_previous.as_str()) {
@@ -247,6 +267,7 @@ pub fn production(
         }
         out.push(Planned {
             model: (model != &base.default_model).then(|| model.clone()),
+            preset: Some(preset.clone()),
             i2v,
             continuity,
         });
@@ -263,7 +284,11 @@ fn time(seconds: f64) -> Time {
 fn seconds(t: Time) -> f64 {
     t.num as f64 / t.den as f64
 }
-pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
+pub fn apply(
+    base: &VideoProject,
+    draft: &Draft,
+    presets: &crate::video::presets::Catalog,
+) -> Result<EditRequest> {
     if draft.phase != Phase::Review
         || base.id != draft.project_id
         || base.project_revision != draft.request.expected_project_revision
@@ -368,7 +393,7 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
             });
         }
         Operation::Outline => {
-            let planned = production(base, draft).map_err(|m| m.code)?;
+            let planned = production(base, draft, presets).map_err(|m| m.code)?;
             let scenes = draft
                 .scenes
                 .iter()
@@ -546,6 +571,21 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                     },
                 );
                 let description = scene.description.clone();
+                // The same scene change the UI applies; recorded for Modified detection.
+                let change = plan
+                    .preset
+                    .as_ref()
+                    .map(|preset| preset.scene_change(base))
+                    .transpose()?;
+                let preset_settings = change.as_ref().and_then(|c| c.settings.clone());
+                if let (Some(change), Some(preset)) = (&change, &plan.preset) {
+                    if let Some(loras) = &change.loras {
+                        creative.scene_loras.insert(id.clone(), loras.clone());
+                    }
+                    creative
+                        .scene_presets
+                        .insert(id.clone(), change.applied(&preset.key));
+                }
                 commands.push(Edit::AddScene {
                     scene: Box::new(Scene {
                         id: id.clone(),
@@ -560,26 +600,31 @@ pub fn apply(base: &VideoProject, draft: &Draft) -> Result<EditRequest> {
                             .model
                             .clone()
                             .map_or(ModelChoice::ProjectDefault, ModelChoice::Override),
-                        settings: base
-                            .scenes
-                            .iter()
-                            .find(|s| Some(&s.id) == request.scene_id.as_ref())
-                            .or_else(|| base.scenes.first())
-                            .map(|s| {
-                                s.settings
-                                    .iter()
-                                    .filter(|slot| slot.model == base.default_model)
-                                    .cloned()
-                                    .collect()
-                            })
-                            .unwrap_or_default(),
+                        settings: match (&preset_settings, &change) {
+                            (Some(slot), _) => vec![slot.clone()],
+                            // A preset without settings inherits the project's settings.
+                            (None, Some(_)) => vec![],
+                            (None, None) => base
+                                .scenes
+                                .iter()
+                                .find(|s| Some(&s.id) == request.scene_id.as_ref())
+                                .or_else(|| base.scenes.first())
+                                .map(|s| {
+                                    s.settings
+                                        .iter()
+                                        .filter(|slot| slot.model == base.default_model)
+                                        .cloned()
+                                        .collect()
+                                })
+                                .unwrap_or_default(),
+                        },
                         sections,
                         bindings,
                         continuity,
                         accepted_take: None,
                     }),
                 });
-                if let Some(model) = plan.model {
+                if let Some(model) = plan.model.filter(|_| preset_settings.is_none()) {
                     commands.push(Edit::InheritModelSettings {
                         scene_id: id.clone(),
                         model,

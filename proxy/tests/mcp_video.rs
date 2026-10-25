@@ -854,6 +854,7 @@ fn catalog_schemas_are_strict_objects() {
     assert!(instructions.contains("Do not open, render, visually inspect or analyze images"));
     assert!(instructions.contains("video_run start (the first and only GPU handover)"));
     assert!(instructions.contains("i2v only to animate one specific start image"));
+    assert!(instructions.contains("No music unless the user asks (add_music false)"));
 }
 #[tokio::test]
 async fn failed_run_names_the_scene_and_only_bounded_job_diagnostics() {

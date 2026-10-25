@@ -1016,6 +1016,15 @@ impl ProjectSession {
             .guard_private(root)?;
         Ok(session)
     }
+    /// The saved document of a private project folder, read without opening a
+    /// session; used to list projects.
+    pub fn peek_private(
+        root: &crate::private_storage::Root,
+        path: &Path,
+    ) -> Result<ProjectDocument, StorageError> {
+        Store::<ProjectDocument>::open_readonly(path, "project.json", root)
+            .map(|(_, document)| document)
+    }
     /// Explicitly selected older projects remain readable. Outside the private
     /// root they require Save As before edits; no file is moved or migrated.
     pub fn open_for_private(

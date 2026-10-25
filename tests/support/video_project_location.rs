@@ -381,3 +381,114 @@ async fn project_at_location_takes_a_canvas_preset_and_resolves_its_delivery_siz
     assert_eq!(capabilities["canvas"]["default"]["quality"], "Quick Draft");
     stop(h).await;
 }
+
+#[tokio::test]
+async fn private_projects_list_both_roots_newest_first_with_metadata_only() {
+    let directory = tempfile::tempdir().unwrap();
+    let (private, _) = private_volume(directory.path());
+    let inputs = directory.path().join("own-volume/own-inputs");
+    std::fs::create_dir(&inputs).unwrap();
+    let (private, _) = private.with_project_roots(std::slice::from_ref(&inputs));
+    let h = setup_private(&private).await;
+    // One project in Imagine's own private root, two agent folders.
+    let (status, own) = call(&h, "POST", "/v1/video/projects", Some(create())).await;
+    assert_eq!(status, 201, "{own}");
+    let mut agent = vec![];
+    for name in ["own-first", "own-second"] {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        let folder = inputs.join(name);
+        let (_, selected) = call(
+            &h,
+            "POST",
+            "/v1/video/locations",
+            Some(location(&folder, true)),
+        )
+        .await;
+        let (status, created) = located(&h, &selected["location_id"], Value::Null).await;
+        assert_eq!(status, 201, "{created}");
+        agent.push((folder, created["project"]["id"].clone()));
+    }
+    // A folder whose document is unreadable is reported, not skipped.
+    let broken = inputs.join("own-broken");
+    std::fs::create_dir(&broken).unwrap();
+    std::fs::write(broken.join("project.json"), b"{ not json").unwrap();
+    // Neither a folder without a document nor a stray file is listed.
+    std::fs::create_dir(inputs.join("own-empty")).unwrap();
+    std::fs::write(inputs.join("own-file.txt"), b"x").unwrap();
+    let (status, listed) = call(&h, "GET", "/v1/video/projects/private", None).await;
+    assert_eq!(status, 200, "{listed}");
+    let projects = listed["projects"].as_array().unwrap();
+    let folders = projects
+        .iter()
+        .map(|p| p["folder"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(folders.len(), 4, "{listed}");
+    assert!(folders.contains(&"own-broken"));
+    let second = projects
+        .iter()
+        .position(|p| p["folder"] == "own-second")
+        .unwrap();
+    let first = projects
+        .iter()
+        .position(|p| p["folder"] == "own-first")
+        .unwrap();
+    assert!(second < first, "newest first: {listed}");
+    let entry = &projects[second];
+    assert_eq!(entry["project_id"], agent[1].1);
+    assert_eq!(entry["path"], json!(agent[1].0));
+    assert_eq!(entry["source"], "agent");
+    assert_eq!(entry["open"], true);
+    assert_eq!(entry["scene_count"], 0);
+    let own_entry = projects
+        .iter()
+        .find(|p| p["project_id"] == own["project"]["id"])
+        .unwrap();
+    assert_eq!(own_entry["source"], "imagine");
+    let broken_entry = projects
+        .iter()
+        .find(|p| p["folder"] == "own-broken")
+        .unwrap();
+    assert_eq!(broken_entry["error"], "invalid_manifest");
+    assert!(broken_entry.get("project_id").is_none());
+    stop(h).await;
+    // After a restart nothing is open; projects are read from their documents.
+    let h = setup_private(&private).await;
+    let (_, listed) = call(&h, "GET", "/v1/video/projects/private", None).await;
+    let entry = listed["projects"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["folder"] == "own-first")
+        .unwrap()
+        .clone();
+    assert_eq!(entry["open"], false);
+    assert_eq!(entry["project_id"], agent[0].1);
+    // Opening a listed folder uses the existing location flow.
+    let (_, selected) = call(
+        &h,
+        "POST",
+        "/v1/video/locations",
+        Some(location(&agent[0].0, false)),
+    )
+    .await;
+    let (status, opened) = call(
+        &h,
+        "POST",
+        "/v1/video/projects/open",
+        Some(json!({"schema_version":1,"location_id":selected["location_id"]})),
+    )
+    .await;
+    assert_eq!(status, 200, "{opened}");
+    assert_eq!(opened["project"]["id"], agent[0].1);
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn private_projects_need_private_storage() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "own-no-private-list").await;
+    let (status, error) = call(&h, "GET", "/v1/video/projects/private", None).await;
+    assert_eq!(status, 422, "{error}");
+    assert_eq!(error["error"]["code"], "private_storage_required");
+    stop(h).await;
+}

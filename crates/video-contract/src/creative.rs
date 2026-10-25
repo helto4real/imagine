@@ -23,6 +23,87 @@ pub struct Creative {
     pub visual_references_enabled: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub global_prompt: Option<GlobalPromptOptions>,
+    /// The video preset each scene was last set to; see `AppliedPreset`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub scene_presets: BTreeMap<SceneId, AppliedPreset>,
+}
+/// A preset applied to a scene, and a fingerprint of the scene's mode, own
+/// settings slot and LoRA override right after applying it. A different
+/// fingerprint now means the scene was changed since.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AppliedPreset {
+    pub key: String,
+    pub fingerprint: String,
+}
+/// Whether a scene still has the values its applied preset gave it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PresetState {
+    Applied,
+    Modified,
+}
+/// Object keys sorted at every level, independent of map ordering features.
+fn canonical(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Object(map) => {
+            let mut entries = map.iter().collect::<Vec<_>>();
+            entries.sort_by(|a, b| a.0.cmp(b.0));
+            let fields = entries
+                .into_iter()
+                .map(|(k, v)| format!("{}:{}", serde_json::Value::String(k.clone()), canonical(v)))
+                .collect::<Vec<_>>();
+            format!("{{{}}}", fields.join(","))
+        }
+        serde_json::Value::Array(values) => {
+            format!(
+                "[{}]",
+                values.iter().map(canonical).collect::<Vec<_>>().join(",")
+            )
+        }
+        other => other.to_string(),
+    }
+}
+/// A scene's mode, own settings slot for that mode and LoRA override.
+pub fn preset_fingerprint(
+    model: &ModelChoice,
+    slot: Option<&serde_json::Value>,
+    loras: Option<&crate::loras::Override>,
+) -> String {
+    use sha2::{Digest, Sha256};
+    let value = serde_json::json!({"model":model,"settings":slot,"loras":loras});
+    format!("{:x}", Sha256::digest(canonical(&value).as_bytes()))[..16].into()
+}
+pub fn scene_preset_fingerprint(project: &VideoProject, scene: &Scene) -> String {
+    let model = project.effective_model(scene);
+    let slot = scene
+        .settings
+        .iter()
+        .find(|s| &s.model == model)
+        .map(|s| &s.values);
+    preset_fingerprint(
+        &scene.model,
+        slot,
+        project.creative.scene_loras.get(&scene.id),
+    )
+}
+pub fn preset_states(project: &VideoProject) -> BTreeMap<SceneId, PresetState> {
+    project
+        .creative
+        .scene_presets
+        .iter()
+        .filter_map(|(id, applied)| {
+            let scene = project.scenes.iter().find(|s| &s.id == id)?;
+            Some((
+                id.clone(),
+                if scene_preset_fingerprint(project, scene) == applied.fingerprint {
+                    PresetState::Applied
+                } else {
+                    PresetState::Modified
+                },
+            ))
+        })
+        .collect()
 }
 impl Creative {
     pub fn is_empty(&self) -> bool {
@@ -35,6 +116,7 @@ impl Creative {
             && self.scene_kinds.is_empty()
             && self.visual_references_enabled.is_none()
             && self.global_prompt.is_none()
+            && self.scene_presets.is_empty()
     }
 }
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

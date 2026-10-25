@@ -1052,6 +1052,13 @@
                 "type": "null"
               }
             ]
+          },
+          "scene_presets": {
+            "description": "The video preset each scene was last set to; see `AppliedPreset`.",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/AppliedPreset"
+            }
           }
         },
         "additionalProperties": false,
@@ -1692,6 +1699,23 @@
         "required": [
           "enabled",
           "position"
+        ]
+      },
+      "AppliedPreset": {
+        "description": "A preset applied to a scene, and a fingerprint of the scene's mode, own\nsettings slot and LoRA override right after applying it. A different\nfingerprint now means the scene was changed since.",
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "fingerprint"
         ]
       },
       "Intent": {
@@ -3422,6 +3446,13 @@
                 "type": "null"
               }
             ]
+          },
+          "scene_presets": {
+            "description": "The video preset each scene was last set to; see `AppliedPreset`.",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/$defs/AppliedPreset"
+            }
           }
         },
         "additionalProperties": false,
@@ -4039,6 +4070,23 @@
         "required": [
           "enabled",
           "position"
+        ]
+      },
+      "AppliedPreset": {
+        "description": "A preset applied to a scene, and a fingerprint of the scene's mode, own\nsettings slot and LoRA override right after applying it. A different\nfingerprint now means the scene was changed since.",
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "fingerprint": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "fingerprint"
         ]
       },
       "Asset": {

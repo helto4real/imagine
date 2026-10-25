@@ -108,6 +108,7 @@ impl State {
                 size: 1,
             }],
             warnings: vec![],
+            root: None,
         });
     }
     pub fn bind(&mut self, scope: Option<Scope>) {
@@ -435,18 +436,20 @@ fn all_entries(catalog: &Catalog) -> Vec<&Entry> {
         .filter(|entry| !entry.file.is_empty())
         .collect()
 }
-/// Popups paint in their own layer, so protect their contents independently.
+/// Popups paint in their own layer, so they protect their contents
+/// independently and reveal them while the pointer is over the list itself.
 pub(super) fn picker(
     ui: &mut egui::Ui,
     index: usize,
     name: &mut String,
     choices: Option<&Filter<'_>>,
-    hidden: bool,
+    privacy: bool,
 ) -> egui::Response {
     egui::ComboBox::from_id_salt("catalog-choice")
         .selected_text("Choose file…")
         .width((ui.available_width() - 64.).max(100.))
         .show_ui(ui, |ui| {
+            let hidden = !helto::reveal_in_viewport(ui, privacy);
             helto::private_scope(ui, hidden, |ui| {
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Wrap);
                 if let Some(choices) = choices {
@@ -486,6 +489,7 @@ mod tests {
             })
             .collect(),
             warnings: vec![],
+            root: None,
         }
     }
     fn scope(name: &str) -> Scope {
@@ -855,11 +859,13 @@ mod tests {
                 size: 1,
             }],
             warnings: vec![],
+            root: None,
         };
         let f = State::default().filtered(&c, "", &ctx);
         let mut name = String::new();
         let mut rect = egui::Rect::NOTHING;
-        let mut draw = |events: Vec<egui::Event>, hidden: bool| {
+        // As in the LoRA window: the window body follows its own hover.
+        let mut draw = |events: Vec<egui::Event>, privacy: bool| {
             let mut output = ctx.run_ui(
                 egui::RawInput {
                     screen_rect: Some(egui::Rect::from_min_size(
@@ -870,8 +876,9 @@ mod tests {
                     ..Default::default()
                 },
                 |ui| {
+                    let hidden = !helto::reveal_in_viewport(ui, privacy);
                     helto::private_scope(ui, hidden, |ui| {
-                        rect = picker(ui, 0, &mut name, Some(&f), hidden).rect;
+                        rect = picker(ui, 0, &mut name, Some(&f), privacy).rect;
                     });
                 },
             );
@@ -908,6 +915,7 @@ mod tests {
             visible.shapes.iter().any(|s| private_text(&s.shape)),
             "catalog popup did not open"
         );
+        // With the pointer on the dropdown button, the open list stays hidden.
         let concealed = draw(vec![], true);
         assert!(!concealed.shapes.iter().any(|s| private_text(&s.shape)));
         assert!(
@@ -923,5 +931,21 @@ mod tests {
                     .chain(node.label())
                     .any(|s| s.contains("PRIVATE_CHOICE")))
         );
+        // Moving onto the list reveals it, so a file can be chosen; this used
+        // to follow the window behind the list and hide it.
+        let choice = ctx
+            .data(|d| {
+                d.get_temp::<egui::Response>(egui::Id::new((
+                    "lora-test-control",
+                    "lora-0-choice-own/PRIVATE_CHOICE.weights",
+                )))
+            })
+            .unwrap()
+            .rect
+            .center();
+        draw(vec![egui::Event::PointerMoved(choice)], true);
+        let revealed = draw(vec![], true);
+        assert!(revealed.shapes.iter().any(|s| private_text(&s.shape)));
+        assert!(rect.is_positive());
     }
 }

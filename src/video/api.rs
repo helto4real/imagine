@@ -115,6 +115,9 @@ pub fn routes() -> Router<App> {
         .route("/v1/video/projects", post(create))
         .route("/v1/video/projects/at-location", post(create_at))
         .route("/v1/video/projects/open", post(open))
+        .route("/v1/video/projects/private", get(private_projects))
+        .route("/v1/video/presets", get(presets))
+        .route("/v1/video/projects/{id}/presets/plan", post(preset_plan))
         .route("/v1/video/projects/{id}", get(read))
         .route("/v1/video/projects/{id}/edits", post(edit))
         .route(
@@ -183,6 +186,11 @@ async fn waveform(
 }
 async fn capabilities(State(app): State<App>) -> Json<Value> {
     let available = crate::api::h3_available(&app);
+    let (presets, root) = {
+        let service = app.video.lock().await;
+        (service.video_presets.clone(), service.h3_model_root.clone())
+    };
+    let authoring = super::presets::limits(presets.as_deref(), root.as_deref());
     let models = super::adapters::h3::variants()
         .into_iter()
         .map(|(model, mut capabilities)| {
@@ -192,7 +200,7 @@ async fn capabilities(State(app): State<App>) -> Json<Value> {
         .collect::<Vec<_>>();
     Json(
         json!({"schema_version":1,"media":{"mime_types":media::MIME_TYPES,"max_upload_bytes":null,"streaming":true,"max_buffered_image_bytes":media::MAX_UPLOAD},
-        "project_operations":["create","create_at_location","read","edits","review","attach_asset","save","open","save_as","export_compatible","preflight"],"models":models,"authoring":super::authoring::steps::limits(),
+        "project_operations":["create","create_at_location","read","edits","review","attach_asset","save","open","save_as","export_compatible","preflight"],"models":models,"authoring":authoring,
         "canvas":{"ratios":crate::h3_protocol::geometry::RATIOS,"qualities":crate::h3_protocol::geometry::QUALITIES,"default":imagine_video_contract::generation::Canvas::default()}}),
     )
 }
@@ -517,6 +525,144 @@ async fn open(
     .map_err(internal)??;
     let mut service = app.video.lock().await;
     register_project(&app, &mut service, project).await
+}
+async fn presets(State(app): State<App>) -> Json<Value> {
+    let service = app.video.lock().await;
+    Json(super::presets::details(
+        service.video_presets.as_deref(),
+        service.h3_model_root.as_deref(),
+    ))
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PresetPlan {
+    schema_version: u32,
+    expected_project_revision: u64,
+    preset: String,
+    #[serde(default)]
+    scenes: Vec<SceneId>,
+    #[serde(default)]
+    project: bool,
+}
+/// The edit batch that applies a preset to scenes or to the project defaults.
+/// The UI submits it through its normal, undoable edit path.
+async fn preset_plan(
+    State(app): State<App>,
+    Path(id): Path<String>,
+    body: Result<Json<PresetPlan>, JsonRejection>,
+) -> Result<Json<Value>, Error> {
+    let request = input(body)?;
+    schema(request.schema_version)?;
+    let invalid = |code| Error::new(StatusCode::UNPROCESSABLE_ENTITY, code);
+    if request.project != request.scenes.is_empty() {
+        return Err(invalid("invalid_request"));
+    }
+    let service = app.video.lock().await;
+    let project = service.projects.read(&ProjectId(id))?;
+    if project.project_revision != request.expected_project_revision {
+        return Err(Error::new(StatusCode::CONFLICT, "revision_conflict"));
+    }
+    let catalog = super::presets::Catalog::load(service.video_presets.as_deref());
+    let preset = catalog
+        .get(&request.preset)
+        .ok_or_else(|| Error::new(StatusCode::NOT_FOUND, "preset_unknown"))?;
+    if let Some(code) = preset.problem {
+        return Err(invalid(code));
+    }
+    let commands = if request.project {
+        preset.project_edits(&project)
+    } else {
+        preset.scene_edits(&project, &request.scenes)
+    }
+    .map_err(invalid)?;
+    Ok(Json(json!(EditRequest {
+        schema_version: 1,
+        expected_project_revision: project.project_revision,
+        commands,
+    })))
+}
+/// Metadata only: never prompts, descriptions, media or resource paths.
+fn project_summary(document: &ProjectDocument) -> Value {
+    let project = &document.project;
+    let end = project
+        .scenes
+        .iter()
+        .map(|s| {
+            (s.start.num as f64 / s.start.den as f64)
+                + s.duration.num as f64 / s.duration.den as f64
+        })
+        .fold(0., f64::max);
+    let title = project
+        .scenes
+        .first()
+        .and_then(|s| project.creative.scene_prompts.get(&s.id))
+        .map(|p| p.title.clone())
+        .filter(|t| !t.trim().is_empty());
+    json!({"project_id":project.id,"scene_count":project.scenes.len(),"duration_seconds":end,
+        "first_scene_title":title,"takes":document.takes.len(),"deliveries":document.deliveries.len()})
+}
+/// Saved projects in Imagine's private root and in the approved project roots
+/// (the folders agents create through MCP), newest first.
+async fn private_projects(State(app): State<App>) -> Result<Json<Value>, Error> {
+    let root = app
+        .store
+        .private_root()
+        .cloned()
+        .ok_or_else(|| media_error("private_storage_required"))?;
+    let live = {
+        let service = app.video.lock().await;
+        service
+            .projects
+            .located()
+            .into_iter()
+            .map(|(path, document)| (path, project_summary(document)))
+            .collect::<Vec<_>>()
+    };
+    let projects = tokio::task::spawn_blocking(move || {
+        let roots = std::iter::once((root.layout().root().join("projects"), "imagine"))
+            .chain(root.project_roots().iter().map(|r| (r.clone(), "agent")));
+        let mut found = vec![];
+        for (parent, source) in roots {
+            let Ok(entries) = std::fs::read_dir(&parent) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                // Real folders on the verified volume that hold a project document.
+                let document = path.join("project.json");
+                if !entry.file_type().is_ok_and(|t| t.is_dir())
+                    || !std::fs::symlink_metadata(&document).is_ok_and(|m| m.is_file())
+                    || !root.allows(&path)
+                {
+                    continue;
+                }
+                let saved = std::fs::metadata(&document)
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_millis() as u64);
+                let open = live.iter().find(|(p, _)| p == &path);
+                let mut value = match open {
+                    Some((_, summary)) => summary.clone(),
+                    None => match ProjectSession::peek_private(&root, &path) {
+                        Ok(document) => project_summary(&document),
+                        Err(error) => json!({"error":error.code}),
+                    },
+                };
+                value["path"] = json!(path);
+                value["folder"] = json!(entry.file_name().to_string_lossy());
+                value["source"] = json!(source);
+                value["saved_at_ms"] = json!(saved);
+                value["open"] = json!(open.is_some());
+                found.push(value);
+            }
+        }
+        found.sort_by_key(|v| std::cmp::Reverse(v["saved_at_ms"].as_u64().unwrap_or(0)));
+        found
+    })
+    .await
+    .map_err(internal)?;
+    Ok(Json(json!({"schema_version":1,"projects":projects})))
 }
 async fn register_project(
     app: &App,

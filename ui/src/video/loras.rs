@@ -1,6 +1,7 @@
 //! H3's shared main-target stack and scene merge editor.
 use super::*;
 use imagine_video_contract::loras::{Merge, Override, Row, Stack};
+use std::path::Path;
 #[path = "lora_catalog.rs"]
 mod catalog;
 #[derive(Default)]
@@ -50,6 +51,28 @@ fn commands(
     }
     pending.push(Edit::SetCreative { creative });
     pending
+}
+/// A file inside the LoRA folder as the catalog's relative name, which the
+/// worker resolves under its own `loras` folder; any other file stays absolute.
+fn relative_name(root: Option<&str>, path: &Path) -> String {
+    let inside = |path: &Path, root: &Path| {
+        path.strip_prefix(root)
+            .ok()
+            .filter(|r| !r.as_os_str().is_empty())
+            .map(Path::to_path_buf)
+    };
+    let relative = root.map(Path::new).and_then(|root| {
+        inside(path, root)
+            .or_else(|| inside(&path.canonicalize().ok()?, &root.canonicalize().ok()?))
+    });
+    match relative {
+        Some(relative) => relative
+            .components()
+            .map(|c| c.as_os_str().to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/"),
+        None => path.to_string_lossy().into_owned(),
+    }
 }
 impl ImagineApp {
     pub(super) fn timeline_open_loras(&mut self, scene: Option<SceneId>) {
@@ -127,6 +150,13 @@ impl ImagineApp {
             .loras
             .catalog
             .ensure(self.client.as_ref(), ctx);
+        let root = self
+            .timeline
+            .loras
+            .catalog
+            .catalog
+            .as_ref()
+            .and_then(|c| c.root.clone());
         let mut inspect = None;
         let mut open = true;
         let mut apply = false;
@@ -188,13 +218,13 @@ impl ImagineApp {
                             }
                         });
                         ui.horizontal_wrapped(|ui| {
-                            let r=catalog::picker(ui,index,&mut row.name,choices.as_ref(),hidden);
+                            let r=catalog::picker(ui,index,&mut row.name,choices.as_ref(),self.prefs.privacy_mode);
                             control(ui,&format!("lora-{index}-catalog"),&r);
                             let r=ui.add_enabled_ui(!row.name.trim().is_empty(),|ui|helto::icon_button(ui,crate::icons::Icon::Eye,"LoRA information",false)).inner;control(ui,&format!("lora-{index}-info"),&r);
                             if r.clicked(){inspect=Some(row.name.clone());}
                         });
                         let mut name=Some(row.name.clone());
-                        if super::generation_ui::component_path(ui,"LoRA file · absolute or relative to models/loras",&format!("lora-{index}-file"),&mut name){row.name=name.unwrap_or_default();}
+                        if super::generation_ui::component_file(ui,"LoRA file · absolute or relative to models/loras",&format!("lora-{index}-file"),&mut name,root.as_deref().map(Path::new),&|path|relative_name(root.as_deref(),path)){row.name=name.unwrap_or_default();}
                     });
                 }
                 if let Some(index)=remove {stack.loras.remove(index);draft.rows.remove(index);}
@@ -222,6 +252,17 @@ impl ImagineApp {
             .catalog
             .info_window(ctx, self.prefs.privacy_mode, self.client.as_ref());
         if apply {
+            // Typed or pasted paths inside the LoRA folder become relative too.
+            for row in draft
+                .global
+                .loras
+                .iter_mut()
+                .chain(&mut draft.local.main.loras)
+            {
+                if Path::new(&row.name).is_absolute() {
+                    row.name = relative_name(root.as_deref(), Path::new(&row.name));
+                }
+            }
             let edits = commands(
                 &document.project,
                 self.timeline.draft_edits(),
@@ -244,6 +285,33 @@ impl ImagineApp {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn picked_files_inside_the_lora_folder_become_relative_names() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("loras");
+        std::fs::create_dir_all(root.join("h3/style")).unwrap();
+        let file = root.join("h3/style/own.safetensors");
+        std::fs::write(&file, b"").unwrap();
+        let text = root.to_string_lossy().into_owned();
+        assert_eq!(
+            relative_name(Some(&text), &file),
+            "h3/style/own.safetensors"
+        );
+        // Through a symlinked path to the same folder.
+        let link = dir.path().join("linked");
+        std::os::unix::fs::symlink(&root, &link).unwrap();
+        assert_eq!(
+            relative_name(Some(&text), &link.join("h3/style/own.safetensors")),
+            "h3/style/own.safetensors"
+        );
+        // Outside the folder, or without a known folder, the path stays absolute.
+        let outside = dir.path().join("own-outside.safetensors");
+        std::fs::write(&outside, b"").unwrap();
+        for root in [Some(text.as_str()), None] {
+            assert_eq!(relative_name(root, &outside), outside.to_string_lossy());
+        }
+        assert_eq!(relative_name(Some(&text), &root), text);
+    }
     #[test]
     fn lora_apply_keeps_pending_cast_and_section_edits_in_one_creative_command() {
         let project = super::super::media_picker::tests::project();

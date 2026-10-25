@@ -950,6 +950,16 @@ pub fn error_message(code: &str) -> String {
         "unsupported_character_sheet_model"=>"This model does not support character sheets.",
         "generation_failed"|"native_generation_failed"=>"Generation failed. Check available GPU memory and try a smaller image or fewer references.",
         "job_not_found"=>"The job is missing on the server. Start a new generation.",
+        "preset_unknown"=>"This preset is no longer in the presets file. Reload the presets.",
+        "preset_file_missing"=>"A model or LoRA file this preset names is missing.",
+        "preset_key_invalid"=>"The preset key must be 1–64 characters without control characters.",
+        "preset_key_duplicate"=>"Another preset already uses this key.",
+        "preset_variant_invalid"=>"The preset variant must be reference or i2v.",
+        "preset_settings_invalid"=>"The preset's settings are invalid for its variant.",
+        "preset_lora_invalid"=>"A preset LoRA needs a relative file name and finite strengths.",
+        "video_presets_unreadable"=>"The presets file cannot be read. Only the default presets are available.",
+        "video_presets_invalid"=>"The presets file is invalid. Only the default presets are available.",
+        "video_presets_unsupported_schema"=>"The presets file uses an unsupported schema_version. Only the default presets are available.",
         _=>"The server could not complete the request. Check the connection and settings."
     }.into()
 }

@@ -11,6 +11,8 @@ pub struct Service {
     pub reference_cache: Option<std::sync::Arc<dyn super::reference_cache::Control>>,
     /// Where the deployed H3 worker resolves model files; none without H3.
     pub h3_model_root: Option<PathBuf>,
+    /// The MCP video preset file; built-in defaults when absent.
+    pub video_presets: Option<PathBuf>,
     pub assemblies: BTreeMap<String, super::assembly::Entry>,
     pub authoring: std::sync::Arc<super::authoring::drafts::Service>,
     pub libraries: BTreeMap<String, super::library::LibrarySession>,
@@ -31,6 +33,7 @@ pub struct Snapshot {
     pub runtime_assets: BTreeMap<AssetId, String>,
     pub runtime_takes: BTreeMap<TakeId, String>,
     pub take_states: BTreeMap<TakeId, super::review::TakeState>,
+    pub preset_states: BTreeMap<SceneId, imagine_video_contract::creative::PresetState>,
 }
 fn check_location(path: &Path, session_data: &Path) -> Result<(), StorageError> {
     if !path.is_absolute() || path.starts_with(session_data) || session_data.starts_with(path) {
@@ -55,6 +58,9 @@ impl Service {
             runtime_assets: self.runtime_assets.get(id).cloned().unwrap_or_default(),
             runtime_takes: self.runtime_takes.get(id).cloned().unwrap_or_default(),
             take_states: super::review::states(project.document()),
+            preset_states: imagine_video_contract::creative::preset_states(
+                &project.document().project,
+            ),
         })
     }
     /// Create only a missing leaf folder for an explicit location, never its

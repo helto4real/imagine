@@ -272,7 +272,12 @@ impl ProductionModel {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProductionScene {
-    pub model: ProductionModel,
+    /// A preset key from the MCP preset catalog; it fixes the model variant.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preset: Option<String>,
+    /// Without a preset, the variant's default preset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<ProductionModel>,
     /// Only for a Scene whose boundary is a continuous shot.
     #[serde(default)]
     pub continuity: Option<ContinuityChoice>,

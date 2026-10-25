@@ -1,0 +1,45 @@
+# MCP video presets: named scene recipes that agents choose by key.
+# Copy this file to config/video-presets.yaml (gitignored) and edit it, or start
+# the server with --video-presets PATH. Changes apply without a restart.
+#
+# Agents always use "Default ref2v" / "Default i2v" unless the user names
+# another preset. Those two are built in; define them here only to change them.
+#
+# Fields:
+#   key          readable name the agent and user refer to (unique)
+#   variant      reference (ref2v) or i2v
+#   description  shown to the agent
+#   settings     only what differs from the project's settings for that model:
+#                components (model, text_encoder, video_vae, audio_vae; paths
+#                under the H3 model root), stage_one {steps, sampler, scheduler,
+#                denoise}, shift_video, shift_audio, ref_image_size (Standard,
+#                High, Extra High), stage_two, base_steps_to_run
+#   loras        LoRA files under the model root's loras/ folder, with strengths
+#   lora_merge   Add To Global (default: the scene's LoRAs add to the project's
+#                global LoRAs), Replace Global, Inherit Global or Disable LoRAs.
+#                A preset set as the project default makes its LoRAs the global
+#                LoRAs.
+schema_version: 1
+presets:
+  - key: Default ref2v
+    variant: reference
+    description: Standard MiniMax H3 reference-to-video
+
+  - key: Default i2v
+    variant: i2v
+    description: Standard MiniMax H3 image-to-video
+
+  # - key: Singularity ref2v
+  #   variant: reference
+  #   description: Singularity fine-tune
+  #   settings:
+  #     components:
+  #       model: diffusion_models/minimax_h3/singularity_ref2va_int8.safetensors
+  #     stage_one:
+  #       steps: 24
+  #       sampler: res_multistep
+  #       scheduler: simple
+  #   loras:
+  #     - name: h3/example_style.safetensors
+  #       strength_model: 0.8
+  #   lora_merge: Add To Global

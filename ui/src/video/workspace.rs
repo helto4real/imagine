@@ -285,11 +285,14 @@ impl ImagineApp {
         if !commands.is_empty() && !self.timeline.busy {
             self.timeline_edit(ui.ctx(), commands, 0);
         }
+        self.timeline_presets_pending(ui.ctx());
         self.timeline_project_prompt_window(ui.ctx());
         self.timeline_project_timing_window(ui.ctx());
         self.timeline_generation_window(ui.ctx());
         self.timeline_loras_window(ui.ctx());
         self.timeline_compatibility_window(ui.ctx());
+        self.timeline_private_projects_window(ui.ctx());
+        self.timeline_presets_window(ui.ctx());
         self.timeline_catalog_window(ui.ctx());
         self.timeline_authoring_background(ui.ctx());
         self.timeline_cast_window(ui.ctx());
@@ -440,7 +443,7 @@ impl ImagineApp {
         }
     }
     /// Runs `action` once pending text drafts are committed.
-    fn timeline_after_drafts(&mut self, ctx: &egui::Context, action: PostAction) {
+    pub(super) fn timeline_after_drafts(&mut self, ctx: &egui::Context, action: PostAction) {
         let edits = self.timeline.draft_edits();
         if edits.is_empty() {
             self.timeline_action(ctx, action);
@@ -519,6 +522,13 @@ impl ImagineApp {
                 super::qa::control(ui, "project-generation".into(), &r);
                 if r.clicked() {
                     self.timeline_open_generation();
+                    ui.close();
+                }
+                let r = ui.button("Video presets…");
+                #[cfg(feature = "ui-preview")]
+                super::qa::control(ui, "project-video-presets".into(), &r);
+                if r.clicked() {
+                    self.timeline_open_presets(ui.ctx());
                     ui.close();
                 }
                 let r = ui.button("Prompt tools…");
