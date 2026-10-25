@@ -72,7 +72,7 @@
     "cuda_include": "${project}/comfyui/moss-20261018/cuda13/nvidia/cu13/include",
     "cxx": "clang++",
     "jobs": 2,
-    "profile": "dev",
+    "profile": "release",
     "rustflags": "-C debuginfo=0",
     "tools": {
       "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)",

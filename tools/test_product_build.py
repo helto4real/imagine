@@ -36,7 +36,7 @@ class BuildTests(unittest.TestCase):
 
     def fake_cargo(self, root, lock, bins, native=False):
         for binary in bins:
-            self.put('comfyui/target/debug/' + binary, '#!/bin/sh\nexit 0\n')
+            self.put('comfyui/target/release/' + binary, '#!/bin/sh\nexit 0\n')
 
     def test_main_required_even_if_old_artifact_exists(self):
         self.put('comfyui/active-product.sh', 'exit 99')
@@ -56,7 +56,7 @@ class BuildTests(unittest.TestCase):
         self.assertNotEqual(before, after)
 
     def test_failed_build_never_reuses_previous_binary(self):
-        self.put('comfyui/target/debug/imagine-ui', 'old executable')
+        self.put('comfyui/target/release/imagine-ui', 'old executable')
         with patch.object(build, 'cargo', side_effect=subprocess.CalledProcessError(1, 'cargo')):
             with self.assertRaises(subprocess.CalledProcessError):
                 build.prepare(self.root, 'ui', False)
@@ -185,6 +185,23 @@ class BuildTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Pinned artifact changed'):
             build.package(self.root, directory, 'ui')
 
+    def test_release_profile_builds_with_release_flag_without_debug_info(self):
+        lock = {'build': {'product_target': '/own/target', 'native_target': '/own/worker',
+                          'jobs': 2, 'rustflags': '-C debuginfo=0', 'profile': 'release'}}
+        self.assertEqual(build.output(lock, 'native_target'), Path('/own/worker/release'))
+        env = build.build_env(lock)
+        self.assertEqual(env['CARGO_PROFILE_RELEASE_DEBUG'], '0')
+        with patch.object(build, 'run') as run:
+            build.cargo(self.root, lock, ('imagine-ui',))
+        self.assertIn('--release', run.call_args.args[0])
+        lock['build']['profile'] = 'dev'
+        self.assertEqual(build.output(lock, 'product_target'), Path('/own/target/debug'))
+        with patch.object(build, 'run') as run:
+            build.cargo(self.root, lock, ('imagine-ui',))
+        self.assertNotIn('--release', run.call_args.args[0])
+        lock['build']['profile'] = 'bench'
+        with self.assertRaisesRegex(ValueError, 'Unsupported build profile'):
+            build.output(lock, 'product_target')
 
 if __name__ == '__main__':
     unittest.main()

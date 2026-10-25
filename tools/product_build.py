@@ -182,6 +182,22 @@ def native_source(root, lock, cache, verifier):
     return dest
 
 
+# Cargo profile name -> its output directory under the target directory.
+PROFILES = {'release': 'release', 'dev': 'debug'}
+
+
+def profile(lock):
+    """The lock's Cargo profile; release unless the lock says otherwise."""
+    name = lock.get('build', {}).get('profile', 'release')
+    if name not in PROFILES:
+        raise ValueError(f'Unsupported build profile: {name}')
+    return name
+
+
+def output(lock, target):
+    return Path(lock['build'][target]) / PROFILES[profile(lock)]
+
+
 def build_env(lock, native=False):
     env = os.environ.copy()
     for name in list(env):
@@ -192,11 +208,10 @@ def build_env(lock, native=False):
                  'LIBTORCH_USE_PYTORCH', 'LIBTORCH_BYPASS_VERSION_CHECK'):
         env.pop(name, None)
     config = lock['build']
-    if config['profile'] != 'dev':
-        raise ValueError('Only the validated dev build profile is supported')
     env.update(CARGO_TARGET_DIR=config['native_target' if native else 'product_target'],
                CARGO_BUILD_JOBS=str(config['jobs']), CARGO_INCREMENTAL='0',
-               CARGO_PROFILE_DEV_DEBUG='0', RUSTFLAGS=config['rustflags'])
+               RUSTFLAGS=config['rustflags'])
+    env[f'CARGO_PROFILE_{profile(lock).upper()}_DEBUG'] = '0'
     if native:
         env.update(CARGO_HOME=config['cargo_home'], LIBTORCH=config['libtorch'],
                    LIBTORCH_CXX11_ABI='1', CXX=config['cxx'],
@@ -206,6 +221,8 @@ def build_env(lock, native=False):
 
 def cargo(root, lock, bins, native=False):
     args = ['cargo', 'build', '--manifest-path', root / 'Cargo.toml', '--locked', '--offline']
+    if profile(lock) == 'release':
+        args.append('--release')
     for binary in bins:
         args += ['--bin', binary]
     if not native:
@@ -251,7 +268,7 @@ def prepare_workers(root, lock, cache, verifier):
     # Build scripts must not mutate the reconstructed core.
     if verifier.tree(source) != json.loads(source.with_suffix('.json').read_text()):
         raise ValueError('Native build mutated its source cache')
-    target = Path(lock['build']['native_target']) / 'debug'
+    target = output(lock, 'native_target')
     hashes = {name: digest(target / name) for name in bins}
     directory = cache / 'workers' / key(hashes)
     if not directory.exists():
@@ -291,7 +308,7 @@ def prepare(root, component, with_runtime=True):
         workers = prepare_workers(root, lock, cache, verifier) if component == 'server' and with_runtime else None
         bins = {'server': ('imagine-server',), 'ui': ('imagine-ui',), 'proxy': PROXY_BINS}[component]
         cargo(root, lock, bins)
-        target = Path(lock['build']['product_target']) / 'debug'
+        target = output(lock, 'product_target')
         # Unique destinations keep an already running executable's inode intact.
         releases = cache / 'releases'
         releases.mkdir(exist_ok=True)

@@ -43,8 +43,10 @@ python3 tools/product_build.py prepare ui
 ```
 
 Each start runs Cargo with `--locked --offline`, reusing its compilation cache.
-The selected profile is **dev without debug information**, matching the local
-product build policy; this is not a new release-performance claim. A shared
+All Rust code — the native image and H3 workers, server, UI and proxy — is
+built with the **release** profile (`--release`, optimized, without debug
+information), as set by `build.profile` in the build lock. CUDA, LibTorch and
+the Triton artifacts are prebuilt and only verified. A shared
 build lock serializes preparation. Rust/Cargo/C++ versions and native headers
 are checked against the native lock before worker builds. CUDA libraries are
 verified, not rebuilt. Python 3.12+ orchestrates preparation only; it is not an
