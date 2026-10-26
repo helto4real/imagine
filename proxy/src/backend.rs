@@ -1,6 +1,7 @@
 use crate::{
-    config::{Config, label},
+    config::Config,
     logging::log,
+    registry::{Adapter, Spec},
 };
 use anyhow::{Result, anyhow, bail};
 use serde::{Deserialize, Serialize};
@@ -29,7 +30,11 @@ impl Target {
 }
 #[derive(Clone)]
 pub struct Backend {
-    pub kind: String,
+    /// The backend id; the engine of its targets and its model ID prefix.
+    pub id: String,
+    pub adapter: Adapter,
+    label: String,
+    default_model: Option<String>,
     pub origin: String,
     pub config: Config,
     pub client: reqwest::Client,
@@ -42,10 +47,13 @@ fn seconds(n: f64) -> Duration {
     Duration::from_secs_f64(n)
 }
 impl Backend {
-    pub fn new(kind: &str, origin: &str, config: &Config, client: reqwest::Client) -> Self {
+    pub fn new(spec: &Spec, config: &Config, client: reqwest::Client) -> Self {
         Self {
-            kind: kind.into(),
-            origin: origin.into(),
+            id: spec.id.clone(),
+            adapter: spec.adapter,
+            label: spec.label.clone(),
+            default_model: spec.default_model.clone(),
+            origin: spec.origin.clone(),
             config: config.clone(),
             client,
             limit: crate::connection_limit::Limit::new(16, config.connect_timeout),
@@ -55,13 +63,16 @@ impl Backend {
         }
     }
     pub fn label(&self) -> &str {
-        label(&self.kind)
+        &self.label
     }
     pub fn strata(&self) -> bool {
-        matches!(
-            self.kind.as_str(),
-            "sc117" | "orca" | "sc117_128k" | "orca_128k" | "swift" | "swift_128k"
-        )
+        self.adapter == Adapter::Strata
+    }
+    /// The llama_router default preset.
+    fn preset(&self) -> &str {
+        self.default_model
+            .as_deref()
+            .unwrap_or(&self.config.prism_model)
     }
     fn err(&self, action: &str, detail: &str) -> anyhow::Error {
         anyhow!("{} {action} failed: {detail}", self.label())
@@ -94,7 +105,7 @@ impl Backend {
                 )
             })?;
         let status = response.status().as_u16();
-        if if ["koboldcpp", "ollama"].contains(&self.kind.as_str()) {
+        if if matches!(self.adapter, Adapter::Koboldcpp | Adapter::Ollama) {
             status >= 400
         } else {
             status != 200
@@ -153,10 +164,7 @@ impl Backend {
             }
             states.push((id.into(), card["status"].clone()));
         }
-        if !states
-            .iter()
-            .any(|(name, _)| name == &self.config.prism_model)
-        {
+        if !states.iter().any(|(name, _)| name == self.preset()) {
             return Err(self.err("model observation", "default preset missing"));
         }
         if states
@@ -215,12 +223,10 @@ impl Backend {
             .collect()
     }
     pub async fn validate(&self) -> Result<()> {
-        match self.kind.as_str() {
-            "koboldcpp" => {
+        match self.adapter {
+            Adapter::Koboldcpp => {
                 let cap = self.json("/api/extra/version", None).await?;
-                if (self.config.kobold_router_mode || self.config.llm_backend == "all")
-                    && cap["router"] != true
-                {
+                if (self.config.kobold_router_mode || self.config.all()) && cap["router"] != true {
                     return Err(self.err(
                         "router readiness check",
                         "restart KoboldCpp with --admin, --admindir and --routermode",
@@ -254,14 +260,14 @@ impl Backend {
                     ),
                 );
             }
-            "tabbyapi" => {
+            Adapter::Tabbyapi => {
                 let h = self.json("/health", None).await?;
                 let m = self.json("/v1/models", None).await?;
                 if h["status"] != "healthy" || !m["data"].is_array() {
                     return Err(self.err("API check", "ValueError"));
                 }
             }
-            "ollama" => {
+            Adapter::Ollama => {
                 let v = self.json("/api/version", None).await?;
                 if v["version"].as_str().is_none_or(|v| v.trim().is_empty()) {
                     return Err(self.err("readiness check", "invalid version response"));
@@ -269,11 +275,11 @@ impl Backend {
                 self.running().await?;
                 log(20, "st_proxy.llm.ollama", "Ollama lifecycle API confirmed");
             }
-            "prism" => {
+            Adapter::LlamaRouter => {
                 self.certain()?;
                 self.states().await?;
             }
-            _ => {
+            Adapter::Strata => {
                 self.certain()?;
                 self.health().await?;
                 self.catalog().await?;
@@ -282,14 +288,14 @@ impl Backend {
         Ok(())
     }
     pub async fn catalog(&self) -> Result<Value> {
-        if self.kind == "prism" {
+        if self.adapter == Adapter::LlamaRouter {
             return Ok(
                 json!({"object":"list","data":self.states().await?.iter().map(|(m,_)|json!({"id":m,"object":"model"})).collect::<Vec<_>>()}),
             );
         }
         let v = self
             .json(
-                if self.kind == "tabbyapi" {
+                if self.adapter == Adapter::Tabbyapi {
                     "/v1/model/list"
                 } else {
                     "/v1/models"
@@ -297,7 +303,7 @@ impl Backend {
                 None,
             )
             .await?;
-        if self.kind == "koboldcpp" {
+        if self.adapter == Adapter::Koboldcpp {
             return kobold_models(&v);
         }
         if v["data"].as_array().is_none_or(|cards| {
@@ -322,19 +328,19 @@ impl Backend {
             {
                 bail!("unknown Strata model")
             };
-            return Ok(Target::new(&self.kind, h["model"].as_str().unwrap()));
+            return Ok(Target::new(&self.id, h["model"].as_str().unwrap()));
         }
-        if self.kind == "prism" {
-            let m = model.unwrap_or(&self.config.prism_model);
+        if self.adapter == Adapter::LlamaRouter {
+            let m = model.unwrap_or(self.preset());
             if m.trim().is_empty() {
                 bail!("model must be a nonempty Prism preset ID")
             };
             if !self.states().await?.iter().any(|(id, _)| id == m) {
                 bail!("unknown Prism model")
             };
-            return Ok(Target::new(&self.kind, m));
+            return Ok(Target::new(&self.id, m));
         }
-        Ok(Target::new(&self.kind, model.unwrap_or("")))
+        Ok(Target::new(&self.id, model.unwrap_or("")))
     }
     async fn tabby_observe(&self) -> Result<Option<Target>> {
         let _permit = self.limit.acquire().await?;
@@ -367,7 +373,7 @@ impl Backend {
         {
             return Err(self.err("model observation", "ValueError"));
         }
-        let mut t = Target::new(&self.kind, id);
+        let mut t = Target::new(&self.id, id);
         for k in [
             "max_seq_len",
             "cache_size",
@@ -409,9 +415,9 @@ impl Backend {
         Ok(current)
     }
     pub async fn observe(&mut self) -> Result<Option<Target>> {
-        match self.kind.as_str() {
-            "tabbyapi" => self.tabby_confirm(false).await,
-            "koboldcpp" => {
+        match self.adapter {
+            Adapter::Tabbyapi => self.tabby_confirm(false).await,
+            Adapter::Koboldcpp => {
                 let m = self.kobold_name().await?;
                 if !self.version_ready().await {
                     return Err(self.err("ready-state observation", "unavailable"));
@@ -419,10 +425,10 @@ impl Backend {
                 Ok(if inactive(&m) {
                     None
                 } else {
-                    Some(Target::new(&self.kind, &m))
+                    Some(Target::new(&self.id, &m))
                 })
             }
-            "ollama" => {
+            Adapter::Ollama => {
                 let m = self.running().await?;
                 if m.len() > 1 {
                     return Err(self.err(
@@ -430,9 +436,9 @@ impl Backend {
                         "exactly one loaded model is required",
                     ));
                 }
-                Ok(m.first().map(|m| Target::new(&self.kind, m)))
+                Ok(m.first().map(|m| Target::new(&self.id, m)))
             }
-            "prism" => {
+            Adapter::LlamaRouter => {
                 self.certain()?;
                 for (m, s) in self.states().await? {
                     if s["value"] != "unloaded" {
@@ -441,16 +447,16 @@ impl Backend {
                                 self.err("model observation", "model not in a stable state")
                             );
                         }
-                        return Ok(Some(Target::new(&self.kind, &m)));
+                        return Ok(Some(Target::new(&self.id, &m)));
                     }
                 }
                 Ok(None)
             }
-            _ => {
+            Adapter::Strata => {
                 self.certain()?;
                 let h = self.health().await?;
                 Ok(if h["loaded"] == true {
-                    Some(Target::new(&self.kind, h["model"].as_str().unwrap()))
+                    Some(Target::new(&self.id, h["model"].as_str().unwrap()))
                 } else {
                     None
                 })
@@ -458,7 +464,10 @@ impl Backend {
         }
     }
     pub async fn snapshot(&mut self) -> Result<Target> {
-        let wait = matches!(self.kind.as_str(), "tabbyapi" | "koboldcpp" | "prism");
+        let wait = matches!(
+            self.adapter,
+            Adapter::Tabbyapi | Adapter::Koboldcpp | Adapter::LlamaRouter
+        );
         let duration = self.config.reload_timeout;
         timeout(seconds(duration), async {
             loop {
@@ -683,15 +692,15 @@ impl Backend {
         .map_err(|_| self.err(&format!("confirmation of {state}"), "timed out"))?
     }
     pub async fn release(&mut self, t: &mut Target) -> Result<()> {
-        match self.kind.as_str() {
-            "koboldcpp" => {
+        match self.adapter {
+            Adapter::Koboldcpp => {
                 self.kobold_reload("unload_model", self.config.unload_timeout)
                     .await?;
                 self.kobold_wait(false, None, self.config.unload_timeout)
                     .await?;
             }
-            "ollama" => self.ollama_change(t, false).await?,
-            "tabbyapi" => {
+            Adapter::Ollama => self.ollama_change(t, false).await?,
+            Adapter::Tabbyapi => {
                 let duration = self.config.unload_timeout;
                 timeout(seconds(duration), async {
                     let Some(current) = self.tabby_confirm(false).await? else {
@@ -721,7 +730,7 @@ impl Backend {
                 .await
                 .map_err(|_| self.err("unload", "TimeoutError"))??;
             }
-            "prism" => {
+            Adapter::LlamaRouter => {
                 self.certain()?;
                 let states = self.states().await?;
                 if !states.iter().any(|(m, _)| m == &t.model) {
@@ -734,7 +743,7 @@ impl Backend {
                     self.change(t, false).await?;
                 }
             }
-            _ => {
+            Adapter::Strata => {
                 self.certain()?;
                 if self.health().await?["model"] != t.model {
                     return Err(self.err("restore target", "model mismatch"));
@@ -841,13 +850,13 @@ impl Backend {
         Ok(())
     }
     pub async fn acquire(&mut self, target: Option<Target>) -> Result<Target> {
-        match self.kind.as_str() {
-            "koboldcpp" => {
-                if self.config.kobold_router_mode || self.config.llm_backend == "all" {
+        match self.adapter {
+            Adapter::Koboldcpp => {
+                if self.config.kobold_router_mode || self.config.all() {
                     if !self.version_ready().await {
                         return Err(self.err("router readiness", "unavailable"));
                     }
-                    return Ok(Target::new(&self.kind, ""));
+                    return Ok(Target::new(&self.id, ""));
                 }
                 self.kobold_reload("initial_model", self.config.reload_timeout)
                     .await?;
@@ -858,28 +867,28 @@ impl Backend {
                         self.config.reload_timeout,
                     )
                     .await?;
-                Ok(target.unwrap_or_else(|| Target::new(&self.kind, &m)))
+                Ok(target.unwrap_or_else(|| Target::new(&self.id, &m)))
             }
-            "ollama" => {
+            Adapter::Ollama => {
                 let t =
                     target.ok_or_else(|| self.err("model load", "a restore target is required"))?;
                 self.ollama_change(&t, true).await?;
                 Ok(t)
             }
-            "tabbyapi" => {
+            Adapter::Tabbyapi => {
                 let duration = self.config.reload_timeout;
                 timeout(seconds(duration),async{
                 let expected=target.as_ref().map(|t|t.parameters.clone()).unwrap_or_default();
                 let current=self.tabby_confirm(true).await?;
-                let t=if let Some(t)=target{t}else{if let Some(c)=current{return Ok(c)}let model=self.config.tabby_model.as_ref().ok_or_else(||self.err("load","no loaded model; configure --tabby-model"))?;let mut t=Target::new(&self.kind,model);t.parameters.insert("max_seq_len".into(),json!(self.config.tabby_max_seq_len));t};
+                let t=if let Some(t)=target{t}else{if let Some(c)=current{return Ok(c)}let model=self.default_model.as_ref().or(self.config.tabby_model.as_ref()).ok_or_else(||self.err("load","no loaded model; configure --tabby-model"))?;let mut t=Target::new(&self.id,model);t.parameters.insert("max_seq_len".into(),json!(self.config.tabby_max_seq_len));t};
                 if let Some(mut c)=current {if c.model==t.model && expected.iter().all(|(k,v)|c.parameters.get(k)==Some(v)){return Ok(c)}self.release(&mut c).await?;}
                 self.uncertain=true;self.pending=Some(Target{parameters:expected.clone(),..t.clone()});self.load_failed=false;self.tabby_load(&t).await?;
                 loop{if let Some(c)=self.tabby_observe().await?{if c.model!=t.model || expected.iter().any(|(k,v)|c.parameters.get(k)!=Some(v)){return Err(self.err("load verification","model/settings mismatch"))}self.uncertain=false;self.pending=None;return Ok(c)}sleep(seconds(self.config.poll_interval)).await;}
             }).await.map_err(|_|self.err("load","TimeoutError"))?
             }
-            "prism" => {
+            Adapter::LlamaRouter => {
                 self.certain()?;
-                let t = target.unwrap_or_else(|| Target::new(&self.kind, &self.config.prism_model));
+                let t = target.unwrap_or_else(|| Target::new(&self.id, self.preset()));
                 let states = self.states().await?;
                 if !states.iter().any(|(m, _)| m == &t.model) {
                     return Err(self.err("restore target", "preset missing"));
@@ -891,12 +900,12 @@ impl Backend {
                     if m == &t.model {
                         return Ok(t);
                     }
-                    self.change(&Target::new(&self.kind, m), false).await?;
+                    self.change(&Target::new(&self.id, m), false).await?;
                 }
                 self.change(&t, true).await?;
                 Ok(t)
             }
-            _ => {
+            Adapter::Strata => {
                 self.certain()?;
                 let t = match target {
                     Some(t) => t,
@@ -960,27 +969,13 @@ impl Backends {
         client: reqwest::Client,
         limit: crate::connection_limit::Limit,
     ) -> Self {
-        let entries = if config.llm_backend == "all" {
-            vec![
-                ("koboldcpp", &config.llm_url),
-                ("tabbyapi", &config.tabby_url),
-                ("sc117", &config.sc117_url),
-                ("orca", &config.orca_url),
-                ("sc117_128k", &config.sc117_128k_url),
-                ("orca_128k", &config.orca_128k_url),
-                ("swift", &config.swift_url),
-                ("swift_128k", &config.swift_128k_url),
-                ("prism", &config.prism_url),
-            ]
-        } else {
-            vec![(config.llm_backend.as_str(), &config.llm_url)]
-        };
         Self {
             config: config.clone(),
-            entries: entries
-                .into_iter()
-                .map(|(k, o)| {
-                    let mut backend = Backend::new(k, o, config, client.clone());
+            entries: config
+                .active()
+                .iter()
+                .map(|spec| {
+                    let mut backend = Backend::new(spec, config, client.clone());
                     backend.limit = limit.clone();
                     backend
                 })
@@ -1001,15 +996,15 @@ impl Backends {
     pub async fn catalog(&self, engine: Option<&str>) -> Result<Value> {
         let mut cards = Vec::new();
         for b in &self.entries {
-            if engine.is_some_and(|e| e != b.kind) {
+            if engine.is_some_and(|e| e != b.id) {
                 continue;
             }
             let v = b.catalog().await?;
             for c in v["data"].as_array().unwrap() {
                 let mut c = c.clone();
-                if self.config.llm_backend == "all" {
-                    c["id"] = format!("{}/{}", b.kind, c["id"].as_str().unwrap()).into();
-                    c["owned_by"] = b.kind.clone().into();
+                if self.config.all() {
+                    c["id"] = format!("{}/{}", b.id, c["id"].as_str().unwrap()).into();
+                    c["owned_by"] = b.id.clone().into();
                 }
                 cards.push(c)
             }
@@ -1017,7 +1012,7 @@ impl Backends {
         Ok(json!({"object":"list","data":cards}))
     }
     pub async fn target(&self, model: Option<&str>) -> Result<Target> {
-        if self.config.llm_backend != "all" {
+        if !self.config.all() {
             return self.entries[0].target(model).await;
         }
         let model =
@@ -1025,7 +1020,7 @@ impl Backends {
         let (e, m) = model
             .split_once('/')
             .ok_or_else(|| anyhow!("select a model ID from /v1/models (backend/model)"))?;
-        if !self.entries.iter().any(|b| b.kind == e) || m.is_empty() {
+        if !self.entries.iter().any(|b| b.id == e) || m.is_empty() {
             bail!("unknown backend/model")
         }
         if !self.catalog(Some(e)).await?["data"]
@@ -1039,7 +1034,7 @@ impl Backends {
         Ok(Target::new(e, m))
     }
     pub async fn observe(&mut self) -> Result<Option<Target>> {
-        if self.config.llm_backend != "all" {
+        if !self.config.all() {
             return self.entries[0].observe().await;
         }
         let mut occupied = self.pending.is_some();
@@ -1054,29 +1049,29 @@ impl Backends {
     }
     async fn release_one(&mut self, i: usize) -> Result<()> {
         let b = &mut self.entries[i];
-        if b.kind == "koboldcpp" {
+        if b.adapter == Adapter::Koboldcpp {
             if !self.kobold_released {
-                b.release(&mut Target::new("koboldcpp", "")).await?;
+                b.release(&mut Target::new(&b.id.clone(), "")).await?;
                 self.kobold_released = true;
             }
             self.router_failed = false;
         } else if let Some(mut observed) = b.observe().await? {
-            if let Some(active) = self.active.as_ref().filter(|a| a.engine == b.kind) {
+            if let Some(active) = self.active.as_ref().filter(|a| a.engine == b.id) {
                 self.saved
-                    .insert((b.kind.clone(), active.model.clone()), observed.clone());
+                    .insert((b.id.clone(), active.model.clone()), observed.clone());
             }
             b.release(&mut observed).await?;
         }
-        if self.active.as_ref().is_some_and(|a| a.engine == b.kind) {
+        if self.active.as_ref().is_some_and(|a| a.engine == b.id) {
             self.active = None;
         }
-        if self.pending.as_ref().is_some_and(|a| a.engine == b.kind) {
+        if self.pending.as_ref().is_some_and(|a| a.engine == b.id) {
             self.pending = None;
         }
         Ok(())
     }
     pub async fn release(&mut self, t: &mut Target) -> Result<()> {
-        if self.config.llm_backend != "all" {
+        if !self.config.all() {
             return self.entries[0].release(t).await;
         }
         for i in 0..self.entries.len() {
@@ -1084,14 +1079,20 @@ impl Backends {
         }
         Ok(())
     }
+    /// Whether `engine` is the KoboldCpp backend, whose router state is shared.
+    fn kobold(&self, engine: &str) -> bool {
+        self.entries
+            .iter()
+            .any(|b| b.id == engine && b.adapter == Adapter::Koboldcpp)
+    }
     pub fn failed(&mut self, t: Option<&Target>) {
-        if t.is_some_and(|t| t.engine == "koboldcpp") {
+        if t.is_some_and(|t| self.kobold(&t.engine)) {
             self.router_failed = true;
             self.kobold_released = false;
         }
     }
     pub async fn acquire(&mut self, target: Option<Target>) -> Result<Target> {
-        if self.config.llm_backend != "all" {
+        if !self.config.all() {
             return self.entries[0].acquire(target).await;
         }
         let t = target.ok_or_else(|| {
@@ -1100,7 +1101,7 @@ impl Backends {
         let i = self
             .entries
             .iter()
-            .position(|b| b.kind == t.engine)
+            .position(|b| b.id == t.engine)
             .ok_or_else(|| {
                 anyhow!("LLM backends model selection failed: explicit model required")
             })?;
@@ -1109,7 +1110,8 @@ impl Backends {
                 self.release_one(n).await?
             }
         }
-        if t.engine == "koboldcpp" && (self.router_failed || self.active.as_ref() == Some(&t)) {
+        let kobold = self.kobold(&t.engine);
+        if kobold && (self.router_failed || self.active.as_ref() == Some(&t)) {
             self.release_one(i).await?
         }
         if let Some(active) = self
@@ -1130,7 +1132,7 @@ impl Backends {
         };
         self.pending = Some(t.clone());
         self.active = None;
-        if t.engine == "koboldcpp" {
+        if kobold {
             self.kobold_released = false;
         }
         let restored = self.entries[i].acquire(Some(native)).await?;

@@ -1,10 +1,11 @@
 use crate::{
     backend::{Backend, Target, kobold_models},
-    config::{Config, label},
+    config::Config,
     coordinator::{Coordinator, Lease},
     http,
     logging::log,
     profiles::Profiles,
+    registry::Adapter,
     requests,
     routes::{self, Kind},
 };
@@ -78,7 +79,7 @@ impl Running {
 }
 impl Service {
     pub async fn start(config: Config) -> Result<Running> {
-        let profiles = Profiles::load(config.model_profiles.as_deref())?;
+        let profiles = Profiles::load(config.model_profiles.as_deref(), &config.registry)?;
         let builder = || {
             reqwest::Client::builder()
                 .connect_timeout(Duration::from_secs_f64(config.connect_timeout))
@@ -222,7 +223,7 @@ impl Service {
         ] {
             s[k] = v.into();
         }
-        if self.config.llm_backend == "all" {
+        if self.config.all() {
             let b = self.coordinator.backends.lock().await;
             s["active_llm_backend"] = b
                 .active
@@ -240,21 +241,21 @@ impl Service {
     async fn catalog(&self, engine: Option<&str>) -> Result<Value> {
         let mut cards = Vec::new();
         for b in &self.catalog_backends {
-            if engine.is_some_and(|e| e != b.kind) {
+            if engine.is_some_and(|e| e != b.id) {
                 continue;
             }
             let v = b.catalog().await?;
             for c in v["data"].as_array().unwrap() {
                 let mut c = c.clone();
-                c["id"] = format!("{}/{}", b.kind, c["id"].as_str().unwrap()).into();
-                c["owned_by"] = b.kind.clone().into();
+                c["id"] = format!("{}/{}", b.id, c["id"].as_str().unwrap()).into();
+                c["owned_by"] = b.id.clone().into();
                 cards.push(c);
             }
         }
         Ok(json!({"object":"list","data":cards}))
     }
     async fn target(&self, model: Option<&str>) -> Result<Target> {
-        if self.config.llm_backend != "all" {
+        if !self.config.all() {
             return self.catalog_backends[0].target(model).await;
         }
         let model =
@@ -262,7 +263,7 @@ impl Service {
         let (e, m) = model
             .split_once('/')
             .ok_or_else(|| anyhow!("select a model ID from /v1/models (backend/model)"))?;
-        if m.is_empty() || !self.catalog_backends.iter().any(|b| b.kind == e) {
+        if m.is_empty() || !self.catalog_backends.iter().any(|b| b.id == e) {
             return Err(anyhow!("unknown backend/model"));
         }
         if !self.catalog(Some(e)).await?["data"]
@@ -290,7 +291,7 @@ impl Service {
             router,
             selection,
         } = options;
-        let path = if self.config.llm_backend != "all"
+        let path = if !self.config.all()
             && !self.config.kobold_router_mode
             && path == decoded_path(request.uri().path()).trim_end_matches('/')
         {
@@ -323,7 +324,9 @@ impl Service {
             .trim_end_matches('/')
             .to_string();
         let method = req.method().to_string();
-        let kind = self.config.llm_backend.as_str();
+        let all = self.config.all();
+        let adapter = self.config.adapter();
+        let name = self.config.label();
         let origin = self.config.llm_url.clone();
         let qs: Vec<(String, String)> = req
             .uri()
@@ -339,11 +342,11 @@ impl Service {
             .find(|(k, _)| k == "model")
             .map(|(_, v)| v.as_str());
         let safe = matches!(method.as_str(), "GET" | "HEAD");
-        let managed = kind == "prism" || self.catalog_backends[0].strata();
-        if kind == "all" || managed {
+        let managed = adapter == Some(Adapter::LlamaRouter) || self.catalog_backends[0].strata();
+        if all || managed {
             if qs.iter().any(|(k, _)| k == "autoload" || k == "reload")
                 || path.starts_with("/models/")
-                || (kind == "all"
+                || (all
                     && (path.starts_with("/api/admin/")
                         || path.starts_with("/v1/model/")
                         || path == "/noscript"))
@@ -353,10 +356,10 @@ impl Service {
             {
                 return Ok(http::text(403, "model lifecycle is owned by the broker"));
             }
-            if kind == "all" && safe && ["/v1/models", "/models"].contains(&path.as_str()) {
+            if all && safe && ["/v1/models", "/models"].contains(&path.as_str()) {
                 return Ok(http::json(200, self.catalog(None).await?));
             }
-            if kind == "all" && safe && path == "/health" {
+            if all && safe && path == "/health" {
                 return Ok(self.status().await);
             }
             let strata = self.catalog_backends[0].strata();
@@ -399,7 +402,7 @@ impl Service {
                             path: &path,
                             query: None,
                             body: None,
-                            target: label(kind),
+                            target: &name,
                             lease: None,
                             router: false,
                             selection: None,
@@ -420,7 +423,7 @@ impl Service {
                 else {
                     return Ok(http::json(
                         503,
-                        json!({"error":format!("{} model is not active",label(kind))}),
+                        json!({"error":format!("{} model is not active",&name)}),
                     ));
                 };
                 let query = with_model(&qs, &active.model);
@@ -432,7 +435,7 @@ impl Service {
                             path: &path,
                             query: Some(query),
                             body: None,
-                            target: label(kind),
+                            target: &name,
                             lease,
                             router: false,
                             selection: None,
@@ -453,9 +456,9 @@ impl Service {
                 }
             };
             if !payload["model"].is_null() && !payload["model"].is_string() {
-                let message = if kind == "all" {
+                let message = if all {
                     "select a model ID from /v1/models (backend/model)"
-                } else if kind == "prism" {
+                } else if adapter == Some(Adapter::LlamaRouter) {
                     "model must be a nonempty Prism preset ID"
                 } else {
                     "unknown Strata model"
@@ -478,14 +481,14 @@ impl Service {
             let backend = self
                 .catalog_backends
                 .iter()
-                .find(|b| b.kind == engine)
+                .find(|b| b.id == engine)
                 .unwrap();
-            if !payload.is_null() && (kind == "all" || payload["model"].is_null()) {
+            if !payload.is_null() && (all || payload["model"].is_null()) {
                 payload["model"] = target.model.clone().into();
-                body = crate::json_wire::dumps(&payload, kind != "all", false).into_bytes();
+                body = crate::json_wire::dumps(&payload, !all, false).into_bytes();
             }
             let query = with_model(&qs, &target.model);
-            if kind == "all"
+            if all
                 && safe
                 && ["/props", "/metrics", "/slots", "/v1/model", "/api/v1/model"]
                     .contains(&path.as_str())
@@ -518,7 +521,7 @@ impl Service {
                 requests::STRATA_PATHS.contains(&path.as_str())
             } else {
                 requests::TEXT_PATHS.contains(&path.as_str())
-                    || (engine == "prism"
+                    || (backend.adapter == Adapter::LlamaRouter
                         && [
                             "/completion",
                             "/tokenize",
@@ -531,29 +534,34 @@ impl Service {
                         ]
                         .contains(&path.as_str()))
             };
-            if kind == "all" && (method != "POST" || !active) {
+            if all && (method != "POST" || !active) {
                 return Ok(http::text(
                     403,
                     "unsupported model request in all-backend mode",
                 ));
             }
-            if kind == "all" && payload.is_null() {
+            if all && payload.is_null() {
                 return Ok(http::text(400, "expected a JSON object with model"));
             }
             if method == "POST" && path == "/v1/chat/completions" && !payload.is_null() {
-                let profiled = self.profiles.apply(&payload, engine, Some(&target.model));
+                let profiled =
+                    self.profiles
+                        .apply(&payload, engine, backend.adapter, Some(&target.model));
                 if profiled != payload {
                     payload = profiled;
                     body = crate::json_wire::dumps(&payload, false, false).into_bytes();
                 }
             }
-            if engine == "koboldcpp" {
+            if backend.adapter == Adapter::Koboldcpp {
                 body = requests::default_model(&body, &self.config.kobold_default_model)?;
             }
-            if engine == "tabbyapi" && path == "/v1/chat/completions" {
+            if backend.adapter == Adapter::Tabbyapi && path == "/v1/chat/completions" {
                 body = requests::tabby(&body)
             }
-            if engine == "prism" && path == "/v1/chat/completions" && !payload.is_null() {
+            if backend.adapter == Adapter::LlamaRouter
+                && path == "/v1/chat/completions"
+                && !payload.is_null()
+            {
                 body = requests::request_usage(payload)
             }
             if body.len() > self.config.max_chat_body_bytes {
@@ -563,7 +571,7 @@ impl Service {
                 Ok(l) => l,
                 Err(e) => return Ok(http::json(503, json!({"error":e.to_string()}))),
             };
-            let upstream_path = if engine == "koboldcpp" {
+            let upstream_path = if backend.adapter == Adapter::Koboldcpp {
                 requests::kobold_path(&path)
             } else {
                 &path
@@ -578,7 +586,7 @@ impl Service {
                         body: Some(body),
                         target: backend.label(),
                         lease: Some(lease),
-                        router: engine == "koboldcpp",
+                        router: backend.adapter == Adapter::Koboldcpp,
                         selection: Some(target),
                     },
                 )
@@ -601,7 +609,7 @@ impl Service {
                     return Ok(http::json(200, self.router_models.lock().unwrap().clone()));
                 }
                 if lease.is_none() {
-                    return Ok(inactive(&path, kind));
+                    return Ok(inactive(&path, adapter));
                 }
                 return self
                     .forward(
@@ -611,7 +619,7 @@ impl Service {
                             path: &path,
                             query: None,
                             body: None,
-                            target: label(kind),
+                            target: &name,
                             lease,
                             router: false,
                             selection: None,
@@ -643,7 +651,7 @@ impl Service {
                             path: &path,
                             query: None,
                             body: Some(body),
-                            target: label(kind),
+                            target: &name,
                             lease,
                             router: false,
                             selection: None,
@@ -652,7 +660,7 @@ impl Service {
                     .await;
             }
         }
-        if kind == "tabbyapi"
+        if adapter == Some(Adapter::Tabbyapi)
             && safe
             && ["/v1/models", "/v1/model/list", "/health"].contains(&path.as_str())
         {
@@ -664,7 +672,7 @@ impl Service {
                         path: &path,
                         query: None,
                         body: None,
-                        target: label(kind),
+                        target: &name,
                         lease: None,
                         router: false,
                         selection: None,
@@ -672,11 +680,12 @@ impl Service {
                 )
                 .await;
         }
-        let passive =
-            (kind == "tabbyapi" && safe && ["/v1/model", "/props"].contains(&path.as_str()))
-                || (kind == "koboldcpp"
-                    && method == "GET"
-                    && ["/api/v1/model", "/v1/models"].contains(&path.as_str()));
+        let passive = (adapter == Some(Adapter::Tabbyapi)
+            && safe
+            && ["/v1/model", "/props"].contains(&path.as_str()))
+            || (adapter == Some(Adapter::Koboldcpp)
+                && method == "GET"
+                && ["/api/v1/model", "/v1/models"].contains(&path.as_str()));
         if passive {
             log(
                 10,
@@ -685,7 +694,7 @@ impl Service {
             );
             let lease = self.coordinator.metadata();
             if lease.is_none() {
-                return Ok(inactive(&path, kind));
+                return Ok(inactive(&path, adapter));
             }
             return self
                 .forward(
@@ -695,7 +704,7 @@ impl Service {
                         path: &path,
                         query: None,
                         body: None,
-                        target: label(kind),
+                        target: &name,
                         lease,
                         router: false,
                         selection: None,
@@ -710,7 +719,9 @@ impl Service {
         let mut body = None;
         let mut upstream_path = path.clone();
         if self.config.kobold_router_mode
-            || (kind == "tabbyapi" && method == "POST" && path == "/v1/chat/completions")
+            || (adapter == Some(Adapter::Tabbyapi)
+                && method == "POST"
+                && path == "/v1/chat/completions")
         {
             let mut bytes = match read_body(&mut req, self.config.max_chat_body_bytes).await {
                 Ok(v) => v,
@@ -725,8 +736,13 @@ impl Service {
                     Err(_) => return Ok(http::text(400, "expected a JSON object")),
                 };
                 upstream_path = requests::kobold_path(&path).into();
-            } else if kind == "tabbyapi" {
-                bytes = requests::tabby(&self.profiles.body(&bytes, kind, None));
+            } else if adapter == Some(Adapter::Tabbyapi) {
+                bytes = requests::tabby(&self.profiles.body(
+                    &bytes,
+                    &self.config.llm_backend,
+                    Adapter::Tabbyapi,
+                    None,
+                ));
                 let [effort, tokens, budget] = requests::thinking_diagnostics(&bytes);
                 log(
                     20,
@@ -748,7 +764,7 @@ impl Service {
                 path: &upstream_path,
                 query: None,
                 body,
-                target: label(kind),
+                target: &name,
                 lease: Some(lease),
                 router: self.config.kobold_router_mode,
                 selection: None,
@@ -757,8 +773,8 @@ impl Service {
         .await
     }
 }
-fn inactive(path: &str, kind: &str) -> Response<Body> {
-    if kind == "tabbyapi" {
+fn inactive(path: &str, adapter: Option<Adapter>) -> Response<Body> {
+    if adapter == Some(Adapter::Tabbyapi) {
         http::json(
             503,
             json!({"detail":"LLM readiness is not currently verified"}),
@@ -794,7 +810,8 @@ async fn chat_handler(State(s): State<Service>, mut req: Request<Body>) -> Respo
     }
     let method = req.method().to_string();
     let path = decoded_path(req.uri().path());
-    let label = label(&s.config.llm_backend);
+    let label = s.config.label();
+    let label = label.as_str();
     let completion =
         crate::request_log::RequestLog::new(label, &method, &path, 20, s.active_chat.clone());
     req.extensions_mut().insert(completion.clone());

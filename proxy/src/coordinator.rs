@@ -1,8 +1,9 @@
 use crate::{
     backend::{Backends, Target},
     comfy::Comfy,
-    config::{Config, label},
+    config::Config,
     logging::log,
+    registry::Adapter,
 };
 use anyhow::{Result, anyhow, bail};
 use axum::http::HeaderMap;
@@ -174,7 +175,7 @@ impl Coordinator {
             registrations: Default::default(),
         };
         log(20, LOG, "broker initialization started");
-        if this.config.llm_backend == "ollama" {
+        if this.config.adapter() == Some(Adapter::Ollama) {
             let init = async {
                 this.backends.lock().await.validate().await?;
                 this.phase("cleaning_comfy");
@@ -214,7 +215,7 @@ impl Coordinator {
                 LOG,
                 format!(
                     "broker initialization completed without contacting {}; waiting for active work",
-                    label(&this.config.llm_backend)
+                    this.config.label()
                 ),
             );
         }
@@ -489,7 +490,7 @@ impl Coordinator {
     }
     async fn dispatch(self) {
         let mut restore = self.backends.lock().await.active.clone();
-        let mut validated = self.config.llm_backend == "ollama" && restore.is_some();
+        let mut validated = self.config.adapter() == Some(Adapter::Ollama) && restore.is_some();
         loop {
             let notified = self.notify.notified();
             let work = {
@@ -542,16 +543,10 @@ impl Coordinator {
             return;
         }
         if self.config.kobold_router_mode
+            || self.config.all()
             || matches!(
-                self.config.llm_backend.as_str(),
-                "prism"
-                    | "all"
-                    | "sc117"
-                    | "orca"
-                    | "sc117_128k"
-                    | "orca_128k"
-                    | "swift"
-                    | "swift_128k"
+                self.config.adapter(),
+                Some(Adapter::LlamaRouter | Adapter::Strata)
             )
         {
             if self.drain(&w.cancel, false).await.is_err() {
@@ -572,11 +567,11 @@ impl Coordinator {
         if w.cancel.is_cancelled() {
             return;
         }
-        if self.config.kobold_router_mode || self.config.llm_backend == "all" {
+        if self.config.kobold_router_mode || self.config.all() {
             self.phase("llm_reserved")
         } else if matches!(
-            self.config.llm_backend.as_str(),
-            "prism" | "sc117" | "orca" | "sc117_128k" | "orca_128k" | "swift" | "swift_128k"
+            self.config.adapter(),
+            Some(Adapter::LlamaRouter | Adapter::Strata)
         ) {
             self.phase("llm_ready")
         }
@@ -668,14 +663,15 @@ impl Coordinator {
                 }
                 b.acquire(None).await?
             } else {
-                let skip = self.config.llm_backend == "tabbyapi"
+                let skip = self.config.adapter() == Some(Adapter::Tabbyapi)
                     && self.state.lock().unwrap().recoverable.is_some();
-                let observed = if restore.is_none() && self.config.llm_backend != "ollama" && !skip
-                {
-                    b.observe().await?
-                } else {
-                    None
-                };
+                let observed =
+                    if restore.is_none() && self.config.adapter() != Some(Adapter::Ollama) && !skip
+                    {
+                        b.observe().await?
+                    } else {
+                        None
+                    };
                 if let Some(t) = observed {
                     t
                 } else {
@@ -691,12 +687,12 @@ impl Coordinator {
             log(
                 40,
                 LOG,
-                format!("{} reload failed: {e}", label(&self.config.llm_backend)),
+                format!("{} reload failed: {e}", self.config.label()),
             );
             let error = if e.to_string().contains("insufficient_vram") {
                 e.to_string()
             } else {
-                format!("{} is not confirmed ready", label(&self.config.llm_backend))
+                format!("{} is not confirmed ready", self.config.label())
             };
             {
                 let mut s = self.state.lock().unwrap();
@@ -714,20 +710,15 @@ impl Coordinator {
             s.recoverable = None;
             s.last_error = None;
         }
-        self.phase(
-            if self.config.kobold_router_mode || self.config.llm_backend == "all" {
-                "llm_reserved"
-            } else {
-                "llm_ready"
-            },
-        );
+        self.phase(if self.config.kobold_router_mode || self.config.all() {
+            "llm_reserved"
+        } else {
+            "llm_ready"
+        });
         log(
             20,
             LOG,
-            format!(
-                "GPU ownership transferred: owner={}",
-                label(&self.config.llm_backend)
-            ),
+            format!("GPU ownership transferred: owner={}", self.config.label()),
         );
         Ok(())
     }
@@ -765,7 +756,9 @@ impl Coordinator {
             self.phase("unloading_llm");
             b.release(restore.as_mut().unwrap()).await?;
         } else {
-            if self.state.lock().unwrap().owner.is_none() && self.config.llm_backend != "ollama" {
+            if self.state.lock().unwrap().owner.is_none()
+                && self.config.adapter() != Some(Adapter::Ollama)
+            {
                 if !*validated {
                     b.validate().await?;
                     *validated = true

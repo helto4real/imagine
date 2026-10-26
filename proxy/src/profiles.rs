@@ -1,4 +1,7 @@
-use crate::logging::log;
+use crate::{
+    logging::log,
+    registry::{Adapter, Spec},
+};
 use anyhow::{Result, bail};
 use serde_json::{Map, Value};
 use std::collections::{HashMap, HashSet};
@@ -10,26 +13,20 @@ const BUDGET: &[&str] = &[
     "thinking_token_budget",
     "thinking_budget_tokens",
 ];
-const STRATA: &[&str] = &[
-    "sc117",
-    "orca",
-    "sc117_128k",
-    "orca_128k",
-    "swift",
-    "swift_128k",
-];
 #[derive(Clone, Default)]
 pub struct Profiles {
     models: HashMap<String, Value>,
 }
-fn mode(v: &Value, engine: &str) -> Option<&'static str> {
+fn mode(v: &Value, adapter: Adapter) -> Option<&'static str> {
+    let tabby = adapter == Adapter::Tabbyapi;
+    let router = adapter == Adapter::LlamaRouter;
     let mut controls = Vec::new();
     let mut modes = HashSet::new();
     if let Some(x) = v.get("reasoning_effort") {
         controls.push(("effort", x))
     }
     if let Some(x) = v.get("enable_thinking") {
-        if engine != "tabbyapi" {
+        if !tabby {
             return None;
         }
         controls.push(("enabled", x))
@@ -41,12 +38,11 @@ fn mode(v: &Value, engine: &str) -> Option<&'static str> {
         "thinking",
     ] {
         let Some(obj) = v.get(key) else { continue };
-        if engine == "tabbyapi" && key == "chat_template_kwargs" && v.get("template_vars").is_some()
-        {
+        if tabby && key == "chat_template_kwargs" && v.get("template_vars").is_some() {
             continue;
         }
         let obj = obj.as_object()?;
-        if key == "thinking" || (key == "template_vars" && engine != "tabbyapi") {
+        if key == "thinking" || (key == "template_vars" && !tabby) {
             return None;
         }
         let effort = if key == "reasoning" {
@@ -61,15 +57,15 @@ fn mode(v: &Value, engine: &str) -> Option<&'static str> {
         };
         for (name, value) in obj {
             if name == effort {
-                if engine == "prism" && (key == "reasoning" || value == "none") {
+                if router && (key == "reasoning" || value == "none") {
                     return None;
                 }
                 controls.push(("effort", value))
             } else if name == enabled {
-                if key == "reasoning" && engine != "tabbyapi" {
+                if key == "reasoning" && !tabby {
                     return None;
                 }
-                if STRATA.contains(&engine) && value == true {
+                if adapter == Adapter::Strata && value == true {
                     continue;
                 }
                 controls.push(("enabled", value))
@@ -85,15 +81,15 @@ fn mode(v: &Value, engine: &str) -> Option<&'static str> {
             });
         } else {
             let text = v.as_str()?;
-            let text = if engine == "prism" {
+            let text = if router {
                 text.to_owned()
             } else {
                 text.trim().to_lowercase()
             };
-            if text == "none" || (engine != "prism" && text == "off") {
+            if text == "none" || (!router && text == "off") {
                 modes.insert("non_thinking");
             } else if ["low", "medium", "xhigh"].contains(&text.as_str())
-                || (engine != "prism" && text == "high")
+                || (!router && text == "high")
             {
                 modes.insert("thinking");
             } else {
@@ -131,18 +127,20 @@ fn thinking(v: &Value) -> bool {
         })
 }
 impl Profiles {
-    pub fn load(path: Option<&str>) -> Result<Self> {
+    /// Profiles name models as `backend/model`; `backends` resolves each
+    /// backend's adapter.
+    pub fn load(path: Option<&str>, backends: &[Spec]) -> Result<Self> {
         let Some(path) = path.filter(|p| !p.is_empty()) else {
             return Ok(Self::default());
         };
         let read = || -> Result<Self> {
             let bytes = std::fs::read(path)?;
             let data = crate::json_wire::unique(&bytes)?;
-            Self::parse(data)
+            Self::parse(data, backends)
         };
         read().map_err(|e| anyhow::anyhow!("model profiles {path}: {e}"))
     }
-    pub fn parse(data: Value) -> Result<Self> {
+    pub fn parse(data: Value, backends: &[Spec]) -> Result<Self> {
         if data.as_object().is_none_or(|o| o.len() != 2)
             || data["version"].as_i64() != Some(1)
             || !data["profiles"].is_array()
@@ -177,7 +175,7 @@ impl Profiles {
             let Some(models) = p["models"].as_array().filter(|v| !v.is_empty()) else {
                 bail!("{name}: models must be a nonempty list")
             };
-            let mut engines = HashSet::new();
+            let mut adapters = HashSet::new();
             for m in models {
                 let Some(model) = m.as_str() else {
                     bail!("{name}: expected an exact supported backend/model ID")
@@ -185,18 +183,30 @@ impl Profiles {
                 let Some((engine, native)) = model.split_once('/') else {
                     bail!("{name}: expected an exact supported backend/model ID")
                 };
-                if (!STRATA.contains(&engine) && !["prism", "tabbyapi"].contains(&engine))
-                    || native.trim().is_empty()
-                    || model.contains(['*', '?', '[', ']'])
-                {
+                if native.trim().is_empty() || model.contains(['*', '?', '[', ']']) {
+                    bail!("{name}: expected an exact supported backend/model ID")
+                }
+                let Some(spec) = backends.iter().find(|s| s.id == engine) else {
+                    // A removed backend's profile is kept for when it returns.
+                    log(
+                        30,
+                        "st_proxy.model_profiles",
+                        format!("profile {name}: backend {engine:?} is not configured; skipped"),
+                    );
+                    continue;
+                };
+                if !matches!(
+                    spec.adapter,
+                    Adapter::Strata | Adapter::LlamaRouter | Adapter::Tabbyapi
+                ) {
                     bail!("{name}: expected an exact supported backend/model ID")
                 }
                 if this.models.insert(model.into(), p.clone()).is_some() {
                     bail!("duplicate model match: {model}")
                 }
-                engines.insert(engine);
+                adapters.insert(spec.adapter);
             }
-            let strata = engines.iter().any(|e| STRATA.contains(e));
+            let strata = adapters.contains(&Adapter::Strata);
             for key in ["defaults", "thinking", "non_thinking"] {
                 let empty = Value::Object(Map::new());
                 let values = p.get(key).unwrap_or(&empty);
@@ -250,11 +260,17 @@ impl Profiles {
         }
         Ok(this)
     }
-    pub fn apply(&self, payload: &Value, engine: &str, model: Option<&str>) -> Value {
+    pub fn apply(
+        &self,
+        payload: &Value,
+        engine: &str,
+        adapter: Adapter,
+        model: Option<&str>,
+    ) -> Value {
         let Some(profile) = model.and_then(|m| self.models.get(&format!("{engine}/{m}"))) else {
             return payload.clone();
         };
-        let mode = mode(payload, engine);
+        let mode = mode(payload, adapter);
         let mut defaults = profile["defaults"].as_object().cloned().unwrap_or_default();
         if let Some(m) = mode
             && let Some(o) = profile[m].as_object()
@@ -267,7 +283,7 @@ impl Profiles {
             if k == "reasoning_budget_tokens" && thinking(payload) {
                 continue;
             }
-            let wire = if k == "repetition_penalty" && engine == "prism" {
+            let wire = if k == "repetition_penalty" && adapter == Adapter::LlamaRouter {
                 "repeat_penalty"
             } else {
                 &k
@@ -282,13 +298,13 @@ impl Profiles {
             result[wire] = v;
             added.push(wire.to_owned());
         }
-        let wire = if engine == "prism" {
+        let wire = if adapter == Adapter::LlamaRouter {
             "repeat_penalty"
         } else {
             "repetition_penalty"
         };
         if payload.get(wire).is_none() {
-            let aliases = if engine == "tabbyapi" {
+            let aliases = if adapter == Adapter::Tabbyapi {
                 &["rep_pen", "repeat_penalty"][..]
             } else {
                 REP
@@ -311,7 +327,13 @@ impl Profiles {
         }
         result
     }
-    pub fn body(&self, body: &[u8], engine: &str, model: Option<&str>) -> Vec<u8> {
+    pub fn body(
+        &self,
+        body: &[u8],
+        engine: &str,
+        adapter: Adapter,
+        model: Option<&str>,
+    ) -> Vec<u8> {
         if self.models.is_empty() {
             return body.into();
         }
@@ -324,6 +346,7 @@ impl Profiles {
         let result = self.apply(
             &payload,
             engine,
+            adapter,
             model.or_else(|| payload["model"].as_str()),
         );
         if result == payload {

@@ -18,120 +18,95 @@ typeset -gr PROXY_PATH="${PROXY_COMMAND}"
 typeset -gr COMFY_URL="${ST_PROXY_COMFY_URL:-http://127.0.0.1:8188}"
 
 typeset -g LLM_BACKEND="${ST_PROXY_LLM_BACKEND:-koboldcpp}"
+# Backends the stack leaves out of "all", from ST_PROXY_EXCLUDE_BACKENDS and
+# backends that did not become ready.
+typeset -ga EXCLUDED_BACKENDS=(${(s:,:)${${ST_PROXY_EXCLUDE_BACKENDS:-}//[[:space:]]/}})
+typeset -g BACKENDS_TABLE=""
+
+# The configured backends (config/proxy/backends.json), as resolved by the
+# proxy: BACKEND_IDS, BACKEND_<FIELD>[id] and BACKEND_COMMAND_<id>. --stop
+# uses the copy saved at start, so it stops what was started.
+load_backends() {
+    local table=""
+
+    if (( STOP_ONLY )) && [[ -r "${BACKENDS_FILE}" && -O "${BACKENDS_FILE}" ]]; then
+        table=$(<"${BACKENDS_FILE}")
+    elif [[ -x "${PROXY_PATH}" ]]; then
+        table=$(env -u ST_PROXY_MCP_PORT "${PROXY_PATH}" --config "${CONFIG_DIR}" \
+            --print-backends shell 2>/dev/null) || {
+            log "could not read the LLM backends file; check ${CONFIG_DIR}/proxy/backends.json"
+            return 1
+        }
+    else
+        return 1
+    fi
+    eval "${table}" || return 1
+    BACKENDS_TABLE=${table}
+}
+
+# Backends that "all" starts: enabled, included in all, available and not excluded.
+all_backend_ids() {
+    local id
+
+    reply=()
+    for id in "${BACKEND_IDS[@]}"; do
+        (( BACKEND_IN_ALL[${id}] )) || continue
+        [[ -z "${BACKEND_SKIP[${id}]}" ]] || continue
+        (( ${EXCLUDED_BACKENDS[(Ie)${id}]} )) && continue
+        reply+=("${id}")
+    done
+}
 
 configure_llm_backend() {
     typeset -gi LLM_COMMAND_EXPLICIT=${+ST_STACK_LLM_COMMAND}
-    typeset -g KOBOLD_EXECUTABLE="${ST_STACK_KOBOLD_EXECUTABLE:-./koboldcpp-linux-x64}"
     typeset -g LLM_LABEL=""
+    typeset -g LLM_ADAPTER=""
     typeset -g LLM_DEFAULT_URL=""
     typeset -g LLM_DEFAULT_DIR=""
-    typeset -g LLM_DEFAULT_COMMAND=""
-    case "${LLM_BACKEND}" in
-        koboldcpp)
-            LLM_LABEL="KoboldCpp"
-            LLM_DEFAULT_URL="http://127.0.0.1:5001"
-            LLM_DEFAULT_DIR="${HOME}/git/cobolcpp"
-            LLM_DEFAULT_COMMAND="${KOBOLD_EXECUTABLE}"
-            ;;
-        prism)
-            LLM_LABEL="Prism"
-            LLM_DEFAULT_URL="http://127.0.0.1:5006"
-            LLM_DEFAULT_DIR="${HOME}/git/local-model-runtimes/models/prism"
-            LLM_DEFAULT_COMMAND="./start.sh"
-            export ST_PROXY_KOBOLD_ROUTER_MODE=false
-            ;;
-        tabbyapi)
-            LLM_LABEL="TabbyAPI"
-            LLM_DEFAULT_URL="http://127.0.0.1:5003"
-            LLM_DEFAULT_DIR="${HOME}/git/tabby"
-            LLM_DEFAULT_COMMAND="./start.sh"
-            # Do not inherit a KoboldCpp-only mode into the selected adapter.
-            export ST_PROXY_KOBOLD_ROUTER_MODE=false
-            ;;
-        sc117|orca|swift)
-            LLM_DEFAULT_DIR="${HOME}/git/qwen-next-server"
-            if [[ "${LLM_BACKEND}" == sc117 ]]; then
-                LLM_LABEL="Qwen SC117"
-                LLM_DEFAULT_URL="${ST_PROXY_SC117_URL:-http://127.0.0.1:48640}"
-                LLM_DEFAULT_COMMAND="./start-server.sh --lazy"
-            elif [[ "${LLM_BACKEND}" == swift ]]; then
-                LLM_LABEL="Qwen SC117 Swift"
-                LLM_DEFAULT_URL="${ST_PROXY_SWIFT_URL:-http://127.0.0.1:48648}"
-                LLM_DEFAULT_COMMAND="./start-swift.sh --lazy"
-            else
-                LLM_LABEL="Qwen Orca"
-                LLM_DEFAULT_URL="${ST_PROXY_ORCA_URL:-http://127.0.0.1:48642}"
-                LLM_DEFAULT_COMMAND="./start-orca.sh --lazy"
-            fi
-            export ST_PROXY_KOBOLD_ROUTER_MODE=false
-            ;;
-        sc117_128k|orca_128k|swift_128k)
-            LLM_DEFAULT_DIR="${HOME}/git/local-model-runtimes/models/qwen-next/${LLM_BACKEND/_/-}"
-            LLM_DEFAULT_COMMAND="./start.sh --lazy"
-            if [[ "${LLM_BACKEND}" == sc117_128k ]]; then
-                LLM_LABEL="Qwen SC117 128k"
-                LLM_DEFAULT_URL="${ST_PROXY_SC117_128K_URL:-http://127.0.0.1:48644}"
-            elif [[ "${LLM_BACKEND}" == swift_128k ]]; then
-                LLM_LABEL="Qwen SC117 Swift 128k"
-                LLM_DEFAULT_URL="${ST_PROXY_SWIFT_128K_URL:-http://127.0.0.1:48650}"
-            else
-                LLM_LABEL="Qwen Orca 128k"
-                LLM_DEFAULT_URL="${ST_PROXY_ORCA_128K_URL:-http://127.0.0.1:48646}"
-            fi
-            export ST_PROXY_KOBOLD_ROUTER_MODE=false
-            ;;
-        ollama)
-            LLM_LABEL="Ollama"
-            LLM_DEFAULT_URL="http://127.0.0.1:11434"
-            LLM_DEFAULT_DIR="${HOME}"
-            LLM_DEFAULT_COMMAND="ollama serve"
-            ;;
-        all)
-            LLM_LABEL="all LLM backends"
-            LLM_DEFAULT_URL="http://127.0.0.1:5001"
-            LLM_DEFAULT_DIR="${SCRIPT_DIR}"
-            LLM_DEFAULT_COMMAND="${PROXY_COMMAND}"
-            export ST_PROXY_KOBOLD_ROUTER_MODE=false
-            ;;
-        *)
-            LLM_LABEL="${LLM_BACKEND}"
-            ;;
-    esac
+    typeset -g LLM_MATCH=""
+    typeset -gi LLM_FILTER=0
+    typeset -ga LLM_DEFAULT_COMMAND=()
+    local name
+
+    if [[ "${LLM_BACKEND}" == all ]]; then
+        LLM_LABEL="all LLM backends"
+        LLM_ADAPTER=all
+    elif (( ${+BACKEND_ADAPTER[${LLM_BACKEND}]} )); then
+        LLM_LABEL=${BACKEND_LABEL[${LLM_BACKEND}]}
+        LLM_ADAPTER=${BACKEND_ADAPTER[${LLM_BACKEND}]}
+        LLM_DEFAULT_URL=${BACKEND_ORIGIN[${LLM_BACKEND}]}
+        LLM_DEFAULT_DIR=${BACKEND_DIR[${LLM_BACKEND}]}
+        LLM_MATCH=${BACKEND_MATCH[${LLM_BACKEND}]}
+        LLM_FILTER=${BACKEND_FILTER[${LLM_BACKEND}]}
+        name="BACKEND_COMMAND_${LLM_BACKEND}"
+        LLM_DEFAULT_COMMAND=("${(@P)name}")
+    else
+        log "unknown LLM backend: ${LLM_BACKEND}; choose one of: all ${BACKEND_IDS[*]}"
+        return 2
+    fi
+    # Only KoboldCpp (and Ollama, which rejects it) may inherit Router mode.
+    if [[ "${LLM_ADAPTER}" != koboldcpp && "${LLM_ADAPTER}" != ollama ]]; then
+        export ST_PROXY_KOBOLD_ROUTER_MODE=false
+    fi
     typeset -g LLM_URL="${ST_PROXY_LLM_URL:-${LLM_DEFAULT_URL}}"
-    if [[ "${LLM_BACKEND}" == koboldcpp || "${LLM_BACKEND}" == ollama || "${LLM_BACKEND}" == all ]]; then
+    if [[ "${LLM_ADAPTER}" == koboldcpp ]]; then
         LLM_URL="${ST_PROXY_LLM_URL:-${ST_PROXY_KOBOLD_URL:-${LLM_DEFAULT_URL}}}"
     fi
     typeset -g LLM_DIR="${ST_STACK_LLM_DIR:-${LLM_DEFAULT_DIR}}"
-    typeset -g LLM_COMMAND_TEXT="${ST_STACK_LLM_COMMAND:-${LLM_DEFAULT_COMMAND}}"
-    typeset -ga LLM_COMMAND=(${(z)LLM_COMMAND_TEXT})
+    if (( LLM_COMMAND_EXPLICIT )); then
+        typeset -ga LLM_COMMAND=(${(z)ST_STACK_LLM_COMMAND})
+    else
+        local port=""
+        [[ "${LLM_URL}" =~ '^https?://[^/:]+:([0-9]+)(/.*)?$' ]] && port=${match[1]}
+        typeset -ga LLM_COMMAND=("${(@)LLM_DEFAULT_COMMAND//\{port\}/${port}}")
+    fi
     typeset -g LLM_COMMAND_NAME=""
-    if (( ${#LLM_COMMAND} )); then
+    if (( LLM_COMMAND_EXPLICIT )); then
         LLM_COMMAND_NAME=${LLM_COMMAND[1]:t:l}
+    else
+        LLM_COMMAND_NAME=${LLM_MATCH}
     fi
-    if [[ "${LLM_BACKEND}" == prism ]] && (( ! LLM_COMMAND_EXPLICIT )); then
-        LLM_COMMAND_NAME="llama-server"
-    fi
-    if [[ "${LLM_BACKEND}" == sc117 || "${LLM_BACKEND}" == orca || "${LLM_BACKEND}" == swift ]]; then
-        # The scripts exec their model-specific Python launcher in this directory.
-        if (( ! LLM_COMMAND_EXPLICIT )); then
-            if [[ "${LLM_BACKEND}" == sc117 ]]; then
-                LLM_COMMAND_NAME="qwen3.8-flash-next-gsq-rco-abliterated-iq3_xxs/launch.py"
-            elif [[ "${LLM_BACKEND}" == swift ]]; then
-                LLM_COMMAND_NAME="swift-1.5-qwen3.8-flash-next-gsq-rco-abliterated-iq3_xxs/launch.py"
-            else
-                LLM_COMMAND_NAME="qwen3.8-flash-next-uncensored-iq3_xxs/launch.py"
-            fi
-            if [[ "${LLM_URL}" =~ '^https?://[^/:]+:([0-9]+)(/.*)?$' ]]; then
-                LLM_COMMAND+=(--port "${match[1]}")
-            fi
-        fi
-    fi
-    if [[ "${LLM_BACKEND}" == sc117_128k || "${LLM_BACKEND}" == orca_128k || "${LLM_BACKEND}" == swift_128k ]] && (( ! LLM_COMMAND_EXPLICIT )); then
-        LLM_COMMAND_NAME="launch.py"
-        if [[ "${LLM_URL}" =~ '^https?://[^/:]+:([0-9]+)(/.*)?$' ]]; then
-            LLM_COMMAND+=(--port "${match[1]}")
-        fi
-    fi
+    typeset -g KOBOLD_EXECUTABLE="${ST_STACK_KOBOLD_EXECUTABLE:-${LLM_COMMAND[1]:-./koboldcpp-linux-x64}}"
     typeset -g KOBOLD_CONFIG_DIR="${ST_STACK_KOBOLD_CONFIG_DIR:-${LLM_DIR}/models}"
     typeset -g KOBOLD_CONFIG_SETTING="${ST_STACK_KOBOLD_CONFIG:-}"
     typeset -g KOBOLD_SELECTED_CONFIG=""
@@ -139,7 +114,7 @@ configure_llm_backend() {
     typeset -g KOBOLD_ROUTER_MODE="${ST_PROXY_KOBOLD_ROUTER_MODE:-}"
     if [[ -z "${KOBOLD_ROUTER_MODE}" ]]; then
         KOBOLD_ROUTER_MODE=false
-        if [[ "${LLM_BACKEND}" == koboldcpp ]] && (( ! LLM_COMMAND_EXPLICIT )); then
+        if [[ "${LLM_ADAPTER}" == koboldcpp ]] && (( ! LLM_COMMAND_EXPLICIT )); then
             KOBOLD_ROUTER_MODE=true
         fi
     fi
@@ -161,23 +136,13 @@ with_llm_backend() (
     OWNS_LOCK=0
     local prefix="ST_STACK_${LLM_BACKEND:u}"
     local directory_key="${prefix}_DIR" command_key="${prefix}_COMMAND"
-    unset ST_STACK_LLM_DIR ST_STACK_LLM_COMMAND
+    local all_args="BACKEND_ALL_ARGS_${LLM_BACKEND}"
+    unset ST_STACK_LLM_DIR ST_STACK_LLM_COMMAND ST_PROXY_LLM_URL
     [[ -n "${(P)directory_key:-}" ]] && export ST_STACK_LLM_DIR="${(P)directory_key}"
     [[ -n "${(P)command_key:-}" ]] && export ST_STACK_LLM_COMMAND="${(P)command_key}"
-    case "${LLM_BACKEND}" in
-        koboldcpp)
-            export ST_PROXY_LLM_URL="${ST_PROXY_LLM_URL:-${ST_PROXY_KOBOLD_URL:-http://127.0.0.1:5001}}"
-            export ST_PROXY_KOBOLD_ROUTER_MODE=true
-            ;;
-        tabbyapi) export ST_PROXY_LLM_URL="${ST_PROXY_TABBY_URL:-http://127.0.0.1:5003}" ;;
-        prism) export ST_PROXY_LLM_URL="${ST_PROXY_PRISM_URL:-http://127.0.0.1:5006}" ;;
-        sc117) export ST_PROXY_LLM_URL="${ST_PROXY_SC117_URL:-http://127.0.0.1:48640}" ;;
-        orca) export ST_PROXY_LLM_URL="${ST_PROXY_ORCA_URL:-http://127.0.0.1:48642}" ;;
-        sc117_128k) export ST_PROXY_LLM_URL="${ST_PROXY_SC117_128K_URL:-http://127.0.0.1:48644}" ;;
-        orca_128k) export ST_PROXY_LLM_URL="${ST_PROXY_ORCA_128K_URL:-http://127.0.0.1:48646}" ;;
-        swift) export ST_PROXY_LLM_URL="${ST_PROXY_SWIFT_URL:-http://127.0.0.1:48648}" ;;
-        swift_128k) export ST_PROXY_LLM_URL="${ST_PROXY_SWIFT_128K_URL:-http://127.0.0.1:48650}" ;;
-    esac
+    if [[ "${BACKEND_ADAPTER[${LLM_BACKEND}]:-}" == koboldcpp ]]; then
+        export ST_PROXY_KOBOLD_ROUTER_MODE=true
+    fi
     configure_llm_backend || return 1
     if [[ "${LLM_URL}" =~ '^https?://[^/:]+:([0-9]+)(/.*)?$' ]]; then
         LLM_PORT=${match[1]}
@@ -185,10 +150,8 @@ with_llm_backend() (
         log "backend URL must include http(s), a host and an explicit port"
         return 2
     fi
-    if [[ "${LLM_BACKEND}" == tabbyapi ]]; then
-        # Native CLI overrides apply only to this launch, never to config.yml.
-        LLM_COMMAND+=(--model-name "" --embedding-model-name "")
-    fi
+    # Launch arguments that apply only when every backend runs together.
+    LLM_COMMAND+=("${(@P)all_args}")
     "$@"
 )
 
@@ -204,6 +167,7 @@ typeset -gr KOBOLD_MODEL_CACHE="${RUNTIME_DIR}/kobold-models.json"
 typeset -gr KOBOLD_DEFAULT_MODEL_FILE="${RUNTIME_DIR}/kobold-default-model"
 typeset -gr LOCK_DIR="${RUNTIME_DIR}/supervisor.lock"
 typeset -gr SUPERVISOR_FILE="${RUNTIME_DIR}/supervisor.pid"
+typeset -gr BACKENDS_FILE="${RUNTIME_DIR}/backends.zsh"
 
 typeset -gi SHOW_CHILD_LOGS=0
 typeset -gi STOP_ONLY=0
@@ -288,11 +252,14 @@ parse_args() {
         log "ST_STACK_POCKETTTS_PORT must be an integer between 1 and 65535"
         return 2
     fi
-    configure_llm_backend
-    [[ "${LLM_BACKEND}" == all ]] && ALL_BACKENDS=1
+    configure_llm_backend || return 2
+    if [[ "${LLM_BACKEND}" == all ]]; then
+        ALL_BACKENDS=1
+        return 0
+    fi
 
-    if [[ -z "${LLM_BACKEND}" || -z "${LLM_URL}" || -z "${LLM_DIR}" || -z "${LLM_COMMAND_NAME}" ]]; then
-        log "LLM backend, URL, directory and command must be configured"
+    if [[ -z "${LLM_URL}" || -z "${LLM_DIR}" || -z "${LLM_COMMAND_NAME}" ]]; then
+        log "${LLM_LABEL}: URL, directory and command must be configured in the backends file"
         return 2
     fi
     if [[ "${LLM_URL}" =~ '^https?://[^/:]+:([0-9]+)(/.*)?$' ]]; then
@@ -526,7 +493,8 @@ service_running() {
 llm_ready() {
     if [[ "${LLM_BACKEND}" == all ]]; then
         local engine
-        for engine in koboldcpp tabbyapi prism sc117 orca sc117_128k orca_128k swift swift_128k; do
+        all_backend_ids
+        for engine in "${reply[@]}"; do
             with_llm_backend "${engine}" llm_ready || return 1
         done
         return 0
@@ -536,6 +504,7 @@ llm_ready() {
     env -u ST_PROXY_MCP_PORT "${PROXY_PATH}" \
         --check-backend \
         --backend-check-timeout 1 \
+        --config "${CONFIG_DIR}" \
         --llm-backend "${LLM_BACKEND}" \
         --llm-url "${LLM_URL}" "${PROXY_ROUTER_ARGS[@]}" >/dev/null 2>&1
 }
@@ -718,8 +687,7 @@ launch_in_directory() {
     if (( hide_output && ! SHOW_CHILD_LOGS )); then
         setsid zsh -c 'cd -- "$1" || exit 1; shift; exec "$@"' \
             st-stack-child "${directory}" "$@" >/dev/null 2>&1 &
-    elif [[ "${service}" == llm && ( "${LLM_BACKEND}" == sc117 || \
-            "${LLM_BACKEND}" == orca || "${LLM_BACKEND}" == swift ) && -z "${NO_COLOR:-}" && \
+    elif [[ "${service}" == llm ]] && (( LLM_FILTER )) && [[ -z "${NO_COLOR:-}" && \
             "${TERM:-}" != dumb ]] && { [[ -t 1 ]] || [[ -t 2 ]]; }; then
         # Filters share the backend's process group; exec preserves its tracked PID.
         # Only terminal streams are filtered. Redirected streams stay untouched.
@@ -744,7 +712,17 @@ ensure_service_started() {
 
     if [[ "${service}" == llm && "${LLM_BACKEND}" == all ]]; then
         local engine
-        for engine in koboldcpp tabbyapi prism sc117 orca sc117_128k orca_128k swift swift_128k; do
+        for engine in "${BACKEND_IDS[@]}"; do
+            if (( BACKEND_IN_ALL[${engine}] )) && [[ -n "${BACKEND_SKIP[${engine}]}" ]]; then
+                log "skipping ${BACKEND_LABEL[${engine}]}: ${BACKEND_SKIP[${engine}]}"
+            fi
+        done
+        all_backend_ids
+        if (( ${#reply} == 0 )); then
+            log "no LLM backend is available; check ${CONFIG_DIR}/proxy/backends.json"
+            return 1
+        fi
+        for engine in "${reply[@]}"; do
             with_llm_backend "${engine}" ensure_service_started llm || return 1
         done
         return 0
@@ -769,7 +747,7 @@ ensure_service_started() {
 
     case "${service}" in
         llm)
-            if [[ "${LLM_BACKEND}" == koboldcpp ]]; then
+            if [[ "${LLM_ADAPTER}" == koboldcpp ]]; then
                 configure_kobold_command || return 1
             fi
             log "starting ${LLM_LABEL} in ${LLM_DIR}"
@@ -800,17 +778,16 @@ ensure_service_started() {
                 IFS= read -r default_model < "${KOBOLD_DEFAULT_MODEL_FILE}" || return 1
                 cache_args+=(--kobold-default-model "${default_model}")
             fi
+            local -a backend_args=(--llm-backend "${LLM_BACKEND}")
+            if (( ALL_BACKENDS )); then
+                # Backend origins come from the backends file and ST_PROXY_<ID>_URL.
+                (( ${#EXCLUDED_BACKENDS} )) &&
+                    backend_args+=(--exclude-backends "${(j:,:)EXCLUDED_BACKENDS}")
+            else
+                backend_args+=(--llm-url "${LLM_URL}")
+            fi
             launch_in_directory proxy "${SCRIPT_DIR}" 0 "${PROXY_COMMAND}" \
-                --llm-backend "${LLM_BACKEND}" \
-                --llm-url "${LLM_URL}" \
-                --tabby-url "${ST_PROXY_TABBY_URL:-http://127.0.0.1:5003}" \
-                --prism-url "${ST_PROXY_PRISM_URL:-http://127.0.0.1:5006}" \
-                --sc117-url "${ST_PROXY_SC117_URL:-http://127.0.0.1:48640}" \
-                --orca-url "${ST_PROXY_ORCA_URL:-http://127.0.0.1:48642}" \
-                --sc117-128k-url "${ST_PROXY_SC117_128K_URL:-http://127.0.0.1:48644}" \
-                --orca-128k-url "${ST_PROXY_ORCA_128K_URL:-http://127.0.0.1:48646}" \
-                --swift-url "${ST_PROXY_SWIFT_URL:-http://127.0.0.1:48648}" \
-                --swift-128k-url "${ST_PROXY_SWIFT_128K_URL:-http://127.0.0.1:48650}" \
+                "${backend_args[@]}" \
                 --comfy-url "${COMFY_URL}" \
                 --chat-port "${PROXY_CHAT_PORT}" \
                 --image-port "${PROXY_IMAGE_PORT}" \
@@ -847,6 +824,41 @@ wait_for_pockettts() {
 wait_for_dependencies() {
     local deadline=$(( SECONDS + START_TIMEOUT ))
     local -a missing
+
+    if (( ALL_BACKENDS )); then
+        local engine
+        local -a pending waiting labels
+        all_backend_ids
+        pending=("${reply[@]}")
+        while (( ${#pending} && SECONDS < deadline )); do
+            waiting=()
+            for engine in "${pending[@]}"; do
+                with_llm_backend "${engine}" llm_ready || waiting+=("${engine}")
+            done
+            pending=("${waiting[@]}")
+            (( ${#pending} )) && sleep 0.2
+        done
+        # A backend that cannot start is left out unless it is required.
+        for engine in "${pending[@]}"; do
+            if (( BACKEND_REQUIRED[${engine}] )); then
+                log "timed out waiting for required ${BACKEND_LABEL[${engine}]}"
+                return 1
+            fi
+            log "${BACKEND_LABEL[${engine}]} did not become ready within ${START_TIMEOUT}s; continuing without it"
+            with_llm_backend "${engine}" stop_service llm || true
+            EXCLUDED_BACKENDS+=("${engine}")
+        done
+        all_backend_ids
+        if (( ${#reply} == 0 )); then
+            log "no LLM backend became ready"
+            return 1
+        fi
+        for engine in "${reply[@]}"; do
+            labels+=("${BACKEND_LABEL[${engine}]}")
+        done
+        log "LLM backends running: ${(j:, :)labels}"
+        return 0
+    fi
 
     while (( SECONDS < deadline )); do
         missing=()
@@ -966,7 +978,8 @@ stop_service() {
 
     if [[ "${service}" == llm && "${LLM_BACKEND}" == all ]]; then
         local engine result=0
-        for engine in koboldcpp tabbyapi prism sc117 orca sc117_128k orca_128k swift swift_128k; do
+        for engine in "${BACKEND_IDS[@]}"; do
+            (( BACKEND_IN_ALL[${engine}] )) || continue
             with_llm_backend "${engine}" stop_service llm || result=1
         done
         return ${result}
@@ -1029,7 +1042,7 @@ cleanup() {
 
     if (( result == 0 )); then
         cleanup_kobold_runtime
-        rm -f -- "${RUNTIME_DIR}/llm-backend"
+        rm -f -- "${RUNTIME_DIR}/llm-backend" "${BACKENDS_FILE}"
     fi
 
     if (( OWNS_LOCK )); then
@@ -1102,7 +1115,12 @@ stop_stack() {
 
     CLEANUP_STARTED=0
     stop_service proxy || result=1
-    stop_service llm || result=1
+    if (( ${#BACKEND_IDS} )) || [[ "${LLM_BACKEND}" != all ]]; then
+        stop_service llm || result=1
+    else
+        stop_recorded_backends || result=1
+    fi
+    (( result == 0 )) && rm -f -- "${RUNTIME_DIR}/llm-backend" "${BACKENDS_FILE}"
     (( result == 0 )) && cleanup_kobold_runtime
     rm -f -- "${SUPERVISOR_FILE}"
     rmdir -- "${LOCK_DIR}" 2>/dev/null || true
@@ -1112,6 +1130,19 @@ stop_stack() {
         log "stack stopped"
     fi
     return ${result}
+}
+
+# Without a saved backend list, stop the process groups the stack recorded.
+stop_recorded_backends() {
+    local file value
+
+    for file in "${RUNTIME_DIR}"/llm-*.pgid(N.); do
+        IFS= read -r value < "${file}" || continue
+        [[ "${value}" == <-> ]] && (( value > 1 )) || continue
+        log "stopping recorded LLM backend group ${file:t:r}"
+        kill -s TERM -- "-${value}" 2>/dev/null || true
+        rm -f -- "${file}"
+    done
 }
 
 monitor_stack() {
@@ -1188,28 +1219,40 @@ main() {
     local lock_status
 
     if (( ${@[(Ie)--stop]} )); then
+        STOP_ONLY=1
         if [[ -z "${ST_PROXY_LLM_BACKEND:-}" && -r "${RUNTIME_DIR}/llm-backend" ]]; then
             IFS= read -r LLM_BACKEND < "${RUNTIME_DIR}/llm-backend"
         fi
-    elif [[ -z "${ST_PROXY_LLM_BACKEND:-}" ]]; then
-        local choice
-        while true; do
-            print -nru2 -- "Select LLM backend: 1) KoboldCpp  2) TabbyAPI  3) Prism  4) Qwen SC117  5) Qwen Orca  6) Qwen SC117 128k  7) Qwen Orca 128k  8) Qwen SC117 Swift  9) Qwen SC117 Swift 128k [Enter: all]: "
-            IFS= read -r choice || choice=""
-            case "${choice}" in
-                "") LLM_BACKEND=all; break ;;
-                1) LLM_BACKEND=koboldcpp; break ;;
-                2) LLM_BACKEND=tabbyapi; break ;;
-                3) LLM_BACKEND=prism; break ;;
-                4) LLM_BACKEND=sc117; break ;;
-                5) LLM_BACKEND=orca; break ;;
-                6) LLM_BACKEND=sc117_128k; break ;;
-                7) LLM_BACKEND=orca_128k; break ;;
-                8) LLM_BACKEND=swift; break ;;
-                9) LLM_BACKEND=swift_128k; break ;;
-                *) log "enter 1, 2, 3, 4, 5, 6, 7, 8, 9 or leave empty for all" ;;
-            esac
-        done
+        # Without a saved or readable list, recorded process groups are stopped.
+        if ! load_backends; then
+            LLM_BACKEND=all
+            STOP_ONLY=1
+            parse_args "$@" 2>/dev/null
+            prepare_runtime_dir || return 1
+            stop_stack
+            return $?
+        fi
+    else
+        load_backends || return 1
+        if [[ -z "${ST_PROXY_LLM_BACKEND:-}" ]]; then
+            local choice id
+            local -a menu
+            for id in "${BACKEND_IDS[@]}"; do
+                menu+=("$(( ${#menu} + 1 ))) ${BACKEND_LABEL[${id}]}${BACKEND_SKIP[${id}]:+ (unavailable)}")
+            done
+            while true; do
+                print -nru2 -- "Select LLM backend: ${(j:  :)menu} [Enter: all]: "
+                IFS= read -r choice || choice=""
+                if [[ -z "${choice}" ]]; then
+                    LLM_BACKEND=all
+                    break
+                elif [[ "${choice}" == <-> ]] && (( choice >= 1 && choice <= ${#BACKEND_IDS} )); then
+                    LLM_BACKEND=${BACKEND_IDS[${choice}]}
+                    break
+                fi
+                log "enter 1–${#BACKEND_IDS} or leave empty for all"
+            done
+        fi
     fi
     parse_args "$@" || return $?
     prepare_runtime_dir || return 1
@@ -1228,12 +1271,14 @@ main() {
     fi
 
     print -r -- "${LLM_BACKEND}" >| "${RUNTIME_DIR}/llm-backend"
+    print -r -- "${BACKENDS_TABLE}" >| "${BACKENDS_FILE}"
     ensure_service_started llm || return 1
-    log "waiting for ${LLM_LABEL} readiness at ${LLM_URL}"
+    log "waiting for ${LLM_LABEL} readiness${LLM_URL:+ at ${LLM_URL}}"
     wait_for_dependencies || return 1
 
     if (( ${#PROXY_ROUTER_ARGS} )); then
-        env -u ST_PROXY_MCP_PORT "${PROXY_PATH}" --check-backend --llm-backend "${LLM_BACKEND}" \
+        env -u ST_PROXY_MCP_PORT "${PROXY_PATH}" --check-backend --config "${CONFIG_DIR}" \
+            --llm-backend "${LLM_BACKEND}" \
             --llm-url "${LLM_URL}" "${PROXY_ROUTER_ARGS[@]}" \
             --write-kobold-model-cache "${KOBOLD_MODEL_CACHE}" || {
                 log "Router mode unavailable; restart KoboldCpp with --admin, --admindir and --routermode"

@@ -27,14 +27,37 @@ async fn run() -> Result<()> {
         let help = include_str!("../reference/cli-help.txt")
             .replace("                [--imagine-access-file IMAGINE_ACCESS_FILE]\n", "")
             .replace("  --imagine-access-file IMAGINE_ACCESS_FILE\n                        operator-owned Imagine access.json for MCP assets and\n                        GPU release\n", "");
-        let help = help.replace(
-            "sc117_128k,orca_128k,prism",
-            "sc117_128k,orca_128k,swift,swift_128k,prism",
-        );
+        // Backends come from the backends file, not a fixed list.
+        let help = help
+            .replace(
+                "{koboldcpp,ollama,sc117,orca,sc117_128k,orca_128k,prism,tabbyapi,all}",
+                "BACKEND",
+            )
+            .lines()
+            .filter(|l| {
+                !["tabby", "prism", "sc117", "orca"].iter().any(|id| {
+                    l.contains(&format!("--{id}-url")) || l.contains(&format!("--{id}-128k-url"))
+                })
+            })
+            .map(|l| format!("{l}\n"))
+            .collect::<String>();
         print!("{help}");
-        println!("  --swift-url SWIFT_URL\n  --swift-128k-url SWIFT_128K_URL");
+        println!(
+            "  --backends BACKENDS   LLM backends file (default: CONFIG/proxy/backends.json)\n  --llm-backend BACKEND a backend id from that file, or all\n  --exclude-backends IDS\n                        comma-separated backend ids that all leaves out\n  --backend-url ID=URL, --ID-url URL\n                        a backend's origin (also ST_PROXY_<ID>_URL)\n  --print-backends table|shell\n                        list the configured backends and exit"
+        );
         println!(
             "\n  --comfy-enabled true|false\n                        enable Comfy routes and GPU cleanup (binary default: true; root launcher: false)\n  --config CONFIG       editable configuration root (MCP texts under mcp/)"
+        );
+        return Ok(());
+    }
+    if let Some(format) = &cli.print_backends {
+        print!(
+            "{}",
+            if format == "shell" {
+                st_proxy::registry::shell(&config.registry)
+            } else {
+                st_proxy::registry::table(&config.registry)
+            }
         );
         return Ok(());
     }
@@ -56,15 +79,16 @@ async fn run() -> Result<()> {
             .build()?;
         let mut b = st_proxy::backend::Backends::new(&config, client);
         b.validate().await?;
+        use st_proxy::registry::Adapter;
         if config.kobold_router_mode
-            || !["koboldcpp", "ollama"].contains(&config.llm_backend.as_str())
+            || !matches!(config.adapter(), Some(Adapter::Koboldcpp | Adapter::Ollama))
         {
             b.observe().await?;
         } else {
             b.entries[0].snapshot().await?;
         }
         if let Some(path) = cli.write_kobold_model_cache {
-            if config.llm_backend != "koboldcpp" || !config.kobold_router_mode {
+            if config.adapter() != Some(Adapter::Koboldcpp) || !config.kobold_router_mode {
                 anyhow::bail!("model cache export requires KoboldCpp Router mode")
             };
             let bytes = serde_json::to_vec(&b.entries[0].catalog().await?)?;
@@ -76,10 +100,7 @@ async fn run() -> Result<()> {
         log(
             20,
             "st_proxy.cli",
-            format!(
-                "LLM backend ready: backend={}",
-                st_proxy::config::label(&config.llm_backend)
-            ),
+            format!("LLM backend ready: backend={}", config.label()),
         );
         return Ok(());
     }
@@ -88,6 +109,13 @@ async fn run() -> Result<()> {
     if config.mcp_port.is_some() && st_proxy::mcp::check_config().is_err() {
         eprintln!("st-proxy: MCP configuration under --config is missing or invalid");
         std::process::exit(2)
+    }
+    for (label, reason) in config.skipped() {
+        log(
+            30,
+            "st_proxy.cli",
+            format!("LLM backend skipped: {label}: {reason}"),
+        );
     }
     let running = Service::start(config).await?;
     log(

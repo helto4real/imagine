@@ -199,7 +199,7 @@ impl Comfy {
         }
         log(20, "st_proxy.comfy", "ComfyUI VRAM cleanup requested");
         timeout(Duration::from_secs_f64(self.config.cleanup_timeout),async{
-        let settle=matches!(self.config.llm_backend.as_str(),"tabbyapi"|"all");
+        let settle=self.config.all()||self.config.adapter()==Some(crate::registry::Adapter::Tabbyapi);
         if settle{self.idle().await?;}
         let permit = self.limit.acquire().await?;
         let r=self.client.post(format!("{}/free",self.config.comfy_url)).json(&json!({"unload_models":true,"free_memory":true})).send().await?;

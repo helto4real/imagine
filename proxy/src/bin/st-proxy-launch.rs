@@ -1,6 +1,6 @@
 //! Resolve launcher options using the proxy's CLI, then run its stack supervisor.
 use anyhow::{Context, Result, bail};
-use st_proxy::config::{Config, default_origin};
+use st_proxy::config::Config;
 use std::{collections::HashMap, os::unix::process::CommandExt, process::Command};
 
 struct Plan {
@@ -50,19 +50,32 @@ fn plan(args: Vec<String>, mut env: HashMap<String, String>) -> Result<Plan> {
                 .or_else(|| args.next())
                 .with_context(|| format!("argument {flag}: expected one argument"))?
         };
-        if matches!(flag.as_str(), "--help" | "--check-backend") {
+        if matches!(
+            flag.as_str(),
+            "--help" | "--check-backend" | "--print-backends"
+        ) {
             direct = true;
         }
         let key = if flag == "--kobold-url" {
             "LLM_URL".into()
+        } else if flag == "--backend-url" {
+            // The stack and proxy both read a backend's origin as ST_PROXY_<ID>_URL.
+            let (id, _) = value
+                .split_once('=')
+                .with_context(|| "argument --backend-url: expected ID=URL")?;
+            format!("{}_URL", id.trim().to_uppercase())
         } else {
             flag[2..].replace('-', "_").to_uppercase()
         };
         if !matches!(
             flag.as_str(),
-            "--help" | "--check-backend" | "--write-kobold-model-cache"
+            "--help" | "--check-backend" | "--write-kobold-model-cache" | "--print-backends"
         ) {
-            env.insert(format!("ST_PROXY_{key}"), value.clone());
+            let value = match value.split_once('=') {
+                Some((_, origin)) if flag == "--backend-url" => origin.trim().to_owned(),
+                _ => value.clone(),
+            };
+            env.insert(format!("ST_PROXY_{key}"), value);
         }
         if flag == "--allow-unknown-comfy-routes" {
             env.remove("ST_PROXY_STRICT_COMFY_ROUTES");
@@ -75,27 +88,15 @@ fn plan(args: Vec<String>, mut env: HashMap<String, String>) -> Result<Plan> {
     if direct && !stack_args.is_empty() {
         bail!("stack controls cannot be combined with direct proxy commands");
     }
-    let backend = env
-        .entry("ST_PROXY_LLM_BACKEND".into())
-        .or_insert_with(|| "all".into())
-        .clone();
-    if env.get("ST_PROXY_LLM_URL").is_none_or(String::is_empty) {
-        let key = match backend.as_str() {
-            "koboldcpp" | "all" => "ST_PROXY_KOBOLD_URL".to_owned(),
-            _ => format!("ST_PROXY_{}_URL", backend.to_uppercase()),
-        };
-        let origin = env.get(&key).filter(|s| !s.is_empty()).cloned().unwrap_or(
-            if matches!(backend.as_str(), "koboldcpp" | "all") {
-                "http://127.0.0.1:5001".into()
-            } else {
-                default_origin(&backend)?
-            },
-        );
-        env.insert("ST_PROXY_LLM_URL".into(), origin);
-    }
+    env.entry("ST_PROXY_LLM_BACKEND".into())
+        .or_insert_with(|| "all".into());
     // Validate before the supervisor starts or stops anything. Retain the
     // canonical argument list so mutual exclusions are checked as well.
-    Config::parse(proxy_args.clone(), &env)?;
+    let (config, _) = Config::parse(proxy_args.clone(), &env)?;
+    // One backend's origin, from the backends file and its overrides.
+    if !config.all() && env.get("ST_PROXY_LLM_URL").is_none_or(String::is_empty) {
+        env.insert("ST_PROXY_LLM_URL".into(), config.llm_url);
+    }
     Ok(Plan {
         env,
         stack_args,
@@ -148,7 +149,28 @@ fn run() -> Result<()> {
 mod tests {
     use super::*;
     fn env() -> HashMap<String, String> {
-        HashMap::from([("ST_PROXY_MCP_OUTPUT_DIR".into(), "/tmp/synthetic".into())])
+        // Synthetic backends: no launcher paths or weights are needed.
+        // Each call has its own file: tests run in parallel.
+        static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "st-launch-backends-{}-{n}.json",
+            std::process::id()
+        ));
+        let backends = [("koboldcpp", "koboldcpp", 5001), ("sc117", "strata", 48640),
+            ("orca_128k", "strata", 48646), ("swift", "strata", 48648), ("swift_128k", "strata", 48650)]
+            .map(|(id, adapter, port)| {
+                format!(r#"{{"id":"{id}","label":"Own {id}","adapter":"{adapter}","origin":"http://127.0.0.1:{port}"}}"#)
+            })
+            .join(",");
+        std::fs::write(&path, format!(r#"{{"schema":1,"backends":[{backends}]}}"#)).unwrap();
+        HashMap::from([
+            ("ST_PROXY_MCP_OUTPUT_DIR".into(), "/tmp/synthetic".into()),
+            (
+                "ST_PROXY_BACKENDS".into(),
+                path.to_string_lossy().into_owned(),
+            ),
+        ])
     }
     #[test]
     fn ordinary_options_keep_stack_and_resolve_abbreviations() {
@@ -196,5 +218,43 @@ mod tests {
         assert!(plan(vec!["--proxy-only".into()], env()).unwrap().direct);
         assert!(plan(vec!["--image-port".into(), "invalid".into()], env()).is_err());
         assert!(plan(vec!["--stop".into(), "--check-backend".into()], env()).is_err());
+    }
+    #[test]
+    fn backend_origins_and_listing_come_from_the_backends_file() {
+        let p = plan(
+            ["--llm-b", "swift", "--swift-url", "http://127.0.0.1:12001"]
+                .map(str::to_owned)
+                .to_vec(),
+            env(),
+        )
+        .unwrap();
+        assert_eq!(p.env["ST_PROXY_SWIFT_URL"], "http://127.0.0.1:12001");
+        assert_eq!(p.env["ST_PROXY_LLM_URL"], "http://127.0.0.1:12001");
+        let p = plan(
+            ["--backend-url", "sc117=http://127.0.0.1:12002"]
+                .map(str::to_owned)
+                .to_vec(),
+            env(),
+        )
+        .unwrap();
+        assert_eq!(p.env["ST_PROXY_SC117_URL"], "http://127.0.0.1:12002");
+        assert_eq!(p.env["ST_PROXY_LLM_BACKEND"], "all");
+        assert!(!p.env.contains_key("ST_PROXY_LLM_URL"));
+        assert!(plan(vec!["--llm-b=orca".into()], env()).is_err());
+        assert!(
+            plan(
+                vec!["--nonexistent-url".into(), "http://127.0.0.1:1".into()],
+                env()
+            )
+            .is_err()
+        );
+        assert!(
+            plan(
+                ["--print-backends", "shell"].map(str::to_owned).to_vec(),
+                env()
+            )
+            .unwrap()
+            .direct
+        );
     }
 }

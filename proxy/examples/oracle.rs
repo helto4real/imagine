@@ -24,14 +24,19 @@ fn main() {
                     v["connected"].as_bool().unwrap()
                 ))
             }
-            "profiles" => match st_proxy::profiles::Profiles::parse(v["profiles"].clone()) {
-                Ok(p) => p.apply(
-                    &v["payload"],
-                    v["engine"].as_str().unwrap(),
-                    v["model"].as_str(),
-                ),
-                Err(e) => json!({"error":e.to_string()}),
-            },
+            "profiles" => {
+                let backends = st_proxy::registry::parse(st_proxy::registry::BUILTIN).unwrap();
+                let engine = v["engine"].as_str().unwrap();
+                // Engines without a profile-capable adapter keep their payload.
+                let adapter = backends
+                    .iter()
+                    .find(|s| s.id == engine)
+                    .map_or(st_proxy::registry::Adapter::Koboldcpp, |s| s.adapter);
+                match st_proxy::profiles::Profiles::parse(v["profiles"].clone(), &backends) {
+                    Ok(p) => p.apply(&v["payload"], engine, adapter, v["model"].as_str()),
+                    Err(e) => json!({"error":e.to_string()}),
+                }
+            }
             "workflow" => {
                 let c =
                     st_proxy::workflows::Catalog::load(v["directory"].as_str().unwrap(), 67108864)

@@ -9,6 +9,7 @@ use st_proxy::{
     backend::{Backend, Backends},
     config::Config,
     profiles::Profiles,
+    registry::{self, Adapter, Spec},
 };
 use std::{
     collections::HashMap,
@@ -66,13 +67,37 @@ async fn server(
     (origin, fake, task)
 }
 
+/// Strata backends at these origins, without launch paths or weights.
+fn specs(origins: &[(&str, &str)]) -> Vec<Spec> {
+    let backends = origins
+        .iter()
+        .map(|(id, origin)| {
+            format!(r#"{{"id":"{id}","label":"Own {id}","adapter":"strata","origin":"{origin}"}}"#)
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    registry::parse(&format!(r#"{{"schema":1,"backends":[{backends}]}}"#)).unwrap()
+}
 #[test]
 fn swift_origins_and_cli_preserve_distinct_backends() {
+    let file = std::env::temp_dir().join(format!("st-swift-backends-{}.json", std::process::id()));
+    std::fs::write(
+        &file,
+        r#"{"schema":1,"backends":[
+            {"id":"sc117","label":"Qwen SC117","adapter":"strata","origin":"http://127.0.0.1:48640"},
+            {"id":"swift","label":"Qwen SC117 Swift","adapter":"strata","origin":"http://127.0.0.1:48648"},
+            {"id":"swift_128k","label":"Qwen SC117 Swift 128k","adapter":"strata","origin":"http://127.0.0.1:48650"}]}"#,
+    )
+    .unwrap();
+    let env = HashMap::from([(
+        "ST_PROXY_BACKENDS".into(),
+        file.to_string_lossy().into_owned(),
+    )]);
     for (kind, port) in [("swift", 48648), ("swift_128k", 48650)] {
-        let (cfg, _) =
-            Config::parse(["--llm-backend".into(), kind.into()], &HashMap::new()).unwrap();
+        let (cfg, _) = Config::parse(["--llm-backend".into(), kind.into()], &env).unwrap();
         assert_eq!(cfg.llm_url, format!("http://127.0.0.1:{port}"));
-        assert!(Backend::new(kind, &cfg.llm_url, &cfg, reqwest::Client::new()).strata());
+        let spec = cfg.spec(kind).unwrap();
+        assert!(Backend::new(spec, &cfg, reqwest::Client::new()).strata());
     }
     let (mut cfg, _) = Config::parse(
         [
@@ -81,13 +106,19 @@ fn swift_origins_and_cli_preserve_distinct_backends() {
             "--swift-url".into(),
             "http://127.0.0.1:48748".into(),
         ],
-        &HashMap::new(),
+        &env,
     )
     .unwrap();
-    assert_eq!(cfg.swift_url, "http://127.0.0.1:48748");
+    assert_eq!(cfg.spec("swift").unwrap().origin, "http://127.0.0.1:48748");
     let backends = Backends::new(&cfg, reqwest::Client::new());
-    assert!(backends.entries.iter().any(|b| b.kind == "swift_128k"));
-    cfg.swift_url = cfg.sc117_url.clone();
+    assert!(backends.entries.iter().any(|b| b.id == "swift_128k"));
+    // Two backends at one origin are rejected.
+    let shared = cfg.spec("sc117").unwrap().origin.clone();
+    cfg.registry
+        .iter_mut()
+        .find(|s| s.id == "swift")
+        .unwrap()
+        .origin = shared;
     assert!(cfg.validate().is_err());
 }
 
@@ -95,17 +126,23 @@ fn swift_origins_and_cli_preserve_distinct_backends() {
 fn swift_profile_uses_recommended_sampling_and_keeps_caller_controls() {
     let profiles = Profiles::parse(
         serde_json::from_str(include_str!("../../config/proxy/model-profiles.json")).unwrap(),
+        &registry::parse(registry::BUILTIN).unwrap(),
     )
     .unwrap();
     for kind in ["swift", "swift_128k"] {
         let payload = json!({"model":MODEL,"messages":[],"reasoning_effort":"low","max_tokens":1234,"temperature":0.4});
-        let effective = profiles.apply(&payload, kind, Some(MODEL));
+        let effective = profiles.apply(&payload, kind, Adapter::Strata, Some(MODEL));
         assert_eq!(effective["top_k"], 20);
         assert_eq!(effective["top_p"], 0.95);
         assert_eq!(effective["temperature"], 0.4);
         assert_eq!(effective["reasoning_effort"], "low");
         assert_eq!(effective["max_tokens"], 1234);
-        let non_thinking = profiles.apply(&json!({"reasoning_effort":"none"}), kind, Some(MODEL));
+        let non_thinking = profiles.apply(
+            &json!({"reasoning_effort":"none"}),
+            kind,
+            Adapter::Strata,
+            Some(MODEL),
+        );
         assert_eq!(non_thinking["temperature"], 0.7);
         assert_eq!(non_thinking["top_p"], 0.8);
         assert_eq!(non_thinking["presence_penalty"], 1.5);
@@ -119,14 +156,10 @@ async fn swift_catalog_is_passive_and_switching_confirms_unload_before_load() {
     let (swift_url, swift, swift_task) = server("swift_128k", events.clone()).await;
     let cfg = Config {
         llm_backend: "all".into(),
-        sc117_url: base_url,
-        swift_128k_url: swift_url,
+        registry: specs(&[("sc117", &base_url), ("swift_128k", &swift_url)]),
         ..Config::default()
     };
     let mut backends = Backends::new(&cfg, reqwest::Client::new());
-    backends
-        .entries
-        .retain(|b| ["sc117", "swift_128k"].contains(&b.kind.as_str()));
     let catalog = backends.catalog(None).await.unwrap();
     assert!(
         catalog["data"]
@@ -164,14 +197,10 @@ async fn failed_swift_unload_blocks_gpu_handoff() {
     let (swift_url, swift, swift_task) = server("swift", events.clone()).await;
     let cfg = Config {
         llm_backend: "all".into(),
-        sc117_url: base_url,
-        swift_url,
+        registry: specs(&[("sc117", &base_url), ("swift", &swift_url)]),
         ..Config::default()
     };
     let mut backends = Backends::new(&cfg, reqwest::Client::new());
-    backends
-        .entries
-        .retain(|b| ["sc117", "swift"].contains(&b.kind.as_str()));
     let target = backends
         .target(Some(&format!("swift/{MODEL}")))
         .await
