@@ -1,0 +1,140 @@
+# Generic Director snippets. Placeholder initial_text is ordinary prompt text
+# and is selected for immediate free-text replacement after expansion.
+schema_version: "1.0"
+mode: merge
+
+namespaces:
+  - key: shot
+    choices:
+      - key: two_character
+        aliases: [two-character, two-shot]
+        label: Two-character shot
+        append: none
+        segments:
+          - text: "A medium two-shot frames "
+          - placeholder:
+              id: characters
+              label: Characters
+              initial_text: "the two characters"
+              hint: "Free text, comma-separated names, or optional Director @references"
+          - text: " as "
+          - placeholder:
+              id: action
+              label: Action
+              initial_text: "they interact"
+              hint: "Describe the action in ordinary prompt text"
+          - text: "."
+
+  - key: blocking
+    label: Blocking
+    description: Spatial placement and character staging.
+    choices:
+      - key: directly_in_front_of
+        aliases: [front-of, stands-in-front]
+        label: Stands directly in front of
+        append: none
+        segments:
+          - placeholder:
+              id: subject
+              label: Subject
+              initial_text: "first character"
+              hint: "Free text or an optional Director @reference"
+          - text: " stands directly in front of "
+          - placeholder:
+              id: target
+              label: Target
+              initial_text: "second character"
+              hint: "Free text or an optional Director @reference"
+      - key: facing
+        aliases: [faces]
+        label: Faces
+        append: none
+        segments:
+          - placeholder:
+              id: subject
+              label: Subject
+              initial_text: "first character"
+              hint: "Free text or an optional Director @reference"
+          - text: " faces "
+          - placeholder:
+              id: target
+              label: Target
+              initial_text: "second character"
+              hint: "Free text or an optional Director @reference"
+      - key: beside
+        aliases: [stands-beside]
+        label: Stands beside
+        append: none
+        segments:
+          - placeholder:
+              id: subject
+              label: Subject
+              initial_text: "first character"
+              hint: "Free text or an optional Director @reference"
+          - text: " stands beside "
+          - placeholder:
+              id: target
+              label: Target
+              initial_text: "second character"
+              hint: "Free text or an optional Director @reference"
+
+  - key: dialogue
+    label: Dialogue
+    description: Explicit spoken dialogue phrasing.
+    choices:
+      - key: speaks
+        aliases: [says]
+        label: Character speaks
+        append: none
+        segments:
+          - placeholder:
+              id: speaker
+              label: Speaker
+              initial_text: "the character"
+              hint: "Free text or an optional Director @reference"
+          - text: " says ["
+          - placeholder:
+              id: language
+              label: Language
+              initial_text: "English"
+              hint: "Enter the spoken language"
+          - text: "] \""
+          - placeholder:
+              id: dialogue
+              label: Dialogue
+              initial_text: "dialogue"
+              hint: "Enter the exact spoken line"
+          - text: "\""
+
+  - key: sound
+    label: Sound
+    description: Ambient and physical sound guidance.
+    choices:
+      - key: ambient
+        aliases: [ambience]
+        label: Ambient sound
+        append: none
+        segments:
+          - placeholder:
+              id: ambience
+              label: Ambient sound
+              initial_text: "natural ambience"
+              hint: "Describe the audible environment"
+          - text: " fills the scene"
+      - key: physical
+        aliases: [physical-sounds]
+        label: Physical sounds
+        append: none
+        segments:
+          - text: "Physical sounds emphasize "
+          - placeholder:
+              id: action_sounds
+              label: Action sounds
+              initial_text: "the movement and contact sounds"
+              hint: "Describe concrete sounds caused by the action"
+      - key: ambient_only
+        aliases: [natural-only, no-music]
+        label: Ambient only, no music
+        append: none
+        segments:
+          - text: "Only natural ambience and physical sounds are heard; no non-diegetic music"

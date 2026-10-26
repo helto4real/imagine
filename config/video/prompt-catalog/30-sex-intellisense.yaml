@@ -1,0 +1,838 @@
+schema_version: "1.1"
+mode: merge
+namespaces:
+  - key: sex
+    label: "Sex"
+    description: "Explicit sex positions and non-graphic intimate blocking between two consenting adults. Includes continuous motion where appropriate."
+    groups:
+      - key: intimate
+        label: "Intimate"
+        description: "Non-graphic romantic and sensual blocking."
+        choices:
+          - key: standing_embrace
+            aliases: ["embrace-standing", "mutual-hug"]
+            label: "Standing mutual embrace"
+            append: none
+            placeholders:
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+              man:
+                label: "Man"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: woman
+              - text: " and "
+              - placeholder_ref: man
+              - text: " stand face-to-face in a close mutual embrace, with their arms around each other and their bodies gently aligned."
+          - key: embrace_from_behind
+            aliases: ["embrace-behind", "hug-from-behind"]
+            label: "Embrace from behind"
+            append: none
+            placeholders:
+              man:
+                label: "Man"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: man
+              - text: " stands directly behind "
+              - placeholder_ref: woman
+              - text: " and wraps both arms gently around her waist. They face the same direction while "
+              - placeholder_ref: woman
+              - text: " rests her hands over his."
+          - key: forehead_touch
+            aliases: ["foreheads-touching"]
+            label: "Foreheads touching"
+            append: none
+            placeholders:
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+              man:
+                label: "Man"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: woman
+              - text: " and "
+              - placeholder_ref: man
+              - text: " stand very close, facing each other with their foreheads touching and their hands resting gently on each other's shoulders."
+          - key: faces_close
+            aliases: ["noses-almost-touching"]
+            label: "Faces at intimate distance"
+            append: none
+            placeholders:
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+              man:
+                label: "Man"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: woman
+              - text: " and "
+              - placeholder_ref: man
+              - text: " remain face-to-face at intimate distance, their noses nearly touching while they look into each other's eyes."
+          - key: hand_on_cheek
+            aliases: ["cup-cheek"]
+            label: "Hand on cheek"
+            append: none
+            placeholders:
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+              man:
+                label: "Man"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: woman
+              - text: " gently cups "
+              - placeholder_ref: man
+              - text: "'s cheek while "
+              - placeholder_ref: man
+              - text: " places one hand at her waist. They remain face-to-face."
+          - key: sitting_close
+            aliases: ["sit-close"]
+            label: "Sitting close together"
+            append: none
+            placeholders:
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+              man:
+                label: "Man"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: woman
+              - text: " and "
+              - placeholder_ref: man
+              - text: " sit close together with their shoulders and hips touching, turned slightly toward each other."
+          - key: on_lap_sideways
+            aliases: ["lap-sideways", "side-saddle"]
+            label: "Sitting sideways on lap"
+            append: none
+            placeholders:
+              man:
+                label: "Man (sitting)"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: man
+              - text: " sits upright while "
+              - placeholder_ref: woman
+              - text: " sits sideways across his lap, with both arms around his shoulders and both legs remaining on the same side."
+          - key: astride_clothed
+            aliases: ["lap-astride-clothed"]
+            label: "Astride lap fully clothed"
+            append: none
+            placeholders:
+              man:
+                label: "Man (sitting)"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: man
+              - text: " sits upright while "
+              - placeholder_ref: woman
+              - text: " sits astride his lap fully clothed, directly facing him as they hold each other in a still mutual embrace."
+          - key: lying_face_intimate
+            aliases: ["lying-intimate-face"]
+            label: "Lying face to face intimate"
+            append: none
+            placeholders:
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+              man:
+                label: "Man"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: woman
+              - text: " and "
+              - placeholder_ref: man
+              - text: " lie on their sides facing each other, with their heads close together and their shoulders and hips aligned."
+          - key: lying_same_intimate
+            aliases: ["spooning-intimate"]
+            label: "Lying same direction intimate"
+            append: none
+            placeholders:
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+              man:
+                label: "Man"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: woman
+              - text: " lies on her side while "
+              - placeholder_ref: man
+              - text: " lies directly behind her, both facing the same direction in a close embrace."
+          - key: lean_over
+            aliases: ["leaning-over"]
+            label: "One leaning over the other"
+            append: none
+            placeholders:
+              man:
+                label: "Man (lying)"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: man
+              - text: " lies on his back while "
+              - placeholder_ref: woman
+              - text: " leans over him, supporting herself with one hand beside his shoulder as they look at each other."
+          - key: afterglow
+            aliases: ["rest-after", "blanket-rest"]
+            label: "Resting after intimacy"
+            append: none
+            placeholders:
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+              man:
+                label: "Man"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: woman
+              - text: " and "
+              - placeholder_ref: man
+              - text: " lie close together beneath a blanket, their faces and shoulders visible as they rest quietly in each other's arms."
+          - key: gentle_kiss_standing
+            aliases: ["kiss-standing"]
+            label: "Gentle standing kiss"
+            append: none
+            placeholders:
+              woman:
+                label: "Woman"
+                initial_text: "@woman"
+                hint: "Free text or optional Director @reference"
+              man:
+                label: "Man"
+                initial_text: "@man"
+                hint: "Free text or optional Director @reference"
+            segments:
+              - placeholder_ref: woman
+              - text: " and "
+              - placeholder_ref: man
+              - text: " stand face-to-face and share a gentle mutual kiss. "
+              - placeholder_ref: woman
+              - text: " rests one hand against "
+              - placeholder_ref: man
+              - text: "'s cheek while "
+              - placeholder_ref: man
+              - text: " keeps one hand at her waist."
+      - key: positions
+        label: "Positions"
+        description: "Explicit vaginal, anal and oral sex positions with continuous motion."
+        groups:
+          - key: vaginal
+            label: "Vaginal"
+            description: "Common vaginal penetration positions with thrusting motion."
+            choices:
+              - key: missionary
+                aliases: ["missionary-vaginal"]
+                label: "Missionary"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " lies flat on her back with her legs spread and knees bent. "
+                  - placeholder_ref: man
+                  - text: " lies on top of her between her thighs, hips centered over her pelvis, penetrating her vagina. Their torsos face each other and remain aligned on the same centerline, her body moves with each impact, his pelvis slamming against her vulva. He moves with aggressive, rapid-fire momentum, thrusting his erect penis deep into her vagina with powerful, driving hip movements."
+              - key: missionary_legs_high
+                aliases: ["missionary-legs-up"]
+                label: "Missionary legs high"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " lies on her back with both legs raised and resting on "
+                  - placeholder_ref: man
+                  - text: "'s shoulders. "
+                  - placeholder_ref: man
+                  - text: " kneels between her thighs, hips pressed against hers, penetrating her vagina deeply, her body arching slightly with each impact, his pelvis slamming against her vulva. He moves with aggressive, rapid-fire momentum, thrusting his erect penis deep into her vagina with powerful, driving hip movements."
+              - key: cowgirl
+                aliases: ["cowgirl-vaginal", "woman-on-top"]
+                label: "Cowgirl"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man (lying)"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " lies flat on his back with his penis inside her vulva. "
+                  - placeholder_ref: woman
+                  - text: " is kneeling astride his hips with one knee on each side of his body, her vulva is centered over his pelvis, with his penis partly visible inside her vulva, torso upright and facing him. She move her hips in a rhythmic, vertical motion, lifting and lowering herself to drive the penetration. Her torso sways slightly with the effort, and she maintains intense eye contact with him."
+              - key: reverse_cowgirl
+                aliases: ["reverse-cowgirl"]
+                label: "Reverse cowgirl"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man (lying)"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " lies flat on his back with his legs straight with his penis inside her "
+                  - placeholder_ref: woman
+                  - text: " vulva. "
+                  - placeholder_ref: woman
+                  - text: " is kneeling straddle his pelvis with one knee on each side of his body, "
+                  - placeholder_ref: woman
+                  - text: " is facing his feet, she is leaning forward towards his feet with her hands resting on his legs. "
+                  - placeholder_ref: woman
+                  - text: " moves her hips steadily up and down, sliding his penis in and out of her vulva, her torso stays upright and sways slightly with the motion."
+              - key: doggy
+                aliases: ["doggy-style", "doggy-vaginal"]
+                label: "Doggy style"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or an optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or an optional Director @reference"
+                  tomas:
+                    label: "Tomas"
+                    initial_text: "@tomas"
+                    hint: "Free text or an optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " is on her hands and knees, back level, knees directly below her hips, facing away from "
+                  - placeholder_ref: man
+                  - text: " . "
+                  - placeholder_ref: man
+                  - text: " kneels upright directly behind her, hips aligned with hers, penetrating her vagina from behind. "
+                  - placeholder_ref: tomas
+                  - text: " move his hip forward and backwards in a continuous motion thrusting his erect penis steadily into "
+                  - placeholder_ref: woman
+                  - text: " vagina positioned behind her facing her head while remaining centered behind her hips. "
+              - key: doggy_standing
+                aliases: ["standing-doggy"]
+                label: "Doggy with standing man"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or an optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or an optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " is on her hands and knees on the edge of the bed. "
+                  - placeholder_ref: man
+                  - text: " stands upright behind her on the floor, hips pressed against her buttocks, penetrating her vagina from behind while both face the same direction. "
+                  - placeholder_ref: man
+                  - text: " moves his hips forward and and backward thrusting his penis in and out of "
+                  - placeholder_ref: woman
+                  - text: "'s vagina in a continuous steady, driving rhythm, The force of his movements causes his pelvis to slap loudly against her skin with every forward strike"
+              - key: spooning
+                aliases: ["spooning-sex", "spooning-vaginal"]
+                label: "Spooning"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or an optional Director @reference"
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or an optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " and "
+                  - placeholder_ref: woman
+                  - text: " both lie on their sides on the mattress, pressed tightly together and both facing the exact same direction. "
+                  - placeholder_ref: man
+                  - text: " lies directly behind "
+                  - placeholder_ref: woman
+                  - text: ", his chest against her back, his hips perfectly aligned with hers from shoulders to pelvis. Neither person is on top or underneath; their bodies remain stacked side-by-side. "
+                  - placeholder_ref: man
+                  - text: " thrusts his visible erect penis in and out of "
+                  - placeholder_ref: woman
+                  - text: "’s vulva with aggressive, driving force, moving his hips backward and forward in a continuous powerful rhythm. With every forward thrust his pelvis slams into her buttocks, jolting her body forward against the mattress. One of his arms is wrapped firmly around her waist, hand gripping her hip to hold her in place. "
+                  - placeholder_ref: woman
+                  - text: "’s head is thrown slightly back, eyes squeezed shut, mouth open as she gasps. Their side-by-side alignment, shared facing direction, and stacked body positions stay completely unchanged throughout."
+              - key: standing_face
+                aliases: ["standing-vaginal-face"]
+                label: "Standing face to face"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or an optional Director @reference"
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or an optional Director @reference"
+                  maja:
+                    label: "Maja"
+                    initial_text: "@maja"
+                    hint: "Free text or an optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " and "
+                  - placeholder_ref: woman
+                  - text: " stand face-to-face, their torsos pressed firmly together from chest to pelvis. "
+                  - placeholder_ref: man
+                  - text: " is holding one of "
+                  - placeholder_ref: maja
+                  - text: "'s legs with his hand while she have the other on the floor, hooking it high and pinning it tightly against his hip to create a deep angle of penetration. He drives his hips forward with aggressive, relentless momentum, thrusting his erect penis deep into "
+                  - placeholder_ref: woman
+                  - text: "'s vagina in a steady, punishing rhythm. The force of each thrust causes "
+                  - placeholder_ref: woman
+                  - text: "'s body to jolt and recoil against his chest, her hands gripping his shoulders for stability. "
+                  - placeholder_ref: man
+                  - text: " maintains an intense, unwavering gaze on "
+                  - placeholder_ref: woman
+                  - text: ", his muscles tensing with the effort of the driving motion. "
+                  - placeholder_ref: maja
+                  - text: "'s head tilts back, her breath coming in sharp, ragged gasps as she clings to him, her body trembling from the continuous, heavy impact of his hips."
+              - key: standing_behind
+                aliases: ["standing-from-behind"]
+                label: "Standing from behind"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or an optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or an optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " stands bent forward at the waist, her torso nearly parallel to the surface, her fingers digging into the edge to brace herself. "
+                  - placeholder_ref: man
+                  - text: " stands directly behind her, his hands firmly grabbing her buttocks toward him. "
+                  - placeholder_ref: man
+                  - text: "'s large, erect penis is seen repeatedly sliding deeply into "
+                  - placeholder_ref: woman
+                  - text: "'s vulva and then pulling back out almost completely before driving back in with smooth continuous motion. The force of each deep, driving thrust causes "
+                  - placeholder_ref: woman
+                  - text: "'s entire body to shudder and jolt forward as he continue fucking her from behind."
+              - key: lotus
+                aliases: ["lotus-position"]
+                label: "Lotus position"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or an optional Director @reference"
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or an optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " sits upright with legs crossed or extended. "
+                  - placeholder_ref: woman
+                  - text: " sits astride his lap facing him, legs wrapped around his waist, with his erect penis inside her vulva for vaginal penetration. Their torsos remain upright and pressed together. "
+                  - placeholder_ref: woman
+                  - text: " moves her hips steadily while remaining centered."
+              - key: edge_of_bed
+                aliases: ["bed-edge"]
+                label: "Edge of bed"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " lies on her back at the edge of the bed with her hips at the mattress edge and legs spread. "
+                  - placeholder_ref: man
+                  - text: " stands between her thighs, holding her legs, and penetrates her vagina while remaining upright. "
+                  - placeholder_ref: man
+                  - text: " thrusts steadily into "
+                  - placeholder_ref: woman
+                  - text: " while remaining centered. Their alignment stays unchanged."
+              - key: prone_bone
+                aliases: ["prone-bone"]
+                label: "Prone bone"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or an optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or an optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " lies flat on her stomach, legs slightly spread. "
+                  - placeholder_ref: man
+                  - text: " lies on top of her, aligned with her body, penetrating her vagina from behind while both face the same direction. "
+                  - placeholder_ref: man
+                  - text: " thrusts steadily his erect penis in and out of "
+                  - placeholder_ref: woman
+                  - text: " vulva, his pelvis slamming against her buttocks, her body moves with each impact while remaining centered."
+              - key: doggie-standing-man-aggressive
+                aliases: []
+                label: "Doggie with standing man - aggressive"
+                description: "Doggie with standing man aggressive"
+                append: space
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or an optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or an optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " is positioned on her hands and knees at the very edge of the bed, her back arched and her posture held firm despite the force of the impact. "
+                  - placeholder_ref: man
+                  - text: " stands upright on the floor behind her, his body leaning forward so his pelvis is pressed hard against "
+                  - placeholder_ref: woman
+                  - text: "'s buttocks. He moves with aggressive, relentless momentum, thrusting his erect penis deep into "
+                  - placeholder_ref: woman
+                  - text: "'s vagina in a continuous, driving rhythm. The force of his movements causes his pelvis to slap loudly against her skin with every forward strike. "
+                  - placeholder_ref: man
+                  - text: " grips "
+                  - placeholder_ref: woman
+                  - text: "'s hips firmly, his knuckles white, as he maintains a steady and punishing pace. "
+                  - placeholder_ref: woman
+                  - text: "'s head hangs low between her arms, her hair swaying with each heavy impact, while her body jolts forward and back in sync with "
+                  - placeholder_ref: woman
+                  - text: "'s powerful thrusts."
+          - key: anal
+            label: "Anal"
+            description: "Common anal penetration positions with thrusting motion."
+            choices:
+              - key: doggy
+                aliases: ["anal-doggy", "doggy-anal"]
+                label: "Anal doggy"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " is on her hands and knees, back level, knees directly below her hips, facing away from "
+                  - placeholder_ref: man
+                  - text: ". "
+                  - placeholder_ref: man
+                  - text: " a kneels upright directly behind her, hips aligned with hers, penetrating her anus from behind. "
+                  - placeholder_ref: man
+                  - text: " move his hip forward and backwards in a continuous motion thrusting his erect penis steadily into "
+                  - placeholder_ref: woman
+                  - text: " anus positioned behind her facing her head while remaining centered behind her hips. "
+              - key: missionary
+                aliases: ["anal-missionary"]
+                label: "Anal missionary"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " lies on her back with legs raised and spread. "
+                  - placeholder_ref: man
+                  - text: " kneels between her thighs, hips pressed against her, penetrating her anus while their torsos face each other. "
+                  - placeholder_ref: man
+                  - text: " thrusts steadily into "
+                  - placeholder_ref: woman
+                  - text: " while remaining centered. Their body alignment stays unchanged."
+              - key: spooning
+                aliases: ["anal-spoon"]
+                label: "Anal spooning"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " and "
+                  - placeholder_ref: man
+                  - text: " lie on their sides facing the same direction. "
+                  - placeholder_ref: man
+                  - text: " lies directly behind her, hips aligned, penetrating her anus from behind while holding her close. "
+                  - placeholder_ref: man
+                  - text: " thrusts steadily into "
+                  - placeholder_ref: woman
+                  - text: " while remaining centered. Their side-by-side alignment stays unchanged."
+              - key: reverse_cowgirl
+                aliases: ["anal-reverse"]
+                label: "Anal reverse cowgirl"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man (lying)"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " lies flat on his back. "
+                  - placeholder_ref: woman
+                  - text: " kneels astride his hips facing away from him, one knee on each side, and lowers herself onto his erect penis for anal penetration. "
+                  - placeholder_ref: woman
+                  - text: " moves her hips steadily while remaining centered. Their shared centerline and leg positions stay unchanged."
+              - key: standing
+                aliases: ["anal-standing-behind"]
+                label: "Anal standing from behind"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " stands bent forward, hands braced. "
+                  - placeholder_ref: man
+                  - text: " stands upright directly behind her, hips pressed to her buttocks, penetrating her anus while both face the same direction. "
+                  - placeholder_ref: man
+                  - text: " thrusts steadily into "
+                  - placeholder_ref: woman
+                  - text: " while remaining centered. Her bent-forward posture stays unchanged."
+              - key: prone
+                aliases: ["anal-prone"]
+                label: "Anal prone"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " lies flat on her stomach. "
+                  - placeholder_ref: man
+                  - text: " lies fully on top of her, aligned from shoulders to hips, penetrating her anus from behind. "
+                  - placeholder_ref: man
+                  - text: " thrusts steadily into "
+                  - placeholder_ref: woman
+                  - text: " while remaining centered. Their aligned posture stays unchanged."
+          - key: oral
+            label: "Oral"
+            description: "Oral sex positions with continuous head motion."
+            choices:
+              - key: blowjob_standing
+                aliases: ["bj-standing", "fellatio-standing"]
+                label: "Blowjob (man standing)"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " stands upright. "
+                  - placeholder_ref: woman
+                  - text: " kneels upright directly in front of him, knees close to his feet, and takes his erect penis into her mouth. Her head is centered on his pelvis while she looks up toward him. "
+                  - placeholder_ref: woman
+                  - text: " moves her head slowly up and down along his shaft while remaining kneeling upright in front of him. Her knee position and upward gaze stay fixed."
+              - key: blowjob_lying
+                aliases: ["bj-lying"]
+                label: "Blowjob (man lying)"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " lies flat on his back. "
+                  - placeholder_ref: woman
+                  - text: " kneels between his spread legs, leaning forward, and takes his erect penis into her mouth while her hands rest on his thighs. "
+                  - placeholder_ref: woman
+                  - text: " moves her head slowly up and down along his shaft while remaining in position. Her knee position stays fixed."
+              - key: sixty_nine
+                aliases: ["sixty-nine"]
+                label: "69 (woman on top)"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " lies flat on his back. "
+                  - placeholder_ref: woman
+                  - text: " positions herself on top of him in reverse, her knees on either side of his head, and takes his erect penis into her mouth while lowering her vulva toward his face. Both perform continuous oral contact while remaining in the same aligned positions."
+              - key: cunnilingus_lying
+                aliases: ["cunnilingus", "oral-woman"]
+                label: "Cunnilingus (woman lying)"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " lies on her back with legs spread and knees bent. "
+                  - placeholder_ref: man
+                  - text: " lies or kneels between her thighs, head centered on her pelvis, and performs oral contact with her vulva. "
+                  - placeholder_ref: man
+                  - text: " continues the oral contact with steady motion while remaining centered between her thighs. Their positions stay unchanged."
+              - key: cunnilingus_sitting
+                aliases: ["cunnilingus-sitting"]
+                label: "Cunnilingus (woman sitting)"
+                append: none
+                placeholders:
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman
+                  - text: " sits upright on the edge of a surface with legs spread. "
+                  - placeholder_ref: man
+                  - text: " kneels upright directly in front of her, head between her thighs, and performs oral contact with her vulva. "
+                  - placeholder_ref: man
+                  - text: " continues the oral contact with steady motion while remaining kneeling. Their positions stay unchanged."
+              - key: face_sitting
+                aliases: ["facesitting", "face-sit"]
+                label: "Face sitting"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " lies flat on his back. "
+                  - placeholder_ref: woman
+                  - text: " kneels astride his face, one knee on each side of his head, and lowers her vulva onto his mouth for oral contact while remaining upright. "
+                  - placeholder_ref: woman
+                  - text: " remains centered while "
+                  - placeholder_ref: man
+                  - text: " continues oral contact. Their positions stay unchanged."

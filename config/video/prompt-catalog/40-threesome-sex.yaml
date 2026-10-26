@@ -1,0 +1,394 @@
+schema_version: "1.1"
+mode: merge
+namespaces:
+  - key: sex
+    label: "Sex"
+    description: "Explicit sexual positions and continuous actions involving one man and two women."
+    groups:
+      - key: positions
+        label: "Positions"
+        description: "Multi-partner sexual positions with locked body geometry and continuous motion."
+        groups:
+          - key: threesome
+            label: "Threesome"
+            description: "Positions for @man with @woman1 and @woman2."
+            choices:
+              - key: double_blowjob
+                aliases: ["double-bj", "two-mouths"]
+                label: "Double blowjob"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or an optional Director @reference"
+                  woman1:
+                    label: "Woman1"
+                    initial_text: "@woman1"
+                    hint: "Free text or an optional Director @reference"
+                  woman2:
+                    label: "Woman2"
+                    initial_text: "@woman2"
+                    hint: "Free text or an optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " stands upright. "
+                  - placeholder_ref: woman1
+                  - text: " and "
+                  - placeholder_ref: woman2
+                  - text: " both kneel upright side by side directly in front of him. Both take turns and simultaneously take his erect penis into their mouths, their heads close together and centered on his pelvis. They move their heads steadily up and down along his shaft while remaining kneeling."
+              - key: spitroast
+                aliases: ["spit-roast"]
+                label: "Spitroast"
+                append: none
+                placeholders:
+                  woman1:
+                    label: "Woman 1 (receiving penetration)"
+                    initial_text: "@woman1"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman2:
+                    label: "Woman 2 (oral)"
+                    initial_text: "@woman2"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman1
+                  - text: " is on her hands and knees, back level, facing away. "
+                  - placeholder_ref: man
+                  - text: " kneels upright directly behind her, hips aligned with hers, thrusting his erect penis in and out of her vulva with continuous forceful rhythm. "
+                  - placeholder_ref: woman2
+                  - text: " kneels upright in front of "
+                  - placeholder_ref: woman1
+                  - text: ", facing her, and receives oral contact from "
+                  - placeholder_ref: woman1
+                  - text: " while the thrusting continues. All three body positions and the shared centerline stay completely unchanged."
+              - key: cowgirl_facesit
+                aliases: ["ride-and-facesit"]
+                label: "Cowgirl + face sitting"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman1:
+                    label: "Woman 1 (riding)"
+                    initial_text: "@woman1"
+                    hint: "Free text or optional Director @reference"
+                  woman2:
+                    label: "Woman 2 (facesitting)"
+                    initial_text: "@woman2"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " lies flat on his back. "
+                  - placeholder_ref: woman1
+                  - text: " kneels astride his hips facing him, one knee on each side, lowering herself onto his erect penis for vaginal penetration. At the same time "
+                  - placeholder_ref: woman2
+                  - text: " kneels astride his face, one knee on each side of his head, lowering her vulva onto his mouth. "
+                  - placeholder_ref: woman1
+                  - text: " moves her hips steadily while remaining centered. "
+                  - placeholder_ref: woman2
+                  - text: " remains upright and centered on his face. All three bodies stay locked in position."
+              - key: reverse_cowgirl_facesit
+                aliases: ["reverse-ride-facesit"]
+                label: "Reverse cowgirl + face sitting"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman1:
+                    label: "Woman 1 (reverse riding)"
+                    initial_text: "@woman1"
+                    hint: "Free text or optional Director @reference"
+                  woman2:
+                    label: "Woman 2 (facesitting)"
+                    initial_text: "@woman2"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " lies flat on his back. "
+                  - placeholder_ref: woman1
+                  - text: " kneels astride his hips facing toward his feet and directly away from his face, one knee on each side, lowering herself onto his erect penis. At the same time "
+                  - placeholder_ref: woman2
+                  - text: " kneels astride his face facing the opposite direction, one knee on each side of his head, lowering her vulva onto his mouth. "
+                  - placeholder_ref: woman1
+                  - text: " moves her hips steadily while remaining centered and facing away. "
+                  - placeholder_ref: woman2
+                  - text: " remains upright. Their reverse orientations and leg positions stay completely unchanged."
+              - key: doggy_double
+                aliases: ["side-by-side-doggy"]
+                label: "Side-by-side doggy"
+                append: none
+                placeholders:
+                  woman1:
+                    label: "Woman 1"
+                    initial_text: "@woman1"
+                    hint: "Free text or optional Director @reference"
+                  woman2:
+                    label: "Woman 2"
+                    initial_text: "@woman2"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman1
+                  - text: " and "
+                  - placeholder_ref: woman2
+                  - text: " are both on their hands and knees side by side on the mattress, backs level, both facing the same direction. "
+                  - placeholder_ref: man
+                  - text: " kneels upright behind them and thrusts his erect penis alternately into each of their vulvas with continuous forceful rhythm, moving from one to the other while both women remain locked on all fours. Their side-by-side alignment and facing direction stay completely unchanged."
+              - key: spooning_oral
+                aliases: ["side-spoon-oral"]
+                label: "Spooning + oral"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or an optional Director @reference"
+                  woman1:
+                    label: "Woman1"
+                    initial_text: "@woman1"
+                    hint: "Free text or an optional Director @reference"
+                  woman:
+                    label: "Woman"
+                    initial_text: "@woman"
+                    hint: "Free text or an optional Director @reference"
+                  woman2:
+                    label: "Woman2"
+                    initial_text: "@woman2"
+                    hint: "Free text or an optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " and "
+                  - placeholder_ref: woman1
+                  - text: " are pressed together from shoulder to hip, both lying flat on their sides and facing the same direction. "
+                  - placeholder_ref: man
+                  - text: "'s chest is crushed against "
+                  - placeholder_ref: woman1
+                  - text: "'s back, his hips locked firmly against hers, his hands on her buttocks as he delivers deep, driving, and relentless thrusts, his erect penis sliding in and out of "
+                  - placeholder_ref: woman
+                  - text: "'s vulva with a heavy, rhythmic impact. Simultaneously, "
+                  - placeholder_ref: woman2
+                  - text: " lies directly in front of "
+                  - placeholder_ref: woman1
+                  - text: ", facing her, her head positioned between "
+                  - placeholder_ref: woman1
+                  - text: "'s legs. "
+                  - placeholder_ref: woman2
+                  - text: " performs intense, vigorous oral contact on "
+                  - placeholder_ref: woman1
+                  - text: "'s vulva, her mouth moving in a rapid, swirling motion. The camera focuses on the intense physical connection: the visible friction of "
+                  - placeholder_ref: man
+                  - text: "'s penis entering "
+                  - placeholder_ref: woman1
+                  - text: ", the wet, rhythmic suction from "
+                  - placeholder_ref: woman2
+                  - text: ", and the way "
+                  - placeholder_ref: woman1
+                  - text: "'s body jolts and shudders from the dual stimulation. All three remain strictly on their sides in a tight, stacked alignment, with no one leaning up or shifting their core posture, creating a sense of intense, compressed energy."
+              - key: man_behind_two
+                aliases: ["man-behind-both"]
+                label: "Man behind both kneeling"
+                append: none
+                placeholders:
+                  woman1:
+                    label: "Woman 1"
+                    initial_text: "@woman1"
+                    hint: "Free text or optional Director @reference"
+                  woman2:
+                    label: "Woman 2"
+                    initial_text: "@woman2"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman1
+                  - text: " and "
+                  - placeholder_ref: woman2
+                  - text: " both kneel upright side by side, facing away from "
+                  - placeholder_ref: man
+                  - text: ". "
+                  - placeholder_ref: man
+                  - text: " kneels upright directly behind them, alternating thrusts of his erect penis into each of their vulvas while both women remain kneeling side by side. Their upright kneeling posture and shared facing direction stay completely unchanged."
+              - key: double_penetration_attempt
+                aliases: ["dp-setup"]
+                label: "Double penetration setup"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman1:
+                    label: "Woman 1"
+                    initial_text: "@woman1"
+                    hint: "Free text or optional Director @reference"
+                  woman2:
+                    label: "Woman 2"
+                    initial_text: "@woman2"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " lies flat on his back. "
+                  - placeholder_ref: woman1
+                  - text: " kneels astride his hips facing him and lowers herself onto his erect penis for vaginal penetration. At the same time "
+                  - placeholder_ref: woman2
+                  - text: " positions herself behind "
+                  - placeholder_ref: woman1
+                  - text: " and presses against her, preparing for or assisting simultaneous contact. "
+                  - placeholder_ref: woman1
+                  - text: " moves her hips steadily while remaining centered. All three body positions stay locked."
+              - key: both_on_top
+                aliases: ["both-riding"]
+                label: "Both women on top"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman1:
+                    label: "Woman 1"
+                    initial_text: "@woman1"
+                    hint: "Free text or optional Director @reference"
+                  woman2:
+                    label: "Woman 2"
+                    initial_text: "@woman2"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " lies flat on his back. "
+                  - placeholder_ref: woman1
+                  - text: " kneels astride his hips facing him, one knee on each side, with his erect penis inside her vulva. "
+                  - placeholder_ref: woman2
+                  - text: " kneels astride higher on his torso or chest facing the same or opposite direction, grinding against him. Both women move their hips steadily while remaining astride him. Their straddling positions and centerlines stay completely unchanged."
+              - key: oral_train
+                aliases: ["oral-chain"]
+                label: "Oral train"
+                append: none
+                placeholders:
+                  woman1:
+                    label: "Woman 1"
+                    initial_text: "@woman1"
+                    hint: "Free text or optional Director @reference"
+                  woman2:
+                    label: "Woman 2"
+                    initial_text: "@woman2"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman1
+                  - text: " lies on her back with legs spread. "
+                  - placeholder_ref: woman2
+                  - text: " kneels or lies between her thighs performing oral contact with her vulva. At the same time "
+                  - placeholder_ref: man
+                  - text: " positions himself behind "
+                  - placeholder_ref: woman2
+                  - text: " and thrusts his erect penis into her from behind while she continues oral contact. All three remain locked in the chain; positions stay completely unchanged."
+              - key: standing_spitroast
+                aliases: ["standing-spit"]
+                label: "Standing spitroast"
+                append: none
+                placeholders:
+                  woman1:
+                    label: "Woman 1"
+                    initial_text: "@woman1"
+                    hint: "Free text or optional Director @reference"
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman2:
+                    label: "Woman 2"
+                    initial_text: "@woman2"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: woman1
+                  - text: " stands bent forward at the waist, hands braced. "
+                  - placeholder_ref: man
+                  - text: " stands directly behind her, hips aligned, thrusting his erect penis into her vulva with continuous forceful rhythm. "
+                  - placeholder_ref: woman2
+                  - text: " stands or kneels in front of "
+                  - placeholder_ref: woman1
+                  - text: " receiving oral contact from her while the thrusting continues. Their standing and bent positions stay completely unchanged."
+              - key: side_by_side_oral
+                aliases: ["both-oral-side"]
+                label: "Side-by-side oral on man"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or optional Director @reference"
+                  woman1:
+                    label: "Woman 1"
+                    initial_text: "@woman1"
+                    hint: "Free text or optional Director @reference"
+                  woman2:
+                    label: "Woman 2"
+                    initial_text: "@woman2"
+                    hint: "Free text or optional Director @reference"
+                segments:
+                  - placeholder_ref: man
+                  - text: " lies flat on his back with legs spread. "
+                  - placeholder_ref: woman1
+                  - text: " and "
+                  - placeholder_ref: woman2
+                  - text: " both kneel or lie on either side of his hips, their heads close together, taking turns and simultaneously performing oral contact with his erect penis. They move their heads steadily while remaining on either side of him. Their side positions stay completely unchanged."
+              - key: double_blowjob2
+                aliases: []
+                label: "Double Blowjob 2"
+                append: none
+                placeholders:
+                  man:
+                    label: "Man"
+                    initial_text: "@man"
+                    hint: "Free text or an optional Director @reference"
+                  woman1:
+                    label: "Woman1"
+                    initial_text: "@woman1"
+                    hint: "Free text or an optional Director @reference"
+                  woman2:
+                    label: "Woman2"
+                    initial_text: "@woman2"
+                    hint: "Free text or an optional Director @reference"
+                segments:
+                  - text: "The camera captures a tight, high-energy shot focused on "
+                  - placeholder_ref: man
+                  - text: "'s pelvis and the intense, coordinated actions of the two women. "
+                  - placeholder_ref: man
+                  - text: " stands tall, his hands gripping the back of "
+                  - placeholder_ref: woman1
+                  - text: "'s head and "
+                  - placeholder_ref: woman2
+                  - text: "'s hair to guide the intensity. "
+                  - placeholder_ref: woman1
+                  - text: " is positioned directly in front of his shaft, her hand resting on her side with his erect penis deep into her mouth, her head moving in a frantic, rapid up-and-down motion as she deepthroats his thick, erect penis, her throat stretching to accommodate the full length of his penis with every deep, driving stroke. Simultaneously, "
+                  - placeholder_ref: woman2
+                  - text: " is positioned on the right side of "
+                  - placeholder_ref: woman1
+                  - text: " with their heads close toghether, slightly lower, her face pressed against his balls  to vigorously and rhythmically suck on his balls. The camera captures the intense, wet friction of "
+                  - placeholder_ref: woman1
+                  - text: "'s mouth sliding deep down the shaft and the rapid, swirling motion of "
+                  - placeholder_ref: woman2
+                  - text: " sucking his scrotum. "
+                  - placeholder_ref: man
+                  - text: "'s hips thrust forward uncontrollably in response to the dual stimulation, his abdominal muscles tensing and rippling. "
+                  - placeholder_ref: woman1
+                  - text: "'s eyes are rolled back in pleasure, while "
+                  - placeholder_ref: woman2
+                  - text: " maintains a focused, intense gaze on his groin, both women working with a relentless, high-speed cadence."

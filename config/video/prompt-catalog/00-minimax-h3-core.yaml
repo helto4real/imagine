@@ -1,0 +1,169 @@
+# Director Prompt IntelliSense defaults inspired by MiniMax H3 prompt vocabulary.
+schema_version: "1.0"
+mode: replace
+
+namespaces:
+  - key: camera
+    label: Camera
+    description: Camera movement phrasing suitable for MiniMax H3 prompts.
+    choices:
+      - key: zoom_in
+        aliases: [zoom-in]
+        label: Zoom In
+        append: space
+        segments:
+          - text: "The camera zooms in"
+      - key: zoom_out
+        aliases: [zoom-out]
+        label: Zoom Out
+        append: space
+        segments:
+          - text: "The camera zooms out"
+      - key: push_in
+        aliases: [push-in]
+        label: Push In
+        append: space
+        segments:
+          - text: "The camera pushes in"
+      - key: pull_out
+        aliases: [pull-out]
+        label: Pull Out
+        append: space
+        segments:
+          - text: "The camera pulls out"
+      - key: pan_left
+        aliases: [pan-left]
+        label: Pan Left
+        append: space
+        segments:
+          - text: "The camera pans left"
+      - key: pan_right
+        aliases: [pan-right]
+        label: Pan Right
+        append: space
+        segments:
+          - text: "The camera pans right"
+      - key: truck_left
+        aliases: [truck-left]
+        label: Truck Left
+        append: space
+        segments:
+          - text: "The camera trucks left"
+      - key: truck_right
+        aliases: [truck-right]
+        label: Truck Right
+        append: space
+        segments:
+          - text: "The camera trucks right"
+      - key: tilt_up
+        aliases: [tilt-up]
+        label: Tilt Up
+        append: space
+        segments:
+          - text: "The camera tilts up"
+      - key: tilt_down
+        aliases: [tilt-down]
+        label: Tilt Down
+        append: space
+        segments:
+          - text: "The camera tilts down"
+      - key: pedestal_up
+        aliases: [pedestal-up]
+        label: Pedestal Up
+        append: space
+        segments:
+          - text: "The entire camera moves upward"
+      - key: pedestal_down
+        aliases: [pedestal-down]
+        label: Pedestal Down
+        append: space
+        segments:
+          - text: "The entire camera moves downward"
+      - key: arc_shot
+        aliases: [arc-shot, arc]
+        label: Arc Shot
+        append: space
+        segments:
+          - text: "The camera moves in an arc around the subject"
+      - key: tracking_shot
+        aliases: [tracking-shot, tracking]
+        label: Tracking Shot
+        append: space
+        segments:
+          - text: "The camera follows the moving subject"
+      - key: static_shot
+        aliases: [static-shot, static]
+        label: Static Shot
+        append: space
+        segments:
+          - text: "The camera holds a static shot"
+      - key: shake_slightly
+        aliases: [shake-slightly]
+        label: Shake Slightly
+        append: space
+        segments:
+          - text: "The camera shakes slightly"
+      - key: shake_strongly
+        aliases: [shake-strongly]
+        label: Shake Strongly
+        append: space
+        segments:
+          - text: "The camera shakes strongly"
+      - key: pov
+        aliases: [point-of-view]
+        label: POV
+        append: space
+        segments:
+          - text: "The shot uses the subject’s point of view"
+      - key: roll_clockwise
+        aliases: [roll-clockwise]
+        label: Roll Clockwise
+        append: space
+        segments:
+          - text: "The camera rolls clockwise around the lens axis"
+      - key: roll_counterclockwise
+        aliases: [roll-counterclockwise]
+        label: Roll Counterclockwise
+        append: space
+        segments:
+          - text: "The camera rolls counterclockwise around the lens axis"
+
+  - key: shot
+    label: Shot
+    description: Shot framing phrasing suitable for MiniMax H3 prompts.
+    choices:
+      - key: close_up
+        aliases: [close-up, close]
+        label: Close-up
+        append: space
+        segments:
+          - text: "A close-up shot frames the action"
+      - key: medium
+        aliases: []
+        label: Medium
+        append: space
+        segments:
+          - text: "A medium shot frames the action"
+      - key: wide
+        aliases: []
+        label: Wide
+        append: space
+        segments:
+          - text: "A wide shot frames the action"
+
+  - key: transition
+    label: Transition
+    description: Explicit transitions between prompt moments.
+    choices:
+      - key: hard_cut
+        aliases: [hard-cut, cut]
+        label: Hard Cut
+        append: space
+        segments:
+          - text: "The shot cuts to"
+      - key: continuous
+        aliases: [no-cut]
+        label: Continuous
+        append: space
+        segments:
+          - text: "The same shot continues without a cut as"
