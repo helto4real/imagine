@@ -189,6 +189,14 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(env['IMAGINE_PRIVATE_STORAGE'], '1')
         self.assertEqual(env['IMAGINE_COORDINATOR_SOCKET'], '/synthetic/run/imagine/gpu.sock')
         self.assertEqual(env['ST_PROXY_COORDINATOR_SOCKET'], env['IMAGINE_COORDINATOR_SOCKET'])
+        # The stack starts every enabled backend and Imagine only, unless told otherwise.
+        self.assertEqual(env['ST_PROXY_LLM_BACKEND'], 'all')
+        self.assertEqual([env[f'ST_PROXY_{kind}_PORT'] for kind in ('CHAT', 'IMAGE', 'MCP')],
+                         ['5002', '8189', '8190'])
+        self.assertEqual(env['ST_PROXY_COMFY_ENABLED'], 'false')
+        with patch.dict(os.environ, {'XDG_RUNTIME_DIR': '/synthetic/run',
+                                     'ST_PROXY_LLM_BACKEND': 'sc117'}, clear=True):
+            self.assertEqual(build.launch_environment(self.root)['ST_PROXY_LLM_BACKEND'], 'sc117')
         args = ['--bind', '127.0.0.1:8087', '--data', '/synthetic/path with spaces']
         directory = self.root / 'release'
         with patch.object(build, 'ROOT', self.root), patch.object(build, 'prepare', return_value=directory), \
