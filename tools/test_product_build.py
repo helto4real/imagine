@@ -93,6 +93,38 @@ class BuildTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Pinned artifact changed'):
             verifier.files({str(artifact): expected})
 
+    def test_system_inputs_are_recorded_and_project_inputs_stay_exact(self):
+        system = self.put('system/usr/lib/libdriver.so', 'upgraded driver')
+        project = self.put('comfyui/artifacts/libkitchen.so', 'changed kitchen')
+        compiler = self.put('system/usr/bin/clang++', '#!/bin/sh\necho "clang version 2.0.4"\n')
+        compiler.chmod(0o755)
+        strict = self.put('system/bin/rustc', '#!/bin/sh\necho "rustc 2.0.0"\n')
+        strict.chmod(0o755)
+        lock = {'build': {'tools': {str(compiler): 'clang version 2.0.1', str(strict): 'rustc 2.0.0'},
+                          'system': {'tools': [str(compiler)], 'prefixes': [str(self.root / 'system/usr') + '/']}},
+                'image': {'files': {str(system): '0' * 64, str(project): '1' * 64}},
+                'h3': {'files': {str(system): '0' * 64}}}
+        verifier = build.Verifier(self.root / 'receipt.json')
+        with patch.object(build.sys, 'stderr') as stderr:
+            changes = build.system_changes(lock, verifier)
+        self.assertEqual(changes, {
+            str(compiler): {'locked': 'clang version 2.0.1', 'actual': 'clang version 2.0.4'},
+            str(system): {'locked': '0' * 64, 'actual': build.digest(system)}})
+        self.assertIn('system input changed', ''.join(c.args[0] for c in stderr.write.call_args_list))
+        # The resolved lock carries the current system values into runtime.json.
+        self.assertEqual(lock['build']['tools'][str(compiler)], 'clang version 2.0.4')
+        self.assertEqual(lock['h3']['files'][str(system)], build.digest(system))
+        self.assertEqual(lock['image']['files'][str(project)], '1' * 64)
+        with self.assertRaisesRegex(ValueError, 'Pinned artifact changed'):
+            verifier.files(lock['image']['files'])
+        lock['build']['tools'][str(strict)] = 'rustc 1.0.0'
+        with self.assertRaisesRegex(ValueError, 'Pinned tool changed'):
+            build.check_native(lock, verifier)
+        # Without a system section every input stays exact.
+        exact = {'build': {'tools': {}}, 'image': {'files': {str(system): '0' * 64}}, 'h3': {'files': {}}}
+        self.assertEqual(build.system_changes(exact, verifier), {})
+        self.assertEqual(exact['image']['files'][str(system)], '0' * 64)
+
     def test_native_core_comes_from_git_and_only_allowlisted_files_follow_main(self):
         self.put('inference/core.rs', 'frozen')
         self.put('inference/adapter.rs', 'old adapter')

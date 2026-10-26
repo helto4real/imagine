@@ -13,7 +13,8 @@ A remote `origin/main` update has no effect until deliberately integrated locall
 | API, UI, proxy, shared product contracts and Comfy worker scripts | Current main checkout, including local edits |
 | Rust image/H3 worker adapters | Exact `product_files` allowlist in `native/product/build-lock.json`, overlaid from main |
 | Rust inference core, memory/allocator/offload code, native bindings, Cargo dependency lock and vendor code | `source_base` Git archive plus `core_files` restored from `core_revision` and hash-checked `core_patches` |
-| Kitchen, Aimdo, Pillow, LibTorch, CUDA libraries, driver/system libraries, headers, Triton cubins | Existing local artifacts with hashes in the product build lock |
+| Kitchen, Aimdo, Pillow, LibTorch, CUDA libraries and headers, Triton compiler tools | Existing local artifacts with hashes in the product build lock |
+| System C++ compiler, GPU driver and C runtime libraries (`build.system`: `clang++` and files under `/usr/`) | The installed versions; a difference from the lock is reported and recorded in `build.json` |
 | Optional stable-diffusion.cpp backend and Qwen native profile | Existing `native/upstream-lock.json` and `native/qwen-default/source-lock.json`; not rebuilt by product launchers |
 
 An edit under `inference/` does **not** automatically enter production. Only
@@ -47,10 +48,19 @@ All Rust code — the native image and H3 workers, server, UI and proxy — is
 built with the **release** profile (`--release`, optimized, without debug
 information), as set by `build.profile` in the build lock. CUDA, LibTorch and
 the Triton artifacts are prebuilt and only verified. A shared
-build lock serializes preparation. Rust/Cargo/C++ versions and native headers
+build lock serializes preparation. Rust/Cargo versions and native headers
 are checked against the native lock before worker builds. CUDA libraries are
 verified, not rebuilt. Python 3.12+ orchestrates preparation only; it is not an
 inference runtime for the Rust backend.
+
+Operating-system inputs follow distribution upgrades instead: the system
+`clang++` and the libraries under `/usr/` (C runtime, `libcuda`, NCCL) named in
+`build.system`. When one differs from the lock, preparation prints
+`system input changed since the build lock`, uses the installed version or hash
+for that build's `runtime.json`, and records the locked and installed values
+under `system_changes` in `build.json`. The lock keeps the values the accepted
+baseline was built with. A system change is not GPU evidence; compare against
+the frozen baseline when quality or speed matters.
 
 Prepared dependencies and the Git objects named by the lock must already exist.
 There are no downloads. The machine-specific prepared paths are in the lock's
@@ -138,8 +148,9 @@ Do not use those commands as the current deployment procedure.
    change. Preserve the accepted baseline and evidence, follow repository native
    instructions, validate the change, then update the pinned source revision,
    individual source/patch hashes and affected dependency/tool/header hashes.
-   System driver/library upgrades can also invalidate this lock; do not disable
-   verification or recalculate the entire lock merely to make startup succeed.
+   System compiler/driver/library upgrades are recorded, not blocked (see above);
+   do not widen `build.system` to project-owned inputs, disable verification or
+   recalculate the entire lock merely to make startup succeed.
 4. Never hand-edit the generated native source cache. Remove only the named
    `comfyui/main-build/native-source-...` directory **and its sibling `.json`
    receipt** when a source-cache rebuild is necessary, with no build in progress.
@@ -149,8 +160,36 @@ Do not use those commands as the current deployment procedure.
    service restarts are separate work; neither happens as part of these checks.
    Keep static/build results separate from live model evidence in the report.
 
+## Restoring native inputs
+
+Pinned inputs live under the project, never in `/tmp`, which is cleared at boot.
+`python3 tools/restore_native_inputs.py` restores what can be restored
+exactly, and verifies everything it covers:
+
+- the CUDA 13.0 headers in `build.cuda_include`, from the five exact wheels in
+  `native/product/native-inputs-lock.json` (cached in `comfyui/inference-wheels/`);
+- missing files named by the image worker's Triton compiler profile: source
+  copies from the original files it names, the Triton driver from the product
+  artifact store, and `triton-opt`/`imagine-triton-llvm` from a rebuild by
+  `tools/build_triton_compiler_tools.sh`.
+
+Every restored file and tree must have its pinned SHA-256; a mismatch stops the
+restore and nothing is rewritten. The compiler rebuild uses the pinned image,
+Triton source and LLVM from `design/stage-1-triton-toolchain-lock.json` in the
+original sandbox, and reproduces the pinned binaries byte for byte. A dangling
+link under `comfyui/` on the way to a restored file becomes a real directory.
+
+```sh
+python3 tools/restore_native_inputs.py
+# Only when it reports missing compiler tools (takes a while):
+tools/build_triton_compiler_tools.sh && python3 tools/restore_native_inputs.py
+```
+
+## Checks
+
 ```sh
 python3 -m unittest discover -s tools -p test_product_build.py -v
+python3 -m unittest discover -s tools -p test_restore_native_inputs.py -v
 bash -n start-server.sh start-ui.sh start-proxy.sh prepare-rust-backend.sh build-product.sh
 ./build-product.sh
 ```

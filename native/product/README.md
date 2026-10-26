@@ -36,7 +36,9 @@ Some frozen Kitchen objects retain the old build-time ComfyUI
 RUNPATH; the explicit product `LD_LIBRARY_PATH` selects the isolated libraries.
 Validate loader resolution with ComfyUI's environment hidden before changing
 this deployment. System libraries, the GPU driver and model directories remain
-separate dependencies. The optional `--backend comfy` and development reference
+separate dependencies. The CUDA headers and the Triton compiler profile's files
+are restored by `tools/restore_native_inputs.py` from `native-inputs-lock.json`;
+see `docs/PRODUCT-BUILDS.md`. The optional `--backend comfy` and development reference
 tools still have their explicit ComfyUI dependencies.
 
 After restoration, use `./build-product.sh` for build-only validation. Neither

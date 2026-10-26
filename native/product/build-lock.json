@@ -79,6 +79,14 @@
       "cargo": "cargo 1.96.1 (356927216 2026-06-26)",
       "clang++": "clang version 23.1.1"
     },
+    "system": {
+      "tools": [
+        "clang++"
+      ],
+      "prefixes": [
+        "/usr/"
+      ]
+    },
     "header_trees": {
       "${project}/.venv-inference/lib/python3.12/site-packages/torch/include": "c8e445fc9ef2ffb85a78d7ad361c7ecba4bb8898573692680f15fad64f1b05de",
       "${project}/comfyui/moss-20261018/cuda13/nvidia/cu13/include": "19e4518955815146cced2a909d7a18f50889d1ab63f72b3152e2a0706a635e5c"
@@ -93,7 +101,6 @@
       "IMAGINE_PILLOW_LIBRARY": "${project}/comfyui/h3-main-20261020/artifacts/095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3/libimagine_pillow.so",
       "IMAGINE_TRITON_COMPILER_PROFILE": "${project}/comfyui/h3-main-20261020/artifacts/f5c036937a02cc570fc9fb4e82fd8167a8d1720641cc0f9fa583a51d33e098e3/triton-compiler-profile.json",
       "IMAGINE_TRITON_DRIVER_LIBRARY": "${project}/comfyui/h3-main-20261020/artifacts/bd124a1b2de3c096e3df0e472699c8734b5f456f58f6201454d6aee566121aeb/libimagine_triton_driver.so",
-      "IMAGINE_TRITON_FRONTEND_CUBINS": "${project}/comfyui/moss-20261018/triton-frontend/standalone",
       "LD_LIBRARY_PATH": "${project}/.venv-inference/lib/python3.12/site-packages/torch/lib",
       "OMP_NUM_THREADS": "2"
     },
@@ -194,7 +201,5 @@
     },
     "model_root": "/mnt/media/gemensam/AI/ComfyUI/models"
   },
-  "runtime_trees": {
-    "${project}/comfyui/moss-20261018/triton-frontend/standalone": "a3bb3e24508d5d67cf55e9d3b15bafd5366d3c004f5166026b661201d0ee17de"
-  }
+  "runtime_trees": {}
 }

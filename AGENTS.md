@@ -36,5 +36,9 @@ changes) through `tools/product_build.py`; they never select `active-product.sh`
 `native/product/build-lock.json` explicitly separates main's product adapters
 from the pinned Rust inference core, compiler, headers and native libraries.
 Do not expand its product allowlist to bypass a core lock, rebuild CUDA during
-normal startup, or silently accept changed dependency hashes. Use build-only
+normal startup, or silently accept changed dependency hashes. Only the system
+inputs in its `build.system` section (the system `clang++` and `/usr/`
+libraries, including the GPU driver) are recorded and reported instead of
+enforced; do not widen that section to project-owned inputs. Keep pinned inputs
+under the project, never in `/tmp`; `tools/restore_native_inputs.py` restores them. Use build-only
 preparation for validation; service restarts and GPU runs are separate actions.

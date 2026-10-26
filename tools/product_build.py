@@ -230,9 +230,41 @@ def cargo(root, lock, bins, native=False):
     run(args, cwd=root, env=build_env(lock, native))
 
 
+def version(tool):
+    return subprocess.check_output([tool, '--version'], text=True).splitlines()[0]
+
+
+def system_changes(lock, verifier):
+    """Operating-system inputs (the system C++ compiler, GPU driver and C
+    runtime libraries) follow distribution upgrades. Their current versions and
+    hashes replace the locked ones in this build's resolved lock, are recorded
+    in build.json and are reported; project-owned inputs stay exact."""
+    system = lock['build'].get('system', {})
+    prefixes = tuple(system.get('prefixes', ()))
+    changes = {}
+    for tool in system.get('tools', ()):
+        actual = version(tool)
+        if actual != lock['build']['tools'][tool]:
+            changes[tool] = {'locked': lock['build']['tools'][tool], 'actual': actual}
+            lock['build']['tools'][tool] = actual
+    for component in ('image', 'h3'):
+        files = lock[component]['files']
+        for path in files:
+            if not prefixes or not path.startswith(prefixes):
+                continue
+            actual = verifier.hash(path)
+            if actual != files[path]:
+                changes[path] = {'locked': files[path], 'actual': actual}
+                files[path] = actual
+    for name, change in changes.items():
+        print(f"imagine: system input changed since the build lock: {name}: "
+              f"{change['locked']} -> {change['actual']} (recorded in build.json)", file=sys.stderr)
+    return changes
+
+
 def check_native(lock, verifier):
     for tool, expected in lock['build']['tools'].items():
-        actual = subprocess.check_output([tool, '--version'], text=True).splitlines()[0]
+        actual = version(tool)
         if actual != expected:
             raise ValueError(f'Pinned tool changed: {tool}: {actual}; expected {expected}')
     verifier.trees(lock['build']['header_trees'])
@@ -305,7 +337,9 @@ def prepare(root, component, with_runtime=True):
     with build_context(root) as (cache, verifier):
         lock = load_lock(root)
         before = source_state(root, lock)
-        workers = prepare_workers(root, lock, cache, verifier) if component == 'server' and with_runtime else None
+        native = component == 'server' and with_runtime
+        system = system_changes(lock, verifier) if native else {}
+        workers = prepare_workers(root, lock, cache, verifier) if native else None
         bins = {'server': ('imagine-server',), 'ui': ('imagine-ui',), 'proxy': PROXY_BINS}[component]
         cargo(root, lock, bins)
         target = output(lock, 'product_target')
@@ -336,9 +370,8 @@ def prepare(root, component, with_runtime=True):
                          for p in sorted(directory.rglob('*')) if p.is_file()}
             write_json(directory / 'build.json', {'schema': 1, 'component': component,
                        'source': before, 'native_lock_sha256': digest(root / LOCK),
-                       'build_lock': lock,
-                       'tools': {tool: subprocess.check_output([tool, '--version'], text=True).splitlines()[0]
-                                 for tool in ('cargo', 'rustc')},
+                       'build_lock': lock, 'system_changes': system,
+                       'tools': {tool: version(tool) for tool in ('cargo', 'rustc')},
                        'workers': str(workers) if workers else None, 'artifacts': artifacts})
             print(f"imagine: {component} from main {before['commit'][:12]}"
                   f"{' (dirty)' if before['dirty'] else ''}; {directory / 'build.json'}", file=sys.stderr)
