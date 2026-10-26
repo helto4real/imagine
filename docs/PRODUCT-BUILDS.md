@@ -57,6 +57,12 @@ There are no downloads. The machine-specific prepared paths are in the lock's
 `build`, `image` and `h3` sections. Old dated target directories remain compiler
 caches only; they are no longer independent source owners or launch selectors.
 
+LibTorch and its packaged NVIDIA libraries/headers live in the project-local
+`.venv-inference`, independent of ComfyUI's `.venv`. Restore it explicitly with
+`python3 tools/prepare_inference_environment.py`; see
+[the dependency lock and restore procedure](../native/product/README.md).
+Normal launchers only verify these dependencies and never install packages.
+
 Successful preparation copies executables into a fresh directory under
 `comfyui/main-build/releases/`. Native worker snapshots are reused by binary
 hash under `comfyui/main-build/workers/`. The server receives that release's
