@@ -208,6 +208,10 @@ struct PublicUi {
     upscale_target: UpscaleTarget,
     layout: PanelLayout,
     media_zoom: MediaZoom,
+    /// One negative prompt for every model, written here by a short-lived
+    /// build; read to carry it over, never written.
+    #[serde(skip_serializing)]
+    negative_prompt: Option<String>,
 }
 impl Default for PublicUi {
     fn default() -> Self {
@@ -218,6 +222,7 @@ impl Default for PublicUi {
             upscale_target: Default::default(),
             layout: Default::default(),
             media_zoom: Default::default(),
+            negative_prompt: None,
         }
     }
 }
@@ -350,6 +355,12 @@ impl PreferencesStore {
             ),
         };
         let private_prefs = private_prefs.unwrap_or_default();
+        // An earlier single negative prompt for every model, newest location first.
+        let legacy = public
+            .negative_prompt
+            .clone()
+            .filter(|n| !n.is_empty())
+            .unwrap_or_else(|| private_prefs.negative_prompt.clone());
         let mut model_groups: std::collections::BTreeMap<String, ModelGroupSettings> = selection
             .as_ref()
             .map(|s| {
@@ -365,10 +376,12 @@ impl PreferencesStore {
                                     .enhancement_profiles
                                     .get(name)
                                     .cloned(),
+                                // Empty means the model's default negative prompt.
                                 negative_prompt: g
                                     .negative_prompt
                                     .clone()
-                                    .unwrap_or_else(|| private_prefs.negative_prompt.clone()),
+                                    .filter(|n| !n.is_empty())
+                                    .unwrap_or_else(|| legacy.clone()),
                             },
                         )
                     })
@@ -382,7 +395,7 @@ impl PreferencesStore {
                 .enhancement_profile_id = Some(profile.clone());
         }
         // The earlier single negative prompt applied to every model.
-        if !private_prefs.negative_prompt.is_empty() {
+        if !legacy.is_empty() {
             for group in [
                 crate::model_catalog::QWEN_GROUP,
                 crate::model_catalog::MOSS_GROUP,
@@ -390,27 +403,30 @@ impl PreferencesStore {
                 model_groups
                     .entry(group.into())
                     .or_insert_with(|| ModelGroupSettings {
-                        negative_prompt: private_prefs.negative_prompt.clone(),
+                        negative_prompt: legacy.clone(),
                         ..Default::default()
                     });
             }
         }
-        Ok((
-            Preferences {
-                model_group: selection.map_or_else(default_model_group, |s| s.model_group),
-                model_groups,
-                output_folder: private_prefs.output_folder,
-                privacy_mode: public.privacy_mode,
-                prompt_catalog_folder: private_prefs.prompt_catalog_folder,
-                preferred_prompt_profile: private_prefs.preferred_prompt_profile,
-                generation: public.generation,
-                sheet_width: public.sheet_width,
-                upscale_target: public.upscale_target,
-                layout: public.layout,
-                media_zoom: public.media_zoom,
-            },
-            warning,
-        ))
+        let prefs = Preferences {
+            model_group: selection.map_or_else(default_model_group, |s| s.model_group),
+            model_groups,
+            output_folder: private_prefs.output_folder,
+            privacy_mode: public.privacy_mode,
+            prompt_catalog_folder: private_prefs.prompt_catalog_folder,
+            preferred_prompt_profile: private_prefs.preferred_prompt_profile,
+            generation: public.generation,
+            sheet_width: public.sheet_width,
+            upscale_target: public.upscale_target,
+            layout: public.layout,
+            media_zoom: public.media_zoom,
+        };
+        // Move an earlier value at once, but only after the private file was
+        // read, so a failed read never overwrites the private preferences.
+        if !legacy.is_empty() && warning.is_none() {
+            self.save(&prefs)?;
+        }
+        Ok((prefs, warning))
     }
     pub fn save(&self, prefs: &Preferences) -> Result<()> {
         let Self::Home { paths, runtime, .. } = self else {
@@ -472,6 +488,7 @@ impl PreferencesStore {
                 upscale_target: prefs.upscale_target,
                 layout: prefs.layout,
                 media_zoom: prefs.media_zoom,
+                negative_prompt: None,
             })?,
             runtime,
         )?;
@@ -479,7 +496,7 @@ impl PreferencesStore {
     }
 }
 impl Preferences {
-    /// The selected model's negative prompt.
+    /// The negative prompt set for the selected model; empty uses its default.
     pub fn negative_prompt(&self) -> &str {
         self.model_groups
             .get(&self.model_group)
@@ -1017,7 +1034,7 @@ pub struct ModelGroupSettings {
     pub variant: String,
     pub loras: Vec<LoraSetting>,
     pub enhancement_profile_id: Option<String>,
-    /// This model's default negative prompt.
+    /// This model's negative prompt; empty uses the model's default.
     pub negative_prompt: String,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1173,6 +1190,10 @@ mod storage_tests {
             Ok(private.clone()),
         );
         let (mut prefs, _) = store.load().unwrap();
+        // Moved at once on load, without waiting for a settings change.
+        let moved =
+            String::from_utf8(private.read(Path::new(PRIVATE_UI)).unwrap().unwrap()).unwrap();
+        assert!(!moved.contains("negative") && moved.contains("own profile"));
         for group in [
             crate::model_catalog::QWEN_GROUP,
             crate::model_catalog::MOSS_GROUP,
@@ -1204,6 +1225,28 @@ mod storage_tests {
         cleared.negative_prompt_mut().clear();
         store.save(&cleared).unwrap();
         assert_eq!(store.load().unwrap().0.negative_prompt(), "");
+    }
+    #[test]
+    fn a_negative_prompt_left_in_the_ui_file_becomes_each_models_setting() {
+        let own = own();
+        let home = own.path().join("home");
+        let (private, _env) = volume(own.path());
+        let paths = crate::storage_layout::PublicPaths::for_home(&home);
+        let runtime = own.path().join("runtime/imagine");
+        // As a short-lived build wrote it: one public value, none private.
+        crate::settings_store::write_value(
+            &paths.ui,
+            json!({"privacy_mode": true, "negative_prompt": "own public negative"}),
+            &runtime,
+        )
+        .unwrap();
+        let store = PreferencesStore::for_home(&home, runtime, Ok(private));
+        let (prefs, _) = store.load().unwrap();
+        assert_eq!(prefs.negative_prompt(), "own public negative");
+        let ui = String::from_utf8(std::fs::read(&paths.ui).unwrap()).unwrap();
+        assert!(!ui.contains("negative"));
+        let models = String::from_utf8(std::fs::read(&paths.models).unwrap()).unwrap();
+        assert!(models.contains("own public negative"));
     }
     #[test]
     fn unavailable_private_root_keeps_public_loadable_but_never_claims_save_success() {

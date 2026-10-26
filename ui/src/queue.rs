@@ -173,7 +173,7 @@ impl ImagineApp {
             .map(|prompt| {
                 let request = self.apply_model_selection(client::make_request(
                     prompt,
-                    self.prefs.negative_prompt(),
+                    &self.effective_negative_prompt(),
                     &references,
                     metadata,
                     &self.prefs.generation,

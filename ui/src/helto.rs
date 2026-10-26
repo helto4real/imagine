@@ -755,6 +755,18 @@ pub fn textarea(
     privacy_mode: bool,
     resizable: bool,
 ) -> egui::Response {
+    textarea_with_hint(ui, text, rows, id, privacy_mode, resizable, None)
+}
+/// [`textarea`] showing `hint` in place of empty text, concealed with it.
+pub fn textarea_with_hint(
+    ui: &mut egui::Ui,
+    text: &mut String,
+    rows: usize,
+    id: &str,
+    privacy_mode: bool,
+    resizable: bool,
+    hint: Option<&str>,
+) -> egui::Response {
     let width = ui.available_width();
     let height = ui.text_style_height(&egui::TextStyle::Monospace) * rows as f32 + 14.;
     egui::Resize::default()
@@ -773,7 +785,7 @@ pub fn textarea(
                 .auto_shrink([false, false])
                 .max_height(rect.height())
                 .show(ui, |ui| {
-                    textarea_content(ui, text, id, privacy_mode, hidden, rect.height())
+                    textarea_content(ui, text, id, privacy_mode, hidden, rect.height(), hint)
                 })
                 .inner;
             // A field's geometry is its frame, not the potentially much taller
@@ -797,6 +809,7 @@ fn textarea_content(
     private: bool,
     hidden: bool,
     height: f32,
+    hint: Option<&str>,
 ) -> egui::Response {
     ui.scope(|ui| {
         ui.visuals_mut().selection.stroke = Stroke::new(1., FOCUS);
@@ -839,6 +852,7 @@ fn textarea_content(
                 }
                 egui::TextEdit::multiline(text)
                     .id(id)
+                    .hint_text(hint.unwrap_or_default())
                     .desired_rows(1)
                     .frame(egui::Frame::NONE.inner_margin(egui::Margin::symmetric(9, 7)))
                     .min_size(egui::vec2(0., height))

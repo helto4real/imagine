@@ -161,6 +161,21 @@ pub struct ImagineApp {
     rx: Receiver<Message>,
 }
 impl ImagineApp {
+    /// The selected model's default negative prompt from the server.
+    pub(crate) fn default_negative_prompt(&self) -> &str {
+        self.metadata
+            .as_ref()
+            .and_then(|m| m["defaults"]["negative_prompt"].as_str())
+            .unwrap_or("")
+    }
+    /// The negative prompt sent for the selected model: the one set for it,
+    /// or the model's default.
+    pub(crate) fn effective_negative_prompt(&self) -> String {
+        match self.prefs.negative_prompt() {
+            "" => self.default_negative_prompt().to_owned(),
+            own => own.to_owned(),
+        }
+    }
     pub fn new(
         project: PathBuf,
         connection: Connection,
@@ -602,7 +617,7 @@ impl ImagineApp {
                     &state.character_description,
                     &state.clothing_description,
                     self.prefs.sheet_width,
-                    self.prefs.negative_prompt(),
+                    &self.effective_negative_prompt(),
                     &refs,
                     metadata,
                     &self.prefs.generation,
@@ -610,7 +625,7 @@ impl ImagineApp {
             } else {
                 client::make_request(
                     &state.prompt,
-                    self.prefs.negative_prompt(),
+                    &self.effective_negative_prompt(),
                     &refs,
                     metadata,
                     &self.prefs.generation,
@@ -1005,3 +1020,24 @@ mod enhancement;
 mod timeline;
 #[path = "video_ui.rs"]
 mod video_ui;
+
+#[cfg(test)]
+mod negative_prompt_tests {
+    use super::*;
+    #[test]
+    fn requests_use_the_models_default_until_one_is_set_for_it() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.metadata =
+            Some(serde_json::json!({"defaults":{"negative_prompt":"own model default"}}));
+        assert_eq!(app.prefs.negative_prompt(), "");
+        assert_eq!(app.effective_negative_prompt(), "own model default");
+        *app.prefs.negative_prompt_mut() = "own chosen negative".into();
+        assert_eq!(app.effective_negative_prompt(), "own chosen negative");
+        // Another model keeps its own setting and default.
+        app.prefs.model_group = crate::model_catalog::MOSS_GROUP.into();
+        app.metadata = Some(serde_json::json!({"defaults":{}}));
+        assert_eq!(app.effective_negative_prompt(), "");
+    }
+}
