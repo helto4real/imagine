@@ -1086,7 +1086,7 @@ async fn run_and_assembly_waits_are_bounded_and_stop_at_terminal_status() {
 
 #[test]
 fn catalog_schemas_are_strict_objects() {
-    let tools: Value = serde_json::from_str(include_str!("../mcp/tools.json")).unwrap();
+    let tools: Value = serde_json::from_str(include_str!("../../config/mcp/tools.json")).unwrap();
     let tools = tools.as_array().unwrap();
     let mut names = std::collections::BTreeSet::new();
     for tool in tools {
@@ -1150,7 +1150,7 @@ fn catalog_schemas_are_strict_objects() {
     assert!(protocol("video_project", &json!({"action":"create","path":"/x"})).is_err());
     // Clients cap server instructions (Claude Code near 4,000 characters):
     // they stay short and send the agent to the full guide.
-    let instructions = include_str!("../mcp/instructions.txt");
+    let instructions = include_str!("../../config/mcp/instructions.txt");
     assert!(
         instructions.len() <= 3500,
         "{} characters",
@@ -1159,7 +1159,7 @@ fn catalog_schemas_are_strict_objects() {
     assert!(instructions.contains("call imagine_guide"));
     assert!(instructions.contains("save the returned workspace_key at once"));
     assert!(instructions.contains("reuse the same job_id"));
-    let guide = include_str!("../mcp/guide.txt");
+    let guide = include_str!("../../config/mcp/guide.txt");
     assert!(guide.contains("Imagine never lists workspaces or shows host paths"));
     assert!(guide.contains("video_run start (the first GPU handover)"));
     assert!(guide.contains("video_run mode rerun"));

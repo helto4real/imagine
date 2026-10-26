@@ -12,7 +12,7 @@ def port():
  with socket.socket() as s:s.bind(('127.0.0.1',0));return s.getsockname()[1]
 async def main():
  (ROOT/'.imagine/test-runs').mkdir(parents=True,exist_ok=True)
- out=pathlib.Path(tempfile.mkdtemp(prefix='profile-mcp-live-',dir=ROOT/'.imagine/test-runs'));profiles=out/'profiles';shutil.copytree(ROOT/'profiles',profiles)
+ out=pathlib.Path(tempfile.mkdtemp(prefix='profile-mcp-live-',dir=ROOT/'.imagine/test-runs'));profiles=out/'profiles';shutil.copytree(ROOT/'config/image/profiles',profiles)
  for path in profiles.glob('*.yaml'):
   profile=yaml.safe_load(path.read_text())
   profile['defaults']['prompt']='A blue ceramic teapot on a wooden table, studio photograph.'

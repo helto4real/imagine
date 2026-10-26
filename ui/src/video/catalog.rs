@@ -55,37 +55,15 @@ pub(super) fn insertion_error(ctx: &egui::Context) {
 fn builtins() -> &'static BTreeMap<String, String> {
     static SOURCES: OnceLock<BTreeMap<String, String>> = OnceLock::new();
     SOURCES.get_or_init(|| {
-        [
-            (
-                "30-reference-and-retention.yaml",
-                include_str!(
-                    "../../../assets/video/prompt-catalog/30-reference-and-retention.yaml"
-                ),
-            ),
-            (
-                "40-sound-dialogue-voice.yaml",
-                include_str!("../../../assets/video/prompt-catalog/40-sound-dialogue-voice.yaml"),
-            ),
-            (
-                "50-blocking-core.yaml",
-                include_str!("../../../assets/video/prompt-catalog/50-blocking-core.yaml"),
-            ),
-            (
-                "60-blocking-advanced.yaml",
-                include_str!("../../../assets/video/prompt-catalog/60-blocking-advanced.yaml"),
-            ),
-            (
-                "70-non-graphic-intimacy.yaml",
-                include_str!("../../../assets/video/prompt-catalog/70-non-graphic-intimacy.yaml"),
-            ),
-            (
-                "80-source-video-editing.yaml",
-                include_str!("../../../assets/video/prompt-catalog/80-source-video-editing.yaml"),
-            ),
-        ]
-        .into_iter()
-        .map(|(n, t)| (n.into(), t.into()))
-        .collect()
+        crate::VIDEO_CATALOG_FILES
+            .iter()
+            .zip(crate::video_catalog_files())
+            .filter_map(|(name, path)| {
+                crate::config_files::text(&path)
+                    .ok()
+                    .map(|text| ((*name).into(), text.into()))
+            })
+            .collect()
     })
 }
 pub(super) struct State {

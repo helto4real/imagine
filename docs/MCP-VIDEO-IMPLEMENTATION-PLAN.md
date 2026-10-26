@@ -11,7 +11,7 @@ checkout, including the NSFW prompt profile. Nothing here was run.
 ## 0. Ground rules for every work package
 
 - **Prompt profiles are served verbatim.** Nothing under
-  `assets/video/prompt-studio/profiles/` is edited, shortened, sanitized or
+  `config/video/prompt-profiles/` is edited, shortened, sanitized or
   softened. The agent receives exactly the text the local provider receives;
   the only substitution is the existing `{{STORY_OUTLINE_JSON_SCHEMA}}`
   placeholder, as today. A test enforces byte equality (WP3). Agent-specific
@@ -151,7 +151,7 @@ Pure refactor; the provider path must behave exactly as before.
 
 Files: `crates/video-contract/src/authoring.rs`, `src/video/authoring/drafts.rs`,
 `src/video/authoring/steps.rs`, `src/video/authoring_api.rs`, new
-`assets/video/prompt-studio/shared/agent_video.txt`.
+`config/video/agent-guidance.txt`.
 
 - **Start.** `Service::start` accepts `provider == "external"` (not added to
   `profiles::PROVIDERS`, which drives generation parameters):
@@ -182,7 +182,7 @@ Files: `crates/video-contract/src/authoring.rs`, `src/video/authoring/drafts.rs`
   "production.scenes[i]", detail}` and restores the Draft's previous state.
   Size limits match the provider path (`story_context_limit`,
   `story_text_limit`).
-- **Shared agent guidance.** `assets/video/prompt-studio/shared/agent_video.txt`
+- **Shared agent guidance.** `config/video/agent-guidance.txt`
   covers only what profiles do not: the bundle and its marked slots, the
   code-owned fields, the production block, Reference/I2V selection, boundary
   mechanisms, cast identity images, and Develop versus Adapt for open ideas
@@ -313,7 +313,7 @@ private root:
 ### WP7 — Proxy: video tools
 
 Files: `proxy/src/mcp.rs` (dispatch), new `proxy/src/mcp_video.rs`,
-`proxy/mcp/tools.json`, `proxy/mcp/instructions.txt`, `proxy/src/imagine.rs`.
+`config/mcp/tools.json`, `config/mcp/instructions.txt`, `proxy/src/imagine.rs`.
 
 | Tool | Actions → endpoints |
 | --- | --- |
@@ -480,7 +480,7 @@ implementation, beyond the text above:
   and reopen from the folder.
 - Not covered: real inference/GPU (live acceptance, section 4), the UI folder
   picker itself (covered at its HTTP boundary), interrupting a running run.
-- No file under `assets/video/prompt-studio/profiles/` changed.
+- No file under `config/video/prompt-profiles/` changed.
 
 ### Live acceptance and follow-up fixes (2026-10-24)
 
@@ -510,8 +510,8 @@ generated and assembled 20-second videos.
 ### Scene presets (2026-10-25)
 
 MCP productions choose a named scene preset per scene instead of a bare
-variant. Presets live in `config/video-presets.yaml` (gitignored; tracked
-example `config/video-presets.example.yaml`; server flag `--video-presets`)
+variant. Presets live in `config/video/presets.yaml` (gitignored; tracked
+example `config/video/presets.example.yaml`; server flag `--video-presets`)
 and are read on each use, so edits apply without a restart. A preset has a
 readable `key`, a `variant` (reference or i2v), a `description`, `settings`
 overrides (model file and other components, sampling, shifts, reference

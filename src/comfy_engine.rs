@@ -565,7 +565,8 @@ fn request_frame(request: &ImagePass, fallback_root: &Path) -> Result<(Value, Ve
     let options = if let Some(w) = request.model_options.generation(&request.model) {
         w
     } else {
-        let profile: Value = serde_yaml::from_str(include_str!("../profiles/qwen.yaml"))?;
+        let profile: Value =
+            serde_yaml::from_str(crate::config_files::text("image/profiles/qwen.yaml")?)?;
         defaults = serde_json::from_value::<WorkflowOptions>(
             profile["defaults"]["model_options"]["qwen_image_2_1"]["generation"].clone(),
         )?;
@@ -774,7 +775,8 @@ mod tests {
     #[test]
     fn lora_paths_use_the_selected_library_loras_directory() {
         let mut request = pass("synthetic");
-        let profile: Value = serde_yaml::from_str(include_str!("../profiles/qwen.yaml")).unwrap();
+        let profile: Value =
+            serde_yaml::from_str(include_str!("../config/image/profiles/qwen.yaml")).unwrap();
         let mut workflow: WorkflowOptions = serde_json::from_value(
             profile["defaults"]["model_options"]["qwen_image_2_1"]["generation"].clone(),
         )
@@ -825,7 +827,8 @@ mod tests {
             );
         }
         let profile: Value =
-            serde_yaml::from_str(include_str!("../profiles/quick-draft.yaml")).unwrap();
+            serde_yaml::from_str(include_str!("../config/image/profiles/quick-draft.yaml"))
+                .unwrap();
         request.model = contract::TURBO.into();
         request.sampling = serde_json::from_value(profile["defaults"]["sampling"].clone()).unwrap();
         request.model_options.qwen_image_2_1.workflow = Some(

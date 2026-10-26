@@ -6,10 +6,7 @@ use super::authoring_messages::{
 use super::authoring_tests::fixture;
 use super::*;
 use imagine_server::video::authoring::engine;
-const PROFILES: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/assets/video/prompt-studio/profiles"
-);
+const PROFILES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/config/video/prompt-profiles");
 async fn start(h: &Harness, project: &str, request: Value) -> Value {
     let (code, d) = call(
         h,
@@ -412,7 +409,7 @@ async fn bundle_and_profile_description_deliver_every_profile_verbatim() {
         assert_eq!(described["limits"], capabilities["authoring"]);
         assert_eq!(
             described["agent_guidance"].as_str().unwrap(),
-            include_str!("../../assets/video/prompt-studio/shared/agent_video.txt")
+            include_str!("../../config/video/agent-guidance.txt")
         );
         for dialogue in [false, true] {
             let mut request = external(&h, &project, id).await;

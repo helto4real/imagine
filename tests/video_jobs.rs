@@ -417,7 +417,7 @@ async fn setup(root: &Path, name: &str) -> Harness {
         profiles: Arc::new(
             imagine_server::profiles::Catalog::load(Path::new(concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/profiles"
+                "/config/image/profiles"
             )))
             .unwrap(),
         ),

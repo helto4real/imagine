@@ -140,7 +140,6 @@ mod tests {
     };
     use axum::{body::to_bytes, http::Request};
     use serde_json::{Value, json};
-    use std::path::Path;
     use tokio::sync::{Semaphore, watch};
     use tower::ServiceExt;
     struct NoInference;
@@ -231,10 +230,8 @@ mod tests {
                 .unwrap(),
             library: Default::default(),
             profiles: Arc::new(
-                crate::profiles::Catalog::load(
-                    &Path::new(env!("CARGO_MANIFEST_DIR")).join("profiles"),
-                )
-                .unwrap(),
+                crate::profiles::Catalog::load(&crate::config_files::path("image/profiles"))
+                    .unwrap(),
             ),
             store: store.clone(),
             control: control.clone(),

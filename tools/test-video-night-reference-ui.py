@@ -34,7 +34,7 @@ def main():
             runtime=json.loads((OWN/source_case/'standard/runtime.json').read_text());assert 'IMAGINE_REFERENCE_PROBE_OUTPUT'not in runtime['h3']['environment']
             (case/'runtime.json').write_text(json.dumps(runtime))
             destination=json.loads((OWN/source_case/'standard/state/video-output.json').read_text());destination['root']=str(case/'output');(case/'state/video-output.json').write_text(json.dumps(destination))
-            command=[str(package/'imagine-server'),'--project',str(case/'server-project'),'--data',str(case/'state'),'--profiles',str(ROOT/'profiles'),'--bind','127.0.0.1:0','--backend','rust','--rust-runtime',str(case/'runtime.json')]
+            command=[str(package/'imagine-server'),'--project',str(case/'server-project'),'--data',str(case/'state'),'--profiles',str(ROOT/'config/image/profiles'),'--bind','127.0.0.1:0','--backend','rust','--rust-runtime',str(case/'runtime.json')]
         else:command=[str(package/'timeline_fixture_server'),str(case),'--reopen=q81']
         with (case / 'evidence/server.log').open('x') as out:
             server = subprocess.Popen(command, env=env, stdout=out, stderr=subprocess.STDOUT)

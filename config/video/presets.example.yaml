@@ -1,5 +1,5 @@
 # MCP video presets: named scene recipes that agents choose by key.
-# Copy this file to config/video-presets.yaml (gitignored) and edit it, or start
+# Copy this file to config/video/presets.yaml (gitignored) and edit it, or start
 # the server with --video-presets PATH. Changes apply without a restart.
 #
 # Agents always use "Default ref2v" / "Default i2v" unless the user names

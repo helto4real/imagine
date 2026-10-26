@@ -110,11 +110,8 @@ impl Service {
                 return Err(fault("story_continuation_context_limit"));
             }
         }
-        let catalog = profiles::Catalog::load(std::path::Path::new(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/assets/video/prompt-studio/profiles"
-        )))
-        .map_err(fault)?;
+        let catalog = profiles::Catalog::load(&crate::config_files::path("video/prompt-profiles"))
+            .map_err(fault)?;
         let profile = catalog
             .snapshot(&request.prompt_profile_id)
             .map_err(fault)?;

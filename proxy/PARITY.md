@@ -7,7 +7,7 @@ The initial checkpoint is Imagine commit `491e07d`. Port/integration changes aft
 ## Approved profile migration
 
 The user subsequently replaced the workflow-based MCP contract with Imagine-owned
-YAML profiles and client overrides. See [profile API](../profiles/README.md).
+YAML profiles and client overrides. See [profile API](../config/image/README.md).
 MCP now exposes `list_profiles`/`describe_profile` and accepts `profile` rather
 than `workflow_id`; Turbo is selected by `quick-draft`. Graph translation is no
 longer on the runtime path. The old graphs, manifests and their differential
@@ -20,7 +20,7 @@ byte-identical MCP metadata for the new contract. Current profile tests cover
 recursive overrides, list replacement, invalid requests, atomic rejection,
 reference sizing/ownership, stored profile version/hash, seed retries, and MCP
 through the real Imagine HTTP API with a fake engine. Native settings/binaries
-are unchanged. See the current run evidence in `profiles/VALIDATION.md`.
+are unchanged. See the current run evidence in `config/image/VALIDATION.md`.
 
 ## Implementation map
 

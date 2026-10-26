@@ -135,7 +135,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
         profiles: Arc::new(
             imagine_server::profiles::Catalog::load(std::path::Path::new(concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/profiles"
+                "/config/image/profiles"
             )))
             .unwrap(),
         ),

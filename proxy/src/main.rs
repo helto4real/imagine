@@ -29,7 +29,7 @@ async fn run() -> Result<()> {
             .replace("  --imagine-access-file IMAGINE_ACCESS_FILE\n                        operator-owned Imagine access.json for MCP assets and\n                        GPU release\n", "");
         print!("{help}");
         println!(
-            "\n  --comfy-enabled true|false\n                        enable Comfy routes and GPU cleanup (binary default: true; root launcher: false)"
+            "\n  --comfy-enabled true|false\n                        enable Comfy routes and GPU cleanup (binary default: true; root launcher: false)\n  --config CONFIG       editable configuration root (MCP texts under mcp/)"
         );
         return Ok(());
     }
@@ -77,6 +77,12 @@ async fn run() -> Result<()> {
             ),
         );
         return Ok(());
+    }
+    // The MCP texts are read once; a restart applies edits.
+    st_proxy::config_files::init(config.config.clone().into());
+    if config.mcp_port.is_some() && st_proxy::mcp::check_config().is_err() {
+        eprintln!("st-proxy: MCP configuration under --config is missing or invalid");
+        std::process::exit(2)
     }
     let running = Service::start(config).await?;
     log(

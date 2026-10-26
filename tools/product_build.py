@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 LOCK = 'native/product/build-lock.json'
 PROXY_BINS = ('st-proxy', 'st-proxy-launch', 'st-kobold-bootstrap', 'st-strata-logging')
 COMFY_SCRIPTS = ('worker.py', 'runtime.py', 'sampling_preview.py')
-SOURCE_PATHS = ('Cargo.toml', 'Cargo.lock', 'build.rs', 'src', 'shared', 'ui', 'assets', 'profiles',
+SOURCE_PATHS = ('Cargo.toml', 'Cargo.lock', 'build.rs', 'src', 'shared', 'ui',
                 'proxy', 'crates', 'workers', '.cargo', 'tools/product_build.py',
                 'native/product', 'native/h3-product', 'start-server.sh',
                 'start-ui.sh', 'start-proxy.sh', 'prepare-rust-backend.sh')
@@ -399,8 +399,9 @@ def needs_runtime(args):
             return False
         if flag == '--no-encryption':
             continue
-        if flag not in ('--project', '--profiles', '--data', '--bind', '--backend',
-                        '--rust-runtime', '--comfy-root', '--comfy-python'):
+        if flag not in ('--project', '--config', '--profiles', '--video-presets', '--data',
+                        '--bind', '--backend', '--rust-runtime', '--comfy-root',
+                        '--comfy-python', '--private-project-root', '--mcp-root'):
             return False  # The server will report the invalid argument.
         value = next(arguments, None)
         if value is None:

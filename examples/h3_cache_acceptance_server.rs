@@ -119,7 +119,10 @@ async fn main() -> anyhow::Result<()> {
             Default::default()
         },
         profiles: Arc::new(imagine_server::profiles::Catalog::load(
-            std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/profiles")),
+            std::path::Path::new(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/config/image/profiles"
+            )),
         )?),
         store: store.clone(),
         control: control.clone(),

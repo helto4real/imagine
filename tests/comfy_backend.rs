@@ -136,7 +136,7 @@ async fn turbo_rust_profile_accepts_comfy_conditioning_without_pooled_tensor() {
     let (_directory, mut engine, _) = fake();
     let mut request = pass("adapter");
     let profile: serde_json::Value =
-        serde_yaml::from_str(include_str!("../profiles/quick-draft.yaml")).unwrap();
+        serde_yaml::from_str(include_str!("../config/image/profiles/quick-draft.yaml")).unwrap();
     request.model = contract::TURBO.into();
     request.sampling = serde_json::from_value(profile["defaults"]["sampling"].clone()).unwrap();
     request.model_options =
@@ -250,7 +250,7 @@ async fn live_lora_through_rust_backend() {
     request.width = 1600;
     request.height = 896;
     let profile: serde_json::Value =
-        serde_yaml::from_str(include_str!("../profiles/qwen.yaml")).unwrap();
+        serde_yaml::from_str(include_str!("../config/image/profiles/qwen.yaml")).unwrap();
     let mut workflow: contract::WorkflowOptions = serde_json::from_value(
         profile["defaults"]["model_options"]["qwen_image_2_1"]["generation"].clone(),
     )

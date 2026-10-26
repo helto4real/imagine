@@ -32,10 +32,7 @@ use tokio::{
     sync::{Semaphore, oneshot, watch},
     task::JoinHandle,
 };
-const PROFILES: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/assets/video/prompt-studio/profiles"
-);
+const PROFILES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/config/video/prompt-profiles");
 #[derive(Default)]
 struct Probe {
     /// H3 profile, reference image count and opening frame bytes per scene job.
@@ -130,7 +127,7 @@ impl Imagine {
             profiles: Arc::new(
                 imagine_server::profiles::Catalog::load(Path::new(concat!(
                     env!("CARGO_MANIFEST_DIR"),
-                    "/profiles"
+                    "/config/image/profiles"
                 )))
                 .unwrap(),
             ),
@@ -422,7 +419,7 @@ async fn agent_produces_a_video_in_its_workspace_and_resumes_with_the_key() {
     assert_eq!(described["profile"], profile);
     assert_eq!(
         described["agent_guidance"].as_str().unwrap(),
-        include_str!("../assets/video/prompt-studio/shared/agent_video.txt")
+        include_str!("../config/video/agent-guidance.txt")
     );
     let capabilities = agent.ok("video_capabilities", json!({})).await;
     assert!(

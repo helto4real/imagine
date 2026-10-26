@@ -276,7 +276,7 @@ impl Mcp {
                     json!({"workspace_key":created["key"],"title":created["title"],"created_ms":created["created_ms"],
                         "next":"Save workspace_key now where you keep notes for this task. Pass it to every workspace, image and video tool. Imagine cannot list or recover workspaces.",
                         // Every task starts here, so the full rules always arrive.
-                        "guide":GUIDE}),
+                        "guide":guide()}),
                     vec![],
                 ))
             }
@@ -285,7 +285,7 @@ impl Mcp {
                 let files = self.listing(&workspace).await?;
                 let projects = self.workspace_projects(&workspace).await?;
                 Ok((
-                    json!({"ok":true,"files":files.len(),"video_projects":projects,"guide":GUIDE}),
+                    json!({"ok":true,"files":files.len(),"video_projects":projects,"guide":guide()}),
                     vec![],
                 ))
             }

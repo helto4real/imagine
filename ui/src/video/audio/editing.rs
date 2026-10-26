@@ -138,7 +138,7 @@ mod tests {
         apply(&mut p, commands);
         let source = clip(&p, &AudioClipId("a".into())).unwrap();
         let oracle: Value = serde_json::from_str(include_str!(
-            "../../../../assets/video/director-audio-defaults.json"
+            "../../../../design/video-contract/director-audio-defaults.json"
         ))
         .unwrap();
         assert_eq!(

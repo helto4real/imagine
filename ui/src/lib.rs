@@ -4,6 +4,24 @@ pub mod client;
 mod clipboard;
 #[path = "../../shared/component_error.rs"]
 pub mod component_error;
+#[path = "../../shared/config_files.rs"]
+pub mod config_files;
+/// The Director prompt catalog files under `video/prompt-catalog/` of the
+/// configuration root, read at startup.
+pub const VIDEO_CATALOG_FILES: [&str; 6] = [
+    "30-reference-and-retention.yaml",
+    "40-sound-dialogue-voice.yaml",
+    "50-blocking-core.yaml",
+    "60-blocking-advanced.yaml",
+    "70-non-graphic-intimacy.yaml",
+    "80-source-video-editing.yaml",
+];
+/// Paths of the Director prompt catalog files below the configuration root.
+pub fn video_catalog_files() -> impl Iterator<Item = String> {
+    VIDEO_CATALOG_FILES
+        .iter()
+        .map(|name| format!("video/prompt-catalog/{name}"))
+}
 #[path = "../../shared/enhancement.rs"]
 pub mod enhancement_types;
 pub mod helto;

@@ -1,6 +1,7 @@
 # Imagine generation profiles
 
-Imagine loads `profiles/*.yaml` and `profiles/*.yml` under `--project` at startup.
+Imagine loads `profiles/*.yaml` and `profiles/*.yml` in this folder
+(`config/image/` of the configuration root) at startup.
 `--profiles /absolute/directory` selects a different catalog. Invalid files,
 unknown fields and duplicate IDs/keys fail startup. Restart Imagine after an edit;
 increment `version` when changing a published profile. Already queued jobs retain
@@ -14,14 +15,16 @@ encrypted negative-prompt envelope from the former `image_generation` preset;
 Turbo retains its empty negative prompt and zero-negative-conditioning setting.
 Prompt guidance and other generation settings are unchanged.
 
-A profile without inline `prompt_guidance` takes it from `guidance/<id>.md` when
-that file exists (`guidance/moss.md` for MOSS prompts, `guidance/qwen-character-sheet.md`
-for the character sheet fields); inline guidance
-wins. `describe_profile` returns it to agents.
+A profile without inline `prompt_guidance` takes it from `guidance/<id>.md` beside
+the profiles folder when that file exists (`guidance/moss.md` for MOSS prompts,
+`guidance/qwen-character-sheet.md` for the character sheet fields); inline guidance
+wins. `describe_profile` returns it to agents. `character-sheet/` holds the
+server's own instructions for the two character sheet passes.
 
 Character sheets and upscale retain their dedicated operation profiles.
 The overlapping `image_generation`, `qwen_scene` and frozen-v2 wrapper presets
-are preserved in `archive/`, outside the active catalog. Native frozen binaries,
+are preserved in [`docs/archive/image-profiles/`](../../docs/archive/image-profiles/),
+outside the active catalog. Native frozen binaries,
 manifests and evidence are unchanged. Catalog descriptions never decrypt or
 expose default prompts.
 

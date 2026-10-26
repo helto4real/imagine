@@ -459,8 +459,10 @@ pub fn model(id: &str) -> Option<Value> {
                     "reference_images":{"max_count":0}
                 }, "request_schema":schemars::schema_for!(JobRequest)
             });
-            v["defaults"] = serde_yaml::from_str::<Value>(include_str!("../profiles/moss.yaml"))
-                .ok()?["defaults"]
+            v["defaults"] = serde_yaml::from_str::<Value>(
+                crate::config_files::text("image/profiles/moss.yaml").ok()?,
+            )
+            .ok()?["defaults"]
                 .clone();
             v["defaults"]["model"] = json!(id);
             if id == MOSS_BF16 {

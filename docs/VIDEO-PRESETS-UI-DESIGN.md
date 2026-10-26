@@ -4,7 +4,7 @@ Status: **Implemented 2026-10-25** (first phase; no preset saving).
 
 Date: 2026-10-25.
 
-Scene presets exist for MCP productions (`config/video-presets.yaml`, see
+Scene presets exist for MCP productions (`config/video/presets.yaml`, see
 [MCP-VIDEO-IMPLEMENTATION-PLAN.md](MCP-VIDEO-IMPLEMENTATION-PLAN.md), "Scene
 presets"). A preset is a named recipe: an H3 variant (reference or I2V),
 settings overrides (model file and other components, sampling, shifts,
@@ -135,7 +135,7 @@ serializer would drop the user's comments and formatting. Options:
 
 - append a generated entry as text at the end of the `presets` list, keeping the
   rest of the file byte-for-byte; or
-- keep UI-created presets in a second file (`config/video-presets.ui.yaml`)
+- keep UI-created presets in a second file (`config/video/presets.ui.yaml`)
   that the catalog merges, so the hand-written file is never touched.
 
 The second is safer and simpler; keys must still be unique across both files.

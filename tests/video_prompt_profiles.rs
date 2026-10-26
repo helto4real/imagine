@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
 fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/video/prompt-studio/profiles")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("config/video/prompt-profiles")
 }
 #[test]
 fn all_five_profiles_prompts_revisions_and_sixty_operation_resolutions_match_director() {

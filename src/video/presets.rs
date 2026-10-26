@@ -430,7 +430,7 @@ mod tests {
     fn the_tracked_example_file_is_valid() {
         let example = Catalog::load(Some(Path::new(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/config/video-presets.example.yaml"
+            "/config/video/presets.example.yaml"
         ))));
         assert_eq!(example.problem, None);
         assert!(example.presets.iter().all(|p| p.problem.is_none()));

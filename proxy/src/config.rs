@@ -11,6 +11,8 @@ pub struct Config {
     pub image_port: usize,
     pub mcp_port: Option<u16>,
     pub mcp_workflows_dir: String,
+    /// The editable configuration root; the MCP texts are under mcp/.
+    pub config: String,
     pub mcp_output_dir: Option<String>,
     pub mcp_token: Option<String>,
     pub model_profiles: Option<String>,
@@ -58,6 +60,7 @@ impl Default for Config {
             image_port: 8188,
             mcp_port: None,
             mcp_workflows_dir: concat!(env!("CARGO_MANIFEST_DIR"), "/workflows").into(),
+            config: concat!(env!("CARGO_MANIFEST_DIR"), "/../config").into(),
             mcp_output_dir: None,
             mcp_token: None,
             model_profiles: None,

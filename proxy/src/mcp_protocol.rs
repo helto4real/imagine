@@ -96,8 +96,21 @@ fn check(value: &Value, ty: &str, location: &str, issues: &mut Vec<String>) {
         issues.push(issue(location, code, message, value));
     }
 }
+/// The MCP tool catalog from the configuration root, parsed once.
+pub fn tools() -> std::io::Result<&'static Value> {
+    static TOOLS: std::sync::OnceLock<Value> = std::sync::OnceLock::new();
+    if let Some(tools) = TOOLS.get() {
+        return Ok(tools);
+    }
+    let tools: Value = serde_json::from_str(crate::config_files::text("mcp/tools.json")?)
+        .map_err(std::io::Error::other)?;
+    if !tools.is_array() {
+        return Err(std::io::Error::other("mcp/tools.json must be a list"));
+    }
+    Ok(TOOLS.get_or_init(|| tools))
+}
 pub fn tool_arguments(name: &str, args: &Value) -> Result<Value, String> {
-    let tools: Value = serde_json::from_str(include_str!("../mcp/tools.json")).unwrap();
+    let tools = tools().map_err(|e| e.to_string())?;
     let Some(tool) = tools.as_array().unwrap().iter().find(|t| t["name"] == name) else {
         return Err(format!("Unknown tool: {name}"));
     };

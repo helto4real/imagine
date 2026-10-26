@@ -387,8 +387,9 @@ impl Library {
             paths.extend(w.loras.iter().map(|l| format!("loras/{}", l.path)));
             paths
         } else {
-            let profile: Value = serde_yaml::from_str(include_str!("../profiles/qwen.yaml"))
-                .expect("shipped profile");
+            let profile: Value =
+                serde_yaml::from_str(crate::config_files::required("image/profiles/qwen.yaml"))
+                    .expect("shipped profile");
             let w = &profile["defaults"]["model_options"]["qwen_image_2_1"]["generation"];
             ["diffusion_model", "text_encoder", "vae"]
                 .iter()
@@ -562,8 +563,10 @@ pub fn model_metadata(model: &str) -> Value {
         meta["operations"] = json!(["text_to_image", "image_edit"]);
         meta.as_object_mut().unwrap().remove("character_sheet");
         // Existing shipped quick-draft defaults, not new inference settings.
-        let profile: Value = serde_yaml::from_str(include_str!("../profiles/quick-draft.yaml"))
-            .expect("shipped profile");
+        let profile: Value = serde_yaml::from_str(crate::config_files::required(
+            "image/profiles/quick-draft.yaml",
+        ))
+        .expect("shipped profile");
         meta["defaults"]["sampling"] = profile["defaults"]["sampling"].clone();
     }
     meta

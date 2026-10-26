@@ -6,8 +6,8 @@ use crate::{
 use serde_json::{Value, json};
 
 pub const SHEET_REVISION: &str = "qwen-character-sheet-v1";
-const PORTRAIT: &str = include_str!("prompts/qwen-character-sheet-v1/portrait.txt");
-const TURNAROUND: &str = include_str!("prompts/qwen-character-sheet-v1/turnaround.txt");
+const PORTRAIT: &str = "image/character-sheet/portrait.txt";
+const TURNAROUND: &str = "image/character-sheet/turnaround.txt";
 
 #[derive(Clone, Copy)]
 pub enum SheetStrategy {
@@ -50,7 +50,7 @@ fn roles(count: usize, turnaround: bool) -> Vec<&'static str> {
 pub fn sheet_prompt(sheet: &CharacterSheet, count: usize, turnaround: bool) -> String {
     let roles = roles(count, turnaround);
     let mut parts = vec![
-        if turnaround { TURNAROUND } else { PORTRAIT }
+        crate::config_files::required(if turnaround { TURNAROUND } else { PORTRAIT })
             .trim()
             .to_owned(),
     ];

@@ -3,6 +3,17 @@ pub mod comfy_engine;
 #[path = "../shared/component_error.rs"]
 pub mod component_error;
 pub mod config;
+#[path = "../shared/config_files.rs"]
+pub mod config_files;
+/// Configuration files the server reads at startup; see `config/README.md`.
+pub const CONFIG_FILES: &[&str] = &[
+    "image/character-sheet/portrait.txt",
+    "image/character-sheet/turnaround.txt",
+    "image/profiles/qwen.yaml",
+    "image/profiles/quick-draft.yaml",
+    "image/profiles/moss.yaml",
+    "video/agent-guidance.txt",
+];
 pub mod contract;
 pub mod engine;
 pub mod enhancement;

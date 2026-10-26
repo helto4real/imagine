@@ -225,9 +225,9 @@ enforce it, block that access in the agent's sandbox:
   commands on `/run/media/veracrypt1`.
 - **Guidance.** Clients cap MCP server instructions (Claude Code cut ours near
   4,080 characters and marked them truncated; tool descriptions arrive whole).
-  The instructions (`proxy/mcp/instructions.txt`) stay short: the workspace rule,
+  The instructions (`config/mcp/instructions.txt`) stay short: the workspace rule,
   the nsfw and `job_id` rules, and "call `imagine_guide` first". The full guidance
-  is `proxy/mcp/guide.txt`, returned by the `imagine_guide` tool and included in
+  is `config/mcp/guide.txt`, returned by the `imagine_guide` tool and included in
   every `workspace_create` and `workspace_open` result. A test keeps the
   instructions at 3,500 characters or less. `video_capabilities` reports Draft
   as the default canvas, and project views show each scene's `preset` and

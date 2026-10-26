@@ -92,8 +92,13 @@ impl Catalog {
             let mut profile: Profile = serde_yaml::from_value(yaml)
                 .with_context(|| format!("invalid profile: {}", path.display()))?;
             profile.sha256 = hash(&bytes);
-            // A profile without inline guidance may take it from guidance/<id>.md.
-            let guidance = dir.join("guidance").join(format!("{}.md", profile.id));
+            // A profile without inline guidance may take it from guidance/<id>.md
+            // beside the profiles folder.
+            let guidance = dir
+                .parent()
+                .unwrap_or(dir)
+                .join("guidance")
+                .join(format!("{}.md", profile.id));
             if profile.prompt_guidance.is_none() && guidance.is_file() {
                 if guidance.metadata()?.len() > 256 * 1024 {
                     bail!("prompt guidance is too large: {}", guidance.display());
@@ -476,7 +481,7 @@ mod tests {
     #[test]
     fn rejects_broken_yaml_and_defaults_without_loading_models() {
         let dir = tempfile::tempdir().unwrap();
-        let good = include_str!("../profiles/qwen.yaml");
+        let good = include_str!("../config/image/profiles/qwen.yaml");
         for bad in [
             good.replace("steps: 40", "steps: 0"),
             good.replace("steps: 40", "steps: 40\n    steps: 12"),
@@ -500,22 +505,24 @@ mod tests {
     }
     #[test]
     fn guidance_file_applies_only_to_profiles_without_inline_guidance() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir(dir.path().join("guidance")).unwrap();
-        let moss = include_str!("../profiles/moss.yaml");
-        std::fs::write(dir.path().join("moss.yaml"), moss).unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let dir = root.path().join("profiles");
+        std::fs::create_dir(&dir).unwrap();
+        std::fs::create_dir(root.path().join("guidance")).unwrap();
+        let moss = include_str!("../config/image/profiles/moss.yaml");
+        std::fs::write(dir.join("moss.yaml"), moss).unwrap();
         std::fs::write(
-            dir.path().join("guidance/moss.md"),
+            root.path().join("guidance/moss.md"),
             "Own synthetic guidance.",
         )
         .unwrap();
-        std::fs::write(dir.path().join("guidance/qwen.md"), "Ignored.").unwrap();
+        std::fs::write(root.path().join("guidance/qwen.md"), "Ignored.").unwrap();
         std::fs::write(
-            dir.path().join("qwen.yaml"),
-            include_str!("../profiles/qwen.yaml"),
+            dir.join("qwen.yaml"),
+            include_str!("../config/image/profiles/qwen.yaml"),
         )
         .unwrap();
-        let catalog = Catalog::load(dir.path()).unwrap();
+        let catalog = Catalog::load(&dir).unwrap();
         assert_eq!(
             catalog.describe("moss").unwrap()["prompt_guidance"],
             "Own synthetic guidance."
@@ -525,8 +532,7 @@ mod tests {
             "Ignored."
         );
         // The shipped MOSS guide is attached from the project catalog.
-        let shipped =
-            Catalog::load(Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/profiles"))).unwrap();
+        let shipped = Catalog::load(&crate::config_files::path("image/profiles")).unwrap();
         let guide = shipped.describe("moss").unwrap()["prompt_guidance"].clone();
         assert!(
             guide

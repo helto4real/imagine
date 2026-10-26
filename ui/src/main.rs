@@ -6,8 +6,7 @@ use imagine_ui::{
     settings::{Connection, DEFAULT_API_URL, PreferencesStore},
 };
 use std::path::PathBuf;
-const USAGE: &str =
-    "imagine-ui [--project PATH] [--api http://127.0.0.1:8189/imagine] [--title TITLE]";
+const USAGE: &str = "imagine-ui [--project PATH] [--config PATH] [--api http://127.0.0.1:8189/imagine] [--title TITLE]";
 /// A command-line mistake. Only these are printed; other startup errors can
 /// name private paths and stay generic.
 #[derive(Debug)]
@@ -40,6 +39,7 @@ fn run() -> Result<()> {
         anyhow::bail!("private_process_initialization_failed");
     }
     let mut project = std::env::current_dir()?;
+    let mut config_dir: Option<PathBuf> = None;
     let mut url = DEFAULT_API_URL.to_owned();
     let mut title = "Imagine".to_owned();
     #[cfg(feature = "ui-preview")]
@@ -85,6 +85,11 @@ fn run() -> Result<()> {
                     args.next().context("--qa-script needs a path")?,
                 ))
             }
+            "--config" => {
+                config_dir = Some(PathBuf::from(
+                    args.next().ok_or_else(|| usage("--config needs a path"))?,
+                ))
+            }
             "--project" => {
                 project = PathBuf::from(args.next().ok_or_else(|| usage("--project needs a path"))?)
             }
@@ -107,6 +112,11 @@ fn run() -> Result<()> {
         .validate()
         .map_err(|error| usage(error.to_string()))?;
     let project = project.canonicalize()?;
+    // The Director prompt catalog is read once; a restart applies edits.
+    imagine_ui::config_files::init(config_dir.unwrap_or_else(|| project.join("config")));
+    let catalog: Vec<String> = imagine_ui::video_catalog_files().collect();
+    let catalog: Vec<&str> = catalog.iter().map(String::as_str).collect();
+    imagine_ui::config_files::preload(&catalog).map_err(|error| usage(error.to_string()))?;
     // Only explicit QA inputs use the old source-owned fixture API. The normal
     // entry never reads project/.imagine/ui-settings.json or migrates user data.
     #[cfg(feature = "ui-preview")]

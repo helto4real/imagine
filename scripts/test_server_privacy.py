@@ -30,7 +30,9 @@ class Server:
         env['HELTO_PRIVACY_SESSION_DIR'] = str(project / 'unused-helto-session')
         binary = os.environ.get('IMAGINE_TEST_SERVER', str(ROOT / 'target/debug/imagine-server'))
         self.process = subprocess.Popen(
-            [binary, '--project', str(project), '--bind', f'127.0.0.1:{self.port}', '--backend', 'native', *args],
+            [binary, '--project', str(project), '--config', str(ROOT / 'config'),
+             '--profiles', str(project / 'profiles'), '--bind', f'127.0.0.1:{self.port}',
+             '--backend', 'native', *args],
             env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     def ready(self):
         until = time.monotonic() + 15

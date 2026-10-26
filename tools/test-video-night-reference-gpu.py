@@ -44,7 +44,7 @@ def main():
         env.pop('IMAGINE_REFERENCE_PROBE_OUTPUT',None)
         for key,name in [('TORCH_HOME','torch'),('HF_HOME','hf'),('TRITON_CACHE_DIR','triton'),('CUDA_CACHE_PATH','cuda')]:env[key]=str(folder/'cache'/name)
         log=case/'evidence'/f'{variant}-server.log'
-        with log.open('x')as f:server=subprocess.Popen([str(package/'imagine-server'),'--project',str(folder/'project'),'--data',str(folder/'state'),'--profiles',str(ROOT/'profiles'),'--bind','127.0.0.1:0','--backend','rust','--rust-runtime',str(folder/'runtime.json')],env=env,stdout=f,stderr=subprocess.STDOUT)
+        with log.open('x')as f:server=subprocess.Popen([str(package/'imagine-server'),'--project',str(folder/'project'),'--data',str(folder/'state'),'--profiles',str(ROOT/'config/image/profiles'),'--bind','127.0.0.1:0','--backend','rust','--rust-runtime',str(folder/'runtime.json')],env=env,stdout=f,stderr=subprocess.STDOUT)
         deadline=time.monotonic()+30;api=None
         while api is None:
           assert server.poll()is None,'own server exited';found=re.search(r'Imagine listening on (http://127[.]0[.]0[.]1:[0-9]+)',log.read_text())

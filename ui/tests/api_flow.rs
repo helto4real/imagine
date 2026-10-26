@@ -115,7 +115,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
     // Keep the shipped upscale settings, with only synthetic plaintext prompts.
     let profiles = dir.path().join("profiles");
     std::fs::create_dir(&profiles).unwrap();
-    let profile = include_str!("../../profiles/image_upscale.yaml")
+    let profile = include_str!("../../config/image/profiles/image_upscale.yaml")
         .lines()
         .map(|line| {
             if line.starts_with("  prompt:") {

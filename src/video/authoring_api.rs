@@ -13,10 +13,7 @@ use imagine_video_contract::authoring::{
     Draft, Production, Request as AuthorRequest, Review, Submission,
 };
 /// Agent guidance beside the prompt profiles; never sent to the local provider.
-const AGENT_GUIDANCE: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/assets/video/prompt-studio/shared/agent_video.txt"
-));
+const AGENT_GUIDANCE: &str = "video/agent-guidance.txt";
 /// The error envelope, with where in a submission a problem was found.
 struct Located {
     error: Error,
@@ -83,10 +80,9 @@ pub(super) fn routes() -> Router<App> {
         .route("/v1/video/authoring/{id}/submission", post(submission))
 }
 fn catalog() -> Result<super::super::authoring::profiles::Catalog, Fault> {
-    super::super::authoring::profiles::Catalog::load(std::path::Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/assets/video/prompt-studio/profiles"
-    )))
+    super::super::authoring::profiles::Catalog::load(&crate::config_files::path(
+        "video/prompt-profiles",
+    ))
     .map_err(|c| Fault::new(422, c))
 }
 async fn profiles() -> Result<Json<Value>, Fault> {
@@ -102,7 +98,7 @@ async fn profile(State(app): State<App>, Path(id): Path<String>) -> Result<Json<
         .find(|p| p.id == id)
         .ok_or(Fault::new(404, "profile_not_found"))?;
     Ok(Json(
-        json!({"profile":profile,"agent_guidance":AGENT_GUIDANCE,"limits":limits(&app).await}),
+        json!({"profile":profile,"agent_guidance":crate::config_files::required(AGENT_GUIDANCE),"limits":limits(&app).await}),
     ))
 }
 /// Limits with the current preset catalog.

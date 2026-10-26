@@ -190,5 +190,5 @@ The Rust service and experiment launcher select v2; v1 is retained as control.
 The strip algorithm is dynamic; 1600×896 identifies the validated profile.
 See [current baseline](experiments/qwen-image21-sage/BASELINE.md).
 
-Generation defaults now live in [YAML profiles](profiles/README.md). See the complete
-[Qwen example](profiles/qwen.yaml); API clients select `profile` and send only overrides.
+Generation defaults now live in [YAML profiles](config/image/README.md). See the complete
+[Qwen example](config/image/profiles/qwen.yaml); API clients select `profile` and send only overrides.

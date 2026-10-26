@@ -126,7 +126,7 @@ three result roles are available through the HTTP API and the native
   publishes the completed result group atomically.
 
 The AIO portrait and turnaround instruction text was retained in versioned
-source templates under `src/prompts/qwen-character-sheet-v1/`. Native source
+source templates under `config/image/character-sheet/`. Native source
 uses the same ordered `<imageN>` markers. Graph imports, ComfyUI execution,
 general workflow plugins and inference optimizations are outside this change.
 

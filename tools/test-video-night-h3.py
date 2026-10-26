@@ -125,7 +125,7 @@ def main():
     try:
         log_path = case / "evidence/server.log"
         with log_path.open("w") as log:
-            server = subprocess.Popen([str(package / "imagine-server"), "--project", str(case / "project"), "--data", str(case / "state"), "--profiles", str(ROOT / "profiles"), "--bind", "127.0.0.1:0", "--backend", "rust", "--rust-runtime", str(case / "runtime.json")], env=env, stdout=log, stderr=subprocess.STDOUT)
+            server = subprocess.Popen([str(package / "imagine-server"), "--project", str(case / "project"), "--data", str(case / "state"), "--profiles", str(ROOT / "config/image/profiles"), "--bind", "127.0.0.1:0", "--backend", "rust", "--rust-runtime", str(case / "runtime.json")], env=env, stdout=log, stderr=subprocess.STDOUT)
         result["server_pid"] = server.pid
         deadline = time.monotonic() + 30
         while api is None:

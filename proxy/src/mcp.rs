@@ -258,7 +258,7 @@ impl Mcp {
                     .await
                     .map_err(validation),
                 "describe_profile" => active.profile(args).await,
-                "imagine_guide" => Ok(json!({"guide":GUIDE})),
+                "imagine_guide" => Ok(json!({"guide":guide()})),
                 "register_image" => active.register(args).await,
                 "generate" | "generate_batch" => {
                     active.generate(args, name == "generate_batch").await
@@ -1233,14 +1233,14 @@ async fn dispatch_rpc(mcp: Mcp, v: Value, modern: bool) -> Value {
     }
     let mut result = match v["method"].as_str() {
         Some("server/discover") if modern => {
-            json!({"cacheScope":"private","capabilities":{"prompts":{"listChanged":true},"resources":{"listChanged":true,"subscribe":true},"tools":{"listChanged":true}},"instructions":include_str!("../mcp/instructions.txt"),"supportedVersions":[crate::mcp_protocol::MODERN],"ttlMs":0})
+            json!({"cacheScope":"private","capabilities":{"prompts":{"listChanged":true},"resources":{"listChanged":true,"subscribe":true},"tools":{"listChanged":true}},"instructions":instructions(),"supportedVersions":[crate::mcp_protocol::MODERN],"ttlMs":0})
         }
         Some("initialize") => {
             let version = v["params"]["protocolVersion"]
                 .as_str()
                 .filter(|s| crate::mcp_protocol::HANDSHAKE.contains(s))
                 .unwrap_or("2025-11-25");
-            json!({"protocolVersion":version,"capabilities":{"prompts":{"listChanged":false},"resources":{"listChanged":false,"subscribe":false},"tools":{"listChanged":false}},"serverInfo":{"name":"st-proxy","version":""},"instructions":include_str!("../mcp/instructions.txt")})
+            json!({"protocolVersion":version,"capabilities":{"prompts":{"listChanged":false},"resources":{"listChanged":false,"subscribe":false},"tools":{"listChanged":false}},"serverInfo":{"name":"st-proxy","version":""},"instructions":instructions()})
         }
         Some("ping") => json!({}),
         Some("resources/list") => json!({"resources":[]}),
@@ -1257,7 +1257,7 @@ async fn dispatch_rpc(mcp: Mcp, v: Value, modern: bool) -> Value {
             }
         },
         Some("tools/list") => {
-            json!({"tools":serde_json::from_str::<Value>(include_str!("../mcp/tools.json")).unwrap()})
+            json!({"tools":crate::mcp_protocol::tools().expect("checked at startup")})
         }
         Some("tools/call") => {
             let name = v["params"]["name"].as_str().unwrap_or("");
@@ -1347,14 +1347,32 @@ fn prompt(params: &Value) -> Option<Value> {
     } else {
         format!("My idea: {idea}")
     };
-    let text = include_str!("../mcp/prompts/video_interactive.txt").replace("{idea}", &idea);
+    let text =
+        crate::config_files::required("mcp/prompts/video_interactive.txt").replace("{idea}", &idea);
     Some(
         json!({"description":"Interactive video","messages":[{"role":"user","content":{"type":"text","text":text.trim_end()}}]}),
     )
 }
 /// The complete agent guidance. Clients cap server instructions (Claude Code
 /// near 4,000 characters), so the instructions stay short and point here.
-pub(crate) const GUIDE: &str = include_str!("../mcp/guide.txt");
+/// The MCP texts under the configuration root, read once at startup.
+const CONFIG_FILES: &[&str] = &[
+    "mcp/instructions.txt",
+    "mcp/guide.txt",
+    "mcp/tools.json",
+    "mcp/prompts/video_interactive.txt",
+];
+/// Reads and checks the MCP texts, so a missing or invalid one stops startup.
+pub fn check_config() -> std::io::Result<()> {
+    crate::config_files::preload(CONFIG_FILES)?;
+    crate::mcp_protocol::tools().map(|_| ())
+}
+pub(crate) fn guide() -> &'static str {
+    crate::config_files::required("mcp/guide.txt")
+}
+fn instructions() -> &'static str {
+    crate::config_files::required("mcp/instructions.txt")
+}
 #[path = "mcp_video.rs"]
 mod video;
 #[path = "mcp_workspace.rs"]

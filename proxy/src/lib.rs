@@ -27,6 +27,9 @@ pub mod json_wire;
 
 pub mod mcp_protocol;
 
+#[path = "../../shared/config_files.rs"]
+pub mod config_files;
+
 pub mod connection_limit;
 
 mod mcp_storage;

@@ -19,7 +19,7 @@ def main():
  env=dict(os.environ,TMPDIR=str(case/'tmp'),CUDA_VISIBLE_DEVICES='',LIBGL_ALWAYS_SOFTWARE='1',XDG_CACHE_HOME=str(case/'cache'),XDG_CONFIG_HOME=str(case/'config'),XDG_DATA_HOME=str(case/'share'),QWEN_MODEL_ROOT=str(case/'models'),PYTHONDONTWRITEBYTECODE='1')
  server=ui=None;result={'case':str(case),'usage':a.usage,'gpu':False,'api':api,'package':str(package),'runtime_logs_read':False}
  try:
-  with(case/'evidence/server.log').open('x')as f:server=subprocess.Popen([str(package/'imagine-server'),'--project',str(case/'server-project'),'--data',str(case/'state'),'--profiles',str(ROOT/'profiles'),'--bind',f'127.0.0.1:{port}','--backend','rust','--rust-runtime',str(case/'runtime.json')],env=env,stdout=f,stderr=subprocess.STDOUT)
+  with(case/'evidence/server.log').open('x')as f:server=subprocess.Popen([str(package/'imagine-server'),'--project',str(case/'server-project'),'--data',str(case/'state'),'--profiles',str(ROOT/'config/image/profiles'),'--bind',f'127.0.0.1:{port}','--backend','rust','--rust-runtime',str(case/'runtime.json')],env=env,stdout=f,stderr=subprocess.STDOUT)
   deadline=time.monotonic()+30
   while True:
    assert server.poll()is None and time.monotonic()<deadline

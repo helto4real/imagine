@@ -948,8 +948,8 @@ Source pointers, not live-runtime verification.
 | Source | Relevance |
 | --- | --- |
 | [Video support design](../video-support-design.md) | Product architecture and decisions |
-| [MCP tool catalog](../proxy/mcp/tools.json) | Current image tool surface |
-| [MCP instructions](../proxy/mcp/instructions.txt) | Image guidance, reference rules, recovery, delivery |
+| [MCP tool catalog](../config/mcp/tools.json) | Current image tool surface |
+| [MCP instructions](../config/mcp/instructions.txt) | Image guidance, reference rules, recovery, delivery |
 | [MCP server](../proxy/src/mcp.rs) | Tool dispatch, session state, per-call timeout, image `job_id` fingerprints |
 | [Authoring drafts](../src/video/authoring/drafts.rs) | Provider messages, answer parsing, review, expansion |
 | [Media bundle store](../src/video/bundle.rs) | Private store path guards |
@@ -963,7 +963,7 @@ Source pointers, not live-runtime verification.
 | [Runs API](../src/video/runs_api.rs) | Run start, read, stop |
 | [Assembly API](../src/video/assembly_api.rs) | Assembly planning and job submission |
 | [Profile resolver](../src/video/authoring/profiles.rs) | Inheritance, snapshots, fallback, skipped prompt serialization |
-| [NSFW profile](../assets/video/prompt-studio/profiles/nsfw/profile.json) | Initial prompt-profile manifest |
+| [NSFW profile](../config/video/prompt-profiles/nsfw/profile.json) | Initial prompt-profile manifest |
 | [Authoring engine](../src/video/authoring/engine.rs) | Validation, timing cap, Draft application, current continuity default |
 | [Visual projection](../src/video/authoring/visuals.rs) | Context-dependent outline schema and image placement |
 | [Shared authoring types](../crates/video-contract/src/authoring.rs) | Request, StoryImage, Storyboard, Draft, destinations |

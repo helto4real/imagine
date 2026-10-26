@@ -117,7 +117,7 @@ for everyone").
 | Proxy: MCP prompts | `prompts/list` returns `video_interactive` (argument `idea`); `prompts/get` returns its text. |
 | Proxy: `video_capabilities` | Adds `mcp_defaults` (section 3). |
 | Proxy: storyboard start | `duration_seconds` defaults to 15 when omitted. |
-| `proxy/mcp/guide.txt` | New "Interactive video" section (sections 2, 4 and 5) and the character choice and the 15 s default in "Video production". |
+| `config/mcp/guide.txt` | New "Interactive video" section (sections 2, 4 and 5) and the character choice and the 15 s default in "Video production". |
 | Tool descriptions | `video_storyboard` and `generate_batch` mention the 15 s default and the batch character sheets. |
 | Agent video guidance | `agent_video.txt` mentions sheets as cast identity images and text-only cast. |
 
@@ -148,13 +148,13 @@ a plan without committing it, and the conversation carries the iteration.
 
 ## 9. Implementation notes
 
-- `proxy/mcp/prompts/video_interactive.txt` is the prompt text; `prompts/list`
+- `config/mcp/prompts/video_interactive.txt` is the prompt text; `prompts/list`
   and `prompts/get` in `proxy/src/mcp.rs` serve it (idea up to 4,000 characters).
 - `video_capabilities` adds `mcp_defaults` (`proxy/src/mcp_video.rs`): 15 s,
   Draft 16:9, the profile marked default, the default reference preset, no music,
   no dialogue, `qwen-character-sheet` and the character rules. Storyboard start
   fills `duration_seconds` with 15 when it is missing.
-- `proxy/mcp/guide.txt` has the "Interactive video" section and the character
+- `config/mcp/guide.txt` has the "Interactive video" section and the character
   and length rules in "Video production"; `agent_video.txt` says a cast image may
   be a character sheet and how text-only characters are written.
 

@@ -147,6 +147,9 @@ class BuildTests(unittest.TestCase):
         self.assertTrue(build.needs_runtime(['--backend', 'native', '--backend', 'rust']))
         self.assertFalse(build.needs_runtime(['--backend', 'rust', '--backend', 'comfy']))
         self.assertTrue(build.needs_runtime(['--data', '--help']))
+        # Path options of the server keep the default Rust runtime.
+        for flag in ('--config', '--video-presets', '--private-project-root', '--mcp-root'):
+            self.assertTrue(build.needs_runtime([flag, '/synthetic/path']), flag)
 
     def test_private_coordinator_and_cli_arguments_are_preserved(self):
         with patch.dict(os.environ, {'XDG_RUNTIME_DIR': '/synthetic/run'}, clear=True):

@@ -172,7 +172,12 @@ async fn setup_inner(coordinated: bool) -> Harness {
     // Test only synthetic prompts; never resolve the production encrypted defaults.
     let profile_dir = dir.path().join("profiles");
     std::fs::create_dir(&profile_dir).unwrap();
-    for entry in std::fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/profiles")).unwrap() {
+    for entry in std::fs::read_dir(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/config/image/profiles"
+    ))
+    .unwrap()
+    {
         let path = entry.unwrap().path();
         if path.extension().and_then(|value| value.to_str()) != Some("yaml") {
             continue;
@@ -1052,7 +1057,7 @@ async fn profiles_reject_invalid_overrides_before_batch_admission() {
     // The frozen comparison wrapper is preserved outside the active catalog.
     let archived = imagine_server::profiles::Catalog::load(std::path::Path::new(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/profiles/archive"
+        "/docs/archive/image-profiles"
     )))
     .unwrap();
     let frozen = archived
@@ -1635,9 +1640,10 @@ async fn rust_admission_exposes_its_own_capabilities_and_rejects_unsupported_sam
     let (_, meta) = req(&h.router, "GET", &format!("/v1/models/{MODEL}"), None, None).await;
     assert_eq!(meta["engine"], "Imagine Rust");
     assert_eq!(meta["constraints"]["samplers"], json!(["er_sde", "euler"]));
-    let mut value: Value = serde_yaml::from_str::<Value>(include_str!("../profiles/qwen.yaml"))
-        .unwrap()["defaults"]
-        .clone();
+    let mut value: Value =
+        serde_yaml::from_str::<Value>(include_str!("../config/image/profiles/qwen.yaml")).unwrap()
+            ["defaults"]
+            .clone();
     value["prompt"] = json!("synthetic");
     value["sampling"]["sampler"] = json!("res_multistep");
     assert_eq!(

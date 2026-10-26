@@ -48,7 +48,7 @@ For a profile-based API request, post `{"profile":"moss","prompt":"A blue
 butterfly on a yellow flower"}` to `/v1/jobs`. The UI uses the existing model
 selector and component library.
 
-The source-controlled `profiles/moss.yaml` gives the local component paths.
+The source-controlled `config/image/profiles/moss.yaml` gives the local component paths.
 A library selection can resolve another nested location with the same supported
 filenames. MOSS references, LoRA, layer skipping, MTP decode and other variants
 remain unavailable and fail explicitly. Ordinary Qwen BF16 is selectable as

@@ -185,13 +185,13 @@ async fn tools_need_a_known_key_and_see_only_their_own_files() {
     assert_eq!(unknown["error"]["category"], "not_found");
     // The guide needs no key; opening or creating a workspace returns it too.
     let guide = structured(f.mcp.call("imagine_guide", &json!({})).await);
-    assert_eq!(guide["guide"], GUIDE);
+    assert_eq!(guide["guide"], super::guide());
     let opened = structured(
         f.mcp
             .call("workspace_open", &json!({"workspace_key":KEY_A}))
             .await,
     );
-    assert_eq!(opened["guide"], GUIDE, "{opened}");
+    assert_eq!(opened["guide"], super::guide(), "{opened}");
     let listed = structured(
         f.mcp
             .call("workspace_files", &json!({"workspace_key":KEY_A}))
