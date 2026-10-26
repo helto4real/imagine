@@ -72,6 +72,9 @@ python3 scripts/test_server_privacy.py
 ```
 
 The binary test launches the actual server in temporary projects with closed
-stdin, verifies startup without terminal login, plain media, token-free API access, startup purge, SIGTERM cleanup and restart isolation. It also
-checks the legacy `--no-encryption` flag. It never starts a model or accesses
-real credentials/history.
+stdin, verifies startup without terminal login, token-free API access, no-store
+responses, session data on the encrypted private volume, SIGTERM cleanup and
+restart isolation, and that legacy `<project>/.imagine` data stays untouched. It
+also checks the legacy `--no-encryption` flag. It needs the private volume
+mounted (otherwise it skips), uses a random port beside a running server, and
+never starts a model or accesses real credentials/history.

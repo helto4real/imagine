@@ -1,4 +1,10 @@
-"""Actual binary lifecycle tests. Every image/path is synthetic."""
+"""Actual binary lifecycle tests. Every image/path is synthetic.
+
+The server keeps its session data on the mounted private volume (a per-session
+folder that a normal stop removes); these tests check it only through HTTP and
+skip when that volume is not mounted. Legacy `<project>/.imagine` data is not
+disposable history: the server must leave it untouched.
+"""
 import json
 import os
 from pathlib import Path
@@ -59,6 +65,12 @@ class Server:
             self.process.wait()
             raise AssertionError('Synthetic server did not stop') from None
 
+def private_volume_mounted():
+    with open('/proc/self/mountinfo') as mounts:
+        return any(line.split()[4] == '/run/media/veracrypt1' and '/dev/mapper/veracrypt1' in line
+                   for line in mounts)
+
+@unittest.skipUnless(private_volume_mounted(), 'the private volume is not mounted')
 class Tests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='imagine-privacy-test-')
@@ -72,38 +84,36 @@ class Tests(unittest.TestCase):
         server = Server(self.root, args)
         self.addCleanup(server.stop)
         return server
-    def stale(self):
+    def legacy(self):
+        """Old project-local data, with the files a former server owned."""
         data = self.root / '.imagine'
         (data / 'media').mkdir(parents=True, exist_ok=True)
         (data / 'media/stale').write_bytes(b'synthetic old data')
         for suffix in ('', '-wal', '-shm', '-journal'):
             (data / ('imagine.sqlite' + suffix)).write_bytes(b'synthetic old database')
-    def assert_purged(self):
+        return self.snapshot()
+    def snapshot(self):
         data = self.root / '.imagine'
-        self.assertFalse((data / 'media/stale').exists())
-        for suffix in ('', '-wal', '-shm', '-journal'):
-            self.assertFalse((data / ('imagine.sqlite' + suffix)).exists())
+        return {str(p.relative_to(data)): p.read_bytes() for p in sorted(data.rglob('*')) if p.is_file()}
     def check_session_lifecycle(self, *args):
-        self.stale()
+        legacy = self.legacy()
         server = self.start(*args)
         session = server.ready()
-        self.assert_purged()
-        self.assertFalse(session['encrypted'])
-        self.assertFalse((self.root / '.imagine/privacy-keystore.json').exists())
-        self.assertFalse((self.root / '.imagine/access.json').exists())
+        # Session data is on the encrypted private volume, also with the legacy flag.
+        self.assertTrue(session['encrypted'])
         with urllib.request.urlopen(f'http://127.0.0.1:{server.port}/v1/session', timeout=3) as response:
             self.assertEqual(response.status, 200)
             self.assertEqual(response.headers['Cache-Control'], 'no-store')
             self.assertEqual(json.load(response)['id'], session['id'])
         asset = server.request('/v1/assets', png())
-        path = self.root / '.imagine/media' / session['id'] / asset['id']
-        # Uploads are session-owned RAM data; only explicit project Save persists media.
-        self.assertFalse(path.exists())
         with urllib.request.urlopen(f'http://127.0.0.1:{server.port}/v1/assets/' + asset['id'], timeout=3) as response:
             self.assertEqual(response.headers['Cache-Control'], 'no-store')
             self.assertEqual(response.read(), png())
+        # Session data never lands in the project folder, and old data there stays as it was.
+        self.assertEqual(self.snapshot(), legacy)
         self.assertEqual(server.stop(), 0)
-        self.assertFalse(path.exists())
+        self.assertEqual(self.snapshot(), legacy)
+        # A new process is a new session: the old session's uploads are gone.
         restarted = self.start()
         self.assertNotEqual(restarted.ready()['id'], session['id'])
         with self.assertRaises(urllib.error.HTTPError) as error:
@@ -111,7 +121,8 @@ class Tests(unittest.TestCase):
         self.assertEqual(error.exception.code, 404)
         error.exception.close()
         self.assertEqual(restarted.stop(), 0)
-    def test_default_start_wipes_before_api_and_cleans_on_stop(self):
+        self.assertEqual(self.snapshot(), legacy)
+    def test_session_data_is_per_process_and_legacy_project_data_untouched(self):
         self.check_session_lifecycle()
     def test_legacy_no_encryption_flag_remains_compatible(self):
         self.check_session_lifecycle('--no-encryption')
