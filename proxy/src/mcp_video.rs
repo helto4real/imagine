@@ -32,7 +32,9 @@ pub(super) fn limit(name: &str, args: &Value) -> Option<Duration> {
         | ("video_project" | "video_storyboard", "get")
         | ("video_storyboard", "list")
         | ("video_take", "list") => 5,
-        ("video_storyboard", "start" | "submit" | "bundle") | ("video_take", "view") => 60,
+        ("video_storyboard", "start" | "submit" | "commit" | "bundle") | ("video_take", "view") => {
+            60
+        }
         ("video_run" | "video_assembly", "get") => 5 + wait(args).as_secs(),
         _ => 15,
     };
@@ -303,7 +305,7 @@ impl Mcp {
             _ => Some(self.bound(args).await?),
         };
         let ws = workspace.as_ref();
-        let value = match (name, action) {
+        let result = async { Ok(match (name, action) {
             ("list_video_profiles", _) => {
                 self.call_video(Method::GET, "/v1/video/authoring/profiles", None, None)
                     .await?
@@ -416,6 +418,25 @@ impl Mcp {
                     value
                 }
             }
+            ("video_storyboard", "commit") => {
+                let draft = self.owned_draft(own(ws)?, args).await?;
+                let path = format!("/v1/video/authoring/{draft}/apply");
+                let current = self
+                    .call_video(Method::GET, &format!("/v1/video/authoring/{draft}"), None, None)
+                    .await?;
+                if current["phase"] != "review" {
+                    return Err(validation(
+                        "commit needs a valid dry run first: submit with dry_run true",
+                    ));
+                }
+                let request = json!({"schema_version":1,"expected_project_revision":revision(args)?,"dry_run":false});
+                let value = self
+                    .call_video(Method::POST, &path, Some(&request), None)
+                    .await?;
+                let mut view = project_view(&value);
+                view["scene_map"] = value["scene_map"].clone();
+                view
+            }
             ("video_storyboard", "list") => {
                 let project = ident(args, "project_id")?;
                 self.owned_project(own(ws)?, project).await?;
@@ -444,8 +465,11 @@ impl Mcp {
                 let request = body(args, "request")?;
                 let project = ident(&request, "project_id")?;
                 self.owned_project(own(ws)?, project).await?;
-                self.call_video(Method::POST, "/v1/video/runs", Some(&request), Some(&key))
-                    .await?
+                let mut run = self
+                    .call_video(Method::POST, "/v1/video/runs", Some(&request), Some(&key))
+                    .await?;
+                run["project_revision"] = self.project_revision(project).await;
+                run
             }
             ("video_run", "plan") => {
                 let request = body(args, "request")?;
@@ -523,6 +547,10 @@ impl Mcp {
                     run["failed_scene"] =
                         json!({"scene_id":scene,"job_id":job,"error":job_error(&detail)});
                 }
+                // Accepted takes change the project revision while a run advances.
+                if let Some(project) = run["project_id"].as_str().map(str::to_owned) {
+                    run["project_revision"] = self.project_revision(&project).await;
+                }
                 run
             }
             ("video_run", "stop") => {
@@ -561,15 +589,38 @@ impl Mcp {
             }
             ("video_assembly", "get") => {
                 let plan = ident(args, "plan_id")?;
-                self.owned_plan(own(ws)?, plan).await?;
-                self.poll(args, || self.assembly(plan), |a| a["terminal"] == true)
-                    .await?
+                let project = self.owned_plan(own(ws)?, plan).await?;
+                let mut value = self
+                    .poll(args, || self.assembly(plan), |a| a["terminal"] == true)
+                    .await?;
+                // Publishing the final video attaches it to the project, a new revision.
+                value["project_revision"] = self.project_revision(&project).await;
+                value
             }
             (_, action) => {
                 return Err(validation(format!(
                     "unknown action for {name}: {}",
                     if action.is_empty() { "missing" } else { action }
                 )));
+            }
+        }) }
+        .await;
+        let value = match result {
+            Ok(value) => value,
+            Err(mut fault) => {
+                // A stale revision names the current one, so the agent need not reread the project.
+                if matches!(
+                    fault.code.as_deref(),
+                    Some("revision_conflict" | "authoring_revision_conflict")
+                ) && let Some(revision) = self.conflict_revision(args).await
+                {
+                    let current = format!("project_revision is now {revision}");
+                    fault.detail = Some(match fault.detail.take() {
+                        Some(detail) => format!("{detail}; {current}"),
+                        None => current,
+                    });
+                }
+                return Err(fault);
             }
         };
         let mut value = bounded(value);
@@ -600,7 +651,50 @@ impl Mcp {
         self.owned_project(workspace, project).await?;
         Ok(draft)
     }
-    async fn owned_plan(&self, workspace: &Bound, plan: &str) -> std::result::Result<(), Fault> {
+    /// The project's current revision, or null when it cannot be read.
+    async fn project_revision(&self, project: &str) -> Value {
+        self.call_video(
+            Method::GET,
+            &format!("/v1/video/projects/{project}"),
+            None,
+            None,
+        )
+        .await
+        .map(|snapshot| snapshot["project"]["project_revision"].clone())
+        .unwrap_or(Value::Null)
+    }
+    /// The current revision of the project a rejected call named.
+    async fn conflict_revision(&self, args: &Value) -> Option<u64> {
+        let mut project = args["project_id"]
+            .as_str()
+            .or(args["request"]["project_id"].as_str())
+            .map(str::to_owned);
+        if project.is_none()
+            && let Ok(draft) = ident(args, "draft_id")
+        {
+            let value = self
+                .call_video(
+                    Method::GET,
+                    &format!("/v1/video/authoring/{draft}"),
+                    None,
+                    None,
+                )
+                .await
+                .ok()?;
+            project = value["project_id"]
+                .as_str()
+                .or(value["draft"]["project_id"].as_str())
+                .map(str::to_owned);
+        }
+        let project = project.filter(|p| ident(&json!({"p":p}), "p").is_ok())?;
+        self.project_revision(&project).await.as_u64()
+    }
+    /// The plan's project ID, if that project belongs to this workspace.
+    async fn owned_plan(
+        &self,
+        workspace: &Bound,
+        plan: &str,
+    ) -> std::result::Result<String, Fault> {
         let value = self
             .call_video(
                 Method::GET,
@@ -612,7 +706,8 @@ impl Mcp {
         let project = value["plan"]["project_id"]
             .as_str()
             .ok_or_else(|| Fault::new("not_found", "plan_id is not a plan of this workspace"))?;
-        self.owned_project(workspace, project).await.map(|_| ())
+        self.owned_project(workspace, project).await?;
+        Ok(project.to_owned())
     }
     /// Read until the status is terminal or the bounded wait elapses; never longer than 60 s.
     async fn poll<F>(
@@ -888,6 +983,7 @@ mod tests {
             ("video_storyboard", "submit", 60),
             ("video_storyboard", "bundle", 60),
             ("video_storyboard", "review", 15),
+            ("video_storyboard", "commit", 60),
             ("video_project", "create", 15),
             ("video_project", "edit", 15),
             ("video_project", "save", 15),

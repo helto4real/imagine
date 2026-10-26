@@ -213,6 +213,14 @@ async fn imagine(
         ("POST", "/v1/video/authoring/d1/submission") => {
             ok(json!({"valid":true,"scene_map":[],"snapshot":snapshot(4, false)}))
         }
+        ("GET", "/v1/video/authoring/d2") => {
+            ok(json!({"id":"d2","phase":"outline","project_id":"p1"}))
+        }
+        ("POST", "/v1/video/authoring/d1/apply") => {
+            let mut value = snapshot(4, false);
+            value["scene_map"] = json!([{"ordinal":1,"scene_id":"scene_1"}]);
+            ok(value)
+        }
         ("GET" | "POST", "/v1/video/authoring/d1" | "/v1/video/authoring/d1/review") => {
             ok(json!({"id":"d1","phase":"review","project_id":"p1"}))
         }
@@ -450,9 +458,20 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
             ],
         ),
         (
+            "video_storyboard",
+            json!({"action":"commit","draft_id":"d1","expected_project_revision":3}),
+            vec![
+                RESOLVE,
+                DRAFT,
+                PROJECT,
+                DRAFT,
+                "POST /v1/video/authoring/d1/apply",
+            ],
+        ),
+        (
             "video_run",
             json!({"action":"start","job_id":"render-1","request":{"project_id":"p1","expected_project_revision":4,"mode":"missing_only","selected_scene":null}}),
-            vec![RESOLVE, PROJECT, "POST /v1/video/runs"],
+            vec![RESOLVE, PROJECT, "POST /v1/video/runs", PROJECT],
         ),
         (
             "video_run",
@@ -462,7 +481,7 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
         (
             "video_run",
             json!({"action":"get","run_id":"run_1"}),
-            vec![RESOLVE, "GET /v1/video/runs/run_1", PROJECT],
+            vec![RESOLVE, "GET /v1/video/runs/run_1", PROJECT, PROJECT],
         ),
         (
             "video_take",
@@ -515,7 +534,7 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
         (
             "video_assembly",
             json!({"action":"get","plan_id":"assembly_1"}),
-            vec![RESOLVE, PLAN, PROJECT, PLAN, "GET /v1/jobs/job_9"],
+            vec![RESOLVE, PLAN, PROJECT, PLAN, "GET /v1/jobs/job_9", PROJECT],
         ),
     ];
     // Capabilities report the defaults MCP productions use.
@@ -691,6 +710,54 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
 }
 
 #[tokio::test]
+async fn storyboard_commit_applies_the_validated_draft_and_responses_carry_the_revision() {
+    let h = Harness::new().await;
+    let committed = h
+        .call(
+            "video_storyboard",
+            json!({"action":"commit","draft_id":"d1","expected_project_revision":3}),
+        )
+        .await;
+    let seen = h.probe.seen();
+    let apply = seen
+        .iter()
+        .find(|s| s.path == "/v1/video/authoring/d1/apply")
+        .unwrap();
+    assert_eq!(
+        apply.body,
+        json!({"schema_version":1,"expected_project_revision":3,"dry_run":false})
+    );
+    let committed = ok(&committed);
+    assert_eq!(committed["project_revision"], 4);
+    assert_eq!(committed["scene_map"][0]["scene_id"], "scene_1");
+    assert!(!committed.to_string().contains("RESOURCE HASH"));
+    // Without a valid dry run there is nothing validated to commit.
+    h.probe.clear();
+    let early = h
+        .call(
+            "video_storyboard",
+            json!({"action":"commit","draft_id":"d2","expected_project_revision":3}),
+        )
+        .await;
+    assert_eq!(fault(&early)["category"], "validation");
+    assert!(h.probe.routes().iter().all(|r| !r.ends_with("/apply")));
+    let started = h.call("video_run", json!({"action":"start","job_id":"render-1","request":{"project_id":"p1","expected_project_revision":1,"mode":"missing_only"}})).await;
+    assert_eq!(ok(&started)["project_revision"], 1);
+    let run = h
+        .call("video_run", json!({"action":"get","run_id":"run_1"}))
+        .await;
+    assert_eq!(ok(&run)["project_revision"], 1);
+    let assembly = h
+        .call(
+            "video_assembly",
+            json!({"action":"get","plan_id":"assembly_1"}),
+        )
+        .await;
+    assert_eq!(ok(&assembly)["project_revision"], 1);
+    h.close().await;
+}
+
+#[tokio::test]
 async fn takes_are_listed_viewed_as_image_blocks_and_selected_with_a_bounded_project() {
     let h = Harness::new().await;
     let listed = h
@@ -856,7 +923,7 @@ async fn imagine_errors_forward_only_stable_code_field_path_and_detail() {
     assert_eq!(
         result["structuredContent"],
         json!({"job_id":null,"error":{"category":"conflict","message":"Imagine rejected the request: revision_conflict",
-        "code":"revision_conflict","at":"commands[0].scene_id","detail":"Reload the project"}})
+        "code":"revision_conflict","at":"commands[0].scene_id","detail":"Reload the project; project_revision is now 1"}})
     );
     let text = result.to_string();
     for leak in ["LEAK", "GLOBAL SYNTHETIC", "Section prompt", "snapshot"] {
@@ -1098,6 +1165,10 @@ fn catalog_schemas_are_strict_objects() {
     assert!(guide.contains("video_run mode rerun"));
     assert!(guide.contains("Always video_run plan first"));
     assert!(guide.contains("go back with video_take select"));
+    assert!(guide.contains("then video_storyboard commit"));
+    assert!(guide.contains("in headless mode then start without waiting"));
+    assert!(guide.contains("keeping its previous seed"));
+    assert!(guide.contains("A revision_conflict error names the current revision"));
     assert!(guide.contains("i2v only to animate one specific start image"));
     assert!(guide.contains("No music unless the user asks (add_music false)"));
     assert!(guide.contains("The video profile never enables the image nsfw switch"));

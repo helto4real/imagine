@@ -92,6 +92,17 @@ impl Catalog {
             let mut profile: Profile = serde_yaml::from_value(yaml)
                 .with_context(|| format!("invalid profile: {}", path.display()))?;
             profile.sha256 = hash(&bytes);
+            // A profile without inline guidance may take it from guidance/<id>.md.
+            let guidance = dir.join("guidance").join(format!("{}.md", profile.id));
+            if profile.prompt_guidance.is_none() && guidance.is_file() {
+                if guidance.metadata()?.len() > 256 * 1024 {
+                    bail!("prompt guidance is too large: {}", guidance.display());
+                }
+                profile.prompt_guidance = Some(
+                    std::fs::read_to_string(&guidance)
+                        .with_context(|| format!("invalid guidance: {}", guidance.display()))?,
+                );
+            }
             profile
                 .check()
                 .with_context(|| format!("invalid profile: {}", path.display()))?;
@@ -485,6 +496,42 @@ mod tests {
         assert_eq!(
             catalog.describe("qwen").unwrap()["defaults"]["sampling"]["steps"],
             40
+        );
+    }
+    #[test]
+    fn guidance_file_applies_only_to_profiles_without_inline_guidance() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("guidance")).unwrap();
+        let moss = include_str!("../profiles/moss.yaml");
+        std::fs::write(dir.path().join("moss.yaml"), moss).unwrap();
+        std::fs::write(
+            dir.path().join("guidance/moss.md"),
+            "Own synthetic guidance.",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("guidance/qwen.md"), "Ignored.").unwrap();
+        std::fs::write(
+            dir.path().join("qwen.yaml"),
+            include_str!("../profiles/qwen.yaml"),
+        )
+        .unwrap();
+        let catalog = Catalog::load(dir.path()).unwrap();
+        assert_eq!(
+            catalog.describe("moss").unwrap()["prompt_guidance"],
+            "Own synthetic guidance."
+        );
+        assert_ne!(
+            catalog.describe("qwen").unwrap()["prompt_guidance"],
+            "Ignored."
+        );
+        // The shipped MOSS guide is attached from the project catalog.
+        let shipped =
+            Catalog::load(Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/profiles"))).unwrap();
+        let guide = shipped.describe("moss").unwrap()["prompt_guidance"].clone();
+        assert!(
+            guide
+                .as_str()
+                .is_some_and(|g| g.contains("origin at the image centre"))
         );
     }
 }

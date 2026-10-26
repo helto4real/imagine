@@ -14,6 +14,11 @@ encrypted negative-prompt envelope from the former `image_generation` preset;
 Turbo retains its empty negative prompt and zero-negative-conditioning setting.
 Prompt guidance and other generation settings are unchanged.
 
+A profile without inline `prompt_guidance` takes it from `guidance/<id>.md` when
+that file exists (`guidance/moss.md` for MOSS prompts, `guidance/qwen-character-sheet.md`
+for the character sheet fields); inline guidance
+wins. `describe_profile` returns it to agents.
+
 Character sheets and upscale retain their dedicated operation profiles.
 The overlapping `image_generation`, `qwen_scene` and frozen-v2 wrapper presets
 are preserved in `archive/`, outside the active catalog. Native frozen binaries,
