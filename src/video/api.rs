@@ -31,6 +31,8 @@ mod media_health;
 mod reference_cache;
 #[path = "streaming_import_api.rs"]
 mod streaming_import;
+#[path = "takes_api.rs"]
+mod takes;
 #[path = "workspace_api.rs"]
 mod workspaces;
 
@@ -107,6 +109,7 @@ pub fn routes() -> Router<App> {
         .merge(workspaces::routes())
         .merge(reference_cache::routes())
         .merge(captures::routes())
+        .merge(takes::routes())
         .merge(lora_catalog::routes())
         .merge(media_health::routes())
         .merge(libraries::routes())

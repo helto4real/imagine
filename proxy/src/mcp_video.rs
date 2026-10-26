@@ -11,6 +11,7 @@ const TOOLS: &[&str] = &[
     "video_register_reference",
     "video_storyboard",
     "video_run",
+    "video_take",
     "video_assembly",
 ];
 const DEFAULT_WAIT: u64 = 30;
@@ -29,8 +30,9 @@ pub(super) fn limit(name: &str, args: &Value) -> Option<Duration> {
     let seconds = match (name, args["action"].as_str().unwrap_or("")) {
         ("list_video_profiles" | "describe_video_profile" | "video_capabilities", _)
         | ("video_project" | "video_storyboard", "get")
-        | ("video_storyboard", "list") => 5,
-        ("video_storyboard", "start" | "submit" | "bundle") => 60,
+        | ("video_storyboard", "list")
+        | ("video_take", "list") => 5,
+        ("video_storyboard", "start" | "submit" | "bundle") | ("video_take", "view") => 60,
         ("video_run" | "video_assembly", "get") => 5 + wait(args).as_secs(),
         _ => 15,
     };
@@ -180,6 +182,35 @@ fn project_view(snapshot: &Value) -> Value {
         "deliveries":list(&snapshot["deliveries"],&|d| json!({"id":d["id"],"asset_id":d["asset_id"]})),
         "authoring":list(&snapshot["authoring"],&|d| json!({"id":d["id"],"phase":d["phase"]}))})
 }
+/// A project's Takes in creation order, optionally of one Scene, with what an agent
+/// needs to choose between them.
+fn take_list(snapshot: &Value, scene: Option<&str>) -> Value {
+    let p = &snapshot["project"];
+    let current = |scene: &Value| {
+        p["scenes"]
+            .as_array()
+            .and_then(|all| all.iter().find(|s| &s["id"] == scene))
+            .map(|s| s["accepted_take"]["id"].clone())
+            .unwrap_or(Value::Null)
+    };
+    let takes = snapshot["takes"]
+        .as_array()
+        .map(|all| {
+            all.iter()
+                .enumerate()
+                .filter(|(_, t)| scene.is_none_or(|s| t["scene_id"] == s))
+                .map(|(order, t)| {
+                    let state = &snapshot["take_states"][t["id"].as_str().unwrap_or("")];
+                    let provenance = &t["provenance"];
+                    json!({"id":t["id"],"scene_id":t["scene_id"],"order":order,"status":t["status"],
+                        "current":current(&t["scene_id"]) == t["id"],"seed":provenance["seed"],
+                        "source_take":provenance["source_take"],"inputs_current":state["inputs_current"]})
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    json!({"project_id":p["id"],"project_revision":p["project_revision"],"takes":takes})
+}
 fn saved(snapshot: &Value) -> Value {
     json!({"project_id":snapshot["project"]["id"],"project_revision":snapshot["project"]["project_revision"],"persistence":snapshot["persistence"]})
 }
@@ -195,7 +226,7 @@ fn bounded(mut value: Value) -> Value {
 }
 /// Move every bundle image's base64 into MCP image blocks, in order; JSON keeps the labels.
 fn take_images(value: &mut Value) -> std::result::Result<Vec<Value>, Fault> {
-    let Some(images) = ["/bundle/images", "/draft/bundle/images"]
+    let Some(images) = ["/bundle/images", "/draft/bundle/images", "/frames"]
         .into_iter()
         .find(|p| value.pointer(p).is_some())
         .and_then(|p| value.pointer_mut(p))
@@ -414,6 +445,50 @@ impl Mcp {
                 let project = ident(&request, "project_id")?;
                 self.owned_project(own(ws)?, project).await?;
                 self.call_video(Method::POST, "/v1/video/runs", Some(&request), Some(&key))
+                    .await?
+            }
+            ("video_run", "plan") => {
+                let request = body(args, "request")?;
+                let project = ident(&request, "project_id")?;
+                self.owned_project(own(ws)?, project).await?;
+                self.call_video(Method::POST, "/v1/video/runs/plan", Some(&request), None)
+                    .await?
+            }
+            ("video_take", "list") => {
+                let snapshot = self
+                    .owned_project(own(ws)?, ident(args, "project_id")?)
+                    .await?;
+                let scene = match &args["scene_id"] {
+                    Value::Null => None,
+                    _ => Some(ident(args, "scene_id")?),
+                };
+                take_list(&snapshot, scene)
+            }
+            ("video_take", "view") => {
+                let project = ident(args, "project_id")?;
+                self.owned_project(own(ws)?, project).await?;
+                let path = format!(
+                    "/v1/video/projects/{project}/takes/{}/frames",
+                    ident(args, "take_id")?
+                );
+                self.call_video(Method::GET, &path, None, None).await?
+            }
+            ("video_take", "select") => {
+                let project = ident(args, "project_id")?;
+                self.owned_project(own(ws)?, project).await?;
+                let path = format!(
+                    "/v1/video/projects/{project}/takes/{}/select",
+                    ident(args, "take_id")?
+                );
+                let restore = match &args["restore_prompt"] {
+                    Value::Null => false,
+                    value => value
+                        .as_bool()
+                        .ok_or_else(|| validation("restore_prompt must be true or false"))?,
+                };
+                let request = json!({"schema_version":1,"expected_project_revision":revision(args)?,
+                    "restore_prompt":restore});
+                self.call_video(Method::POST, &path, Some(&request), None)
                     .await?
             }
             ("video_run", "get") => {
@@ -818,7 +893,11 @@ mod tests {
             ("video_project", "save", 15),
             ("video_register_reference", "", 15),
             ("video_run", "start", 15),
+            ("video_run", "plan", 15),
             ("video_run", "stop", 15),
+            ("video_take", "list", 5),
+            ("video_take", "view", 60),
+            ("video_take", "select", 15),
             ("video_run", "get", 5),
             ("video_assembly", "plan", 15),
             ("video_assembly", "submit", 15),

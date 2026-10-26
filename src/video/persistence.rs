@@ -284,6 +284,46 @@ pub struct TakeProvenance {
     pub source_take: Option<TakeId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub continuity: Option<EndpointSource>,
+    /// The Scene's prompt text when the Take was made, so selecting it can restore it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authored: Option<AuthoredPrompt>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoredPrompt {
+    pub description: String,
+    pub sections: Vec<AuthoredSection>,
+    pub summary: String,
+    pub ambient_sound: String,
+    pub non_diegetic_music: String,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuthoredSection {
+    pub id: SectionId,
+    pub prompt: String,
+}
+impl AuthoredPrompt {
+    pub fn of(project: &VideoProject, scene: &Scene) -> Self {
+        let prompt = project.creative.scene_prompts.get(&scene.id);
+        let text = |f: fn(&imagine_video_contract::creative::ScenePrompt) -> &String| {
+            prompt.map(f).cloned().unwrap_or_default()
+        };
+        Self {
+            description: scene.description.clone(),
+            sections: scene
+                .sections
+                .iter()
+                .map(|s| AuthoredSection {
+                    id: s.id.clone(),
+                    prompt: s.prompt.clone(),
+                })
+                .collect(),
+            summary: text(|p| &p.summary),
+            ambient_sound: text(|p| &p.ambient_sound),
+            non_diegetic_music: text(|p| &p.non_diegetic_music),
+        }
+    }
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -380,6 +420,14 @@ impl ProjectDocument {
             authoring: vec![],
             deliveries: vec![],
         }
+    }
+    /// The validated document after an edit, with changed continuity invalidated.
+    pub(crate) fn edited(&self, request: EditRequest) -> Result<ProjectDocument, StorageError> {
+        let mut candidate = self.clone();
+        editing::apply(&mut candidate.project, request)?;
+        super::review::invalidate_changed(&self.project, &mut candidate)?;
+        candidate.validate()?;
+        Ok(candidate)
     }
 }
 pub(crate) fn validate_resources(resources: &[Resource]) -> Result<(), StorageError> {
@@ -794,16 +842,26 @@ impl ProjectSession {
     }
     pub fn edit(&mut self, request: EditRequest) -> Result<(), StorageError> {
         self.ensure_writable()?;
-        let mut candidate = self.document.clone();
-        editing::apply(&mut candidate.project, request)?;
-        super::review::invalidate_changed(&self.document.project, &mut candidate)?;
-        candidate.validate()?;
-        self.document = candidate;
+        self.document = self.document.edited(request)?;
         if self.store.is_some() {
             self.save()
         } else {
             Ok(())
         }
+    }
+    /// Publish a document prepared from the current one, such as a rerun's prompt edits.
+    pub(crate) fn publish(&mut self, candidate: ProjectDocument) -> Result<(), StorageError> {
+        self.ensure_writable()?;
+        let previous = std::mem::replace(&mut self.document, candidate);
+        if let Err(error) = self.autosave() {
+            // After a completed rename, keep memory aligned with the committed file.
+            if error.code == "storage_durability_uncertain" {
+                return Ok(());
+            }
+            self.document = previous;
+            return Err(error);
+        }
+        Ok(())
     }
     /// The document `apply_authoring` would publish, validated; nothing changes.
     pub fn authoring_candidate(
@@ -1373,6 +1431,7 @@ mod tests {
                     references: vec![],
                     source_take: None,
                     continuity: None,
+                    authored: None,
                 }),
             });
             document.resources.push(Resource {

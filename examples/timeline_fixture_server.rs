@@ -420,6 +420,7 @@ fn seed(
             references: vec![],
             source_take: None,
             continuity: None,
+            authored: None,
         }),
     });
     if let Some(motion) = motion {

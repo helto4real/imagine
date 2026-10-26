@@ -2402,6 +2402,13 @@
       },
       "outdated": {
         "type": "boolean"
+      },
+      "inputs_current": {
+        "description": "Whether a generated Take was made from its Scene's current inputs.",
+        "type": [
+          "boolean",
+          "null"
+        ]
       }
     },
     "required": [
@@ -2434,6 +2441,18 @@
         "type": [
           "string",
           "null"
+        ],
+        "default": null
+      },
+      "rerun": {
+        "description": "Only for `Mode::Rerun`.",
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Rerun"
+          },
+          {
+            "type": "null"
+          }
         ]
       }
     },
@@ -2446,12 +2465,147 @@
     ],
     "$defs": {
       "Mode": {
-        "type": "string",
-        "enum": [
-          "missing_only",
-          "all_same_seeds",
-          "all_fresh_seeds",
-          "selected_with_dependents"
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "missing_only",
+              "all_same_seeds",
+              "all_fresh_seeds",
+              "selected_with_dependents"
+            ]
+          },
+          {
+            "description": "Selected Scenes with their own seed and prompt choices, plus every Scene\nthat continues from them.",
+            "type": "string",
+            "const": "rerun"
+          }
+        ]
+      },
+      "Rerun": {
+        "type": "object",
+        "properties": {
+          "scenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/RerunScene"
+            }
+          },
+          "dependents_seed": {
+            "description": "Seed of the Scenes rendered again because they continue from a selected one.",
+            "$ref": "#/$defs/Seed",
+            "default": "same"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scenes"
+        ]
+      },
+      "RerunScene": {
+        "type": "object",
+        "properties": {
+          "scene_id": {
+            "type": "string"
+          },
+          "seed": {
+            "$ref": "#/$defs/Seed",
+            "default": "fresh"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/PromptChange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scene_id"
+        ]
+      },
+      "Seed": {
+        "oneOf": [
+          {
+            "description": "A new random seed.",
+            "type": "string",
+            "const": "fresh"
+          },
+          {
+            "description": "The seed of the Scene's current, or last locked, Take.",
+            "type": "string",
+            "const": "same"
+          },
+          {
+            "description": "The seed of an earlier Take of the same Scene.",
+            "type": "object",
+            "properties": {
+              "from_take": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "from_take"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PromptChange": {
+        "description": "Prompt text applied in the same revision as the run; timing never changes.",
+        "type": "object",
+        "properties": {
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/SectionPrompt"
+            }
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ambient_sound": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "non_diegetic_music": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
+      "SectionPrompt": {
+        "type": "object",
+        "properties": {
+          "section_id": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "section_id",
+          "prompt"
         ]
       }
     }
@@ -2507,12 +2661,21 @@
     ],
     "$defs": {
       "Mode": {
-        "type": "string",
-        "enum": [
-          "missing_only",
-          "all_same_seeds",
-          "all_fresh_seeds",
-          "selected_with_dependents"
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "missing_only",
+              "all_same_seeds",
+              "all_fresh_seeds",
+              "selected_with_dependents"
+            ]
+          },
+          {
+            "description": "Selected Scenes with their own seed and prompt choices, plus every Scene\nthat continues from them.",
+            "type": "string",
+            "const": "rerun"
+          }
         ]
       },
       "Status": {
@@ -2554,6 +2717,17 @@
               "null"
             ]
           },
+          "reason": {
+            "description": "Why a rerun renders this Scene.",
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Reason"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "job_id": {
             "type": [
               "string",
@@ -2571,6 +2745,13 @@
           "scene_id",
           "seed",
           "seed_source"
+        ]
+      },
+      "Reason": {
+        "type": "string",
+        "enum": [
+          "selected",
+          "continues_from"
         ]
       }
     }

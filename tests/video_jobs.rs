@@ -958,9 +958,10 @@ async fn manual_take_review_conflicts_invalidation_and_reopen_keep_media_and_pro
     assert!(outdated["project"]["scenes"][0]["accepted_take"].is_null());
     let (code, old) = call(&h, "POST", &review, body(7, &first, "accept"), None).await;
     assert_eq!(code, 200, "{old}");
+    // Accepted again, though made before the description changed.
     assert_eq!(
         old["take_states"][first.as_str().unwrap()],
-        json!({"accepted":true,"outdated":false})
+        json!({"accepted":true,"outdated":false,"inputs_current":false})
     );
     assert_eq!(
         old["takes"][0]["provenance"],

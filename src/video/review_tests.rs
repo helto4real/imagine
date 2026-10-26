@@ -183,6 +183,7 @@ fn add_take(document: &mut ProjectDocument, scene: u64, id: &str) {
             references: vec![],
             source_take,
             continuity: None,
+            authored: None,
         }),
     });
     document.resources.push(Resource {

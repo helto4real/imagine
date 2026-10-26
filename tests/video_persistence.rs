@@ -386,6 +386,7 @@ fn all_completed_take_statuses_and_historical_references_survive_open() {
             }],
             source_take: None,
             continuity: None,
+            authored: None,
         };
         if status == TakeStatus::Accepted {
             doc.project.scenes[0].accepted_take = Some(AcceptedTake {

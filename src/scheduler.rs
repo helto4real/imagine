@@ -88,6 +88,10 @@ pub enum Action {
         request: crate::video::runs::Request,
         key: String,
     },
+    PlanVideoRun {
+        owner: String,
+        request: crate::video::runs::Request,
+    },
     ReadVideoRuns {
         owner: String,
         project_id: Option<crate::video::contract::ProjectId>,
@@ -296,6 +300,7 @@ impl Scheduler {
                 request,
                 key,
             } => self.start_video_run(owner, request, key).await,
+            Action::PlanVideoRun { owner, request } => self.plan_video_run(owner, request).await,
             Action::ReadVideoRuns {
                 owner,
                 project_id,

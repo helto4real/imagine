@@ -625,7 +625,7 @@
   },
   {
     "name": "video_run",
-    "description": "Generate the project's scenes. start is the first and only GPU handover; call it only after the storyboard is committed.\nstart: job_id plus request {schema_version (1), project_id, expected_project_revision, mode (missing_only, all_same_seeds, all_fresh_seeds, selected_with_dependents), selected_scene (scene ID for selected_with_dependents, otherwise null)}; returns the run with id, status and targets. There is no seed parameter: each scene gets a fresh random seed, except that all_same_seeds and locked takes reuse the seed of the scene's existing take. Imagine accepts technically valid takes automatically; that is not a visual review.\nget: run status with per-scene targets; wait true polls up to wait_seconds (max 60). A failed run adds failed_scene {scene_id, job_id, error {code, stage, kind, exception, accelerator_code, sizes}}: stage says where generation stopped (for example preparing_motion_context or sampling) and kind what failed (for example out_of_memory or shape_mismatch); use them to change the failing scene instead of retrying it unchanged. Runs continue when a call times out or the client disconnects.\nstop: cancel_current true also cancels the scene in progress.\nAfter a timeout, call start again with the same job_id and request, or get with the run_id; never use a new job_id to recover.",
+    "description": "Generate the project's scenes. start is the first GPU handover; call it only after the storyboard is committed.\nstart: job_id plus request {schema_version (1), project_id, expected_project_revision, mode (missing_only, all_same_seeds, all_fresh_seeds, selected_with_dependents, rerun), selected_scene (scene ID for selected_with_dependents, otherwise null), rerun (only for mode rerun)}; returns the run with id, status and targets. There is no seed number: the first render gives each scene a fresh random seed; all_same_seeds and locked takes reuse the seed of the scene's existing take. Imagine accepts technically valid takes automatically; that is not a visual review.\nrerun renders chosen scenes again in the existing project: rerun {scenes [{scene_id, seed (\"fresh\", default; \"same\"; or {\"from_take\": take_id}), prompt (optional) {sections [{section_id, prompt}], description, summary, ambient_sound, non_diegetic_music}}], dependents_seed (\"same\", default, or \"fresh\")}. Every scene that continues from a chosen scene (a continuous shot, transitively) is rendered again too, after its source; earlier scenes and scenes after a hard cut are untouched. Prompt changes replace only the text (timing stays) and are committed in the same revision as the run; a failed start changes nothing. A chosen scene with seed same and unchanged inputs is rerun_would_repeat_take.\nplan: the same request without job_id; changes nothing and uses no GPU. Returns targets [{scene_id, title, reason (selected or continues_from), source, seed (fresh, locked_take or take), prompt_changed, previous_take, planned_seconds}], unchanged, total_seconds and warnings: final_video_outdated (assemble again after the run), dependent_opening_may_mismatch:<scene> (that continuation's opening prompt may still describe the old ending; read it and add a prompt change for it with seed same). Always plan a rerun and report it before start.\nget: run status with per-scene targets; wait true polls up to wait_seconds (max 60). A failed run adds failed_scene {scene_id, job_id, error {code, stage, kind, exception, accelerator_code, sizes}}: stage says where generation stopped (for example preparing_motion_context or sampling) and kind what failed (for example out_of_memory or shape_mismatch); use them to change the failing scene instead of retrying it unchanged. Finished scenes of a failed run stay current; rerun the failed scene to complete the chain. Runs continue when a call times out or the client disconnects.\nstop: cancel_current true also cancels the scene in progress.\nAfter a timeout, call start again with the same job_id and request, or get with the run_id; never use a new job_id to recover.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -638,6 +638,7 @@
           "type": "string",
           "enum": [
             "start",
+            "plan",
             "get",
             "stop"
           ]
@@ -650,7 +651,7 @@
         "request": {
           "type": "object",
           "additionalProperties": true,
-          "description": "start: run request."
+          "description": "start, plan: run request."
         },
         "run_id": {
           "type": "string",
@@ -684,6 +685,64 @@
       "readOnlyHint": false,
       "destructiveHint": false,
       "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "video_take",
+    "description": "List, view and select the takes (rendered clips) of a video project. No GPU acquisition.\nlist: the project's takes in creation order (scene_id optional): id, scene_id, order, status, current (the scene's accepted take), seed, source_take (the take it continued from) and inputs_current (made from the scene's current prompt and inputs).\nview: the first, middle and last frame of take_id as image blocks; for a continuous shot first the last frame of its source take (position source_last), to judge the join. Show them to the user when comparing versions.\nselect: make an earlier take of a scene current again. Every scene that continues from it gets back its kept take made from that chain, without rendering; returns restored [{scene_id, take_id}], needs_render (continuations without such a take: rerun them), final_video_outdated and the project. A take made with an older prompt is take_prompt_changed unless restore_prompt is true, which restores the prompt text it was made with; take_inputs_changed means other inputs (timing, settings, an earlier scene) changed and it cannot be selected.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspace_key": {
+          "type": "string",
+          "pattern": "^imk-[a-z2-7]{26}$",
+          "description": "Your workspace key from workspace_create."
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "view",
+            "select"
+          ]
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "description": "Project ID."
+        },
+        "scene_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "description": "list: only this scene's takes."
+        },
+        "take_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,128}$",
+          "description": "view, select: take ID."
+        },
+        "expected_project_revision": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "select: the project_revision you last read; stale revisions are rejected."
+        },
+        "restore_prompt": {
+          "type": "boolean",
+          "description": "select: also restore the prompt text the take was made with."
+        }
+      },
+      "required": [
+        "workspace_key",
+        "action",
+        "project_id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
       "openWorldHint": false
     }
   },

@@ -217,6 +217,11 @@ async fn imagine(
             ok(json!({"id":"d1","phase":"review","project_id":"p1"}))
         }
         ("POST", "/v1/video/runs") => ok(json!({"id":"run_1","status":"running"})),
+        ("POST", "/v1/video/runs/plan") => ok(json!({"valid":true,"targets":[],"warnings":[]})),
+        ("GET", "/v1/video/projects/p1/takes/take_1/frames") => ok(json!({"take_id":"take_1",
+            "frames":[{"position":"first","take_id":"take_1","mime":"image/png","base64":"QUJD"}]})),
+        ("POST", "/v1/video/projects/p1/takes/take_1/select") => ok(json!({"selected":"take_1",
+            "restored":[],"needs_render":["scene_2"],"snapshot":snapshot(2, false)})),
         ("GET", "/v1/video/runs/run_1") => {
             let n = p.run_polls.fetch_add(1, Ordering::SeqCst);
             ok(
@@ -451,8 +456,36 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
         ),
         (
             "video_run",
+            json!({"action":"plan","request":{"project_id":"p1","expected_project_revision":4,"mode":"rerun","rerun":{"scenes":[{"scene_id":"scene_1"}]}}}),
+            vec![RESOLVE, PROJECT, "POST /v1/video/runs/plan"],
+        ),
+        (
+            "video_run",
             json!({"action":"get","run_id":"run_1"}),
             vec![RESOLVE, "GET /v1/video/runs/run_1", PROJECT],
+        ),
+        (
+            "video_take",
+            json!({"action":"list","project_id":"p1"}),
+            vec![RESOLVE, PROJECT],
+        ),
+        (
+            "video_take",
+            json!({"action":"view","project_id":"p1","take_id":"take_1"}),
+            vec![
+                RESOLVE,
+                PROJECT,
+                "GET /v1/video/projects/p1/takes/take_1/frames",
+            ],
+        ),
+        (
+            "video_take",
+            json!({"action":"select","project_id":"p1","take_id":"take_1","expected_project_revision":1}),
+            vec![
+                RESOLVE,
+                PROJECT,
+                "POST /v1/video/projects/p1/takes/take_1/select",
+            ],
         ),
         (
             "video_run",
@@ -654,6 +687,68 @@ async fn every_video_tool_and_action_routes_to_its_imagine_endpoint() {
         .call("video_run", json!({"action":"restart","run_id":"run_1"}))
         .await;
     assert_eq!(fault(&unknown)["category"], "validation");
+    h.close().await;
+}
+
+#[tokio::test]
+async fn takes_are_listed_viewed_as_image_blocks_and_selected_with_a_bounded_project() {
+    let h = Harness::new().await;
+    let listed = h
+        .call(
+            "video_take",
+            json!({"action":"list","project_id":"p1","scene_id":"scene_1"}),
+        )
+        .await;
+    assert_eq!(
+        ok(&listed)["takes"],
+        json!([{"id":"take_1","scene_id":"scene_1","order":0,"status":"accepted","current":true,
+            "seed":"PROVENANCE","source_take":null,"inputs_current":null}])
+    );
+    let other = h
+        .call(
+            "video_take",
+            json!({"action":"list","project_id":"p1","scene_id":"scene_9"}),
+        )
+        .await;
+    assert_eq!(ok(&other)["takes"], json!([]));
+    let viewed = h
+        .call(
+            "video_take",
+            json!({"action":"view","project_id":"p1","take_id":"take_1"}),
+        )
+        .await;
+    let content = viewed["content"].as_array().unwrap();
+    assert_eq!(content.len(), 2);
+    assert_eq!(
+        content[1],
+        json!({"type":"image","data":"QUJD","mimeType":"image/png"})
+    );
+    assert_eq!(
+        ok(&viewed)["frames"][0],
+        json!({"position":"first","take_id":"take_1","mime":"image/png","index":0})
+    );
+    h.probe.clear();
+    let selected = h
+        .call(
+            "video_take",
+            json!({"action":"select","project_id":"p1","take_id":"take_1","expected_project_revision":1}),
+        )
+        .await;
+    assert_eq!(
+        h.probe.seen()[2].body,
+        json!({"schema_version":1,"expected_project_revision":1,"restore_prompt":false})
+    );
+    let selected = ok(&selected);
+    assert_eq!(selected["needs_render"], json!(["scene_2"]));
+    assert_eq!(selected["snapshot"]["project_revision"], 2);
+    assert!(!selected.to_string().contains("RESOURCE HASH"));
+    assert!(
+        st_proxy::mcp_protocol::tool_arguments(
+            "video_take",
+            &json!({"action":"select","workspace_key":KEY,"project_id":"p1","take_id":"take_1","restore_prompt":"yes"})
+        )
+        .is_err()
+    );
     h.close().await;
 }
 
@@ -964,6 +1059,7 @@ fn catalog_schemas_are_strict_objects() {
         "video_register_reference",
         "video_storyboard",
         "video_run",
+        "video_take",
         "video_assembly",
     ] {
         assert!(names.contains(name), "{name}");
@@ -998,7 +1094,10 @@ fn catalog_schemas_are_strict_objects() {
     assert!(instructions.contains("reuse the same job_id"));
     let guide = include_str!("../mcp/guide.txt");
     assert!(guide.contains("Imagine never lists workspaces or shows host paths"));
-    assert!(guide.contains("video_run start (the first and only GPU handover)"));
+    assert!(guide.contains("video_run start (the first GPU handover)"));
+    assert!(guide.contains("video_run mode rerun"));
+    assert!(guide.contains("Always video_run plan first"));
+    assert!(guide.contains("go back with video_take select"));
     assert!(guide.contains("i2v only to animate one specific start image"));
     assert!(guide.contains("No music unless the user asks (add_music false)"));
     assert!(guide.contains("The video profile never enables the image nsfw switch"));

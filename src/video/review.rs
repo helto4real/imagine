@@ -1,9 +1,19 @@
 //! Atomic manual selection and transitive invalidation of retained generation results.
 use super::{bundle::Bundle, contract::*, persistence::*};
 pub use imagine_video_contract::review::*;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub fn states(document: &ProjectDocument) -> BTreeMap<TakeId, TakeState> {
+    let revisions: BTreeMap<_, _> = document
+        .project
+        .scenes
+        .iter()
+        .filter_map(|scene| {
+            imagine_video_contract::planning::input_revision(&document.project, &scene.id)
+                .ok()
+                .map(|revision| (&scene.id, revision))
+        })
+        .collect();
     document
         .takes
         .iter()
@@ -15,7 +25,18 @@ pub fn states(document: &ProjectDocument) -> BTreeMap<TakeId, TakeState> {
                 .and_then(|scene| scene.accepted_take.as_ref())
                 .is_some_and(|selected| selected.id == take.id);
             let outdated = take.status == TakeStatus::Outdated;
-            (take.id.clone(), TakeState { accepted, outdated })
+            let inputs_current = take
+                .provenance
+                .as_ref()
+                .map(|p| revisions.get(&take.scene_id) == Some(&p.input_revision));
+            (
+                take.id.clone(),
+                TakeState {
+                    accepted,
+                    outdated,
+                    inputs_current,
+                },
+            )
         })
         .collect()
 }
@@ -151,6 +172,183 @@ pub fn apply(
         .ok_or_else(|| StorageError::new("invalid_revision"))?;
     candidate.validate()?;
     Ok(candidate)
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SelectRequest {
+    pub schema_version: u32,
+    pub expected_project_revision: u64,
+    /// Also restore the prompt text the Take was made with.
+    #[serde(default)]
+    pub restore_prompt: bool,
+}
+pub struct Selected {
+    pub document: ProjectDocument,
+    pub prompt_restored: bool,
+    /// Continuations made current again, in timeline order.
+    pub restored: Vec<(SceneId, TakeId)>,
+    /// Continuations without a kept Take made from the selected chain.
+    pub needs_render: Vec<SceneId>,
+    pub final_video_outdated: bool,
+}
+fn restore(project: &mut VideoProject, scene_id: &SceneId, authored: &AuthoredPrompt) {
+    if let Some(scene) = project.scenes.iter_mut().find(|s| &s.id == scene_id) {
+        scene.description.clone_from(&authored.description);
+        for section in &mut scene.sections {
+            if let Some(text) = authored.sections.iter().find(|a| a.id == section.id) {
+                section.prompt.clone_from(&text.prompt);
+            }
+        }
+    }
+    let texts = [
+        &authored.summary,
+        &authored.ambient_sound,
+        &authored.non_diegetic_music,
+    ];
+    if !project.creative.scene_prompts.contains_key(scene_id) && texts.iter().all(|t| t.is_empty())
+    {
+        return;
+    }
+    let prompt = project
+        .creative
+        .scene_prompts
+        .entry(scene_id.clone())
+        .or_default();
+    prompt.summary.clone_from(&authored.summary);
+    prompt.ambient_sound.clone_from(&authored.ambient_sound);
+    prompt
+        .non_diegetic_music
+        .clone_from(&authored.non_diegetic_music);
+}
+fn accept(document: &ProjectDocument, take: &StoredTake) -> Result<ProjectDocument, StorageError> {
+    apply(
+        document,
+        ReviewRequest {
+            schema_version: SCHEMA_VERSION,
+            expected_project_revision: document.project.project_revision,
+            scene_id: take.scene_id.clone(),
+            take_id: take.id.clone(),
+            action: ReviewAction::Accept,
+        },
+    )
+}
+/// Make an earlier Take current, then bring back, for every Scene that continues from
+/// it, the kept Take made from the now-current chain.
+pub fn select(
+    document: &ProjectDocument,
+    take_id: &TakeId,
+    request: SelectRequest,
+) -> Result<Selected, StorageError> {
+    use imagine_video_contract::planning::input_revision;
+    if request.schema_version != SCHEMA_VERSION {
+        return Err(StorageError::new("unsupported_schema"));
+    }
+    if request.expected_project_revision != document.project.project_revision {
+        return Err(StorageError::new("revision_conflict"));
+    }
+    let take = document
+        .takes
+        .iter()
+        .find(|t| &t.id == take_id)
+        .ok_or_else(|| StorageError::new("take_not_found"))?;
+    let scene = document.project.scene(&take.scene_id)?;
+    if scene
+        .accepted_take
+        .as_ref()
+        .is_some_and(|a| &a.id == take_id)
+    {
+        return Err(StorageError::new("take_already_current"));
+    }
+    let mut candidate = document.clone();
+    let mut prompt_restored = false;
+    if let Some(provenance) = &take.provenance
+        && input_revision(&candidate.project, &scene.id)? != provenance.input_revision
+    {
+        let mut restored = candidate.project.clone();
+        if let Some(authored) = &provenance.authored {
+            restore(&mut restored, &scene.id, authored);
+        }
+        let prompt_only = provenance.authored.is_some()
+            && input_revision(&restored, &scene.id)? == provenance.input_revision;
+        match (prompt_only, request.restore_prompt) {
+            (false, _) if provenance.authored.is_none() => {
+                return Err(StorageError::new("take_prompt_unknown"));
+            }
+            (false, _) => return Err(StorageError::new("take_inputs_changed")),
+            (true, false) => return Err(StorageError::new("take_prompt_changed")),
+            (true, true) => {
+                candidate.project = restored;
+                prompt_restored = true;
+            }
+        }
+    }
+    candidate = accept(&candidate, take)?;
+    let mut changed = BTreeSet::from([scene.id.clone()]);
+    let mut restored = vec![];
+    let mut needs_render = vec![];
+    let ids: Vec<_> = candidate
+        .project
+        .scenes
+        .iter()
+        .map(|s| s.id.clone())
+        .collect();
+    for id in ids {
+        let scene = candidate.project.scene(&id)?;
+        if !super::runs::dependency(&candidate.project, scene).is_some_and(|s| changed.contains(&s))
+            || scene.accepted_take.is_some()
+        {
+            continue;
+        }
+        changed.insert(id.clone());
+        let revision = input_revision(&candidate.project, &id)?;
+        let kept = candidate
+            .takes
+            .iter()
+            .rev()
+            .find(|t| {
+                t.scene_id == id
+                    && t.status != TakeStatus::Rejected
+                    && t.provenance
+                        .as_ref()
+                        .is_some_and(|p| p.input_revision == revision)
+            })
+            .cloned();
+        let next = kept.as_ref().map(|t| accept(&candidate, t)).transpose()?;
+        match (kept, next) {
+            (Some(take), Some(next))
+                if next
+                    .project
+                    .scene(&id)?
+                    .accepted_take
+                    .as_ref()
+                    .is_some_and(|a| a.id == take.id) =>
+            {
+                candidate = next;
+                restored.push((id, take.id));
+            }
+            _ => needs_render.push(id),
+        }
+    }
+    let final_video_outdated = candidate.deliveries.last().is_some_and(|d| {
+        d.plan.clips.iter().any(|clip| {
+            clip.take_id.is_some()
+                && candidate
+                    .project
+                    .scene(&clip.scene_id)
+                    .ok()
+                    .and_then(|s| s.accepted_take.as_ref())
+                    .map(|a| &a.id)
+                    != clip.take_id.as_ref()
+        })
+    });
+    Ok(Selected {
+        document: candidate,
+        prompt_restored,
+        restored,
+        needs_render,
+        final_video_outdated,
+    })
 }
 
 #[cfg(test)]

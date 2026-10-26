@@ -17,9 +17,10 @@ Reference IDs, RAM-only normalized previews and job history exist only during th
 
 ## Video production
 Video production is headless unless the user asks for interactive mode (next section); the user opens the project later in the Imagine UI. Read describe_video_profile agent_guidance and the video tool descriptions; they hold the full rules. video_capabilities mcp_defaults lists the defaults: total length 15 s when the user gives none (duration_seconds), Draft 16:9, the default prompt profile, Default ref2v, no music, no dialogue.
-Order: video_capabilities; video_project create (in the workspace; Draft size unless the user asks for another); video_register_reference (cast for characters); video_storyboard start (bundle: verbatim prompts, schemas, images); write notes, outline, all expansions and the production block in one pass; submit dry_run true, fix errors by code/at/detail, submit dry_run false; video_run start (the first and only GPU handover) and get; video_assembly plan, submit, get.
+Order: video_capabilities; video_project create (in the workspace; Draft size unless the user asks for another); video_register_reference (cast for characters); video_storyboard start (bundle: verbatim prompts, schemas, images); write notes, outline, all expansions and the production block in one pass; submit dry_run true, fix errors by code/at/detail, submit dry_run false; video_run start (the first GPU handover) and get; video_assembly plan, submit, get.
 Scene preset: Default ref2v; Default i2v only to animate one specific start image; other presets only if the user names them. No music unless the user asks (add_music false). Bundle images are for viewing while writing prompts.
 Characters without a supplied image: generate a character sheet for each one that appears in more than one scene, and describe the others in the prompts, unless the user says otherwise. Generate all sheets in one generate_batch call with the qwen-character-sheet profile (follow its describe_profile guidance), one item per character, and register each whole sheet with video_register_reference as that character's cast identity image.
+Redo scenes in the existing project with video_run mode rerun: per chosen scene a new seed (default), the same seed, or an earlier take's seed, optionally with new prompt text. Every continuous shot that follows a chosen scene is rendered again with its own seed; earlier scenes and scenes after a hard cut stay. Always video_run plan first and report what will render and why. On dependent_opening_may_mismatch, read that scene's opening and add a matching prompt change for it (seed same). After a rerun, offer to assemble again. Compare versions with video_take view; go back with video_take select, which also restores the continuations made from that take without rendering.
 Reuse the same job_id after timeouts. The video profile never enables the image nsfw switch.
 
 ## Interactive video
@@ -30,8 +31,8 @@ Use this mode when the user asks for it: the video_interactive prompt, or words 
 4. Characters: after the outline is accepted, ask for each character without a supplied image (or once for all) whether to generate a character sheet or describe the character in the prompts; say which scenes each one is in. Generate the chosen sheets in one batch, show each with workspace_view, regenerate any the user rejects, then register accepted sheets and supplied images as cast.
 5. Prompts and dry run: write the full storyboard, run the dry run, and report per scene the model, preset, continuity and warnings. Offer to show any scene's full prompt.
 6. Render: only on the user's go, video_run start, then report progress until it is done.
-7. Review: report the takes and offer to assemble the final video, regenerate a scene with a new seed, change a scene and render it again, or stop.
-Use the GPU only after the user's answer in step 4 and go in step 6.
+7. Review: report the takes and offer to assemble the final video, regenerate a scene with a new seed, change a scene's prompt and render it again (both video_run rerun), go back to an earlier take (video_take select), or stop. For a rerun show the plan (scenes, reasons, seconds, warnings) and wait for go.
+Use the GPU only after the user's answer in step 4 and go in step 6 or on a rerun plan.
 
 ## Reporting
 Report results by ID: image file_ids, and for video the project_id, save status and the final video's file_id. Automatic acceptance of a take is not a visual review; say so if you could not look at the result.

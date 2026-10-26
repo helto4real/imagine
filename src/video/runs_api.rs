@@ -4,6 +4,7 @@ use axum::http::HeaderMap;
 pub(super) fn routes() -> Router<App> {
     Router::new()
         .route("/v1/video/runs", post(start).get(all))
+        .route("/v1/video/runs/plan", post(plan))
         .route("/v1/video/runs/{id}", get(read))
         .route("/v1/video/runs/{id}/stop", post(stop))
         .route("/v1/video/projects/{id}/runs", get(list))
@@ -41,6 +42,20 @@ async fn start(
         })
         .await?;
     Ok((StatusCode::ACCEPTED, Json(value)))
+}
+async fn plan(
+    State(app): State<App>,
+    body: Result<Json<super::super::runs::Request>, JsonRejection>,
+) -> Result<Json<Value>, crate::scheduler::Fault> {
+    let Json(request) = body.map_err(|_| crate::scheduler::Fault::new(422, "invalid_request"))?;
+    Ok(Json(
+        app.control
+            .call(Action::PlanVideoRun {
+                owner: "local".into(),
+                request,
+            })
+            .await?,
+    ))
 }
 async fn read(
     State(app): State<App>,

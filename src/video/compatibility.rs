@@ -327,6 +327,7 @@ mod tests {
                 references: vec![],
                 source_take: None,
                 continuity: None,
+                authored: None,
             }),
         });
         assert_eq!(

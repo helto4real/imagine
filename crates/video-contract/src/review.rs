@@ -27,4 +27,7 @@ pub struct ReviewRequest {
 pub struct TakeState {
     pub accepted: bool,
     pub outdated: bool,
+    /// Whether a generated Take was made from its Scene's current inputs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inputs_current: Option<bool>,
 }

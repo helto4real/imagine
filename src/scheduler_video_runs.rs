@@ -5,6 +5,32 @@ use crate::video::{
     execution,
     runs::{self, Status},
 };
+/// Stable request errors keep their own code; anything else is an invalid request.
+fn fault(e: crate::video::persistence::StorageError) -> Fault {
+    const KEPT: [&str; 11] = [
+        "all_scenes_require_locked_seeds",
+        "selected_scene_required",
+        "rerun_required",
+        "rerun_requires_rerun_mode",
+        "rerun_scenes_required",
+        "rerun_scene_duplicate",
+        "rerun_scene_imported",
+        "rerun_take_not_found",
+        "rerun_would_repeat_take",
+        "rerun_prompt_empty",
+        "section_not_found",
+    ];
+    match e.code.as_str() {
+        "revision_conflict" => Fault::new(409, "revision_conflict"),
+        "scene_not_found" => Fault::new(422, "scene_not_found"),
+        code => KEPT
+            .into_iter()
+            .find(|kept| *kept == code)
+            .map_or(Fault::new(422, "invalid_run_request"), |code| {
+                Fault::new(422, code)
+            }),
+    }
+}
 impl Scheduler {
     pub(super) async fn start_video_run(
         &mut self,
@@ -35,24 +61,51 @@ impl Scheduler {
         {
             return Err(Fault::new(409, "run_already_active"));
         }
+        let mut service = self.video.lock().await;
+        let mut plan = runs::plan(
+            service
+                .projects
+                .session(&request.project_id)
+                .map_err(|_| Fault::new(404, "project_not_found"))?
+                .document(),
+            &request,
+            owner,
+            key,
+        )
+        .map_err(fault)?;
+        // A rerun's prompt edits become one revision together with the run.
+        if let Some(edited) = plan.edited.take() {
+            service
+                .projects
+                .session_mut(&request.project_id)
+                .map_err(crate::video::persistence::StorageError::from)
+                .and_then(|session| session.publish(edited))
+                .map_err(|_| Fault::new(503, "project_save_failed"))?;
+        }
+        let value = json!(plan.run);
+        self.video_runs.insert(plan.run.id.clone(), plan);
+        Ok(value)
+    }
+    /// What a start with this request would render, without changing anything.
+    pub(super) async fn plan_video_run(
+        &mut self,
+        owner: String,
+        request: runs::Request,
+    ) -> std::result::Result<Value, Fault> {
+        if self
+            .video_runs
+            .values()
+            .any(|r| r.run.project_id == request.project_id && !r.run.status.terminal())
+        {
+            return Err(Fault::new(409, "run_already_active"));
+        }
         let service = self.video.lock().await;
         let session = service
             .projects
             .session(&request.project_id)
             .map_err(|_| Fault::new(404, "project_not_found"))?;
-        let plan = runs::plan(session.document(), &request, owner, key).map_err(|e| {
-            match e.code.as_str() {
-                "revision_conflict" => Fault::new(409, "revision_conflict"),
-                "all_scenes_require_locked_seeds" => {
-                    Fault::new(422, "all_scenes_require_locked_seeds")
-                }
-                "selected_scene_required" => Fault::new(422, "selected_scene_required"),
-                _ => Fault::new(422, "invalid_run_request"),
-            }
-        })?;
-        let value = json!(plan.run);
-        self.video_runs.insert(plan.run.id.clone(), plan);
-        Ok(value)
+        let plan = runs::plan(session.document(), &request, owner, String::new()).map_err(fault)?;
+        Ok(plan.report)
     }
     pub(super) fn read_video_runs(
         &self,

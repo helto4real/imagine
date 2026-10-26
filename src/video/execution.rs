@@ -440,6 +440,7 @@ pub fn freeze(
                         has_boundary.then(||input.references.manifest["videos"][0]["take_id"].as_str()
                             .map(|id|TakeId(id.into()))).flatten()),
                     continuity: source,
+                    authored: Some(AuthoredPrompt::of(project, scene)),
                 }),
             },
             references,
