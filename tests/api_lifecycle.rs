@@ -920,7 +920,7 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
             .get("resolved_profile")
             .is_none()
     );
-    let body = json!({"profile":"qwen","profile_version":4,"prompt":"synthetic profile test", "width":1024,"sampling":{"steps":12},"model_options":{"qwen_image_2_1":{"generation":{"loras":[{"path":"synthetic.safetensors","strength":0.5}]}}}});
+    let body = json!({"profile":"qwen","profile_version":5,"prompt":"synthetic profile test", "width":1024,"sampling":{"steps":12},"model_options":{"qwen_image_2_1":{"generation":{"loras":[{"path":"synthetic.safetensors","strength":0.5}]}}}});
     let (status, validation) = req(
         &h.router,
         "POST",
@@ -949,7 +949,7 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
     wait_calls(&h.probe, 1).await;
     let effective = h.store.job(id, "local").await.unwrap().unwrap()["effective"].clone();
     assert_eq!(effective["resolved_profile"]["id"], "qwen");
-    assert_eq!(effective["resolved_profile"]["version"], 4);
+    assert_eq!(effective["resolved_profile"]["version"], 5);
     assert_eq!(effective["negative_prompt"], "synthetic profile negative");
     assert_eq!(
         effective["resolved_profile"]["sha256"],

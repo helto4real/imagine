@@ -568,6 +568,11 @@ pub fn model_metadata(model: &str) -> Value {
         ))
         .expect("shipped profile");
         meta["defaults"]["sampling"] = profile["defaults"]["sampling"].clone();
+        // CFG 1 discards negative conditioning, so Turbo has no default negative prompt.
+        meta["defaults"]
+            .as_object_mut()
+            .unwrap()
+            .remove("negative_prompt");
     }
     meta
 }

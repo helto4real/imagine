@@ -431,6 +431,25 @@ impl JobRequest {
 pub fn models() -> Value {
     json!({"models":[model(MODEL).unwrap(), model(TURBO).unwrap(), model(MOSS).unwrap(), model(MOSS_BF16).unwrap(), model(BF16).unwrap(), model("minimax-h3").unwrap()]})
 }
+/// The model's default negative prompt from its image profile, for clients
+/// such as the UI that send a request without a profile. A default prompt is
+/// not private; one that cannot be read is left out.
+fn with_negative(mut model: Value, profile: &str) -> Value {
+    let negative = crate::config_files::text(profile)
+        .ok()
+        .and_then(|text| serde_yaml::from_str::<Value>(text).ok())
+        .and_then(|p| p["defaults"]["negative_prompt"].as_str().map(str::to_owned))
+        .and_then(|text| crate::privacy::decrypt(&text).ok());
+    match negative {
+        Some(text) => model["defaults"]["negative_prompt"] = json!(text),
+        None => {
+            if let Some(defaults) = model["defaults"].as_object_mut() {
+                defaults.remove("negative_prompt");
+            }
+        }
+    }
+    model
+}
 pub fn model(id: &str) -> Option<Value> {
     match id {
         BF16 => {
@@ -465,6 +484,7 @@ pub fn model(id: &str) -> Option<Value> {
             .ok()?["defaults"]
                 .clone();
             v["defaults"]["model"] = json!(id);
+            v = with_negative(v, "image/profiles/moss.yaml");
             if id == MOSS_BF16 {
                 v["defaults"]["model_options"]["moss_image"]["diffusion_model"] =
                     json!("diffusion_models/moss/moss_image_sft_bf16.safetensors");
@@ -474,26 +494,29 @@ pub fn model(id: &str) -> Option<Value> {
         TURBO => Some(
             json!({"id":TURBO,"available":true,"availability":"requires_local_workflow_binary_and_weights","engine":"stable-diffusion.cpp","profile_revision":MCP_PROFILE,"operations":["text_to_image","image_edit"],"request_schema":schemars::schema_for!(JobRequest)}),
         ),
-        MODEL => Some(json!({
-            "id": MODEL, "available": true, "availability": "requires_local_frozen_binary_and_weights",
-            "engine":"stable-diffusion.cpp", "profile_revision":PROFILE,
-            "operations":["text_to_image","image_edit","character_sheet"],
-            "character_sheet":crate::model_adapter::sheet_capabilities(),
-            "constraints": {
-                "dimensions":{"min":128,"max":4096,"multiple":32,"min_max_side":256},
-                "validated_resolutions":[{"width":1600,"height":896}],
-                "resolution_note":"Other dimensions use the same runtime configuration but are not locally validated; memory requirements vary",
-                "steps":{"min":1},
-                "cfg_scale":{"finite":true}, "samplers":["er_sde"], "schedulers":["beta"],
-                "output_formats":["png"],"max_output_count":1,"loras":false,
-                "reference_images":{"max_count":10,"locally_validated_count":1,"ordered":true,
-                    "pixel_limit_min":262144,"pixel_limit_max":4000000,"pixel_limit_scope":"per_image",
-                    "resize":"CPU Lanczos shrink only; center crop to multiples of 32; shared VAE/vision input",
-                    "resource_note":"Multiple references and larger caps can exceed available memory"}
-            },
-            "defaults":{"width":1600,"height":896,"sampling":Sampling::default(),"output":Output::default(),"model_options":ModelOptions::default()},
-            "request_schema":schemars::schema_for!(JobRequest)
-        })),
+        MODEL => Some(with_negative(
+            json!({
+                "id": MODEL, "available": true, "availability": "requires_local_frozen_binary_and_weights",
+                "engine":"stable-diffusion.cpp", "profile_revision":PROFILE,
+                "operations":["text_to_image","image_edit","character_sheet"],
+                "character_sheet":crate::model_adapter::sheet_capabilities(),
+                "constraints": {
+                    "dimensions":{"min":128,"max":4096,"multiple":32,"min_max_side":256},
+                    "validated_resolutions":[{"width":1600,"height":896}],
+                    "resolution_note":"Other dimensions use the same runtime configuration but are not locally validated; memory requirements vary",
+                    "steps":{"min":1},
+                    "cfg_scale":{"finite":true}, "samplers":["er_sde"], "schedulers":["beta"],
+                    "output_formats":["png"],"max_output_count":1,"loras":false,
+                    "reference_images":{"max_count":10,"locally_validated_count":1,"ordered":true,
+                        "pixel_limit_min":262144,"pixel_limit_max":4000000,"pixel_limit_scope":"per_image",
+                        "resize":"CPU Lanczos shrink only; center crop to multiples of 32; shared VAE/vision input",
+                        "resource_note":"Multiple references and larger caps can exceed available memory"}
+                },
+                "defaults":{"width":1600,"height":896,"sampling":Sampling::default(),"output":Output::default(),"model_options":ModelOptions::default()},
+                "request_schema":schemars::schema_for!(JobRequest)
+            }),
+            "image/profiles/qwen.yaml",
+        )),
         "minimax-h3" => Some(
             json!({"id":id,"available":false,"reason":"model_not_validated",
             "planned_operations":["text_to_video","image_to_video","reference_to_video"],
@@ -507,6 +530,37 @@ pub fn model(id: &str) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn image_models_report_their_profile_default_negative_prompt() {
+        let negative = |id: &str| {
+            crate::model_library::model_metadata(id)["defaults"]["negative_prompt"]
+                .as_str()
+                .map(str::to_owned)
+        };
+        let profile = |file: &str| {
+            let value: Value =
+                serde_yaml::from_str(&std::fs::read_to_string(file).unwrap()).unwrap();
+            value["defaults"]["negative_prompt"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        };
+        let qwen = profile(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/config/image/profiles/qwen.yaml"
+        ));
+        let moss = profile(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/config/image/profiles/moss.yaml"
+        ));
+        assert!(!qwen.is_empty() && !moss.is_empty());
+        assert_eq!(negative(MODEL), Some(qwen.clone()));
+        assert_eq!(negative(BF16), Some(qwen));
+        assert_eq!(negative(MOSS), Some(moss.clone()));
+        assert_eq!(negative(MOSS_BF16), Some(moss));
+        // CFG 1 discards negative conditioning.
+        assert_eq!(negative(TURBO), None);
+    }
     #[test]
     fn dimensions_accept_aligned_sizes_and_reject_out_of_bounds() {
         let mut r: JobRequest = serde_json::from_value(

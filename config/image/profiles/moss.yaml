@@ -1,6 +1,6 @@
 schema_version: 1
 id: moss
-version: 1
+version: 2
 name: MOSS Image
 description: MOSS SFT INT8 ConvRot, lokal Rust-inferens.
 references:
@@ -9,7 +9,7 @@ references:
 defaults:
   model: moss-image-sft-int8
   operation: text_to_image
-  negative_prompt: ""
+  negative_prompt: "worst quality, bad anatomy, watermark, jpeg artifact"
   width: 1024
   height: 1024
   seed: null

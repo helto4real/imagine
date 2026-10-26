@@ -1,6 +1,6 @@
 schema_version: 1
 id: qwen
-version: 4
+version: 5
 name: Qwen Image 2.1
 description: Standardprofil för bildgenerering och redigering med Qwen Image 2.1.
 prompt_guidance: 'IMAGE PROMPT REWRITING EXPERT — STRUCTURED REFERENCE SCENES
@@ -737,7 +737,7 @@ nsfw_loras:
 defaults:
   model: qwen-image-2.1-int8
   # prompt kommer från klienten. operation härleds från eventuella referenser.
-  negative_prompt: '{"version":1,"schema":"helto.aio-image-generate.v2","encrypted":true,"algorithm":"AES-256-GCM","keyId":"1roEaeczxUSeMw6x","nonce":"iDYoybz8saF3rPyh","ciphertext":"jcxkimzlOejGndeWJoXU55fuNF2M3X3TuszE4b3RwweKouIfHLPkuE-aJAvVuXV7GsQ6JFcI5tvjv_sbosdkHEcWUB_oBX8VCRR9u-cfS24PxnmJDFl7NhcXxCmy-gyz1BvS67twZMqlwrhTc32ES6qtf1KsAbWxV6_6xpGqEzdooxjmSwMyLhYWDPgKCV3g8It7QHfVB_TMYXOGP3TYUBLj5Jx-Obv4At6RlqFarOvw5uHKC0mYqIom9ssn8cZ9hNPzXXYat_3fydsSgyPvpyelTS3_vAGG0Tsn6PXrrVwvXw"}'
+  negative_prompt: "artifacts, gpt-image, washed-out colors, low quality, low resolution, AI slop, deviantart, sloppy lines, rough sketch, blurry, indistinct, missing fingers, badly drawn hands, wrong number of fingers"
   width: 1600
   height: 896
   seed: null                    # Ny slumpad seed per jobb.
