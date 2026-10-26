@@ -2,7 +2,8 @@
 
 `character_sheet` is a job operation. The first supported model is
 `qwen-image-2.1-int8`, selected by the `qwen-character-sheet` profile.
-Turbo is not enabled for this operation. The matched Qwen reference workload
+MOSS draws a sheet in one pass, selected by the `moss-character-sheet` profile;
+see [MOSS sheets](#moss-sheets). Turbo is not enabled for this operation. The matched Qwen reference workload
 has passed live acceptance; see the [reference baseline](../native/reference-cache/ACCEPTANCE-REUSE.md).
 This does not validate every allowed layout, prompt, reference count or GPU.
 
@@ -109,12 +110,39 @@ exports the primary sheet only. Custom pose-guide upload and access to all
 three result roles are available through the HTTP API and the native
 [Character sheets tab](UI.md#character-sheets). There is no separate recompose endpoint.
 
+## MOSS sheets
+
+The `moss-character-sheet` profile selects `moss-image-sft-int8` (the BF16
+weights work the same way). MOSS has no image editing, so it draws the whole
+16:9 sheet in one text-to-image pass: the face portrait on the left, then front,
+right-profile and back body views. The request has the same `character_sheet`
+fields and layout rules as above, with these differences:
+
+- No identity references and no pose guide; `character_description` is required.
+- The server's template `config/image/character-sheet/moss.txt` is the prompt.
+  It receives the character description, the clothing description (or asks
+  MOSS to choose one outfit) and the portrait share of `portrait_fraction` as a
+  percentage. Clothing also shows in the portrait, which is part of one image.
+- The canvas is `output_width` by its 16:9 height (1536x864 by default). MOSS
+  places the split itself, so the portrait is close to, not exactly at, the
+  layout fraction. Nothing is composed on the CPU.
+- One pass with the job seed and no `stage` in progress. The profile's sampling
+  and default negative prompt are MOSS's own.
+- One result: `character_sheet`. `effective.execution_plan` records the
+  `moss-character-sheet-v1` strategy, the canvas, the seed and
+  `output_roles: ["character_sheet"]`. Qwen plans list their three roles there too.
+
+Model metadata reports each model's `character_sheet` capabilities, including
+`max_identity_references` and `output_roles`; clients take a sheet's images
+from those instead of assuming three.
+
 ## Responsibility boundaries
 
 - `generation.rs` resolves a typed image or character-sheet task and orchestrates
   passes under the existing scheduler lifecycle.
-- `model_adapter.rs` explicitly selects supported sheet strategies and owns
-  Qwen prompts, reference roles and revision metadata. A future model needs an
+- `model_adapter.rs` explicitly selects supported sheet strategies (Qwen two-pass,
+  MOSS single-pass) and owns their prompts, reference roles, output roles and
+  revision metadata. A future model needs an
   explicit strategy and validation; generic image-edit support does not imply
   character-sheet support.
 - `character_sheet.rs` owns model-independent inputs, geometry, composition and

@@ -302,16 +302,18 @@ text-only; this tab does not assign separate clothing-reference roles.
 stays at 45%. Steps, CFG, negative prompt, seed mode/value, reference size and
 output folder use the shared controls. Descriptions and reference selections
 stay in memory. Generate requires server support for the operation and either
-a character description or a reference.
+a character description or a reference. MOSS draws the sheet in one pass from
+the description alone: it needs a character description and takes no
+references (see [MOSS sheets](CHARACTER-SHEETS.md#moss-sheets)).
 
-**Sheet / Portrait / Views** select the three outputs of one job in the same
-viewer. Changing the selection resets to Fit; 1:1 and Pan apply to the selected
+**Sheet / Portrait / Views** select the three outputs of one Qwen job in the same
+viewer. A MOSS sheet is a single image, so the selector is hidden. Changing the selection resets to Fit; 1:1 and Pan apply to the selected
 output. The existing progress area names Portrait, Views and Composing; sampling
 percentage and ETA refer only to the current pass. Cancel and Retry retain the
 same job semantics as image generation. Async events always return to their
 originating tab, even while another tab is visible.
 
-The client downloads and decodes all three roles before saving them to the
+The client downloads and decodes every role the job's plan lists before saving them to the
 selected folder's local-date subfolder as `image_0001_character_sheet.png`,
 `image_0001_portrait.png` and `image_0001_turnaround.png`, sharing one sequence
 number. **Saved** appears only after all files have

@@ -376,12 +376,12 @@ impl Client {
             label: "Loading saved preview".into(),
             sampling: None,
         });
-        let roles: &[OutputRole] = if submission.request["operation"] == "character_sheet" {
-            &[OutputRole::Sheet, OutputRole::Portrait, OutputRole::Views]
+        let roles = if submission.request["operation"] == "character_sheet" {
+            sheet_roles(&result)?
         } else {
-            &[OutputRole::Image]
+            vec![OutputRole::Image]
         };
-        let ids = result_assets(&result, roles)?;
+        let ids = result_assets(&result, &roles)?;
         // Preview bytes stay in memory; publication and naming already completed on the server.
         let mut downloads = Vec::new();
         for (role, asset) in ids {
@@ -469,6 +469,26 @@ fn saved_image_paths(
         .collect()
 }
 
+/// The images a sheet job publishes, as its execution plan names them. Jobs
+/// from before plans named them are Qwen sheets with all three roles.
+fn sheet_roles(result: &Value) -> std::result::Result<Vec<OutputRole>, Failure> {
+    let Some(names) = result["effective"]["execution_plan"]["output_roles"].as_array() else {
+        return Ok(vec![
+            OutputRole::Sheet,
+            OutputRole::Portrait,
+            OutputRole::Views,
+        ]);
+    };
+    names
+        .iter()
+        .map(|name| {
+            [OutputRole::Sheet, OutputRole::Portrait, OutputRole::Views]
+                .into_iter()
+                .find(|role| name == role.name())
+                .ok_or_else(|| Failure::retry("Unexpected result roles from the server. Retry."))
+        })
+        .collect()
+}
 fn result_assets(
     result: &Value,
     roles: &[OutputRole],
@@ -517,6 +537,12 @@ pub fn make_upscale_request(
     }))
 }
 
+/// Whether the model's sheets include this image; unknown models list all three.
+pub fn sheet_has_role(metadata: Option<&Value>, role: OutputRole) -> bool {
+    metadata
+        .and_then(|m| m["character_sheet"]["output_roles"].as_array())
+        .is_none_or(|roles| roles.iter().any(|r| r == role.name()))
+}
 pub fn supports_character_sheets(metadata: &Value) -> bool {
     metadata["operations"]
         .as_array()
@@ -535,14 +561,24 @@ pub fn make_sheet_request(
     if !supports_character_sheets(metadata) {
         bail!("This server does not support character sheets. Update the server and reconnect.");
     }
+    let max_refs = metadata["character_sheet"]["max_identity_references"]
+        .as_u64()
+        .unwrap_or(8) as usize;
+    if max_refs == 0 && !refs.is_empty() {
+        bail!("This model draws sheets from the description alone. Remove the reference images.");
+    }
     if character.trim().is_empty() && refs.is_empty() {
-        bail!("Describe the character or add a reference image.");
+        bail!(if max_refs == 0 {
+            "Describe the character."
+        } else {
+            "Describe the character or add a reference image."
+        });
     }
     if character.len() > 12000 || clothing.len() > 12000 {
         bail!("Each description must be at most 12,000 UTF-8 bytes.");
     }
-    if refs.len() > 8 {
-        bail!("Up to eight identity references.");
+    if refs.len() > max_refs {
+        bail!("Up to {max_refs} identity references.");
     }
     if !(512..=4096).contains(&width) || !width.is_multiple_of(512) {
         bail!("Width must be 512–4096 px in steps of 512.");
@@ -1109,6 +1145,33 @@ mod tests {
             make_sheet_request(&"x".repeat(12001), "", 1536, "", &[], &meta, &settings).is_err()
         );
         assert!(make_sheet_request("x", "", 1536, "", &[], &json!({}), &settings).is_err());
+    }
+    #[test]
+    fn moss_sheets_need_a_description_take_no_references_and_have_one_image() {
+        let meta = imagine_server::contract::model(imagine_server::contract::MOSS).unwrap();
+        let settings = GenerationSettings::default();
+        assert!(make_sheet_request("", "outfit", 1536, "", &[], &meta, &settings).is_err());
+        assert!(make_sheet_request("x", "", 1536, "", &["ref".into()], &meta, &settings).is_err());
+        let request = make_sheet_request("x", "", 1536, "", &[], &meta, &settings).unwrap();
+        assert_eq!(request["model"], imagine_server::contract::MOSS);
+        let request: imagine_server::contract::JobRequest =
+            serde_json::from_value(request).unwrap();
+        request.validate().unwrap();
+        let plan = request.effective()["execution_plan"].clone();
+        assert_eq!(
+            sheet_roles(&json!({"effective":{"execution_plan":plan}})).unwrap(),
+            [OutputRole::Sheet]
+        );
+        assert!(sheet_has_role(Some(&meta), OutputRole::Sheet));
+        assert!(!sheet_has_role(Some(&meta), OutputRole::Portrait));
+        assert!(sheet_has_role(None, OutputRole::Views));
+        // Jobs from before plans named their roles are three-image Qwen sheets.
+        assert_eq!(
+            sheet_roles(&json!({"effective":{}})).unwrap(),
+            [OutputRole::Sheet, OutputRole::Portrait, OutputRole::Views]
+        );
+        let unknown = json!({"effective":{"execution_plan":{"output_roles":["image"]}}});
+        assert!(sheet_roles(&unknown).unwrap_err().retryable);
     }
     #[test]
     fn sheet_roles_are_order_independent_and_partial_results_are_retryable() {

@@ -9,6 +9,7 @@ pub mod config_files;
 pub const CONFIG_FILES: &[&str] = &[
     "image/character-sheet/portrait.txt",
     "image/character-sheet/turnaround.txt",
+    "image/character-sheet/moss.txt",
     "image/profiles/qwen.yaml",
     "image/profiles/quick-draft.yaml",
     "image/profiles/moss.yaml",

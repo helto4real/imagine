@@ -1,0 +1,34 @@
+schema_version: 1
+id: moss-character-sheet
+version: 1
+name: MOSS Character Sheet
+description: Portrait and three body views drawn as one 16:9 character sheet by MOSS.
+references:
+  min: 0
+  max: 0
+defaults:
+  operation: character_sheet
+  character_sheet:
+    character_description: ""
+    clothing_description: ""
+    layout:
+      output_width: 1536
+      portrait_fraction: 0.45
+  model: moss-image-sft-int8
+  negative_prompt: "worst quality, bad anatomy, watermark, jpeg artifact"
+  seed: null
+  sampling:
+    steps: 50
+    cfg_scale: 3.0
+    sampler: euler
+    scheduler: normal
+  inputs:
+    reference_images: []
+  model_options:
+    moss_image:
+      diffusion_model: diffusion_models/moss/moss_image_sft_int8_convrot.safetensors
+      text_encoder: text_encoders/moss/qwen3.5_9b_int8_convrot.safetensors
+      vae: vae/flux.2/flux2-vae.safetensors
+  output:
+    format: png
+    count: 1

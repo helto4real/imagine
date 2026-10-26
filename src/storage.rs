@@ -543,11 +543,7 @@ impl Store {
         } else {
             None
         };
-        let count = if request.operation == crate::contract::Operation::CharacterSheet {
-            3
-        } else {
-            1
-        };
+        let count = crate::model_adapter::output_count(request) as u64;
         (0..count)
             .map(|_| {
                 destination

@@ -606,10 +606,8 @@ impl Scheduler {
                 .shape
                 .raw_bytes()
                 + 64 * 1024 * 1024
-        } else if request.operation == crate::contract::Operation::CharacterSheet {
-            96 * 1024 * 1024
         } else {
-            32 * 1024 * 1024
+            32 * 1024 * 1024 * crate::model_adapter::output_count(&request) as u64
         };
         self.store
             .destination_for_proof(&request.client_metadata["video_destination"])

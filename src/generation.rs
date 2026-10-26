@@ -207,6 +207,16 @@ async fn generate_images(
             .await??;
             Ok(result)
         }
+        Task::CharacterSheet(sheet, model_adapter::SheetStrategy::MossSinglePass) => {
+            pass.prompt = model_adapter::moss_sheet_prompt(sheet);
+            (pass.width, pass.height) = sheet.layout.dimensions();
+            let bytes = engine.generate(&pass).await?;
+            check_canvas(&bytes, (pass.width, pass.height))?;
+            Ok(vec![Artifact {
+                role: "character_sheet",
+                bytes,
+            }])
+        }
     }
 }
 fn check_canvas(bytes: &[u8], expected: (u32, u32)) -> Result<()> {

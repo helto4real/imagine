@@ -7,19 +7,30 @@ unknown fields and duplicate IDs/keys fail startup. Restart Imagine after an edi
 increment `version` when changing a published profile. Already queued jobs retain
 their resolved settings. The proxy does not load graphs or YAML itself.
 
-`qwen.yaml` is **Qwen Image 2.1** (version 4); `quick-draft.yaml` is
+`qwen.yaml` is **Qwen Image 2.1** (version 5); `quick-draft.yaml` is
 **Qwen Image 2.1 Turbo** (version 3). Both accept zero to ten ordered references:
 no references selects text-to-image; references select image-edit. Each recipe
-owns its model files and sampling defaults. Standard Qwen retains the exact
-encrypted negative-prompt envelope from the former `image_generation` preset;
-Turbo retains its empty negative prompt and zero-negative-conditioning setting.
-Prompt guidance and other generation settings are unchanged.
+owns its model files and sampling defaults. Standard Qwen and MOSS (`moss.yaml`)
+carry a plain default negative prompt, which the server also reports in their
+model metadata; Turbo retains its empty negative prompt and
+zero-negative-conditioning setting.
 
 A profile without inline `prompt_guidance` takes it from `guidance/<id>.md` beside
 the profiles folder when that file exists (`guidance/moss.md` for MOSS prompts,
-`guidance/qwen-character-sheet.md` for the character sheet fields); inline guidance
-wins. `describe_profile` returns it to agents. `character-sheet/` holds the
-server's own instructions for the two character sheet passes.
+`guidance/qwen-character-sheet.md` and `guidance/moss-character-sheet.md` for the
+character sheet fields); inline guidance wins. `describe_profile` returns it to
+agents. `character-sheet/` holds the server's own prompts: `portrait.txt` and
+`turnaround.txt` for the two Qwen passes, and `moss.txt` for MOSS.
+
+`qwen-character-sheet.yaml` makes a sheet in two Qwen passes, a portrait and a
+turnaround guided by up to eight identity references, which the server composes
+and publishes with both passes. `moss-character-sheet.yaml` has MOSS draw the
+whole sheet in one text-to-image pass from the description alone, so it takes
+no references and publishes only the sheet. `moss.txt` fills
+`{character_description}`, `{outfit}` (the clothing description, or an outfit
+MOSS chooses), and `{portrait_percent}`/`{views_percent}` from the layout's
+`portrait_fraction`. The job's `execution_plan.output_roles` lists the images a
+sheet publishes.
 
 Character sheets and upscale retain their dedicated operation profiles.
 The overlapping `image_generation`, `qwen_scene` and frozen-v2 wrapper presets

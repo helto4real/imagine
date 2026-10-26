@@ -29,6 +29,8 @@ use tokio::{
     sync::{Notify, Semaphore, watch},
     task::JoinHandle,
 };
+/// Model, negative prompt and size of one image pass the engine received.
+type Pass = (String, String, (u32, u32));
 #[derive(Default)]
 struct Probe {
     llm: AtomicBool,
@@ -38,8 +40,7 @@ struct Probe {
     unloads: AtomicUsize,
     fail_next: AtomicBool,
     release: Notify,
-    /// Model and negative prompt of every image pass the engine received.
-    passes: Mutex<Vec<(String, String)>>,
+    passes: Mutex<Vec<Pass>>,
 }
 struct Engine(Arc<Probe>);
 impl Backend for Engine {
@@ -51,17 +52,19 @@ impl Backend for Engine {
             assert!(!self.0.llm.load(Ordering::SeqCst), "LLM overlapped Imagine");
             self.0.image.store(true, Ordering::SeqCst);
             self.0.calls.fetch_add(1, Ordering::SeqCst);
-            self.0
-                .passes
-                .lock()
-                .unwrap()
-                .push((pass.model.clone(), pass.negative_prompt.clone()));
+            self.0.passes.lock().unwrap().push((
+                pass.model.clone(),
+                pass.negative_prompt.clone(),
+                (pass.width, pass.height),
+            ));
             if self.0.fail_next.swap(false, Ordering::SeqCst) {
                 return Err(imagine_server::engine::EngineError("native_generation_failed").into());
             }
             self.0.release.notified().await;
             let mut bytes = Cursor::new(Vec::new());
-            image::RgbImage::new(2, 2).write_to(&mut bytes, image::ImageFormat::Png)?;
+            // The requested size, which a character sheet checks.
+            image::RgbImage::new(pass.width, pass.height)
+                .write_to(&mut bytes, image::ImageFormat::Png)?;
             Ok(bytes.into_inner())
         })
     }
@@ -552,9 +555,10 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     llm_task.abort();
 }
 /// MOSS is one more shipped profile to the MCP: text to image only, with the
-/// profile's default negative prompt unless the agent gives its own.
+/// profile's default negative prompt unless the agent gives its own, and a
+/// character sheet profile that draws the whole sheet in one pass.
 #[tokio::test]
-async fn mcp_generates_moss_images_with_its_default_negative_prompt() {
+async fn mcp_generates_moss_images_and_character_sheets() {
     let dir = tempfile::tempdir().unwrap();
     let probe = Arc::new(Probe::default());
     let stack = start(dir.path(), &probe).await;
@@ -647,12 +651,39 @@ async fn mcp_generates_moss_images_with_its_default_negative_prompt() {
         assert_eq!(public["resolved_profile"]["id"], "moss");
         assert!(public.get("prompt").is_none() && public.get("negative_prompt").is_none());
         assert!(result["images"][0]["file_id"].is_string(), "{result}");
-        assert_eq!(
-            probe.passes.lock().unwrap().last().unwrap(),
-            &(MOSS.to_owned(), negative.to_owned())
-        );
+        let passes = probe.passes.lock().unwrap();
+        let (model, used, _) = passes.last().unwrap();
+        assert_eq!((model.as_str(), used.as_str()), (MOSS, negative));
     }
-    assert_eq!(probe.calls.load(Ordering::SeqCst), 2);
+    // A MOSS character sheet is one image, drawn in one pass from the description.
+    assert!(
+        list["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["id"] == "moss-character-sheet"),
+        "{list}"
+    );
+    probe.release.notify_one();
+    let sheet = mcp(
+        &client,
+        &url,
+        "generate",
+        json!({"workspace_key":key,"job_id":"moss-sheet","profile":"moss-character-sheet",
+            "parameters":{"character_sheet":{"character_description":"synthetic sheet identity"}}}),
+    )
+    .await;
+    assert_eq!(sheet["status"], "succeeded", "{sheet}");
+    assert_eq!(sheet["images"].as_array().unwrap().len(), 1, "{sheet}");
+    assert!(sheet["images"][0]["file_id"].is_string());
+    let plan = &sheet["parameters"]["execution_plan"];
+    assert_eq!(plan["output_roles"], json!(["character_sheet"]));
+    assert!(!sheet.to_string().contains("synthetic sheet identity"));
+    assert_eq!(
+        probe.passes.lock().unwrap().last().unwrap(),
+        &(MOSS.to_owned(), default.clone(), (1536, 864))
+    );
+    assert_eq!(probe.calls.load(Ordering::SeqCst), 3);
     stack.running.close().await;
     stack.control.call(Action::Shutdown).await.unwrap();
     stack.scheduler.await.unwrap().unwrap();

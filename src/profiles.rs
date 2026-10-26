@@ -193,7 +193,11 @@ impl Catalog {
             for key in ["prompt", "width", "height", "max_side", "aspect_ratio"] {
                 properties.remove(key);
             }
-            value["character_sheet"] = crate::model_adapter::sheet_capabilities();
+            if let Ok(strategy) =
+                crate::model_adapter::sheet_strategy(p.defaults["model"].as_str().unwrap_or(""))
+            {
+                value["character_sheet"] = crate::model_adapter::sheet_capabilities(strategy);
+            }
         }
         value["parameters_schema"] = schema;
         Ok(value)

@@ -878,7 +878,7 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
             .any(|p| p["id"] == "qwen")
     );
     let profiles = catalog["profiles"].as_array().unwrap();
-    assert_eq!(profiles.len(), 5); // standard, Turbo, MOSS, sheets and upscale
+    assert_eq!(profiles.len(), 6); // standard, Turbo, MOSS, two sheets and upscale
     for (id, name, model) in [
         ("qwen", "Qwen Image 2.1", "qwen-image-2.1-int8"),
         (
@@ -1387,6 +1387,93 @@ async fn character_sheet_is_one_job_with_ordered_in_memory_passes_and_three_resu
 }
 
 #[tokio::test]
+async fn moss_character_sheet_is_one_text_to_image_pass_and_one_result() {
+    let h = setup().await;
+    h.engine_state.send_modify(|s| s.backend = "rust".into());
+    h.probe.sized_output.store(1, Ordering::SeqCst);
+    let mut body = sheet_request();
+    body["profile"] = json!("moss-character-sheet");
+    let (_, profile) = req(
+        &h.router,
+        "GET",
+        "/v1/profiles/moss-character-sheet",
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(profile["references"]["max"], 0);
+    assert_eq!(profile["character_sheet"]["max_identity_references"], 0);
+    assert_eq!(profile["character_sheet"]["pose_guide"], false);
+    assert_eq!(
+        profile["character_sheet"]["output_roles"],
+        json!(["character_sheet"])
+    );
+    let (status, valid) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/validate",
+        Some(body.clone()),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{valid}");
+    let plan = &valid["effective"]["execution_plan"];
+    assert_eq!(plan["strategy"], "moss-character-sheet-v1");
+    assert_eq!(plan["output_roles"], json!(["character_sheet"]));
+    assert_eq!(
+        plan["passes"],
+        json!([{"stage":"sheet","width":512,"height":288,"seed":42,"reference_roles":[]}])
+    );
+    // MOSS reads text only: no identity references, no pose guide, and a description.
+    let asset = h.store.save_asset("local", png()).await.unwrap();
+    let mut cases = Vec::new();
+    let mut with_reference = body.clone();
+    with_reference["inputs"] = json!({"reference_images":[asset["id"]]});
+    cases.push(with_reference);
+    let mut with_guide = body.clone();
+    with_guide["inputs"] = json!({"pose_guide":asset["id"]});
+    cases.push(with_guide);
+    let mut undescribed = body.clone();
+    undescribed["character_sheet"]["character_description"] = json!(" ");
+    cases.push(undescribed);
+    for case in cases {
+        let (status, error) = req(&h.router, "POST", "/v1/jobs/validate", Some(case), None).await;
+        assert_eq!(status, 422, "{error}");
+    }
+    let (status, job) = req(&h.router, "POST", "/v1/jobs", Some(body), None).await;
+    assert_eq!(status, 202, "{job}");
+    let id = job["id"].as_str().unwrap();
+    wait_calls(&h.probe, 1).await;
+    h.probe.release.notify_one();
+    let result = wait_status(&h.store, id, "local", "succeeded").await;
+    {
+        let passes = h.probe.passes.lock().unwrap();
+        assert_eq!(passes.len(), 1);
+        let pass = &passes[0];
+        assert_eq!(pass.model, imagine_server::contract::MOSS);
+        assert_eq!((pass.width, pass.height, pass.seed), (512, 288, 42));
+        assert!(pass.references.is_empty());
+        assert!(
+            pass.prompt
+                .contains("The character: SYNTHETIC_SHEET_IDENTITY.")
+        );
+        assert!(pass.prompt.contains("body views: SYNTHETIC_SHEET_CLOTHES."));
+        assert!(pass.prompt.contains("the left 45 percent"));
+        assert!(!pass.prompt.contains('{'), "{}", pass.prompt);
+        assert_eq!(pass.negative_prompt, "synthetic profile negative");
+    }
+    assert!(h.probe.stages.lock().unwrap().is_empty());
+    let assets = result["output"]["assets"].as_array().unwrap();
+    assert_eq!(assets.len(), 1);
+    assert_eq!(assets[0]["role"], "character_sheet");
+    assert_eq!(
+        (&assets[0]["width"], &assets[0]["height"]),
+        (&json!(512), &json!(288))
+    );
+    stop(h).await;
+}
+
+#[tokio::test]
 async fn character_sheet_cancel_or_second_pass_failure_never_publishes_partial_results() {
     for cancel in [true, false] {
         let h = setup().await;
@@ -1661,7 +1748,10 @@ async fn rust_admission_exposes_its_own_capabilities_and_rejects_unsupported_sam
         None,
     )
     .await;
-    assert_eq!(moss["operations"], json!(["text_to_image"]));
+    assert_eq!(
+        moss["operations"],
+        json!(["text_to_image", "character_sheet"])
+    );
     h.control.call(Action::Shutdown).await.unwrap();
     h.task.await.unwrap().unwrap();
 }

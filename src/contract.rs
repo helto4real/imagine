@@ -203,7 +203,7 @@ impl JobRequest {
             return Err("unsupported_operation");
         }
         if self.operation == Operation::CharacterSheet {
-            crate::model_adapter::sheet_strategy(&self.model)?;
+            let strategy = crate::model_adapter::sheet_strategy(&self.model)?;
             let sheet = self
                 .character_sheet
                 .as_ref()
@@ -212,31 +212,41 @@ impl JobRequest {
             if !self.prompt.is_empty() {
                 return Err("unexpected_prompt");
             }
-            if self.inputs.reference_images.len() > 8 {
+            if self.inputs.reference_images.len() > strategy.max_identity_references() {
                 return Err("invalid_reference_count");
             }
-            // This strategy has its own canvas and no scene colour transfer.
-            if self
-                .model_options
-                .qwen_image_2_1
-                .workflow
-                .as_ref()
-                .is_some_and(|w| {
-                    w.color_match_strength > 0.
-                        || w.brightness_strength > 0.
-                        || w.contrast_strength > 0.
-                })
-            {
-                return Err("unsupported_character_sheet_color_matching");
-            }
-            let cap = self
-                .model_options
-                .qwen_image_2_1
-                .reference_max_pixels_per_image;
-            for (w, h) in sheet.layout.pass_sizes()? {
-                let (_, _, w, h) = crate::workflow_image::dimensions(w, h, cap);
-                if w == 0 || h == 0 {
-                    return Err("unsupported_reference_geometry");
+            match strategy {
+                // One text-to-image canvas, without a pose guide.
+                crate::model_adapter::SheetStrategy::MossSinglePass => {
+                    if self.inputs.pose_guide.is_some() {
+                        return Err("unexpected_character_sheet_input");
+                    }
+                }
+                crate::model_adapter::SheetStrategy::QwenTwoPass => {
+                    // This strategy has its own canvas and no scene colour transfer.
+                    if self
+                        .model_options
+                        .qwen_image_2_1
+                        .workflow
+                        .as_ref()
+                        .is_some_and(|w| {
+                            w.color_match_strength > 0.
+                                || w.brightness_strength > 0.
+                                || w.contrast_strength > 0.
+                        })
+                    {
+                        return Err("unsupported_character_sheet_color_matching");
+                    }
+                    let cap = self
+                        .model_options
+                        .qwen_image_2_1
+                        .reference_max_pixels_per_image;
+                    for (w, h) in sheet.layout.pass_sizes()? {
+                        let (_, _, w, h) = crate::workflow_image::dimensions(w, h, cap);
+                        if w == 0 || h == 0 {
+                            return Err("unsupported_reference_geometry");
+                        }
+                    }
                 }
             }
         } else if self.character_sheet.is_some() || self.inputs.pose_guide.is_some() {
@@ -302,8 +312,10 @@ impl JobRequest {
             return Err("invalid_seed");
         }
         if crate::model_spec::is_moss(&self.model)
-            && (self.operation != Operation::TextToImage
-                || !self.inputs.reference_images.is_empty()
+            && (!matches!(
+                self.operation,
+                Operation::TextToImage | Operation::CharacterSheet
+            ) || !self.inputs.reference_images.is_empty()
                 || workflow.is_none()
                 || self.sampling.sampler != "euler"
                 || !matches!(self.sampling.scheduler.as_str(), "normal" | "sgm_uniform")
@@ -476,7 +488,8 @@ pub fn model(id: &str) -> Option<Value> {
                     "samplers":spec.architecture.samplers(), "schedulers":spec.architecture.schedulers(),
                     "output_formats":["png"],"max_output_count":1,"loras":true,
                     "reference_images":{"max_count":0}
-                }, "request_schema":schemars::schema_for!(JobRequest)
+                }, "character_sheet":crate::model_adapter::sheet_capabilities(crate::model_adapter::SheetStrategy::MossSinglePass),
+                "request_schema":schemars::schema_for!(JobRequest)
             });
             v["defaults"] = serde_yaml::from_str::<Value>(
                 crate::config_files::text("image/profiles/moss.yaml").ok()?,
@@ -499,7 +512,7 @@ pub fn model(id: &str) -> Option<Value> {
                 "id": MODEL, "available": true, "availability": "requires_local_frozen_binary_and_weights",
                 "engine":"stable-diffusion.cpp", "profile_revision":PROFILE,
                 "operations":["text_to_image","image_edit","character_sheet"],
-                "character_sheet":crate::model_adapter::sheet_capabilities(),
+                "character_sheet":crate::model_adapter::sheet_capabilities(crate::model_adapter::SheetStrategy::QwenTwoPass),
                 "constraints": {
                     "dimensions":{"min":128,"max":4096,"multiple":32,"min_max_side":256},
                     "validated_resolutions":[{"width":1600,"height":896}],

@@ -8,9 +8,9 @@ A missing or invalid required file stops that process at startup with its path.
 
 | Path | Contents | Read by | After an edit |
 | --- | --- | --- | --- |
-| `image/profiles/*.yaml` | Image generation profiles (Qwen, Turbo, MOSS, character sheet, upscale); see [image/README.md](image/README.md) | Server (`--profiles` overrides the folder) | Restart server |
+| `image/profiles/*.yaml` | Image generation profiles (Qwen, Turbo, MOSS, Qwen and MOSS character sheets, upscale); see [image/README.md](image/README.md) | Server (`--profiles` overrides the folder) | Restart server |
 | `image/guidance/<id>.md` | Prompt guides returned by `describe_profile` for profiles without inline guidance | Server | Restart server |
-| `image/character-sheet/` | The server's instructions for the portrait and turnaround passes | Server | Restart server |
+| `image/character-sheet/` | The server's instructions for the Qwen portrait and turnaround passes (`portrait.txt`, `turnaround.txt`) and the template for MOSS's one-pass sheet (`moss.txt`) | Server | Restart server |
 | `video/presets.yaml` | Your scene presets (git-ignored; copy `presets.example.yaml`) | Server (`--video-presets` overrides the file) | None: read on each use |
 | `video/prompt-profiles/<id>/` | Video prompt profiles: `profile.json` and the step templates | Server | None: read on each use |
 | `video/agent-guidance.txt` | Guidance returned to agents with a video prompt profile | Server | Restart server |

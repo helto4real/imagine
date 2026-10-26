@@ -1220,9 +1220,22 @@ impl ImagineApp {
         let activity = self.viewer_progress();
         let sheet = self.workspace == Workspace::CharacterSheet;
         let editing = self.workspace == Workspace::ImageEdit;
-        let stacked_tools = sheet && bounds.width() < 360.;
+        // The images this sheet has, or the selected model's sheets will have.
+        let views: Vec<_> = [
+            (OutputRole::Sheet, "Sheet"),
+            (OutputRole::Portrait, "Portrait"),
+            (OutputRole::Views, "Views"),
+        ]
+        .into_iter()
+        .filter(|(role, _)| match &self.desk().result {
+            Some(result) => result.assets.iter().any(|a| a.role == *role),
+            None => client::sheet_has_role(self.metadata.as_ref(), *role),
+        })
+        .collect();
+        let selector = sheet && views.len() > 1;
+        let stacked_tools = selector && bounds.width() < 360.;
         let tools_height = if stacked_tools { 70. } else { 32. };
-        if sheet {
+        if selector {
             let selectors = Rect::from_min_size(
                 bounds.min,
                 egui::vec2(
@@ -1236,11 +1249,7 @@ impl ImagineApp {
             );
             region(ui, "result-selector", selectors, |ui| {
                 ui.horizontal(|ui| {
-                    for (role, label) in [
-                        (OutputRole::Sheet, "Sheet"),
-                        (OutputRole::Portrait, "Portrait"),
-                        (OutputRole::Views, "Views"),
-                    ] {
+                    for (role, label) in views {
                         if helto::select_button(ui, label, self.desk().selected_role == role)
                             .clicked()
                         {
