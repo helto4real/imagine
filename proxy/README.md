@@ -40,11 +40,11 @@ cd /home/thhel/ChatGPT/imagine
 
 `start-proxy.sh` defaults to chat port **5002**, image port **8189**, and enabled MCP on **8190**, matching `st-stack.zsh`. ComfyUI defaults to upstream port 8188 and KoboldCpp to 5001. The root launcher uses private storage and does not inject a legacy fixed MCP output directory. Agents exchange files through key-scoped workspaces in Imagine's MCP root (`/run/media/veracrypt1/mcp-root`, set on the Imagine server with `--mcp-root`), never through host paths; see [MCP-WORKSPACES-DESIGN.md](../docs/MCP-WORKSPACES-DESIGN.md). Environment variables and CLI arguments can override these defaults.
 
-`./start-proxy.sh` without arguments incrementally builds the local `main` binaries through the [shared product builder](../docs/PRODUCT-BUILDS.md) and runs `proxy/st-stack.zsh` in **all** mode. It starts or reuses KoboldCpp, TabbyAPI, Prism, SC117, Orca, SC117 128k and Orca 128k, waits for readiness, then starts the proxy with the combined `backend/model` catalog that Pi expects. Models are activated on demand through the shared GPU coordinator. Imagine must be started separately first. Ctrl-C or `./start-proxy.sh --stop` stops the stack; `--log` shows backend logs. Set `ST_PROXY_LLM_BACKEND` to select another stack backend.
+`./start-proxy.sh` without arguments incrementally builds the local `main` binaries through the [shared product builder](../docs/PRODUCT-BUILDS.md) and runs `proxy/st-stack.zsh` in **all** mode. It starts or reuses every available backend in [the backends file](#backends-file), waits for readiness, then starts the proxy with the combined `backend/model` catalog that Pi expects. Models are activated on demand through the shared GPU coordinator. Imagine must be started separately first. Ctrl-C or `./start-proxy.sh --stop` stops the stack; `--log` shows backend logs. Set `ST_PROXY_LLM_BACKEND` to select another stack backend.
 
 Proxy CLI options and unambiguous abbreviations configure the supervised stack too: `./start-proxy.sh --llm-b sc117 --chat-port 5002` starts that backend and the proxy. Use `--proxy-only` to connect to independently managed backends without starting them. `--help` lists existing CLI options plus the integration options. The usual `ST_PROXY_*` variables work; the new ones are `ST_PROXY_COORDINATOR_SOCKET` and `ST_PROXY_IMAGINE_URL`. `ST_PROXY_MCP_TOKEN` remains environment-only. Tokens are not logged.
 
-Use `--llm-backend koboldcpp|tabbyapi|ollama|prism|sc117|orca|sc117_128k|orca_128k|swift|swift_128k|all` and the corresponding origin options. `all` exposes `backend/model` IDs and requires distinct origins. Kobold router mode retains `--kobold-router-mode`, admin password, bootstrap/cache and default-model behavior. `--model-profiles "$PWD/config/proxy/model-profiles.json"` enables the copied profiles. `--check-backend` validates the selected backend without starting listeners.
+Use `--llm-backend ID|all` with a backend id from the backends file; `--ID-url URL`, `--backend-url ID=URL` or `ST_PROXY_<ID>_URL` changes a backend's origin. `all` exposes `backend/model` IDs and requires distinct origins. Kobold router mode retains `--kobold-router-mode`, admin password, bootstrap/cache and default-model behavior. `--model-profiles "$PWD/config/proxy/model-profiles.json"` enables the copied profiles. `--check-backend` validates the selected backend without starting listeners.
 
 `proxy/st-stack.zsh` preserves the original stack's menus, backend choices, colors, cleanup, TTS and SillyTavern options. Build first with `cargo build --release -p st-proxy --bins`, export the integration variables above, and start Imagine separately before launching this script. Its listener ports match the root launcher; inspect its environment options for other stack settings. It does not own the separate Imagine process. The Kobold bootstrap and Strata log filter are Rust binaries. No other stack launch scripts are replaced.
 
@@ -102,7 +102,6 @@ export PYTHONDONTWRITEBYTECODE=1
 "$PY" proxy/tests/http_parity.py --reference /home/thhel/git/st-proxy --logs \
   --backends koboldcpp tabbyapi ollama prism sc117 orca sc117_128k orca_128k
 "$PY" proxy/tests/gateway_parity.py --reference /home/thhel/git/st-proxy
-python3 proxy/tests/root_launcher.py
 "$PY" proxy/tests/stack_parity.py --reference /home/thhel/git/st-proxy
 "$PY" proxy/tests/multi_parity.py --reference /home/thhel/git/st-proxy
 "$PY" proxy/tests/failure_parity.py --reference /home/thhel/git/st-proxy
@@ -207,13 +206,37 @@ Preview paths remain available for the MCP contract, so normalized previews are 
 only in this encrypted process cache. Historical plaintext cache/session files are not
 inspected, migrated or deleted by this implementation.
 
+## Backends file
+
+`config/proxy/backends.json` (under `--config`; `--backends PATH` or
+`ST_PROXY_BACKENDS` selects another file) lists the LLM backends. Adding, removing
+or disabling a backend needs no rebuild; restart the stack. Each entry has:
+
+| Field | Meaning |
+| --- | --- |
+| `id`, `label` | Backend id (lowercase letters, digits, `_`; the `backend/` model ID prefix) and display name |
+| `adapter` | Compiled protocol: `koboldcpp`, `tabbyapi`, `ollama`, `llama_router` (Prism) or `strata` |
+| `origin` | Loopback origin with an explicit port |
+| `enabled` | `false` hides the backend from `all`, the menu and `--llm-backend` (default `true`) |
+| `in_all` | `false` keeps an enabled backend out of `all` (Ollama) |
+| `requires` | Paths such as weights; when one is missing the backend is skipped with a warning |
+| `required` | `true` stops the stack when the backend does not become ready |
+| `default_model` | Default preset (`llama_router`) or model (`tabbyapi`) instead of the global option |
+| `launch` | `dir`, `command` (`{port}` is the origin's port), `match` (lowercase process text), `all_args` (added in `all` mode), `terminal_filter` |
+
+In `all` mode the stack skips backends whose `requires` are missing and leaves out a
+backend that does not become ready within `ST_STACK_START_TIMEOUT`, unless it is
+`required`; the proxy then starts with `--exclude-backends`. `ST_PROXY_EXCLUDE_BACKENDS=a,b`
+leaves backends out explicitly. `st-proxy --print-backends table` shows each backend
+as available, disabled or skipped. Only one KoboldCpp backend can be in `all`. Model
+profiles name `backend/model`; a profile for a backend that is not in the file is
+skipped with a warning. `ST_STACK_<ID>_DIR` and `ST_STACK_<ID>_COMMAND` still
+override one backend's launch.
+
 ## SC117 Swift 1.5
 
 `swift` (32768 context, port 48648) and `swift_128k` (131072 context, port 48650)
-use the existing Strata adapter, lazy startup and confirmed GPU handoffs.
-`--swift-url` / `ST_PROXY_SWIFT_URL` and `--swift-128k-url` /
-`ST_PROXY_SWIFT_128K_URL` override their distinct loopback origins. Both are included
-in `all` and the stack menu. Their native ID is
+use the Strata adapter, lazy startup and confirmed GPU handoffs. Their native ID is
 `sc117-swift-1.5-qwen3.8-flash-next-gsq-rco-abliterated-iq3_xxs`;
 all-mode IDs add `swift/` or `swift_128k/`.
 
