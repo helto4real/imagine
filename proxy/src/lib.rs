@@ -5,6 +5,7 @@ pub mod coordinator;
 pub mod http;
 pub mod logging;
 pub mod profiles;
+pub mod registry;
 pub mod requests;
 pub mod routes;
 pub mod service;

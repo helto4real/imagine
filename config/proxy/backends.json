@@ -1,0 +1,149 @@
+{
+  "schema": 1,
+  "backends": [
+    {
+      "id": "koboldcpp",
+      "label": "KoboldCpp",
+      "adapter": "koboldcpp",
+      "origin": "http://127.0.0.1:5001",
+      "requires": ["~/git/cobolcpp/koboldcpp-linux-x64"],
+      "launch": {
+        "dir": "~/git/cobolcpp",
+        "command": ["./koboldcpp-linux-x64"],
+        "match": "koboldcpp-linux-x64"
+      }
+    },
+    {
+      "id": "tabbyapi",
+      "label": "TabbyAPI",
+      "adapter": "tabbyapi",
+      "origin": "http://127.0.0.1:5003",
+      "requires": ["~/git/tabby/start.sh"],
+      "launch": {
+        "dir": "~/git/tabby",
+        "command": ["./start.sh"],
+        "match": "start.sh",
+        "all_args": ["--model-name", "", "--embedding-model-name", ""]
+      }
+    },
+    {
+      "id": "prism",
+      "label": "Prism",
+      "adapter": "llama_router",
+      "origin": "http://127.0.0.1:5006",
+      "requires": ["~/git/local-model-runtimes/models/prism/bin/llama-server"],
+      "launch": {
+        "dir": "~/git/local-model-runtimes/models/prism",
+        "command": ["./start.sh"],
+        "match": "llama-server"
+      }
+    },
+    {
+      "id": "sc117",
+      "label": "Qwen SC117",
+      "adapter": "strata",
+      "origin": "http://127.0.0.1:48640",
+      "requires": [
+        "~/git/qwen-next-server/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS/packs/sc117-gsq-rco-iq3_xxs",
+        "~/git/qwen-next-server/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS/model/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS-00001-of-00002.gguf"
+      ],
+      "launch": {
+        "dir": "~/git/qwen-next-server",
+        "command": ["./start-server.sh", "--lazy", "--port", "{port}"],
+        "match": "qwen3.8-flash-next-gsq-rco-abliterated-iq3_xxs/launch.py",
+        "terminal_filter": true
+      }
+    },
+    {
+      "id": "orca",
+      "label": "Qwen Orca",
+      "adapter": "strata",
+      "enabled": false,
+      "origin": "http://127.0.0.1:48642",
+      "requires": [
+        "~/git/qwen-next-server/Qwen3.8-Flash-Next-Uncensored-IQ3_XXS/packs/orca-iq3_xxs",
+        "~/git/qwen-next-server/Qwen3.8-Flash-Next-Uncensored-IQ3_XXS/model/Qwen3.8-Flash-Next-Uncensored-IQ3_XXS-00001-of-00002.gguf"
+      ],
+      "launch": {
+        "dir": "~/git/qwen-next-server",
+        "command": ["./start-orca.sh", "--lazy", "--port", "{port}"],
+        "match": "qwen3.8-flash-next-uncensored-iq3_xxs/launch.py",
+        "terminal_filter": true
+      }
+    },
+    {
+      "id": "sc117_128k",
+      "label": "Qwen SC117 128k",
+      "adapter": "strata",
+      "origin": "http://127.0.0.1:48644",
+      "requires": [
+        "~/git/qwen-next-server/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS/packs/sc117-gsq-rco-iq3_xxs",
+        "~/git/qwen-next-server/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS/model/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS-00001-of-00002.gguf"
+      ],
+      "launch": {
+        "dir": "~/git/local-model-runtimes/models/qwen-next/sc117-128k",
+        "command": ["./start.sh", "--lazy", "--port", "{port}"],
+        "match": "launch.py"
+      }
+    },
+    {
+      "id": "orca_128k",
+      "label": "Qwen Orca 128k",
+      "adapter": "strata",
+      "enabled": false,
+      "origin": "http://127.0.0.1:48646",
+      "requires": [
+        "~/git/qwen-next-server/Qwen3.8-Flash-Next-Uncensored-IQ3_XXS/packs/orca-iq3_xxs",
+        "~/git/qwen-next-server/Qwen3.8-Flash-Next-Uncensored-IQ3_XXS/model/Qwen3.8-Flash-Next-Uncensored-IQ3_XXS-00001-of-00002.gguf"
+      ],
+      "launch": {
+        "dir": "~/git/local-model-runtimes/models/qwen-next/orca-128k",
+        "command": ["./start.sh", "--lazy", "--port", "{port}"],
+        "match": "launch.py"
+      }
+    },
+    {
+      "id": "swift",
+      "label": "Qwen SC117 Swift",
+      "adapter": "strata",
+      "origin": "http://127.0.0.1:48648",
+      "requires": [
+        "~/git/qwen-next-server/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS/packs/swift-gsq-rco-iq3_xxs",
+        "~/git/qwen-next-server/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS/model/IQ3_XXS/Swift-Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS-00001-of-00002.gguf"
+      ],
+      "launch": {
+        "dir": "~/git/qwen-next-server",
+        "command": ["./start-swift.sh", "--lazy", "--port", "{port}"],
+        "match": "swift-1.5-qwen3.8-flash-next-gsq-rco-abliterated-iq3_xxs/launch.py",
+        "terminal_filter": true
+      }
+    },
+    {
+      "id": "swift_128k",
+      "label": "Qwen SC117 Swift 128k",
+      "adapter": "strata",
+      "origin": "http://127.0.0.1:48650",
+      "requires": [
+        "~/git/qwen-next-server/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS/packs/swift-gsq-rco-iq3_xxs",
+        "~/git/qwen-next-server/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS/model/IQ3_XXS/Swift-Qwen3.8-Flash-Next-GSQ-RCO-abliterated-IQ3_XXS-00001-of-00002.gguf"
+      ],
+      "launch": {
+        "dir": "~/git/local-model-runtimes/models/qwen-next/swift-128k",
+        "command": ["./start.sh", "--lazy", "--port", "{port}"],
+        "match": "launch.py"
+      }
+    },
+    {
+      "id": "ollama",
+      "label": "Ollama",
+      "adapter": "ollama",
+      "in_all": false,
+      "origin": "http://127.0.0.1:11434",
+      "launch": {
+        "dir": "~",
+        "command": ["ollama", "serve"],
+        "match": "ollama"
+      }
+    }
+  ]
+}
