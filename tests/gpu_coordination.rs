@@ -8,23 +8,27 @@ use axum::{
 use destination::task_fixtures;
 use imagine_server::{
     api::{self, App},
-    contract::MODEL,
+    contract::{MODEL, MOSS},
     engine::{Backend, EngineFuture, EngineState},
     private_storage::Root,
-    scheduler::{self, Action},
+    scheduler::{self, Action, Control},
     storage::Store,
     video_destination as d,
 };
 use serde_json::{Value, json};
 use std::{
     io::Cursor,
+    path::{Path, PathBuf},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
 };
-use tokio::sync::{Notify, Semaphore, watch};
+use tokio::{
+    sync::{Notify, Semaphore, watch},
+    task::JoinHandle,
+};
 #[derive(Default)]
 struct Probe {
     llm: AtomicBool,
@@ -34,17 +38,24 @@ struct Probe {
     unloads: AtomicUsize,
     fail_next: AtomicBool,
     release: Notify,
+    /// Model and negative prompt of every image pass the engine received.
+    passes: Mutex<Vec<(String, String)>>,
 }
 struct Engine(Arc<Probe>);
 impl Backend for Engine {
     fn generate<'a>(
         &'a mut self,
-        _: &'a imagine_server::generation::ImagePass,
+        pass: &'a imagine_server::generation::ImagePass,
     ) -> EngineFuture<'a, Vec<u8>> {
         Box::pin(async move {
             assert!(!self.0.llm.load(Ordering::SeqCst), "LLM overlapped Imagine");
             self.0.image.store(true, Ordering::SeqCst);
             self.0.calls.fetch_add(1, Ordering::SeqCst);
+            self.0
+                .passes
+                .lock()
+                .unwrap()
+                .push((pass.model.clone(), pass.negative_prompt.clone()));
             if self.0.fail_next.swap(false, Ordering::SeqCst) {
                 return Err(imagine_server::engine::EngineError("native_generation_failed").into());
             }
@@ -80,7 +91,7 @@ async fn serve(router: Router) -> (String, tokio::task::JoinHandle<()>) {
     (u, task)
 }
 /// A private root on the owned task volume with an MCP root for workspaces.
-fn private_root(dir: &std::path::Path) -> (Root, std::path::PathBuf) {
+fn private_root(dir: &Path) -> (Root, PathBuf) {
     let root = dir.join("own-imagine");
     let mcp = dir.join("own-mcp-root");
     let runtime = dir.join("own-runtime");
@@ -102,19 +113,28 @@ fn private_root(dir: &std::path::Path) -> (Root, std::path::PathBuf) {
     assert!(ignored.is_empty());
     (root, mcp)
 }
-#[tokio::test]
-async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
-    let dir = tempfile::tempdir().unwrap();
-    assert!(task_fixtures::is_owned(dir.path()));
-    let (root, mcp_root) = private_root(dir.path());
+/// Imagine with the shipped image profiles and the fake engine, a fake LLM, and
+/// the proxy with its MCP and the GPU coordinator, all in process.
+struct Stack {
+    store: Store,
+    control: Control,
+    scheduler: JoinHandle<anyhow::Result<()>>,
+    imagine: String,
+    imagine_task: JoinHandle<()>,
+    llm_task: JoinHandle<()>,
+    running: st_proxy::service::Running,
+    socket: PathBuf,
+}
+async fn start(dir: &Path, probe: &Arc<Probe>) -> Stack {
+    assert!(task_fixtures::is_owned(dir));
+    let (root, mcp_root) = private_root(dir);
     let mut store = Store::open_private(root.clone(), "own-image-workspace".into())
         .await
         .unwrap();
     store.workspaces = Some(Arc::new(imagine_server::workspaces::Workspaces::open(
         root.rooted_at(&mcp_root).unwrap(),
     )));
-    let probe = Arc::new(Probe::default());
-    let socket = dir.path().join("gpu.sock");
+    let socket = dir.join("gpu.sock");
     let (control, scheduler) = scheduler::start_coordinated(
         store.clone(),
         Box::new(Engine(probe.clone())),
@@ -123,7 +143,11 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     .await
     .unwrap();
 
-    let (_, engine) = watch::channel(EngineState::default());
+    // The Rust backend, which MOSS requires.
+    let (_, engine) = watch::channel(EngineState {
+        backend: "rust".into(),
+        ..Default::default()
+    });
     let (imagine, imagine_task) = serve(api::router(App {
         video: control.video.clone(),
         enhancement: imagine_server::enhancement::Service::open_private(
@@ -191,7 +215,7 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     let config = st_proxy::config::Config {
         mcp_port: Some(0),
         mcp_workflows_dir: "/nonexistent/no-comfy-graphs-needed".into(),
-        mcp_output_dir: Some(dir.path().join("output").to_string_lossy().into()),
+        mcp_output_dir: Some(dir.join("output").to_string_lossy().into()),
         chat_port: 0,
         image_port: 0,
         llm_backend: "sc117".into(),
@@ -205,6 +229,31 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
         ..Default::default()
     };
     let running = st_proxy::service::Service::start(config).await.unwrap();
+    Stack {
+        store,
+        control,
+        scheduler,
+        imagine,
+        imagine_task,
+        llm_task,
+        running,
+        socket,
+    }
+}
+#[tokio::test]
+async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
+    let dir = tempfile::tempdir().unwrap();
+    let probe = Arc::new(Probe::default());
+    let Stack {
+        store,
+        control,
+        scheduler,
+        imagine,
+        imagine_task,
+        llm_task,
+        running,
+        socket,
+    } = start(dir.path(), &probe).await;
     let client = reqwest::Client::new();
     let blocked = client
         .post(format!("http://127.0.0.1:{}/prompt", running.image_port))
@@ -501,6 +550,116 @@ async fn direct_jobs_share_fifo_and_coordinator_loss_stops_gpu() {
     scheduler.await.unwrap().unwrap();
     imagine_task.abort();
     llm_task.abort();
+}
+/// MOSS is one more shipped profile to the MCP: text to image only, with the
+/// profile's default negative prompt unless the agent gives its own.
+#[tokio::test]
+async fn mcp_generates_moss_images_with_its_default_negative_prompt() {
+    let dir = tempfile::tempdir().unwrap();
+    let probe = Arc::new(Probe::default());
+    let stack = start(dir.path(), &probe).await;
+    let client = reqwest::Client::new();
+    let url = format!("http://127.0.0.1:{}/mcp", stack.running.mcp_port.unwrap());
+    let list = mcp(&client, &url, "list_profiles", json!({})).await;
+    assert!(
+        list["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["id"] == "moss"),
+        "{list}"
+    );
+    let described = mcp(&client, &url, "describe_profile", json!({"profile":"moss"})).await;
+    assert_eq!(described["references"], json!({"min":0,"max":0}));
+    assert!(described["defaults"].get("negative_prompt").is_none());
+    assert!(
+        described["prompt_guidance"]
+            .as_str()
+            .is_some_and(|g| !g.is_empty())
+    );
+    let model: Value = client
+        .get(format!("{}/v1/models/{MOSS}", stack.imagine))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let default = model["defaults"]["negative_prompt"]
+        .as_str()
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| panic!("MOSS reports no default negative prompt"))
+        .to_owned();
+    let key = mcp(
+        &client,
+        &url,
+        "workspace_create",
+        json!({"title":"Own MOSS Images"}),
+    )
+    .await["workspace_key"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let mut synthetic = Cursor::new(Vec::new());
+    image::RgbImage::new(64, 64)
+        .write_to(&mut synthetic, image::ImageFormat::Png)
+        .unwrap();
+    use base64::Engine as _;
+    let uploaded = mcp(
+        &client,
+        &url,
+        "workspace_upload",
+        json!({"workspace_key":key,"name":"synthetic.png",
+            "content_base64":base64::engine::general_purpose::STANDARD.encode(synthetic.get_ref())}),
+    )
+    .await;
+    let refused = mcp(
+        &client,
+        &url,
+        "register_image",
+        json!({"workspace_key":key,"profile":"moss","file_id":uploaded["file_id"]}),
+    )
+    .await;
+    assert_eq!(refused["error"]["category"], "validation", "{refused}");
+    for (job, parameters, negative) in [
+        (
+            "moss-default",
+            json!({"prompt":"synthetic moss"}),
+            default.as_str(),
+        ),
+        (
+            "moss-own",
+            json!({"prompt":"synthetic moss","negative_prompt":"synthetic own negative"}),
+            "synthetic own negative",
+        ),
+    ] {
+        probe.release.notify_one();
+        let result = mcp(
+            &client,
+            &url,
+            "generate",
+            json!({"workspace_key":key,"job_id":job,"profile":"moss","parameters":parameters}),
+        )
+        .await;
+        assert_eq!(result["status"], "succeeded", "{result}");
+        let public = &result["parameters"];
+        assert_eq!(public["model"], MOSS, "{result}");
+        assert_eq!(public["resolved_profile"]["id"], "moss");
+        assert!(public.get("prompt").is_none() && public.get("negative_prompt").is_none());
+        assert!(result["images"][0]["file_id"].is_string(), "{result}");
+        assert_eq!(
+            probe.passes.lock().unwrap().last().unwrap(),
+            &(MOSS.to_owned(), negative.to_owned())
+        );
+    }
+    assert_eq!(probe.calls.load(Ordering::SeqCst), 2);
+    stack.running.close().await;
+    stack.control.call(Action::Shutdown).await.unwrap();
+    stack.scheduler.await.unwrap().unwrap();
+    stack.store.close().await.unwrap();
+    stack.imagine_task.abort();
+    stack.llm_task.abort();
+    assert!(!stack.socket.exists());
 }
 
 async fn mcp(client: &reqwest::Client, url: &str, name: &str, args: Value) -> Value {
