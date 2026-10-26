@@ -7,11 +7,13 @@ use std::{
     collections::BTreeMap,
     ffi::CString,
     fs::{self, OpenOptions},
-    io::{Read, Write},
+    io::Write,
     os::{fd::AsRawFd, unix::fs::OpenOptionsExt},
     path::Path,
 };
+#[cfg(test)]
 fn read(path: &Path) -> Result<String, String> {
+    use std::io::Read;
     let mut f = OpenOptions::new()
         .read(true)
         .open(path)
@@ -23,23 +25,13 @@ fn read(path: &Path) -> Result<String, String> {
     f.read_to_string(&mut text).map_err(|e| e.to_string())?;
     Ok(text)
 }
+/// A catalog folder by Director's file rules; an empty folder can receive a first file.
 pub(super) fn load(folder: &Path, selected: Option<String>) -> Result<Loaded, String> {
-    let mut sources = BTreeMap::new();
-    for entry in fs::read_dir(folder).map_err(|e| e.to_string())? {
-        let path = entry.map_err(|e| e.to_string())?.path();
-        if path
-            .extension()
-            .and_then(|s| s.to_str())
-            .is_some_and(|s| s.eq_ignore_ascii_case("yaml") || s.eq_ignore_ascii_case("yml"))
-        {
-            let name = path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .ok_or("Catalog filename is not UTF-8.")?
-                .to_owned();
-            sources.insert(name, read(&path)?);
-        }
-    }
+    let sources = match prompt_catalog::read_folder(folder) {
+        Ok(sources) => sources,
+        Err(issue) if issue.code == "PROMPT_CATALOG_NO_FILES" => BTreeMap::new(),
+        Err(issue) => return Err(issue.to_string()),
+    };
     Ok(Loaded {
         folder: folder.into(),
         sources,
@@ -50,19 +42,26 @@ pub(super) fn load(folder: &Path, selected: Option<String>) -> Result<Loaded, St
     })
 }
 
+/// Director's catalog file names: `^[A-Za-z0-9][A-Za-z0-9._-]{0,119}\.(?:yaml|yml)$`.
+pub(super) fn catalog_filename(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    let Some(stem) = lower
+        .strip_suffix(".yaml")
+        .or_else(|| lower.strip_suffix(".yml"))
+    else {
+        return false;
+    };
+    stem.chars()
+        .next()
+        .is_some_and(|c| c.is_ascii_alphanumeric())
+        && stem.len() <= 120
+        && stem
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+}
 fn filename(name: &str) -> Result<(), String> {
-    let path = Path::new(name);
-    if path.components().count() != 1
-        || !matches!(
-            path.components().next(),
-            Some(std::path::Component::Normal(_))
-        )
-        || !path
-            .extension()
-            .and_then(|s| s.to_str())
-            .is_some_and(|s| s.eq_ignore_ascii_case("yaml") || s.eq_ignore_ascii_case("yml"))
-    {
-        return Err("Choose a YAML filename within the private catalog.".into());
+    if !catalog_filename(name) {
+        return Err("Catalog filenames must be safe YAML basenames using letters, numbers, dots, dashes, or underscores.".into());
     }
     Ok(())
 }
@@ -157,13 +156,7 @@ pub(super) fn save(
         .and_then(|s| s.to_str())
         .ok_or("Choose a YAML filename.")?
         .to_owned();
-    if !path
-        .extension()
-        .and_then(|s| s.to_str())
-        .is_some_and(|s| s.eq_ignore_ascii_case("yaml") || s.eq_ignore_ascii_case("yml"))
-    {
-        return Err("Catalog files use .yaml or .yml.".into());
-    }
+    filename(&name)?;
     let mut loaded = load(folder, None)?;
     if let Some(expected) = expected
         && loaded.sources.get(&name).map(String::as_str) != Some(expected)

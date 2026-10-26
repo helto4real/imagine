@@ -575,42 +575,9 @@ fn composer(ui: &mut egui::Ui, node: &mut Value, key: egui::Id, privacy: bool) -
     changed
 }
 
+/// The form edits Director's normalized editor document.
 pub(super) fn canonical_form(value: &mut Value) {
-    fn container(node: &mut Value) {
-        if let Some(choices) = node.get_mut("choices").and_then(Value::as_array_mut) {
-            for choice in choices {
-                let mut definitions = choice["placeholders"]
-                    .as_object()
-                    .cloned()
-                    .unwrap_or_default();
-                if let Some(segments) = choice.get_mut("segments").and_then(Value::as_array_mut) {
-                    for s in segments {
-                        if let Some(mut p) = s.get("placeholder").cloned()
-                            && let Some(id) = p["id"].as_str().map(str::to_owned)
-                        {
-                            p.as_object_mut().unwrap().remove("id");
-                            definitions.insert(id.clone(), p);
-                            *s = json!({"placeholder_ref":id});
-                        }
-                    }
-                }
-                if !definitions.is_empty() {
-                    choice["placeholders"] = json!(definitions);
-                }
-            }
-        }
-        if let Some(groups) = node.get_mut("groups").and_then(Value::as_array_mut) {
-            for g in groups {
-                container(g);
-            }
-        }
-    }
-    if let Some(nodes) = value.get_mut("namespaces").and_then(Value::as_array_mut) {
-        for n in nodes {
-            container(n);
-        }
-    }
-    value["schema_version"] = json!("1.1");
+    *value = imagine_video_contract::prompt_catalog::editor::normalize(value);
 }
 
 #[cfg(test)]

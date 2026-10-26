@@ -112,11 +112,9 @@ fn run() -> Result<()> {
         .validate()
         .map_err(|error| usage(error.to_string()))?;
     let project = project.canonicalize()?;
-    // The Director prompt catalog is read once; a restart applies edits.
+    // The Director prompt catalog is read once; a restart applies edits. As in
+    // Director, a missing or invalid catalog disables `#` completion only.
     imagine_ui::config_files::init(config_dir.unwrap_or_else(|| project.join("config")));
-    let catalog: Vec<String> = imagine_ui::video_catalog_files().collect();
-    let catalog: Vec<&str> = catalog.iter().map(String::as_str).collect();
-    imagine_ui::config_files::preload(&catalog).map_err(|error| usage(error.to_string()))?;
     // Only explicit QA inputs use the old source-owned fixture API. The normal
     // entry never reads project/.imagine/ui-settings.json or migrates user data.
     #[cfg(feature = "ui-preview")]

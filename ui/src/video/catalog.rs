@@ -52,19 +52,27 @@ pub(super) fn insertion_error(ctx: &egui::Context) {
         )
     });
 }
-fn builtins() -> &'static BTreeMap<String, String> {
-    static SOURCES: OnceLock<BTreeMap<String, String>> = OnceLock::new();
-    SOURCES.get_or_init(|| {
-        crate::VIDEO_CATALOG_FILES
-            .iter()
-            .zip(crate::video_catalog_files())
-            .filter_map(|(name, path)| {
-                crate::config_files::text(&path)
-                    .ok()
-                    .map(|text| ((*name).into(), text.into()))
-            })
-            .collect()
+/// The shipped catalog folder, read once: its files and merged catalog, or
+/// why Director would disable completion.
+type Builtins = Result<(BTreeMap<String, String>, Arc<Catalog>), String>;
+fn builtins() -> &'static Builtins {
+    static LOADED: OnceLock<Builtins> = OnceLock::new();
+    LOADED.get_or_init(|| {
+        imagine_video_contract::prompt_catalog::load_folder(&crate::video_catalog_folder())
+            .map(|(sources, catalog)| (sources, Arc::new(catalog)))
+            .map_err(|issue| format!("Prompt IntelliSense catalog is unavailable: {issue}"))
     })
+}
+/// The shipped sources and catalog, or none with the reason.
+fn shipped() -> (BTreeMap<String, String>, Arc<Catalog>, Option<String>) {
+    match builtins() {
+        Ok((sources, catalog)) => (sources.clone(), catalog.clone(), None),
+        Err(error) => (
+            BTreeMap::new(),
+            Arc::new(Catalog::default()),
+            Some(error.clone()),
+        ),
+    }
 }
 pub(super) struct State {
     pub open: bool,
@@ -94,19 +102,15 @@ pub(super) struct State {
 }
 impl Default for State {
     fn default() -> Self {
-        let sources = builtins().clone();
-        let resolved = Arc::new(
-            imagine_video_contract::prompt_catalog::load(&sources)
-                .expect("shipped catalog grammar"),
-        );
+        let (sources, resolved, error) = shipped();
         Self {
             open: false,
             busy: false,
             initialized: false,
             confirm_delete: false,
             nonce: 0,
-            selected: sources.keys().next().unwrap().clone(),
-            draft: sources.values().next().unwrap().clone(),
+            selected: sources.keys().next().cloned().unwrap_or_default(),
+            draft: sources.values().next().cloned().unwrap_or_default(),
             drafts: BTreeMap::new(),
             sources,
             resolved,
@@ -117,7 +121,7 @@ impl Default for State {
             editor: false,
             filter: String::new(),
             validation: None,
-            error: None,
+            error,
             stale: false,
             choice: None,
             values: BTreeMap::new(),
@@ -341,6 +345,12 @@ impl ImagineApp {
         state.busy = true;
         state.nonce += 1;
         let nonce = state.nonce;
+        // Saving from the Form tab merges linked @identity placeholders, as in Director.
+        if !state.yaml
+            && let Some(form) = state.form.take()
+        {
+            state.draft = imagine_video_contract::prompt_catalog::editor::form_save(&form);
+        }
         let folder = state.folder.clone();
         let name = state.selected.clone();
         let content = state.draft.clone();
@@ -708,13 +718,11 @@ let _canvas = helto::window_canvas(ui);
             } else {
                 let state = &mut self.timeline.catalog;
                 state.retain_draft();
-                state.sources = builtins().clone();
-                state.resolved = Arc::new(
-                    imagine_video_contract::prompt_catalog::load(&state.sources)
-                        .expect("shipped catalog grammar"),
-                );
+                let (sources, resolved, error) = shipped();
+                state.sources = sources;
+                state.resolved = resolved;
                 state.stale = false;
-                state.error = None;
+                state.error = error;
                 state.load_selection(state.selected.clone());
             }
         }
