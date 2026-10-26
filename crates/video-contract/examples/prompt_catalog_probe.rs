@@ -11,8 +11,18 @@ fn main() {
     let request: Value = serde_json::from_str(&input).unwrap();
     let sources: BTreeMap<String, String> =
         serde_json::from_value(request["sources"].clone()).unwrap();
+    // Canonical editor YAML for synthetic documents, independent of the sources.
+    let serialized = request["serialize"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|v| json!({"text": pc::source_text(v).unwrap(), "form": pc::editor::form_save(v)}))
+        .collect::<Vec<_>>();
     match pc::load(&sources) {
-        Err(e) => println!("{}", json!({"ok":false,"issue":e})),
+        Err(e) => println!(
+            "{}",
+            json!({"ok":false,"issue":e,"summary":e.to_string(),"serialized":serialized})
+        ),
         Ok(catalog) => {
             fn normalized(nodes: &[pc::Container]) -> Value {
                 Value::Array(nodes.iter().map(|n|{
@@ -30,7 +40,7 @@ fn main() {
             }
             let queries=request["queries"].as_array().into_iter().flatten().filter_map(Value::as_str).map(|text|{
                 let entries=pc::context(text,text.chars().count(),text.chars().count()).map(|c|catalog.completions(&c)).unwrap_or_default();
-                json!({"text":text,"items":entries.iter().map(|e|json!({"path":e.path,"label":e.label,"expansion":e.choice.as_ref().map(|c|c.expand(&BTreeMap::new()))})).collect::<Vec<_>>()})
+                json!({"text":text,"items":entries.iter().map(|e|json!({"path":e.path,"label":e.label,"detail":e.detail,"expansion":e.choice.as_ref().map(|c|c.expand(&BTreeMap::new()))})).collect::<Vec<_>>()})
             }).collect::<Vec<_>>();
             let composer = request["composer"]
                 .as_array()
@@ -54,7 +64,7 @@ fn main() {
                 .collect::<Vec<_>>();
             println!(
                 "{}",
-                json!({"ok":true,"catalog":{"schema_version":catalog.schema_version,"namespaces":normalized(&catalog.namespaces)},"queries":queries,"composer":composer,"duplicates":duplicates})
+                json!({"ok":true,"catalog":{"schema_version":catalog.schema_version,"namespaces":normalized(&catalog.namespaces)},"queries":queries,"composer":composer,"duplicates":duplicates,"serialized":serialized})
             );
         }
     }
