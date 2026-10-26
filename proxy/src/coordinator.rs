@@ -544,7 +544,14 @@ impl Coordinator {
         if self.config.kobold_router_mode
             || matches!(
                 self.config.llm_backend.as_str(),
-                "prism" | "all" | "sc117" | "orca" | "sc117_128k" | "orca_128k"
+                "prism"
+                    | "all"
+                    | "sc117"
+                    | "orca"
+                    | "sc117_128k"
+                    | "orca_128k"
+                    | "swift"
+                    | "swift_128k"
             )
         {
             if self.drain(&w.cancel, false).await.is_err() {
@@ -569,7 +576,7 @@ impl Coordinator {
             self.phase("llm_reserved")
         } else if matches!(
             self.config.llm_backend.as_str(),
-            "prism" | "sc117" | "orca" | "sc117_128k" | "orca_128k"
+            "prism" | "sc117" | "orca" | "sc117_128k" | "orca_128k" | "swift" | "swift_128k"
         ) {
             self.phase("llm_ready")
         }

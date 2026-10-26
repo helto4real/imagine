@@ -60,7 +60,7 @@ impl Backend {
     pub fn strata(&self) -> bool {
         matches!(
             self.kind.as_str(),
-            "sc117" | "orca" | "sc117_128k" | "orca_128k"
+            "sc117" | "orca" | "sc117_128k" | "orca_128k" | "swift" | "swift_128k"
         )
     }
     fn err(&self, action: &str, detail: &str) -> anyhow::Error {
@@ -968,6 +968,8 @@ impl Backends {
                 ("orca", &config.orca_url),
                 ("sc117_128k", &config.sc117_128k_url),
                 ("orca_128k", &config.orca_128k_url),
+                ("swift", &config.swift_url),
+                ("swift_128k", &config.swift_128k_url),
                 ("prism", &config.prism_url),
             ]
         } else {

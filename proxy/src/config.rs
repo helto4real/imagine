@@ -24,6 +24,8 @@ pub struct Config {
     pub orca_url: String,
     pub sc117_128k_url: String,
     pub orca_128k_url: String,
+    pub swift_url: String,
+    pub swift_128k_url: String,
     pub comfy_url: String,
     pub comfy_enabled: bool,
     pub kobold_admin_password: Option<String>,
@@ -72,6 +74,8 @@ impl Default for Config {
             orca_url: "http://127.0.0.1:48642".into(),
             sc117_128k_url: "http://127.0.0.1:48644".into(),
             orca_128k_url: "http://127.0.0.1:48646".into(),
+            swift_url: "http://127.0.0.1:48648".into(),
+            swift_128k_url: "http://127.0.0.1:48650".into(),
             comfy_url: "http://127.0.0.1:8189".into(),
             comfy_enabled: true,
             kobold_admin_password: None,
@@ -107,6 +111,8 @@ pub const KINDS: &[&str] = &[
     "orca",
     "sc117_128k",
     "orca_128k",
+    "swift",
+    "swift_128k",
     "prism",
     "tabbyapi",
     "all",
@@ -121,6 +127,8 @@ pub fn label(kind: &str) -> &str {
         "orca" => "Qwen Orca",
         "sc117_128k" => "Qwen SC117 128k",
         "orca_128k" => "Qwen Orca 128k",
+        "swift" => "Qwen SC117 Swift",
+        "swift_128k" => "Qwen SC117 Swift 128k",
         "all" => "LLM backends",
         _ => kind,
     }
@@ -135,6 +143,8 @@ pub fn default_origin(kind: &str) -> Result<String> {
         "orca" => 48642,
         "sc117_128k" => 48644,
         "orca_128k" => 48646,
+        "swift" => 48648,
+        "swift_128k" => 48650,
         _ => bail!(
             "unsupported LLM backend {kind:?}; choose one of: {}",
             KINDS.join(", ")
@@ -258,11 +268,13 @@ impl Config {
             &mut self.orca_url,
             &mut self.sc117_128k_url,
             &mut self.orca_128k_url,
+            &mut self.swift_url,
+            &mut self.swift_128k_url,
         ] {
             *url = normalize_origin(url)?;
             origins.insert(url.clone());
         }
-        if self.llm_backend == "all" && origins.len() != 7 {
+        if self.llm_backend == "all" && origins.len() != 9 {
             bail!("all backends require distinct upstream origins")
         }
         self.comfy_url = normalize_origin(&self.comfy_url)?;

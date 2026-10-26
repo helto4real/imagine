@@ -27,7 +27,12 @@ async fn run() -> Result<()> {
         let help = include_str!("../reference/cli-help.txt")
             .replace("                [--imagine-access-file IMAGINE_ACCESS_FILE]\n", "")
             .replace("  --imagine-access-file IMAGINE_ACCESS_FILE\n                        operator-owned Imagine access.json for MCP assets and\n                        GPU release\n", "");
+        let help = help.replace(
+            "sc117_128k,orca_128k,prism",
+            "sc117_128k,orca_128k,swift,swift_128k,prism",
+        );
         print!("{help}");
+        println!("  --swift-url SWIFT_URL\n  --swift-128k-url SWIFT_128K_URL");
         println!(
             "\n  --comfy-enabled true|false\n                        enable Comfy routes and GPU cleanup (binary default: true; root launcher: false)\n  --config CONFIG       editable configuration root (MCP texts under mcp/)"
         );

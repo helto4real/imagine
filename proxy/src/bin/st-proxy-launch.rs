@@ -166,6 +166,15 @@ mod tests {
         }
         let p = plan(vec!["--llm-b=orca_128k".into()], env()).unwrap();
         assert_eq!(p.env["ST_PROXY_LLM_URL"], "http://127.0.0.1:48646");
+        for (kind, port) in [("swift", 48648), ("swift_128k", 48650)] {
+            let p = plan(vec![format!("--llm-b={kind}")], env()).unwrap();
+            assert!(!p.direct);
+            assert_eq!(
+                p.env["ST_PROXY_LLM_URL"],
+                format!("http://127.0.0.1:{port}")
+            );
+            assert_eq!(p.env["ST_PROXY_LLM_BACKEND"], kind);
+        }
     }
     #[test]
     fn explicit_origin_and_stack_controls_survive() {

@@ -34,6 +34,37 @@
       "notes": "Qwen recommendations inherited by this derivative; no separate sampling recommendation found. Coding/agent starting point, not a locally benchmarked optimum. Frequency penalty 0 is a neutral project default. Mode-specific defaults require an explicit, unambiguous thinking control. No reasoning level, budget or output limit is set."
     },
     {
+      "id": "qwen-flash-next-sc117-swift",
+      "models": [
+        "swift/sc117-swift-1.5-qwen3.8-flash-next-gsq-rco-abliterated-iq3_xxs",
+        "swift_128k/sc117-swift-1.5-qwen3.8-flash-next-gsq-rco-abliterated-iq3_xxs"
+      ],
+      "defaults": {
+        "top_k": 20,
+        "repetition_penalty": 1.0,
+        "frequency_penalty": 0.0,
+        "min_p": 0.0
+      },
+      "sources": [
+        "https://huggingface.co/SC117/Swift-1.5-Qwen3.8-Flash-Next-GSQ-RCO-abliterated-GGUF/tree/3db919a964b1f0ae0d1000ba7be90b3e38b1f7a3",
+        "https://huggingface.co/Qwen/Qwen3.8-Flash-Next"
+      ],
+      "checked_at": "2026-10-26",
+      "notes": "SC117 Swift recommended thinking sampling; existing Qwen non-thinking profile retained. The Swift runtime defaults to high (mapped to xhigh); explicit caller controls win. Existing output limits and runtime budgets are retained.",
+      "thinking": {
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "min_p": 0.0,
+        "presence_penalty": 0.0
+      },
+      "non_thinking": {
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "min_p": 0.0,
+        "presence_penalty": 1.5
+      }
+    },
+    {
       "id": "qwen-flash-next-orca",
       "models": [
         "orca/orcarouter-qwen3.8-flash-next-uncensored-iq3_xxs",

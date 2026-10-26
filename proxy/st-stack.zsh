@@ -48,12 +48,16 @@ configure_llm_backend() {
             # Do not inherit a KoboldCpp-only mode into the selected adapter.
             export ST_PROXY_KOBOLD_ROUTER_MODE=false
             ;;
-        sc117|orca)
+        sc117|orca|swift)
             LLM_DEFAULT_DIR="${HOME}/git/qwen-next-server"
             if [[ "${LLM_BACKEND}" == sc117 ]]; then
                 LLM_LABEL="Qwen SC117"
                 LLM_DEFAULT_URL="${ST_PROXY_SC117_URL:-http://127.0.0.1:48640}"
                 LLM_DEFAULT_COMMAND="./start-server.sh --lazy"
+            elif [[ "${LLM_BACKEND}" == swift ]]; then
+                LLM_LABEL="Qwen SC117 Swift"
+                LLM_DEFAULT_URL="${ST_PROXY_SWIFT_URL:-http://127.0.0.1:48648}"
+                LLM_DEFAULT_COMMAND="./start-swift.sh --lazy"
             else
                 LLM_LABEL="Qwen Orca"
                 LLM_DEFAULT_URL="${ST_PROXY_ORCA_URL:-http://127.0.0.1:48642}"
@@ -61,12 +65,15 @@ configure_llm_backend() {
             fi
             export ST_PROXY_KOBOLD_ROUTER_MODE=false
             ;;
-        sc117_128k|orca_128k)
+        sc117_128k|orca_128k|swift_128k)
             LLM_DEFAULT_DIR="${HOME}/git/local-model-runtimes/models/qwen-next/${LLM_BACKEND/_/-}"
             LLM_DEFAULT_COMMAND="./start.sh --lazy"
             if [[ "${LLM_BACKEND}" == sc117_128k ]]; then
                 LLM_LABEL="Qwen SC117 128k"
                 LLM_DEFAULT_URL="${ST_PROXY_SC117_128K_URL:-http://127.0.0.1:48644}"
+            elif [[ "${LLM_BACKEND}" == swift_128k ]]; then
+                LLM_LABEL="Qwen SC117 Swift 128k"
+                LLM_DEFAULT_URL="${ST_PROXY_SWIFT_128K_URL:-http://127.0.0.1:48650}"
             else
                 LLM_LABEL="Qwen Orca 128k"
                 LLM_DEFAULT_URL="${ST_PROXY_ORCA_128K_URL:-http://127.0.0.1:48646}"
@@ -104,11 +111,13 @@ configure_llm_backend() {
     if [[ "${LLM_BACKEND}" == prism ]] && (( ! LLM_COMMAND_EXPLICIT )); then
         LLM_COMMAND_NAME="llama-server"
     fi
-    if [[ "${LLM_BACKEND}" == sc117 || "${LLM_BACKEND}" == orca ]]; then
+    if [[ "${LLM_BACKEND}" == sc117 || "${LLM_BACKEND}" == orca || "${LLM_BACKEND}" == swift ]]; then
         # The scripts exec their model-specific Python launcher in this directory.
         if (( ! LLM_COMMAND_EXPLICIT )); then
             if [[ "${LLM_BACKEND}" == sc117 ]]; then
                 LLM_COMMAND_NAME="qwen3.8-flash-next-gsq-rco-abliterated-iq3_xxs/launch.py"
+            elif [[ "${LLM_BACKEND}" == swift ]]; then
+                LLM_COMMAND_NAME="swift-1.5-qwen3.8-flash-next-gsq-rco-abliterated-iq3_xxs/launch.py"
             else
                 LLM_COMMAND_NAME="qwen3.8-flash-next-uncensored-iq3_xxs/launch.py"
             fi
@@ -117,7 +126,7 @@ configure_llm_backend() {
             fi
         fi
     fi
-    if [[ "${LLM_BACKEND}" == sc117_128k || "${LLM_BACKEND}" == orca_128k ]] && (( ! LLM_COMMAND_EXPLICIT )); then
+    if [[ "${LLM_BACKEND}" == sc117_128k || "${LLM_BACKEND}" == orca_128k || "${LLM_BACKEND}" == swift_128k ]] && (( ! LLM_COMMAND_EXPLICIT )); then
         LLM_COMMAND_NAME="launch.py"
         if [[ "${LLM_URL}" =~ '^https?://[^/:]+:([0-9]+)(/.*)?$' ]]; then
             LLM_COMMAND+=(--port "${match[1]}")
@@ -166,6 +175,8 @@ with_llm_backend() (
         orca) export ST_PROXY_LLM_URL="${ST_PROXY_ORCA_URL:-http://127.0.0.1:48642}" ;;
         sc117_128k) export ST_PROXY_LLM_URL="${ST_PROXY_SC117_128K_URL:-http://127.0.0.1:48644}" ;;
         orca_128k) export ST_PROXY_LLM_URL="${ST_PROXY_ORCA_128K_URL:-http://127.0.0.1:48646}" ;;
+        swift) export ST_PROXY_LLM_URL="${ST_PROXY_SWIFT_URL:-http://127.0.0.1:48648}" ;;
+        swift_128k) export ST_PROXY_LLM_URL="${ST_PROXY_SWIFT_128K_URL:-http://127.0.0.1:48650}" ;;
     esac
     configure_llm_backend || return 1
     if [[ "${LLM_URL}" =~ '^https?://[^/:]+:([0-9]+)(/.*)?$' ]]; then
@@ -515,7 +526,7 @@ service_running() {
 llm_ready() {
     if [[ "${LLM_BACKEND}" == all ]]; then
         local engine
-        for engine in koboldcpp tabbyapi prism sc117 orca sc117_128k orca_128k; do
+        for engine in koboldcpp tabbyapi prism sc117 orca sc117_128k orca_128k swift swift_128k; do
             with_llm_backend "${engine}" llm_ready || return 1
         done
         return 0
@@ -708,7 +719,7 @@ launch_in_directory() {
         setsid zsh -c 'cd -- "$1" || exit 1; shift; exec "$@"' \
             st-stack-child "${directory}" "$@" >/dev/null 2>&1 &
     elif [[ "${service}" == llm && ( "${LLM_BACKEND}" == sc117 || \
-            "${LLM_BACKEND}" == orca ) && -z "${NO_COLOR:-}" && \
+            "${LLM_BACKEND}" == orca || "${LLM_BACKEND}" == swift ) && -z "${NO_COLOR:-}" && \
             "${TERM:-}" != dumb ]] && { [[ -t 1 ]] || [[ -t 2 ]]; }; then
         # Filters share the backend's process group; exec preserves its tracked PID.
         # Only terminal streams are filtered. Redirected streams stay untouched.
@@ -733,7 +744,7 @@ ensure_service_started() {
 
     if [[ "${service}" == llm && "${LLM_BACKEND}" == all ]]; then
         local engine
-        for engine in koboldcpp tabbyapi prism sc117 orca sc117_128k orca_128k; do
+        for engine in koboldcpp tabbyapi prism sc117 orca sc117_128k orca_128k swift swift_128k; do
             with_llm_backend "${engine}" ensure_service_started llm || return 1
         done
         return 0
@@ -798,6 +809,8 @@ ensure_service_started() {
                 --orca-url "${ST_PROXY_ORCA_URL:-http://127.0.0.1:48642}" \
                 --sc117-128k-url "${ST_PROXY_SC117_128K_URL:-http://127.0.0.1:48644}" \
                 --orca-128k-url "${ST_PROXY_ORCA_128K_URL:-http://127.0.0.1:48646}" \
+                --swift-url "${ST_PROXY_SWIFT_URL:-http://127.0.0.1:48648}" \
+                --swift-128k-url "${ST_PROXY_SWIFT_128K_URL:-http://127.0.0.1:48650}" \
                 --comfy-url "${COMFY_URL}" \
                 --chat-port "${PROXY_CHAT_PORT}" \
                 --image-port "${PROXY_IMAGE_PORT}" \
@@ -953,7 +966,7 @@ stop_service() {
 
     if [[ "${service}" == llm && "${LLM_BACKEND}" == all ]]; then
         local engine result=0
-        for engine in koboldcpp tabbyapi prism sc117 orca sc117_128k orca_128k; do
+        for engine in koboldcpp tabbyapi prism sc117 orca sc117_128k orca_128k swift swift_128k; do
             with_llm_backend "${engine}" stop_service llm || result=1
         done
         return ${result}
@@ -1181,7 +1194,7 @@ main() {
     elif [[ -z "${ST_PROXY_LLM_BACKEND:-}" ]]; then
         local choice
         while true; do
-            print -nru2 -- "Select LLM backend: 1) KoboldCpp  2) TabbyAPI  3) Prism  4) Qwen SC117  5) Qwen Orca  6) Qwen SC117 128k  7) Qwen Orca 128k [Enter: all]: "
+            print -nru2 -- "Select LLM backend: 1) KoboldCpp  2) TabbyAPI  3) Prism  4) Qwen SC117  5) Qwen Orca  6) Qwen SC117 128k  7) Qwen Orca 128k  8) Qwen SC117 Swift  9) Qwen SC117 Swift 128k [Enter: all]: "
             IFS= read -r choice || choice=""
             case "${choice}" in
                 "") LLM_BACKEND=all; break ;;
@@ -1192,7 +1205,9 @@ main() {
                 5) LLM_BACKEND=orca; break ;;
                 6) LLM_BACKEND=sc117_128k; break ;;
                 7) LLM_BACKEND=orca_128k; break ;;
-                *) log "enter 1, 2, 3, 4, 5, 6, 7 or leave empty for all" ;;
+                8) LLM_BACKEND=swift; break ;;
+                9) LLM_BACKEND=swift_128k; break ;;
+                *) log "enter 1, 2, 3, 4, 5, 6, 7, 8, 9 or leave empty for all" ;;
             esac
         done
     fi

@@ -10,7 +10,14 @@ const BUDGET: &[&str] = &[
     "thinking_token_budget",
     "thinking_budget_tokens",
 ];
-const STRATA: &[&str] = &["sc117", "orca", "sc117_128k", "orca_128k"];
+const STRATA: &[&str] = &[
+    "sc117",
+    "orca",
+    "sc117_128k",
+    "orca_128k",
+    "swift",
+    "swift_128k",
+];
 #[derive(Clone, Default)]
 pub struct Profiles {
     models: HashMap<String, Value>,

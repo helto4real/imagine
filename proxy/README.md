@@ -44,7 +44,7 @@ cd /home/thhel/ChatGPT/imagine
 
 Proxy CLI options and unambiguous abbreviations configure the supervised stack too: `./start-proxy.sh --llm-b sc117 --chat-port 5002` starts that backend and the proxy. Use `--proxy-only` to connect to independently managed backends without starting them. `--help` lists existing CLI options plus the integration options. The usual `ST_PROXY_*` variables work; the new ones are `ST_PROXY_COORDINATOR_SOCKET` and `ST_PROXY_IMAGINE_URL`. `ST_PROXY_MCP_TOKEN` remains environment-only. Tokens are not logged.
 
-Use `--llm-backend koboldcpp|tabbyapi|ollama|prism|sc117|orca|sc117_128k|orca_128k|all` and the corresponding origin options. `all` exposes `backend/model` IDs and requires distinct origins. Kobold router mode retains `--kobold-router-mode`, admin password, bootstrap/cache and default-model behavior. `--model-profiles "$PWD/config/proxy/model-profiles.json"` enables the copied profiles. `--check-backend` validates the selected backend without starting listeners.
+Use `--llm-backend koboldcpp|tabbyapi|ollama|prism|sc117|orca|sc117_128k|orca_128k|swift|swift_128k|all` and the corresponding origin options. `all` exposes `backend/model` IDs and requires distinct origins. Kobold router mode retains `--kobold-router-mode`, admin password, bootstrap/cache and default-model behavior. `--model-profiles "$PWD/config/proxy/model-profiles.json"` enables the copied profiles. `--check-backend` validates the selected backend without starting listeners.
 
 `proxy/st-stack.zsh` preserves the original stack's menus, backend choices, colors, cleanup, TTS and SillyTavern options. Build first with `cargo build --release -p st-proxy --bins`, export the integration variables above, and start Imagine separately before launching this script. Its listener ports match the root launcher; inspect its environment options for other stack settings. It does not own the separate Imagine process. The Kobold bootstrap and Strata log filter are Rust binaries. No other stack launch scripts are replaced.
 
@@ -206,3 +206,25 @@ partials remain there. Metadata, normalization and HTTP upload/download use RAM.
 Preview paths remain available for the MCP contract, so normalized previews are kept
 only in this encrypted process cache. Historical plaintext cache/session files are not
 inspected, migrated or deleted by this implementation.
+
+## SC117 Swift 1.5
+
+`swift` (32768 context, port 48648) and `swift_128k` (131072 context, port 48650)
+use the existing Strata adapter, lazy startup and confirmed GPU handoffs.
+`--swift-url` / `ST_PROXY_SWIFT_URL` and `--swift-128k-url` /
+`ST_PROXY_SWIFT_128K_URL` override their distinct loopback origins. Both are included
+in `all` and the stack menu. Their native ID is
+`sc117-swift-1.5-qwen3.8-flash-next-gsq-rco-abliterated-iq3_xxs`;
+all-mode IDs add `swift/` or `swift_128k/`.
+
+The pinned installation is in `~/git/qwen-next-server`; the 128k launcher is in
+`~/git/local-model-runtimes/models/qwen-next/swift-128k`. Weights and native pack
+are in `~/models/strata-sc117-swift-1.5-qwen3.8-flash-next-gsq-rco-iq3_xxs`.
+The exact-model sampling profile follows the Swift model card; explicit caller
+settings win. The runtime defaults to high (Qwen xhigh), with existing context,
+memory and output limits. Passive catalog requests do not load the model.
+
+Run the focused synthetic adapter tests with `cargo test --release --locked
+--offline -p st-proxy --test swift`. Prepare the updated proxy through
+`python3 tools/product_build.py prepare proxy`; an existing process keeps its
+old binary until explicitly restarted through `start-proxy.sh`.
