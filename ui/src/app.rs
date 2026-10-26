@@ -602,7 +602,7 @@ impl ImagineApp {
                     &state.character_description,
                     &state.clothing_description,
                     self.prefs.sheet_width,
-                    &self.prefs.negative_prompt,
+                    self.prefs.negative_prompt(),
                     &refs,
                     metadata,
                     &self.prefs.generation,
@@ -610,7 +610,7 @@ impl ImagineApp {
             } else {
                 client::make_request(
                     &state.prompt,
-                    &self.prefs.negative_prompt,
+                    self.prefs.negative_prompt(),
                     &refs,
                     metadata,
                     &self.prefs.generation,

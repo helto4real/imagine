@@ -42,8 +42,6 @@ pub struct Preferences {
     #[serde(default = "privacy_default")]
     pub privacy_mode: bool,
     #[serde(default)]
-    pub negative_prompt: String,
-    #[serde(default)]
     pub prompt_catalog_folder: Option<PathBuf>,
     #[serde(default)]
     pub preferred_prompt_profile: Option<String>,
@@ -228,6 +226,10 @@ impl Default for PublicUi {
 struct PublicGroup {
     variant: String,
     loras: Vec<LoraSetting>,
+    /// A default prompt, not the user's own writing; absent in files saved
+    /// while it was one private value for every model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    negative_prompt: Option<String>,
 }
 #[derive(Serialize, Deserialize)]
 struct Selection {
@@ -238,6 +240,9 @@ struct Selection {
 #[serde(default)]
 struct PrivateUi {
     output_folder: PathBuf,
+    /// The one negative prompt for every model saved before it moved to each
+    /// model's public settings; read to carry it over, never written.
+    #[serde(skip_serializing)]
     negative_prompt: String,
     prompt_catalog_folder: Option<PathBuf>,
     preferred_prompt_profile: Option<String>,
@@ -360,6 +365,10 @@ impl PreferencesStore {
                                     .enhancement_profiles
                                     .get(name)
                                     .cloned(),
+                                negative_prompt: g
+                                    .negative_prompt
+                                    .clone()
+                                    .unwrap_or_else(|| private_prefs.negative_prompt.clone()),
                             },
                         )
                     })
@@ -372,13 +381,26 @@ impl PreferencesStore {
                 .or_default()
                 .enhancement_profile_id = Some(profile.clone());
         }
+        // The earlier single negative prompt applied to every model.
+        if !private_prefs.negative_prompt.is_empty() {
+            for group in [
+                crate::model_catalog::QWEN_GROUP,
+                crate::model_catalog::MOSS_GROUP,
+            ] {
+                model_groups
+                    .entry(group.into())
+                    .or_insert_with(|| ModelGroupSettings {
+                        negative_prompt: private_prefs.negative_prompt.clone(),
+                        ..Default::default()
+                    });
+            }
+        }
         Ok((
             Preferences {
                 model_group: selection.map_or_else(default_model_group, |s| s.model_group),
                 model_groups,
                 output_folder: private_prefs.output_folder,
                 privacy_mode: public.privacy_mode,
-                negative_prompt: private_prefs.negative_prompt,
                 prompt_catalog_folder: private_prefs.prompt_catalog_folder,
                 preferred_prompt_profile: private_prefs.preferred_prompt_profile,
                 generation: public.generation,
@@ -402,7 +424,7 @@ impl PreferencesStore {
             .map_err(|error| anyhow::anyhow!("Private preferences unavailable: {error}"))?;
         let private = PrivateUi {
             output_folder: prefs.output_folder.clone(),
-            negative_prompt: prefs.negative_prompt.clone(),
+            negative_prompt: String::new(),
             prompt_catalog_folder: prefs.prompt_catalog_folder.clone(),
             preferred_prompt_profile: prefs.preferred_prompt_profile.clone(),
             enhancement_profiles: prefs
@@ -429,6 +451,7 @@ impl PreferencesStore {
                         PublicGroup {
                             variant: g.variant.clone(),
                             loras: g.loras.clone(),
+                            negative_prompt: Some(g.negative_prompt.clone()),
                         },
                     )
                 })
@@ -456,6 +479,19 @@ impl PreferencesStore {
     }
 }
 impl Preferences {
+    /// The selected model's negative prompt.
+    pub fn negative_prompt(&self) -> &str {
+        self.model_groups
+            .get(&self.model_group)
+            .map_or("", |g| g.negative_prompt.as_str())
+    }
+    pub fn negative_prompt_mut(&mut self) -> &mut String {
+        &mut self
+            .model_groups
+            .entry(self.model_group.clone())
+            .or_default()
+            .negative_prompt
+    }
     /// Explicit source-owned fixture API. Normal entry uses PreferencesStore::system.
     pub fn load(project: &Path) -> Result<Self> {
         let path = project.join(".imagine/ui-settings.json");
@@ -465,7 +501,6 @@ impl Preferences {
                 model_groups: Default::default(),
                 output_folder: project.join(".imagine/images"),
                 privacy_mode: true,
-                negative_prompt: String::new(),
                 prompt_catalog_folder: None,
                 preferred_prompt_profile: None,
                 generation: GenerationSettings::default(),
@@ -905,10 +940,15 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let p = Preferences {
             model_group: default_model_group(),
-            model_groups: Default::default(),
+            model_groups: std::collections::BTreeMap::from([(
+                default_model_group(),
+                ModelGroupSettings {
+                    negative_prompt: "  artifacts, suddig\nextra fingrar  ".into(),
+                    ..Default::default()
+                },
+            )]),
             output_folder: root.path().join("pictures"),
             privacy_mode: false,
-            negative_prompt: "  artifacts, suddig\nextra fingrar  ".into(),
             prompt_catalog_folder: Some(root.path().join("own-catalog")),
             preferred_prompt_profile: Some("own custom profile".into()),
             sheet_width: 1536,
@@ -945,7 +985,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let defaults = Preferences::load(root.path()).unwrap();
         assert!(defaults.privacy_mode);
-        assert!(defaults.negative_prompt.is_empty());
+        assert!(defaults.negative_prompt().is_empty());
         defaults.save(root.path()).unwrap();
         let folder = root.path().join("existing-pictures");
         std::fs::write(
@@ -956,7 +996,7 @@ mod tests {
         let loaded = Preferences::load(root.path()).unwrap();
         assert_eq!(loaded.output_folder, folder);
         assert!(loaded.privacy_mode);
-        assert!(loaded.negative_prompt.is_empty());
+        assert!(loaded.negative_prompt().is_empty());
         assert_eq!(loaded.generation, GenerationSettings::default());
         let previous: GenerationSettings = serde_json::from_value(serde_json::json!({
             "steps": 24, "max_side": 1024
@@ -977,6 +1017,8 @@ pub struct ModelGroupSettings {
     pub variant: String,
     pub loras: Vec<LoraSetting>,
     pub enhancement_profile_id: Option<String>,
+    /// This model's default negative prompt.
+    pub negative_prompt: String,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LoraSetting {
@@ -1052,7 +1094,6 @@ mod storage_tests {
         )
         .unwrap();
         let mut prefs = initial;
-        prefs.negative_prompt = "OWN PRIVATE NEGATIVE".into();
         prefs.output_folder = private.layout().root().join("projects/own/outputs/images");
         prefs.prompt_catalog_folder = Some(private.layout().library().join("OWN PRIVATE CATALOG"));
         prefs.preferred_prompt_profile = Some("OWN PRIVATE PROMPT PROFILE".into());
@@ -1067,6 +1108,7 @@ mod storage_tests {
                     enabled: true,
                 }],
                 enhancement_profile_id: Some("OWN PRIVATE PROVIDER PROFILE".into()),
+                negative_prompt: "own default negative".into(),
             },
         );
         store.save(&prefs).unwrap();
@@ -1080,7 +1122,6 @@ mod storage_tests {
             let text = String::from_utf8(bytes).unwrap();
             for private in [
                 "OWN PRIVATE",
-                "negative_prompt",
                 "output_folder",
                 "prompt_catalog_folder",
                 "preferred_prompt_profile",
@@ -1089,12 +1130,16 @@ mod storage_tests {
                 assert!(!text.contains(private), "private field leaked: {private}");
             }
         }
-        let private_bytes = private.read(Path::new(PRIVATE_UI)).unwrap().unwrap();
+        // The negative prompt is each model's default prompt: public, not on the private volume.
         assert!(
-            String::from_utf8(private_bytes)
+            String::from_utf8(std::fs::read(&paths.models).unwrap())
                 .unwrap()
-                .contains("OWN PRIVATE NEGATIVE")
+                .contains("own default negative")
         );
+        let private_bytes = private.read(Path::new(PRIVATE_UI)).unwrap().unwrap();
+        let private_text = String::from_utf8(private_bytes).unwrap();
+        assert!(private_text.contains("OWN PRIVATE PROMPT PROFILE"));
+        assert!(!private_text.contains("negative"));
         assert_eq!(
             std::fs::read(&legacy).unwrap(),
             b"Own deliberately invalid legacy fixture; must not be read"
@@ -1102,13 +1147,63 @@ mod storage_tests {
         let public_before = std::fs::read(&paths.ui).unwrap();
         let models_before = std::fs::read(&paths.models).unwrap();
         env.0.lock().unwrap().clear();
-        prefs.negative_prompt = "OWN UNSAVED RAM VALUE".into();
+        *prefs.negative_prompt_mut() = "OWN UNSAVED RAM VALUE".into();
         assert!(store.save(&prefs).is_err());
-        assert_eq!(prefs.negative_prompt, "OWN UNSAVED RAM VALUE");
+        assert_eq!(prefs.negative_prompt(), "OWN UNSAVED RAM VALUE");
         assert_eq!(std::fs::read(&paths.ui).unwrap(), public_before);
         assert_eq!(std::fs::read(&paths.models).unwrap(), models_before);
         let (_, warning) = store.load().unwrap();
         assert!(warning.unwrap().contains("Private preferences unavailable"));
+    }
+    #[test]
+    fn the_earlier_single_negative_prompt_becomes_each_models_public_setting() {
+        let own = own();
+        let home = own.path().join("home");
+        let (private, _env) = volume(own.path());
+        // As saved while one private negative prompt applied to every model.
+        private
+            .write(
+                Path::new(PRIVATE_UI),
+                br#"{"negative_prompt":"own earlier negative","preferred_prompt_profile":"own profile"}"#,
+            )
+            .unwrap();
+        let store = PreferencesStore::for_home(
+            &home,
+            own.path().join("runtime/imagine"),
+            Ok(private.clone()),
+        );
+        let (mut prefs, _) = store.load().unwrap();
+        for group in [
+            crate::model_catalog::QWEN_GROUP,
+            crate::model_catalog::MOSS_GROUP,
+        ] {
+            assert_eq!(
+                prefs.model_groups[group].negative_prompt,
+                "own earlier negative"
+            );
+        }
+        // Each model keeps its own value from now on.
+        prefs.model_group = crate::model_catalog::MOSS_GROUP.into();
+        *prefs.negative_prompt_mut() = "own moss negative".into();
+        store.save(&prefs).unwrap();
+        let paths = crate::storage_layout::PublicPaths::for_home(&home);
+        let models = String::from_utf8(std::fs::read(&paths.models).unwrap()).unwrap();
+        assert!(models.contains("own earlier negative") && models.contains("own moss negative"));
+        let private_text =
+            String::from_utf8(private.read(Path::new(PRIVATE_UI)).unwrap().unwrap()).unwrap();
+        assert!(!private_text.contains("negative"));
+        assert!(private_text.contains("own profile"));
+        let (loaded, _) = store.load().unwrap();
+        assert_eq!(loaded.negative_prompt(), "own moss negative");
+        assert_eq!(
+            loaded.model_groups[crate::model_catalog::QWEN_GROUP].negative_prompt,
+            "own earlier negative"
+        );
+        // An emptied value stays empty.
+        let mut cleared = loaded;
+        cleared.negative_prompt_mut().clear();
+        store.save(&cleared).unwrap();
+        assert_eq!(store.load().unwrap().0.negative_prompt(), "");
     }
     #[test]
     fn unavailable_private_root_keeps_public_loadable_but_never_claims_save_success() {
@@ -1119,9 +1214,9 @@ mod storage_tests {
         let (mut prefs, warning) = store.load().unwrap();
         assert!(warning.unwrap().contains("video_volume_not_mounted"));
         assert!(prefs.output_folder.as_os_str().is_empty());
-        prefs.negative_prompt = "OWN RAM ONLY".into();
+        *prefs.negative_prompt_mut() = "OWN RAM ONLY".into();
         assert!(store.save(&prefs).is_err());
-        assert_eq!(prefs.negative_prompt, "OWN RAM ONLY");
+        assert_eq!(prefs.negative_prompt(), "OWN RAM ONLY");
         assert!(!home.join(".config").exists());
     }
 }

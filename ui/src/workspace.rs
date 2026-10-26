@@ -984,12 +984,14 @@ impl ImagineApp {
                             .show(ui, |ui| {
                                 ui.set_width(ui.available_width());
                                 egui::CollapsingHeader::new("Negative prompt").show(ui, |ui| {
+                                    // The selected model's own negative prompt.
+                                    let privacy = self.prefs.privacy_mode;
                                     if helto::textarea(
                                         ui,
-                                        &mut self.prefs.negative_prompt,
+                                        self.prefs.negative_prompt_mut(),
                                         3,
                                         "negative-prompt",
-                                        self.prefs.privacy_mode,
+                                        privacy,
                                         false,
                                     )
                                     .changed()

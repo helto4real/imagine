@@ -173,7 +173,7 @@ impl ImagineApp {
             .map(|prompt| {
                 let request = self.apply_model_selection(client::make_request(
                     prompt,
-                    &self.prefs.negative_prompt,
+                    self.prefs.negative_prompt(),
                     &references,
                     metadata,
                     &self.prefs.generation,
@@ -569,7 +569,6 @@ impl ImagineApp {
         });
         self.image.prompt = snapshot.prompt;
         self.image.references = snapshot.references;
-        self.prefs.negative_prompt = snapshot.preferences.negative_prompt;
         self.prefs.generation = snapshot.preferences.generation;
         self.prefs.model_group = snapshot.preferences.model_group;
         let group_settings = snapshot
@@ -596,7 +595,6 @@ impl ImagineApp {
         self.image.references = previous.references;
         // Only what Reuse settings changed; later preference changes stay.
         let before = previous.preferences;
-        self.prefs.negative_prompt = before.negative_prompt;
         self.prefs.generation = before.generation;
         self.prefs.model_group = before.model_group;
         self.prefs.model_groups = before.model_groups;

@@ -122,7 +122,7 @@ impl ImagineApp {
             .collect::<Vec<_>>();
         client::make_edit_request(
             &self.edit.desk.prompt,
-            &self.prefs.negative_prompt,
+            self.prefs.negative_prompt(),
             client::EditSource {
                 asset_id: &source.asset_id,
                 width: width as u32,

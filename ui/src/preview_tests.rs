@@ -368,12 +368,12 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
     assert!(!negative.is_disabled());
     let negative = negative.bounds().unwrap();
     replace(&mut desk, negative, "Next negative prompt");
-    assert_eq!(desk.app.prefs.negative_prompt, "Next negative prompt");
+    assert_eq!(desk.app.prefs.negative_prompt(), "Next negative prompt");
     // Typing is saved once the field is left, not on every keystroke.
     assert_ne!(
         Preferences::load(desk._root.path())
             .unwrap()
-            .negative_prompt,
+            .negative_prompt(),
         "Next negative prompt"
     );
     desk.frame(vec![egui::Event::Key {
@@ -386,7 +386,7 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
     assert_eq!(
         Preferences::load(desk._root.path())
             .unwrap()
-            .negative_prompt,
+            .negative_prompt(),
         "Next negative prompt"
     );
     desk.click("Settings");
@@ -458,7 +458,7 @@ fn editing_next_prompt_and_settings_does_not_change_the_running_job() {
         .unwrap();
     desk.app.receive(&desk.ctx);
     assert_eq!(desk.app.image.prompt, "Next prompt");
-    assert_eq!(desk.app.prefs.negative_prompt, "Next negative prompt");
+    assert_eq!(desk.app.prefs.negative_prompt(), "Next negative prompt");
     assert_eq!(desk.app.prefs.generation.steps, 24);
     assert_eq!(desk.app.prefs.output_folder, new_folder);
     assert!(desk.app.image.pending.is_none());
@@ -675,7 +675,7 @@ fn preferences_survive_folder_change_and_app_restart() {
         Preferences::load(root.path()).unwrap(),
     );
     app.prefs.privacy_mode = false;
-    app.prefs.negative_prompt = "  artifacts\nextra fingrar  ".into();
+    *app.prefs.negative_prompt_mut() = "  artifacts\nextra fingrar  ".into();
     app.prefs.generation = crate::settings::GenerationSettings {
         steps: 25,
         cfg_scale: 3.5,
@@ -701,7 +701,7 @@ fn preferences_survive_folder_change_and_app_restart() {
     assert_eq!(restarted.prefs.output_folder, folder);
     assert!(!restarted.prefs.privacy_mode);
     assert_eq!(
-        restarted.prefs.negative_prompt,
+        restarted.prefs.negative_prompt(),
         "  artifacts\nextra fingrar  "
     );
 }

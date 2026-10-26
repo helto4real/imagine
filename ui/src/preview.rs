@@ -19,7 +19,6 @@ impl ImagineApp {
                 model_groups: Default::default(),
                 output_folder: project.join("Pictures/Imagine"),
                 privacy_mode: false,
-                negative_prompt: String::new(),
                 generation: Default::default(),
                 sheet_width: 1536,
                 upscale_target: Default::default(),
