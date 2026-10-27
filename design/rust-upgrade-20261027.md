@@ -60,3 +60,24 @@ worker RSS rose 10,929 → 11,931 → 12,227 → 12,512 MiB over four identical 
 check whether the candidate behaves the same (reference host cache or growth).
 H3 is not in this baseline; it shares the Kitchen library, so an H3 baseline is
 recorded before item 2.
+
+## Phase 1: new reference
+
+The main checkout `/home/thhel/git/ComfyUI` was fast-forwarded to `426f5eea` and
+`pip install -r requirements.txt` ran in its `.venv`. That changed only the
+frontend (1.57.4), workflow templates (0.11.97) and embedded docs (0.5.15);
+Torch 2.13.0, Kitchen 0.2.40 and comfy-aimdo 0.6.0 were already installed.
+`pip check` reports conflicts only in packages outside ComfyUI's requirements
+(`inference-gpu`, `inference-models`, `onnx`), which the install did not touch.
+
+[`reference-20261027`](reference-20261027/README.md) locks the new reference with
+copies of the previous capture tools: 45,357 source fingerprints, the static
+dependency closure, native linkage (only Kitchen and Aimdo objects changed) and
+the source acquisition lock with Kitchen `v0.2.40` and Aimdo `v0.6.0` checkouts
+under `comfyui/rust-upgrade-20261027/sources`. Both verify. `reference-current.json`
+now selects it for development tools; product builds do not read it and still
+pin the Rust core and Kitchen 0.2.38 bridge. The previous reference and its
+expected results stay unchanged in `reference-20261018`.
+
+Recapturing expected values happens per item in Phase 2, from ComfyUI's Python
+code run directly: unchanged functions keep their existing fixtures.

@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "scope": "base inference; no graphs/UI; initial Arch Linux + RTX 4070 Ti SUPER",
+  "comfy_revision": "426f5eea52a7ece1dd599fff4cb6cd1f352ddd24",
+  "roots": {
+    "comfy": "/home/thhel/git/ComfyUI",
+    "site": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages"
+  },
+  "kitchen_version": "0.2.40",
+  "torch_version": "2.13.0",
+  "source_count": 45357,
+  "artifacts": {
+    "source-manifest.json": "906eef58a9edad2a6f0dc7478889a9c07b7cc38a19ab06aacedcc72e34b6c1c7",
+    "inference-inventory.json": "ec5ea5c1638b3c9991f9e847730a3e299344ac3df5f4b3102cf861e07cfe169e",
+    "dependencies.json": "7c758b689b19d9a984a4a57aa0bdc87c0d5132ad40cb80922c4dbc2d3c365c87",
+    "environment.json": "6ee74eda90df1081e2f126285cd7387f99dd8d1f3c8e04826dcfcda52d113656",
+    "reference-source.tar.gz": "eda7f9d6b29726c720be5eb7ebd5191443b3a24766b835efc7228ab8b1204f4f",
+    "capability-index.json": "e9ed49ef9ccbb6248736261d073169535c97c7790cb5c80ee4c2532d96001535",
+    "tools/index.py": "99f5fe9721e8b6e7282f3da5218ea3de4039ea612fb88e686504ccf152aa1c57",
+    "boundary-source.tar.gz": "b2f8a389fd5bcf22f3758afdf8fbf2280a2711f7b2b962d7d695e226c5bf861b",
+    "tools/supplement.py": "40aa2373b70c8176ce91d3089acce65e4fb0a30e040b7c7bcef398ab6c54161e",
+    "native-linkage-lock.json": "66d3484df2831ed356a957cdb974c7ed487d29b1fee7e0f3857e9727e0c7e90d",
+    "tools/native_linkage.py": "30cdb6aceff7dc2d646be360292daedd52f286603a855d51f4deab60b6fb1d12",
+    "tools/capture.py": "0916cb8bb91c3f355f6e22e7772eee1b48c67aee0236d1c02c249473751f4580",
+    "source-acquisition-lock.json": "852995ad2c72dca18eaf72824a3e88b6e1eb068634ddb17abe44cd80437883c4",
+    "tools/source_provenance.py": "21e6ee7c87c534d0c0fd9577b749f16eaa6a69ab8e37910e73b0bef1eff30c8d"
+  },
+  "capture_script_sha256": "0916cb8bb91c3f355f6e22e7772eee1b48c67aee0236d1c02c249473751f4580",
+  "activation": "not observed; static source predicates only",
+  "production_rust_libtorch_kitchen_build": "not built; the product build still uses the reference-20261018 Kitchen 0.2.38 bridge"
+}
