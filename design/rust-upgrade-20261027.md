@@ -162,3 +162,17 @@ fused projection, which lives only in its chunks), the attention output and the
 FFN input as soon as each is used; the text blocks release q/k/v and the attention
 output before their FFN. Outputs are unchanged (the complete MOSS DiT test is
 exact); the peak-memory effect is measured with the candidate worker in Phase 3.
+
+### Item 2: Kitchen 0.2.40 (deferred)
+
+The bridge build toolchain was reassembled in the dev root from verified inputs:
+the pinned manylinux image (`comfyui/native-toolchain/manylinux-ca4cca0a`), the
+CUDA 13.0 wheels named in the stage-1 evidence (`nvcc`/`crt`/`nvvm` 13.0.88,
+`cccl` 13.0.85, `runtime` 13.0.96; headers identical to the verified tree) and the
+two pinned PyTorch sources `prepare_kitchen.py` checks. Rebuilt with today's
+native sources, the Kitchen 0.2.38 bridge passes the complete suite (503/503),
+which validates the toolchain. The Kitchen 0.2.40 bridge (`612fcc11…`) passes all
+tests except `group_norm_silu_pad3d`, whose native call gained `stats` and
+`row_stride` arguments. Because both workers share the Rust Kitchen bindings, H3
+must move to 0.2.40 with the image worker, so an H3 old-vs-new run is needed.
+Tomas chose to do MOSS editing (item 1) first; item 2 follows items 6 and 7.
