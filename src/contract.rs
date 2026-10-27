@@ -311,11 +311,12 @@ impl JobRequest {
         if self.seed.is_some_and(|seed| seed > MAX_SEED) {
             return Err("invalid_seed");
         }
+        // MOSS edits through an edit LoRA (Moss-Image-Edit), with up to four references.
         if crate::model_spec::is_moss(&self.model)
             && (!matches!(
                 self.operation,
-                Operation::TextToImage | Operation::CharacterSheet
-            ) || !self.inputs.reference_images.is_empty()
+                Operation::TextToImage | Operation::ImageEdit | Operation::CharacterSheet
+            ) || self.inputs.reference_images.len() > 4
                 || workflow.is_none()
                 || self.sampling.sampler != "euler"
                 || !matches!(self.sampling.scheduler.as_str(), "normal" | "sgm_uniform")

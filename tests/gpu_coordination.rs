@@ -41,6 +41,8 @@ struct Probe {
     fail_next: AtomicBool,
     release: Notify,
     passes: Mutex<Vec<Pass>>,
+    /// Reference image count of every image pass.
+    references: Mutex<Vec<usize>>,
 }
 struct Engine(Arc<Probe>);
 impl Backend for Engine {
@@ -57,6 +59,11 @@ impl Backend for Engine {
                 pass.negative_prompt.clone(),
                 (pass.width, pass.height),
             ));
+            self.0
+                .references
+                .lock()
+                .unwrap()
+                .push(pass.references.len());
             if self.0.fail_next.swap(false, Ordering::SeqCst) {
                 return Err(imagine_server::engine::EngineError("native_generation_failed").into());
             }
@@ -684,6 +691,30 @@ async fn mcp_generates_moss_images_and_character_sheets() {
         &(MOSS.to_owned(), default.clone(), (1536, 864))
     );
     assert_eq!(probe.calls.load(Ordering::SeqCst), 3);
+    // MOSS edits through its edit profile, which takes registered references.
+    let image = mcp(
+        &client,
+        &url,
+        "register_image",
+        json!({"workspace_key":key,"profile":"moss-edit","file_id":uploaded["file_id"]}),
+    )
+    .await;
+    assert!(image["image_id"].is_string(), "{image}");
+    probe.release.notify_one();
+    let edit = mcp(
+        &client,
+        &url,
+        "generate",
+        json!({"workspace_key":key,"job_id":"moss-edit","profile":"moss-edit",
+            "parameters":{"prompt":"synthetic edit"},"references":[image["image_id"]]}),
+    )
+    .await;
+    assert_eq!(edit["status"], "succeeded", "{edit}");
+    assert_eq!(edit["parameters"]["operation"], "image_edit");
+    let (model, _, size) = probe.passes.lock().unwrap().last().unwrap().clone();
+    assert_eq!((model.as_str(), size), (MOSS, (1024, 1024)));
+    assert_eq!(probe.references.lock().unwrap().last(), Some(&1));
+    assert_eq!(probe.calls.load(Ordering::SeqCst), 4);
     stack.running.close().await;
     stack.control.call(Action::Shutdown).await.unwrap();
     stack.scheduler.await.unwrap().unwrap();

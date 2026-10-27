@@ -878,7 +878,7 @@ async fn yaml_profiles_resolve_overrides_and_persist_provenance() {
             .any(|p| p["id"] == "qwen")
     );
     let profiles = catalog["profiles"].as_array().unwrap();
-    assert_eq!(profiles.len(), 6); // standard, Turbo, MOSS, two sheets and upscale
+    assert_eq!(profiles.len(), 7); // standard, Turbo, MOSS, MOSS edit, two sheets and upscale
     for (id, name, model) in [
         ("qwen", "Qwen Image 2.1", "qwen-image-2.1-int8"),
         (
@@ -1470,6 +1470,59 @@ async fn moss_character_sheet_is_one_text_to_image_pass_and_one_result() {
         (&assets[0]["width"], &assets[0]["height"]),
         (&json!(512), &json!(288))
     );
+    stop(h).await;
+}
+
+#[tokio::test]
+async fn moss_edit_profile_sends_references_with_the_edit_lora() {
+    let h = setup().await;
+    h.engine_state.send_modify(|s| s.backend = "rust".into());
+    let mut wide = Cursor::new(Vec::new());
+    image::RgbImage::from_pixel(64, 32, image::Rgb([42, 50, 60]))
+        .write_to(&mut wide, image::ImageFormat::Png)
+        .unwrap();
+    let reference = h
+        .store
+        .save_asset("local", wide.into_inner())
+        .await
+        .unwrap();
+    let body = json!({"profile":"moss-edit","prompt":"synthetic edit","seed":7,
+        "inputs":{"reference_images":[reference["id"]]}});
+    let (status, valid) = req(
+        &h.router,
+        "POST",
+        "/v1/jobs/validate",
+        Some(body.clone()),
+        None,
+    )
+    .await;
+    assert_eq!(status, 200, "{valid}");
+    let effective = &valid["effective"];
+    assert_eq!(effective["model"], imagine_server::contract::MOSS);
+    assert_eq!(effective["operation"], "image_edit");
+    assert_eq!(
+        (&effective["width"], &effective["height"]),
+        (&json!(1024), &json!(512))
+    );
+    assert_eq!(
+        effective["model_options"]["moss_image"]["loras"][0]["path"],
+        "moss/Moss-Image-Edit/adapter_model.safetensors"
+    );
+    let mut without = body.clone();
+    without["inputs"] = json!({"reference_images":[]});
+    let (status, error) = req(&h.router, "POST", "/v1/jobs/validate", Some(without), None).await;
+    assert_eq!(status, 422, "{error}");
+    let (status, job) = req(&h.router, "POST", "/v1/jobs", Some(body), None).await;
+    assert_eq!(status, 202, "{job}");
+    wait_calls(&h.probe, 1).await;
+    {
+        let passes = h.probe.passes.lock().unwrap();
+        assert_eq!(passes[0].model, imagine_server::contract::MOSS);
+        assert_eq!(passes[0].references.len(), 1);
+        assert_eq!((passes[0].width, passes[0].height), (1024, 512));
+    }
+    h.probe.release.notify_one();
+    wait_status(&h.store, job["id"].as_str().unwrap(), "local", "succeeded").await;
     stop(h).await;
 }
 

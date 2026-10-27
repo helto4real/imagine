@@ -1,0 +1,34 @@
+schema_version: 1
+id: moss-edit
+version: 1
+name: MOSS Image Edit
+description: Edits one to four reference images by instruction with MOSS and the Moss-Image-Edit LoRA.
+references:
+  min: 1
+  max: 4
+sizing:
+  max_side: 1024
+  reference_aspect: true
+defaults:
+  model: moss-image-sft-int8
+  operation: image_edit
+  negative_prompt: ""
+  seed: null
+  sampling:
+    steps: 30
+    cfg_scale: 4.0
+    sampler: euler
+    scheduler: normal
+  inputs:
+    reference_images: []
+  model_options:
+    moss_image:
+      diffusion_model: diffusion_models/moss/moss_image_sft_int8_convrot.safetensors
+      text_encoder: text_encoders/moss/qwen3.5_9b_int8_convrot.safetensors
+      vae: vae/flux.2/flux2-vae.safetensors
+      loras:
+        - path: moss/Moss-Image-Edit/adapter_model.safetensors
+          strength: 1.0
+  output:
+    format: png
+    count: 1

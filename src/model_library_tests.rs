@@ -451,7 +451,14 @@ fn moss_defaults_keep_its_encoder_and_vae_but_explicit_cross_family_choices_are_
     let mut request: contract::JobRequest = serde_json::from_value(value).unwrap();
     request.validate().unwrap();
     request.inputs.reference_images.push("synthetic".into());
+    assert_eq!(request.validate(), Err("unexpected_reference_images"));
+    // MOSS edits through an edit LoRA with up to four references.
+    request.operation = contract::Operation::ImageEdit;
+    request.validate().unwrap();
+    request.inputs.reference_images = vec!["synthetic".into(); 5];
     assert_eq!(request.validate(), Err("unsupported_moss_configuration"));
+    request.inputs.reference_images.truncate(1);
+    request.operation = contract::Operation::TextToImage;
     library.settings.components.insert(
         diffusion.clone(),
         Components {
