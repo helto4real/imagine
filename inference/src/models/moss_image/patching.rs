@@ -24,23 +24,32 @@ pub fn moss_key_map(weights: &[(String, Vec<i64>)]) -> Vec<(String, Target)> {
         }
     }
     for (key, shape) in weights {
+        let Some(name) = key.strip_prefix("diffusion_model.") else {
+            continue;
+        };
+        if let Some(stem) = name.strip_suffix(".weight") {
+            // Bare module paths, as LoRAs trained outside ComfyUI name them.
+            mapping.push((
+                stem.into(),
+                Target {
+                    key: key.clone(),
+                    offset: None,
+                },
+            ));
+        }
         if let Some(stem) = key.strip_suffix(".proj.qkv.weight") {
+            // Fused q/k/v files; LoRAs address the separate projections.
             let third = shape[0] / 3;
             for (i, projection) in ["q", "k", "v"].iter().enumerate() {
                 let name = format!("{stem}.proj.{projection}");
+                let bare = name.trim_start_matches("diffusion_model.");
                 let target = Target {
                     key: key.clone(),
                     offset: Some([0, i as i64 * third, third]),
                 };
                 mapping.push((name.clone(), target.clone()));
-                mapping.push((
-                    format!(
-                        "lora_unet_{}",
-                        name.trim_start_matches("diffusion_model.")
-                            .replace('.', "_")
-                    ),
-                    target,
-                ));
+                mapping.push((bare.into(), target.clone()));
+                mapping.push((format!("lora_unet_{}", bare.replace('.', "_")), target));
             }
         }
     }

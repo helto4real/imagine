@@ -144,3 +144,44 @@ fn moss_layout_changes_only_constructor_metadata_and_preserves_total_weight_size
     );
     assert_eq!(b.modules.len(), a.modules.len() + 84);
 }
+#[test]
+fn moss_aliases_match_comfy_426f5eea_in_order() {
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/reference-20261027/moss-lora-keys.json"
+    ))
+    .unwrap();
+    for case in fixture["cases"].as_array().unwrap() {
+        let weights = case["weights"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|w| {
+                let shape = w[1].as_array().unwrap().iter();
+                (
+                    w[0].as_str().unwrap().to_owned(),
+                    shape.map(|d| d.as_i64().unwrap()).collect(),
+                )
+            })
+            .collect::<Vec<_>>();
+        // The original builds a dict: a repeated alias keeps its first position and
+        // takes the last target.
+        let mut aliases: Vec<(String, serde_json::Value)> = Vec::new();
+        for (alias, target) in m::moss_key_map(&weights) {
+            let target = match target.offset {
+                None => serde_json::json!(target.key),
+                Some(offset) => serde_json::json!([target.key, offset]),
+            };
+            match aliases.iter_mut().find(|(a, _)| *a == alias) {
+                Some(existing) => existing.1 = target,
+                None => aliases.push((alias, target)),
+            }
+        }
+        let expected = case["aliases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|a| (a[0].as_str().unwrap().to_owned(), a[1].clone()))
+            .collect::<Vec<_>>();
+        assert_eq!(aliases, expected, "fused {}", case["fused"]);
+    }
+}

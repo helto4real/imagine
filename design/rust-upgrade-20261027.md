@@ -144,3 +144,13 @@ environment, NA3D and W4A8 tests. The stage-1 capture times come from the bundle
 recorded `compiler_source_files` (`fixtures/reference-20261027/triton-capture-source-times.json`),
 W4A8's from its own capture. With this and the dev-root fixes the complete inference
 suite passes: 502 tests, 0 failures, 14 ignored.
+
+### Item 3: MOSS LoRA keys
+
+`tools/reference_moss_lora_keys.py` runs `426f5eea`'s `model_lora_keys_unet` on
+shape-only split and fused q/k/v layouts (`fixtures/reference-20261027/moss-lora-keys.json`).
+`moss_key_map` now also maps bare module paths (`layers.0.proj.o`) and bare names of
+fused q/k/v slices (`layers.0.proj.q`); the test compares the whole alias map,
+including order, with dict semantics. Our checkpoint uses fused q/k/v, and every
+module of the Moss-Image-Edit LoRA (bare `layers.N.proj.{q,k,v,o,ffn_up_gate,ffn_down}`)
+now resolves; previously none of its names had a mapping.
