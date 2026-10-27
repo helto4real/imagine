@@ -4,7 +4,6 @@ use imagine_inference::{
     triton_frontend::{Count, Element, na},
     triton_specialization::na_ast_digest,
 };
-use sha2::{Digest, Sha256};
 use std::{path::Path, sync::Arc};
 fn element(name: &str) -> Element {
     match name {
@@ -80,6 +79,7 @@ fn original_na3d_keys_complete_images_cache_restoration_and_source_failures_pres
         .as_str()
         .unwrap();
     let mut images = 0;
+    let times = super::cubin_source_times::stage1("na");
     for c in fixtures()["triton_na_specialization"].as_array().unwrap() {
         let s = specialization(c);
         assert_eq!(na_ast_digest(&s, key), c["ast_digest"].as_str().unwrap());
@@ -92,13 +92,7 @@ fn original_na3d_keys_complete_images_cache_restoration_and_source_failures_pres
                 .find(|(ext, _)| ext == "cubin")
                 .unwrap()
                 .1;
-            assert_eq!(
-                Sha256::digest(cubin)
-                    .iter()
-                    .map(|b| format!("{b:02x}"))
-                    .collect::<String>(),
-                expected
-            );
+            assert_eq!(super::cubin_source_times::digest(cubin, &times), expected);
             assert_eq!(image.metadata["shared"], c["compiled_metadata"]["shared"]);
             assert_eq!(image.metadata["num_warps"], 4);
             assert_eq!(image.metadata["num_stages"], 3);

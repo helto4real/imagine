@@ -135,3 +135,12 @@ Python copy. Rust now follows the launcher rule, checked against
 `tools/reference_kitchen_convrot_shared_memory.py`, which evaluates Kitchen 0.2.40's
 own function over 75 row/width cases. On the RTX 4070 Ti SUPER the old and new
 estimates select the same kernels.
+
+Approved by Tomas: cubin comparisons ignore the source-time field. The test helper
+`tests/support/cubin_source_times.rs` writes the times a capture compiled with into
+the line table of a freshly compiled cubin (same field width) and then compares the
+hash exactly, so later Kitchen reinstalls no longer break the compiler-mode,
+environment, NA3D and W4A8 tests. The stage-1 capture times come from the bundle's
+recorded `compiler_source_files` (`fixtures/reference-20261027/triton-capture-source-times.json`),
+W4A8's from its own capture. With this and the dev-root fixes the complete inference
+suite passes: 502 tests, 0 failures, 14 ignored.

@@ -23,6 +23,7 @@ fn original_compiler_modes_preserve_cache_layers_assemblies_metadata_overrides_a
     let _root = super::triton_file_cache_tests::OwnDirectory::create();
     let own = std::env::current_dir().unwrap();
     let native = kitchen();
+    let times = super::cubin_source_times::stage1("quantization");
     for c in fixtures()["triton_compiler_modes"].as_array().unwrap() {
         let label = c["label"].as_str().unwrap();
         let root = own.join(label);
@@ -73,7 +74,14 @@ fn original_compiler_modes_preserve_cache_layers_assemblies_metadata_overrides_a
             let assembly = kernel
                 .assembly
                 .iter()
-                .map(|(k, v)| (k.clone(), sha(v)))
+                .map(|(k, v)| {
+                    let digest = if k == "cubin" {
+                        super::cubin_source_times::digest(v, &times)
+                    } else {
+                        sha(v)
+                    };
+                    (k.clone(), digest)
+                })
                 .collect::<BTreeMap<_, _>>();
             assert_eq!(serde_json::json!(assembly), expected["asm"], "{label}");
             let listener = expected["events"]
@@ -105,20 +113,31 @@ fn original_compiler_modes_preserve_cache_layers_assemblies_metadata_overrides_a
                 assert!(!key.to_utf8().unwrap().is_empty());
             }
         }
-        fn files(root: &Path, dir: &Path, out: &mut BTreeMap<String, String>) {
+        fn files(
+            root: &Path,
+            dir: &Path,
+            out: &mut BTreeMap<String, String>,
+            times: &super::cubin_source_times::Times,
+        ) {
             if !dir.exists() {
                 return;
             }
             for entry in std::fs::read_dir(dir).unwrap() {
                 let p = entry.unwrap().path();
                 if p.is_dir() {
-                    files(root, &p, out);
+                    files(root, &p, out, times);
                 } else {
                     let name = p.file_name().unwrap().to_str().unwrap();
                     if !name.starts_with("__grp__") {
+                        let data = std::fs::read(&p).unwrap();
+                        let digest = if name.ends_with(".cubin") {
+                            super::cubin_source_times::digest(&data, times)
+                        } else {
+                            sha(&data)
+                        };
                         out.insert(
                             p.strip_prefix(root).unwrap().to_str().unwrap().into(),
-                            sha(&std::fs::read(&p).unwrap()),
+                            digest,
                         );
                     }
                 }
@@ -126,7 +145,7 @@ fn original_compiler_modes_preserve_cache_layers_assemblies_metadata_overrides_a
         }
         let mut actual = BTreeMap::new();
         for directory in ["cache", "dump", "override"] {
-            files(&root, &root.join(directory), &mut actual);
+            files(&root, &root.join(directory), &mut actual, &times);
         }
         let expected = c["files"]
             .as_object()

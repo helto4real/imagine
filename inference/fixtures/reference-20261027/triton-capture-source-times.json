@@ -1,0 +1,22 @@
+{
+ "schema": 1,
+ "scope": "Source modification times the stage-1 Triton captures compiled with, from the recorded compiler_source_files of the stage-1 bundle's triton-frontend and triton-na-frontend references. ptxas -lineinfo writes them into each cubin's DWARF line table.",
+ "captures": {
+  "quantization": [
+   {
+    "file": "comfy_kitchen/backends/triton/quantization.py",
+    "mtime": 1791429179
+   }
+  ],
+  "na": [
+   {
+    "file": "comfy_kitchen/backends/triton/na.py",
+    "mtime": 1791429179
+   },
+   {
+    "file": "triton/language/standard.py",
+    "mtime": 1784389924
+   }
+  ]
+ }
+}

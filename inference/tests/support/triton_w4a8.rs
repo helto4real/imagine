@@ -4,7 +4,6 @@ use imagine_inference::{
     triton_frontend::{Count, w4a8},
     triton_specialization::w4a8_ast_digest,
 };
-use sha2::{Digest, Sha256};
 use std::{path::Path, sync::Arc};
 
 #[test]
@@ -26,6 +25,7 @@ fn original_w4a8_unpack_keys_complete_binaries_and_cache_restoration() {
         .as_str()
         .unwrap();
     let mut compiled = 0;
+    let times = super::cubin_source_times::times(&fixtures()["triton_w4a8_compiler_source_files"]);
     for c in fixtures()["triton_w4a8_specialization"].as_array().unwrap() {
         let s = w4a8::Specialization {
             has_cb: c["has_cb"].as_bool().unwrap(),
@@ -57,10 +57,7 @@ fn original_w4a8_unpack_keys_complete_binaries_and_cache_restoration() {
                 .find(|(ext, _)| ext == "cubin")
                 .unwrap()
                 .1;
-            let hash = Sha256::digest(cubin)
-                .iter()
-                .map(|b| format!("{b:02x}"))
-                .collect::<String>();
+            let hash = super::cubin_source_times::digest(cubin, &times);
             if hash != expected {
                 eprintln!(
                     "W4A8_ASSEMBLY_DIAGNOSTIC {}",

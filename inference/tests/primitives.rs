@@ -322,6 +322,8 @@ mod backend_binding_tests;
 mod binding_tests;
 #[path = "support/conv_bindings.rs"]
 mod conv_binding_tests;
+#[path = "support/cubin_source_times.rs"]
+mod cubin_source_times;
 #[path = "support/cuda_convrot_dequant.rs"]
 mod cuda_convrot_dequant_tests;
 #[path = "support/cuda_memory_startup.rs"]
@@ -517,6 +519,7 @@ fn fixtures() -> &'static Value {
         .unwrap();
         data["triton_w4a8_specialization"] = w4a8["cases"].clone();
         data["triton_w4a8_function_cache_keys"] = w4a8["function_cache_keys"].clone();
+        data["triton_w4a8_compiler_source_files"] = w4a8["compiler_source_files"].clone();
         let diagnostics: Value =
             serde_json::from_str(include_str!("../fixtures/kitchen-0238-diagnostics.json"))
                 .unwrap();

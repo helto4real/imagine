@@ -59,6 +59,7 @@ fn original_environment_changes_preserve_warm_jit_identity_then_cold_disk_hash_m
         source_path: compiler.source_path(),
     };
     let mut previous = None;
+    let times = super::cubin_source_times::stage1("quantization");
     for c in fixtures()["triton_environment_cache"].as_array().unwrap() {
         let events = Arc::new(Mutex::new(Vec::new()));
         let seen = events.clone();
@@ -87,7 +88,14 @@ fn original_environment_changes_preserve_warm_jit_identity_then_cold_disk_hash_m
         let assembly = kernel
             .assembly
             .iter()
-            .map(|(name, data)| (name.clone(), sha(data)))
+            .map(|(name, data)| {
+                let digest = if name == "cubin" {
+                    super::cubin_source_times::digest(data, &times)
+                } else {
+                    sha(data)
+                };
+                (name.clone(), digest)
+            })
             .collect::<BTreeMap<_, _>>();
         assert_eq!(serde_json::json!(assembly), c["assembly"]);
         let (_, path) = kernel
