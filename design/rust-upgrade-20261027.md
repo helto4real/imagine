@@ -81,3 +81,30 @@ expected results stay unchanged in `reference-20261018`.
 
 Recapturing expected values happens per item in Phase 2, from ComfyUI's Python
 code run directly: unchanged functions keep their existing fixtures.
+
+## Phase 2: ports
+
+### Development root
+
+`comfyui/rust-upgrade-20261027` is the isolated root for new-reference captures
+and the Python-free suite; `source comfyui/rust-upgrade-20261027/env.sh` sets the
+same variables as `inference/tools/check_saved.sh` plus the Aimdo and Pillow
+libraries. Several inputs of the previous root `comfyui/moss-20261018` had been
+links into `/tmp` and are gone (Cargo home, Triton and INT8 AOT probes, Triton
+standalone cubins). The new root restores them from the verified `stage-1` bundle
+(19,204 files), takes copy-on-write copies of the product Cargo home and the old
+build cache, links the intact native inputs (CUDA headers, Kitchen 0.2.38 bridge,
+Triton driver, Aimdo, Pillow) and uses the relocated Triton compiler profile from
+`moss-20261018` (the bundle's copy keeps its original `/tmp` paths). Fixtures from
+the new reference go to `inference/fixtures/reference-20261027/`; the previous
+fixtures stay unchanged.
+
+### Item 4: Qwen prefix-cache key
+
+`tools/reference_qwen_image21_core.py` run against `426f5eea` changes only the
+prefix-cache key in its 192 cases: in all 24 sequence cases the new key is the old
+key with the batch size (2) prepended. The other outputs, including every INT8
+projection under Kitchen 0.2.40, and the dispatch traces are identical. Rust's
+`prefix_cache_key` now puts the batch size first; the component test checks it
+exactly against the new fixture and, with the batch column removed, against the
+previous one. All 46 Qwen Image 2.1 tests pass.

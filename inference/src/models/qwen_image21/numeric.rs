@@ -131,7 +131,9 @@ pub fn prefix_cache_key(
     slots: &[i64],
 ) -> Result<Tensor, Error> {
     let shape = x.size();
+    // Batch size first: prefix GEMMs can round differently when CFG batching changes.
     let mut header = vec![
+        context.size()[0],
         context.size()[1],
         refs.len() as i64,
         shape[shape.len() - 2],
