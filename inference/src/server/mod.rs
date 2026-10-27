@@ -71,54 +71,6 @@ pub enum Event {
     PreviewWarning,
 }
 pub type Observer<'a> = dyn FnMut(Event) -> Result<(), Error> + 'a;
-#[cfg(test)]
-mod lora_selection_tests {
-    use super::*;
-
-    fn selection(entries: &[(&str, f64)]) -> Vec<Lora> {
-        entries
-            .iter()
-            .map(|(path, strength)| Lora {
-                path: path.into(),
-                strength: *strength,
-            })
-            .collect()
-    }
-
-    #[test]
-    fn zero_strength_never_reaches_the_reader() {
-        let loras = selection(&[
-            ("missing-positive-zero", 0.0),
-            ("missing-negative-zero", -0.0),
-        ]);
-        let loaded: Result<Vec<()>, &str> = active_loras(&loras)
-            .map(|_| Err("reader must not be called"))
-            .collect();
-        assert_eq!(loaded, Ok(vec![]));
-    }
-
-    #[test]
-    fn mixed_selection_preserves_order_duplicates_and_nonzero_strengths() {
-        let loras = selection(&[
-            ("disabled", 0.0),
-            ("same", 0.5),
-            ("disabled", -0.0),
-            ("negative", -1.0),
-            ("same", f64::MIN_POSITIVE),
-        ]);
-        let loaded: Vec<_> = active_loras(&loras)
-            .map(|l| (l.path.to_str().unwrap(), l.strength))
-            .collect();
-        assert_eq!(
-            loaded,
-            vec![
-                ("same", 0.5),
-                ("negative", -1.0),
-                ("same", f64::MIN_POSITIVE)
-            ]
-        );
-    }
-}
 pub(super) fn attention() -> Attention {
     Attention {
         method: AttentionMethod::Pytorch,
@@ -335,4 +287,52 @@ pub(super) fn qwen_vae<'a>(
     let out = policy.execute(op, input, &mut service)?;
     drop(service);
     Ok(out)
+}
+#[cfg(test)]
+mod lora_selection_tests {
+    use super::*;
+
+    fn selection(entries: &[(&str, f64)]) -> Vec<Lora> {
+        entries
+            .iter()
+            .map(|(path, strength)| Lora {
+                path: path.into(),
+                strength: *strength,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn zero_strength_never_reaches_the_reader() {
+        let loras = selection(&[
+            ("missing-positive-zero", 0.0),
+            ("missing-negative-zero", -0.0),
+        ]);
+        let loaded: Result<Vec<()>, &str> = active_loras(&loras)
+            .map(|_| Err("reader must not be called"))
+            .collect();
+        assert_eq!(loaded, Ok(vec![]));
+    }
+
+    #[test]
+    fn mixed_selection_preserves_order_duplicates_and_nonzero_strengths() {
+        let loras = selection(&[
+            ("disabled", 0.0),
+            ("same", 0.5),
+            ("disabled", -0.0),
+            ("negative", -1.0),
+            ("same", f64::MIN_POSITIVE),
+        ]);
+        let loaded: Vec<_> = active_loras(&loras)
+            .map(|l| (l.path.to_str().unwrap(), l.strength))
+            .collect();
+        assert_eq!(
+            loaded,
+            vec![
+                ("same", 0.5),
+                ("negative", -1.0),
+                ("same", f64::MIN_POSITIVE)
+            ]
+        );
+    }
 }
