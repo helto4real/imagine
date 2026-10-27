@@ -222,6 +222,19 @@ with face, pose, accessories, background and composition unchanged, 25.6 s for
 30 steps. The first candidate failed because the reference encode reused Qwen's
 crop, which pads to four channels; fixed in `dd90cf7`.
 
+### Item 7: MOSS Scale ROPE
+
+`MossInputs` and `MossDenoiserConfig` take ComfyUI's Scale ROPE options
+(`MossRope`: `scale_x`, `scale_y`, `shift_t`, `shift_x`, `shift_y`). A row or
+column scale `s` sets that axis's theta to `10000 · s^(−d/(d−2))` (NTK-aware); a
+zero scale keeps theta and collapses the axis's positions; the shifts move the
+image's positions. Text and references keep the trained frequencies and positions,
+as in `426f5eea`. MOSS ignores `scale_t`. The defaults reproduce the previous
+forward bit for bit (72 forwards and 32 edit cases unchanged); 32 new Scale ROPE
+cases (NTK scales; a collapsed, shifted axis; the same with Moss-Image-Edit and
+ai-toolkit references) match `426f5eea` exactly. The worker passes the defaults;
+no product setting exposes the options yet.
+
 ### Candidate bench (`dd90cf7`)
 
 One sequential run (`comfyui/bench/candidate-dd90cf7-20261027T193907Z`, four runs

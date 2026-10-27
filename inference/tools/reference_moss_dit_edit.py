@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Hash-checked original MOSS DiT (ComfyUI 426f5eea) with bounded, initialized synthetic weights,
-including reference-image editing: precomputed reference keys/values and edit forwards.
+including reference-image editing (precomputed reference keys/values and edit forwards)
+and Scale ROPE options.
 
 No trained constructor, model discovery, services or production data is used.
 """
@@ -91,7 +92,27 @@ with torch.no_grad():
       out=model(x,time,context,transformer_options={},ref_latents=refs,ref_latents_method=method)
       group['edits'].append(dict(method=method,args=[encode(v)for v in [x,time,context,*refs]],
           ref_kv=encode(kv),kv_events=kv_events,output=encode(out),events=events.copy(),post_input=encode(x)))
+    # Scale ROPE (b9b290e4): NTK-aware row/column scales, a collapsed axis and shifts;
+    # with references, which keep the trained frequencies and positions.
+    group['ropes']=[]
+    for options,method in [(dict(scale_x=2.,scale_y=1.5),None),
+                           (dict(scale_x=0.,shift_x=3.5,scale_y=.5,shift_y=-1.25,shift_t=2.5),None),
+                           (dict(scale_x=0.,shift_x=3.5,scale_y=.5,shift_y=-1.25,shift_t=2.5),'index_timestep_zero_text_start'),
+                           (dict(scale_x=0.,shift_x=3.5,scale_y=.5,shift_y=-1.25,shift_t=2.5),'index_timestep_zero_isolated')]:
+     namespace['optimized_attention']=namespace['attention_pytorch']
+     mm.in_training=False;operation_state.interrupt_at=None;operation_state.count=0
+     namespace['interrupt_processing']=False;events.clear()
+     # ScaleROPE sets all six options; MOSS has no use for scale_t.
+     rope=dict(scale_x=1.,shift_x=0.,scale_y=1.,shift_y=0.,scale_t=1.,shift_t=0.)|options
+     refs=[data((1,128,2,2),device,torch.bfloat16,11)]if method else[]
+     x=data((2,128,2,3),device,torch.bfloat16,3)
+     time=torch.tensor([.913123,.451456],device=device,dtype=torch.float32)
+     context=data((2,3,64),device,torch.bfloat16,6)
+     kwargs=dict(ref_latents=refs,ref_latents_method=method)if method else{}
+     out=model(x,time,context,transformer_options=dict(rope_options=rope),**kwargs)
+     group['ropes'].append(dict(options=rope,method=method,args=[encode(v)for v in [x,time,context,*refs]],
+         output=encode(out)))
     models.append(group)
     print('Captured',group['label'],len(group['calls']),flush=True)
-a.output.write_text(json.dumps(dict(schema=1,provenance='Original full MOSS DiT (426f5eea) on bounded own weights, with reference editing; not trained pipeline acceptance',sources=sources,models=models),separators=(',',':'))+'\n')
+a.output.write_text(json.dumps(dict(schema=1,provenance='Original full MOSS DiT (426f5eea) on bounded own weights, with reference editing and Scale ROPE; not trained pipeline acceptance',sources=sources,models=models),separators=(',',':'))+'\n')
 print('Captured',len(models),'MOSS groups and',sum(len(g['calls'])for g in models),'forwards',flush=True)

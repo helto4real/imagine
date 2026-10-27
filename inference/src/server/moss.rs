@@ -229,6 +229,7 @@ pub(super) fn generate(
                     kv,
                     layout: m::MossEditLayout::TextStart,
                 }),
+                rope: Default::default(),
             })
         };
         let out = q::sample_euler(input, &sigmas, Default::default(), &mut denoiser)?;

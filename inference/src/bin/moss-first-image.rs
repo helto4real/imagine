@@ -323,6 +323,7 @@ fn execute(
                     .map_err(|e| Error::Native(e.to_string()))
                 })),
                 references: None,
+                rope: Default::default(),
             })
         };
         let sampled = q::sample_euler(input, &sigmas, Default::default(), &mut denoiser)?;

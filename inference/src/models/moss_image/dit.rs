@@ -47,6 +47,39 @@ pub struct MossInputs<'a> {
     pub timestep: &'a Tensor,
     pub context: &'a Tensor,
     pub references: Option<MossReferences<'a>>,
+    pub rope: MossRope,
+}
+/// ComfyUI's `rope_options` (Scale ROPE): NTK-aware scales of the image's row and
+/// column frequencies, a zero scale collapsing that axis, and shifts of the image's
+/// positions. References keep the trained frequencies and positions.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MossRope {
+    pub scale_x: f64,
+    pub scale_y: f64,
+    pub shift_t: f64,
+    pub shift_x: f64,
+    pub shift_y: f64,
+}
+impl Default for MossRope {
+    fn default() -> Self {
+        Self {
+            scale_x: 1.,
+            scale_y: 1.,
+            shift_t: 0.,
+            shift_x: 0.,
+            shift_y: 0.,
+        }
+    }
+}
+impl MossRope {
+    /// RoPE theta per (r, f, h, w) axis of `dim` frequencies.
+    fn thetas(&self, dim: i64) -> [f64; 4] {
+        let theta = |s: f64| {
+            let s = if s == 0. { 1. } else { s };
+            10000. * s.powf(-(dim as f64) / (dim - 2) as f64)
+        };
+        [10000., 10000., theta(self.scale_y), theta(self.scale_x)]
+    }
 }
 /// Where an edit LoRA was trained to place its references on RoPE's frame axis.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -196,24 +229,44 @@ pub fn moss_rope(
     device: Device,
     fp64: bool,
 ) -> Result<Tensor, Error> {
+    let rope = MossRope::default();
     moss_rope_ids(
-        &sequence_ids(h, w, text, 0, device)?,
+        &sequence_ids(h, w, text, 0, &rope, device)?,
         head_dim,
+        rope.thetas(head_dim / 4),
         device,
         fp64,
     )
 }
 /// (r, f, h, w) of the image then the text: the image sits after the text on f,
-/// its rows and columns centered; `offset` shifts both along f.
-fn sequence_ids(h: i64, w: i64, text: i64, offset: i64, device: Device) -> Result<Tensor, Error> {
+/// its rows and columns centered; `offset` shifts both along f. The image's
+/// positions take the RoPE options' shifts, a zero scale collapsing its axis.
+fn sequence_ids(
+    h: i64,
+    w: i64,
+    text: i64,
+    offset: i64,
+    rope: &MossRope,
+    device: Device,
+) -> Result<Tensor, Error> {
     let ids = Tensor::f_zeros([h * w + text, 4], (Kind::Float, device))?;
     let _ = ids
         .f_narrow(0, 0, h * w)?
         .f_select(1, 1)?
-        .f_fill_(text + offset)?;
+        .f_fill_((text + offset) as f64 + rope.shift_t)?;
+    let centered = centered(h, w, device)?;
+    for (axis, scale, shift) in [
+        (0, rope.scale_y, rope.shift_y),
+        (1, rope.scale_x, rope.shift_x),
+    ] {
+        let _ = centered
+            .f_select(1, axis)?
+            .f_mul_scalar_(f64::from(u8::from(scale != 0.)))?
+            .f_add_scalar_(shift)?;
+    }
     ids.f_narrow(0, 0, h * w)?
         .f_narrow(1, 2, 2)?
-        .f_copy_(&centered(h, w, device)?)?;
+        .f_copy_(&centered)?;
     ids.f_narrow(0, h * w, text)?
         .f_select(1, 1)?
         .f_copy_(&Tensor::f_arange(text, (Kind::Float, device))?.f_add_scalar(offset)?)?;
@@ -240,15 +293,21 @@ fn centered(h: i64, w: i64, device: Device) -> Result<Tensor, Error> {
         .f_repeat([h])?;
     Ok(Tensor::f_stack(&[rows, cols], 1)?)
 }
-fn moss_rope_ids(ids: &Tensor, head_dim: i64, device: Device, fp64: bool) -> Result<Tensor, Error> {
+fn moss_rope_ids(
+    ids: &Tensor,
+    head_dim: i64,
+    thetas: [f64; 4],
+    device: Device,
+    fp64: bool,
+) -> Result<Tensor, Error> {
     let n = ids.size()[0];
     let ids = ids.f_unsqueeze(0)?;
     let dim = head_dim / 4;
     let mut axes = Vec::new();
-    for axis in 0..4 {
+    for (axis, theta) in thetas.into_iter().enumerate() {
         let dev = if fp64 { device } else { Device::Cpu };
         let omega = Tensor::f_pow_scalar(
-            10000.,
+            theta,
             &Tensor::f_linspace(
                 0.,
                 (dim - 2) as f64 / dim as f64,
@@ -259,7 +318,7 @@ fn moss_rope_ids(ids: &Tensor, head_dim: i64, device: Device, fp64: bool) -> Res
         .f_reciprocal()?
         .f_mul_scalar(1.)?;
         let pos = ids
-            .f_select(-1, axis)?
+            .f_select(-1, axis as i64)?
             .f_to_device_(dev, Kind::Float, false, false)?;
         let out = Tensor::f_einsum("...n,d->...nd", &[pos, omega], None::<&[i64]>)?;
         axes.push(
@@ -557,9 +616,11 @@ impl MossDiT {
             Some(r) if r.layout == MossEditLayout::ImageFrame => -text,
             _ => 0,
         };
+        let head_dim = self.config.dim / self.config.heads;
         let pe = moss_rope_ids(
-            &sequence_ids(h, w, text, offset, a.latent.device())?,
-            self.config.dim / self.config.heads,
+            &sequence_ids(h, w, text, offset, &a.rope, a.latent.device())?,
+            head_dim,
+            a.rope.thetas(head_dim / 4),
             a.latent.device(),
             true,
         )?;
@@ -666,9 +727,11 @@ impl MossDiT {
             .iter()
             .map(|r| (r.size()[2], r.size()[3]))
             .collect::<Vec<_>>();
+        let head_dim = self.config.dim / self.config.heads;
         let pe = moss_rope_ids(
             &reference_ids(&shapes, device)?,
-            self.config.dim / self.config.heads,
+            head_dim,
+            MossRope::default().thetas(head_dim / 4),
             device,
             true,
         )?;

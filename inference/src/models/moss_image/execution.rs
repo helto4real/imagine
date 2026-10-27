@@ -1,6 +1,7 @@
 //! Explicit static MOSS services; source compiler/vbars/async offload are disabled.
 use super::{
-    MossDiT, MossExecution, MossInputs, MossLifecycle, MossReferences, moss_memory_required,
+    MossDiT, MossExecution, MossInputs, MossLifecycle, MossReferences, MossRope,
+    moss_memory_required,
 };
 use crate::models::qwen_image21::{
     EulerExecution, EulerStep, FullAreaCondition, FullAreaExecution, SamplingObserver,
@@ -190,6 +191,8 @@ pub struct MossDenoiserConfig<'a> {
     /// Edit references both conditions attend to, as the original gives the
     /// negative prompt the references too.
     pub references: Option<MossReferences<'a>>,
+    /// Scale ROPE's options for the generated image.
+    pub rope: MossRope,
 }
 pub struct MossDenoiser<'a> {
     config: MossDenoiserConfig<'a>,
@@ -210,6 +213,7 @@ struct Forward<'a, 'b> {
     flash: bool,
     multiplier: f64,
     references: Option<MossReferences<'a>>,
+    rope: MossRope,
 }
 impl FullAreaExecution for Forward<'_, '_> {
     fn free_memory(&mut self, device: Device) -> Result<f64, Error> {
@@ -254,6 +258,7 @@ impl FullAreaExecution for Forward<'_, '_> {
                     timestep: &timestep,
                     context: &context,
                     references: self.references,
+                    rope: self.rope,
                 },
                 self.exec,
             )
@@ -280,6 +285,7 @@ impl EulerExecution for MossDenoiser<'_> {
                 flash: config.flash_attention_memory,
                 multiplier: config.multiplier,
                 references: config.references,
+                rope: config.rope,
             },
         )
     }
