@@ -1,0 +1,1298 @@
+{
+  "schema": 1,
+  "scope": "original W4A8 INT4/INT6 unpacking; no GPU execution",
+  "gpu_work": false,
+  "cases": [
+    {
+      "index": 0,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 4,
+      "scalar_scenario": "dynamic32",
+      "scalar_types": [
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "63f8040620fb4c7b87a77fd4dc6bdb6e9ea45cb66022d6aab7810138087c69e8",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-0.expected.source": "7f68e025981400b9f8461689cfe904c5e899f267041f84b621cf60b3621fe266",
+        "case-0.expected.ttir": "7c61b02d9fb8a08dbdee671bb1f064d9e622f10440b144ae8304e57ca159a978",
+        "case-0.expected.ttgir": "ca74190efe1bcec67a96e28c04eb2e03971425cca48aee878d89aebb74ee9a39",
+        "case-0.expected.llvm.mlir": "3b368d18f4bff1e1d625eda2403a68f4f46ce25428aa11c4109636ff0ff1289f",
+        "case-0.expected.llir": "bbea0ba81e26151a9ba1637306c87a802dad63cdb332cb1c5d94a9737fa1f640",
+        "case-0.expected.ptx": "d8ce66968107c16c180dc4bb561f55abffee037c226ef39bf2c3386afe005f13",
+        "case-0.expected.cubin": "e5a8d216b3e81a2917ac1f5c346ff1b2eab1a8dc6948ec1d9486d3b096732060"
+      },
+      "expected_sha256": "7c61b02d9fb8a08dbdee671bb1f064d9e622f10440b144ae8304e57ca159a978",
+      "raw_sha256": "7f68e025981400b9f8461689cfe904c5e899f267041f84b621cf60b3621fe266"
+    },
+    {
+      "index": 1,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 4,
+      "scalar_scenario": "dynamic32",
+      "scalar_types": [
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "af950999fe3eb179674d439941f79392440456daea24bac4c87c4bf1ea3d9a2b",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-1.expected.source": "bf6c7dbe31990f4c6ed09bc12d6510054a00ea02006728d01d0b0b7ba06765de",
+        "case-1.expected.ttir": "7fd1672d74cc62f4aae20b03b18b2b830f11aa352c9189db37b22af5f9d4449b"
+      },
+      "expected_sha256": "7fd1672d74cc62f4aae20b03b18b2b830f11aa352c9189db37b22af5f9d4449b",
+      "raw_sha256": "bf6c7dbe31990f4c6ed09bc12d6510054a00ea02006728d01d0b0b7ba06765de"
+    },
+    {
+      "index": 2,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 4,
+      "scalar_scenario": "one",
+      "scalar_types": [
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "a8c25ddf151bdf3ce79aedf25df954e817d4ce576223180b5ea4725bc84234ce",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-2.expected.source": "bceccdd27d2520fdc6d931d9d8ff92483e229114d66f69c107070c3a4906d312",
+        "case-2.expected.ttir": "6ced1d56d8f8e0d87d48b56b92d2ee5f57a8cd6267842c39ae9edcf39d70df80"
+      },
+      "expected_sha256": "6ced1d56d8f8e0d87d48b56b92d2ee5f57a8cd6267842c39ae9edcf39d70df80",
+      "raw_sha256": "bceccdd27d2520fdc6d931d9d8ff92483e229114d66f69c107070c3a4906d312"
+    },
+    {
+      "index": 3,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 4,
+      "scalar_scenario": "one",
+      "scalar_types": [
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "e8e5cc0267f3daf4205108c5443ea83438bab819eaed3a70ad5fe73c34868029",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-3.expected.source": "3f8ea9da56dbb2d258091a36de43b3c54e795d4f739d1525d1ebc46d7b1570d7",
+        "case-3.expected.ttir": "e0ef73a54b0b4933d016e4a1c45822ec7067df83a2aaf37a81b556309beab6b3"
+      },
+      "expected_sha256": "e0ef73a54b0b4933d016e4a1c45822ec7067df83a2aaf37a81b556309beab6b3",
+      "raw_sha256": "3f8ea9da56dbb2d258091a36de43b3c54e795d4f739d1525d1ebc46d7b1570d7"
+    },
+    {
+      "index": 4,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 4,
+      "scalar_scenario": "wide",
+      "scalar_types": [
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64"
+      ],
+      "scalar_div16": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "8a26876c0ce3760878961429db06b0fff82d1faf2d4ad7eb8cf3b3d16c84fa86",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-4.expected.source": "1d772e599c7e19b6790f3814c58b36fc13a00a93a69e66c2fa37129f1da93501",
+        "case-4.expected.ttir": "4f57de45ab8a581350ee98b4fab0c704d81805af26660c69af7f7751876b47d4"
+      },
+      "expected_sha256": "4f57de45ab8a581350ee98b4fab0c704d81805af26660c69af7f7751876b47d4",
+      "raw_sha256": "1d772e599c7e19b6790f3814c58b36fc13a00a93a69e66c2fa37129f1da93501"
+    },
+    {
+      "index": 5,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 4,
+      "scalar_scenario": "wide",
+      "scalar_types": [
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64"
+      ],
+      "scalar_div16": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "2d50c03a7a21d8d2bd1c5ab759168ebaafd3c474d8305bb95f046ae80c866dde",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-5.expected.source": "8e3649042d79ec477a3840bb10648c0b095252b14abd3fe94373146374194c34",
+        "case-5.expected.ttir": "97f85443e9801cbf3b60a8fd2ab7ea5db6bf2e1b01777cb5dad8b84b1553f700"
+      },
+      "expected_sha256": "97f85443e9801cbf3b60a8fd2ab7ea5db6bf2e1b01777cb5dad8b84b1553f700",
+      "raw_sha256": "8e3649042d79ec477a3840bb10648c0b095252b14abd3fe94373146374194c34"
+    },
+    {
+      "index": 6,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 4,
+      "scalar_scenario": "dynamic32",
+      "scalar_types": [
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "684a2ae6f50be2fd148f2821f0efd8d104c46b974cbbc811f8a82eb9dc75619a",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-6.expected.source": "7cc2b97992323d4169fed6926fcfb5b49ee5be2b809faa840116909c4509262c",
+        "case-6.expected.ttir": "72b2a94e05f4c3ea72dc820e3b8de5a8d5b16fa6b9214893001f559558aeae23",
+        "case-6.expected.ttgir": "c9daee28540f0c0e25abde6d5ba5cbaff066f20ab91079dfbb09aba1a6eda641",
+        "case-6.expected.llvm.mlir": "e7a5c9dc667aad41ec34ffd93e34648c7b27ecfe05b09191cf74b5d57b394d93",
+        "case-6.expected.llir": "6c0b288e4be892bd2dd3b4aa82f9996acd132f3fdff91555c31b03306f95d1ae",
+        "case-6.expected.ptx": "9e6bedf735a42c5a30174102a2cb3974010c23bc8b8b39fe341408ce49398a83",
+        "case-6.expected.cubin": "e98dc3d44bb632041abdc7713ff7ff288a69757c4fe33cd1ed5322bcc3f37240"
+      },
+      "expected_sha256": "72b2a94e05f4c3ea72dc820e3b8de5a8d5b16fa6b9214893001f559558aeae23",
+      "raw_sha256": "7cc2b97992323d4169fed6926fcfb5b49ee5be2b809faa840116909c4509262c"
+    },
+    {
+      "index": 7,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 4,
+      "scalar_scenario": "dynamic32",
+      "scalar_types": [
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "0a1d19be8e22245db263a055faf43c303e8dbc876ad081f8e142e9d2089e7b52",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-7.expected.source": "582bff530ea18d5925703ec0a245885d479cc83896b7b9cb7323bd80a67c9871",
+        "case-7.expected.ttir": "7e829595d1c6f6ed15a63cb94242425548d58cf62b4acdae056d6bb3212bac65"
+      },
+      "expected_sha256": "7e829595d1c6f6ed15a63cb94242425548d58cf62b4acdae056d6bb3212bac65",
+      "raw_sha256": "582bff530ea18d5925703ec0a245885d479cc83896b7b9cb7323bd80a67c9871"
+    },
+    {
+      "index": 8,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 4,
+      "scalar_scenario": "one",
+      "scalar_types": [
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "edd02a0a037bdac770b6923178c25531ed5613940a5f1d531e987835396f55d5",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-8.expected.source": "1156fc05e3f514f2ba147a38ab0c9f6d53853599aca7bf10ce790a2d783016f1",
+        "case-8.expected.ttir": "d6260699d317eeb6467273c5cf950e3a25e3365c4430ae6c1e0e8419dbfae067"
+      },
+      "expected_sha256": "d6260699d317eeb6467273c5cf950e3a25e3365c4430ae6c1e0e8419dbfae067",
+      "raw_sha256": "1156fc05e3f514f2ba147a38ab0c9f6d53853599aca7bf10ce790a2d783016f1"
+    },
+    {
+      "index": 9,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 4,
+      "scalar_scenario": "one",
+      "scalar_types": [
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "978a814c77d8a24ba04c4e9c6d48ead45af45c58a20fd4049dc9937053cd6a04",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-9.expected.source": "8b4db3fe1d5c7472e1dc23213750d177398a830200fdf7eb99a6dabd2197713a",
+        "case-9.expected.ttir": "c97108f0589c028b2c8a5cfe39b45670b5eafa8718788dfa75dee2af74d91692"
+      },
+      "expected_sha256": "c97108f0589c028b2c8a5cfe39b45670b5eafa8718788dfa75dee2af74d91692",
+      "raw_sha256": "8b4db3fe1d5c7472e1dc23213750d177398a830200fdf7eb99a6dabd2197713a"
+    },
+    {
+      "index": 10,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 4,
+      "scalar_scenario": "wide",
+      "scalar_types": [
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64"
+      ],
+      "scalar_div16": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "51001c93fd7fc953a1831d4136520a01855b267d27f0125b439e55d02e36e6c4",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-10.expected.source": "426e136073758fb5f9877fb9053f76099193f7c77ee6f0db00db3cec36b35591",
+        "case-10.expected.ttir": "3d835638274621b056836ed2bc6513574395a1912aec382f49831eb6ae1da87c"
+      },
+      "expected_sha256": "3d835638274621b056836ed2bc6513574395a1912aec382f49831eb6ae1da87c",
+      "raw_sha256": "426e136073758fb5f9877fb9053f76099193f7c77ee6f0db00db3cec36b35591"
+    },
+    {
+      "index": 11,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 4,
+      "scalar_scenario": "wide",
+      "scalar_types": [
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64"
+      ],
+      "scalar_div16": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "f3e94954bd4f3303dcfe994ce498c67f418b9f99ae3806428cabb84364c9fa6c",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-11.expected.source": "6dbbe06393dca0fdeb1f185f3023a2c310c865001587076a2ee49a362f073186",
+        "case-11.expected.ttir": "edec49f68afa5674cc9d833d8c5a6070fc32ca4be270be76881998cb6be94a53"
+      },
+      "expected_sha256": "edec49f68afa5674cc9d833d8c5a6070fc32ca4be270be76881998cb6be94a53",
+      "raw_sha256": "6dbbe06393dca0fdeb1f185f3023a2c310c865001587076a2ee49a362f073186"
+    },
+    {
+      "index": 12,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 6,
+      "scalar_scenario": "dynamic32",
+      "scalar_types": [
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "1d940e231368ebee4e8d6bd1a6690e51e5ddfb48186432ae6a9b336dee35a07f",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-12.expected.source": "b858a60fb0873fdf48e42f29aecb3b064bd2ba91c2e5aab27c37a797d442e1ad",
+        "case-12.expected.ttir": "1ce1eb0b6a011cc377bac92bf3e05188ef6f3154b198a5dbd625e2ff31a2d544",
+        "case-12.expected.ttgir": "5b1fb7210f043777614cf94e398317151455df80b0d234230668a7270816701f",
+        "case-12.expected.llvm.mlir": "f7af94e78858ed912db8aed90d682ccb56f769ac6adedb923d618a4b41188677",
+        "case-12.expected.llir": "cf84f191ff2d8a2aa6ef5cfce7462b8915555e4cc1066b1d90fb66a1da306ea7",
+        "case-12.expected.ptx": "906448d7b2ca61e84c49afafc9747d5c5330183adb7ec47add326de8c7403665",
+        "case-12.expected.cubin": "01ea53ba118477f7047938771db9cf378b619ca8e61228ee55293c68f242de82"
+      },
+      "expected_sha256": "1ce1eb0b6a011cc377bac92bf3e05188ef6f3154b198a5dbd625e2ff31a2d544",
+      "raw_sha256": "b858a60fb0873fdf48e42f29aecb3b064bd2ba91c2e5aab27c37a797d442e1ad"
+    },
+    {
+      "index": 13,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 6,
+      "scalar_scenario": "dynamic32",
+      "scalar_types": [
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "64e8a7e64f29b4bffdc56f23811305acb8081939b8acb9a11b943b3adf53029b",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-13.expected.source": "063bdca15790c6c91d598f254e177150adbd32a2bd6a8b4a1b94476ebeecc907",
+        "case-13.expected.ttir": "4a4056459790c43e29988a76d5f5846b42aa570ac2224c6148c1902b6fab4da6"
+      },
+      "expected_sha256": "4a4056459790c43e29988a76d5f5846b42aa570ac2224c6148c1902b6fab4da6",
+      "raw_sha256": "063bdca15790c6c91d598f254e177150adbd32a2bd6a8b4a1b94476ebeecc907"
+    },
+    {
+      "index": 14,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 6,
+      "scalar_scenario": "one",
+      "scalar_types": [
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "6bc918a11a2814a304e14fdf9b854c7bcf765f21b76ea26762300328f942b4e9",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-14.expected.source": "6fd1eada9b59f74401f62bd5de38825abd50aaaae6b98e09e1e76de810dfd04b",
+        "case-14.expected.ttir": "58aeb44444d2925eae9db854cee748388b6e1791ac54d40171c48be62a551abb"
+      },
+      "expected_sha256": "58aeb44444d2925eae9db854cee748388b6e1791ac54d40171c48be62a551abb",
+      "raw_sha256": "6fd1eada9b59f74401f62bd5de38825abd50aaaae6b98e09e1e76de810dfd04b"
+    },
+    {
+      "index": 15,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 6,
+      "scalar_scenario": "one",
+      "scalar_types": [
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "c768bc63fe02bd5e6d1a0a7df97546e4b130dba62ca0c0c32dcc9db63388ac0e",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-15.expected.source": "bcaabf8257aaa2e627cff2c193a9b459dc9595132c843898b7fd2edb28f0ad90",
+        "case-15.expected.ttir": "c7f47d6f541f787b65e9a4f192a57a99d1d8efe33c91d8fdc880b74de6b081f7"
+      },
+      "expected_sha256": "c7f47d6f541f787b65e9a4f192a57a99d1d8efe33c91d8fdc880b74de6b081f7",
+      "raw_sha256": "bcaabf8257aaa2e627cff2c193a9b459dc9595132c843898b7fd2edb28f0ad90"
+    },
+    {
+      "index": 16,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 6,
+      "scalar_scenario": "wide",
+      "scalar_types": [
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64"
+      ],
+      "scalar_div16": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "2a50cc9dd01dd8ca5fc80754af5cba6b20a5327a3cc19163c54cc7871b966758",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-16.expected.source": "9f449825078a59fec9c1bc8d237236cabcb4e8a6be0f9110e081782bfde84d2e",
+        "case-16.expected.ttir": "64849fdad2e28d31c7da39306db8bcd292a3aa11a5182920a479e1fc4c7dcea0"
+      },
+      "expected_sha256": "64849fdad2e28d31c7da39306db8bcd292a3aa11a5182920a479e1fc4c7dcea0",
+      "raw_sha256": "9f449825078a59fec9c1bc8d237236cabcb4e8a6be0f9110e081782bfde84d2e"
+    },
+    {
+      "index": 17,
+      "operation": "w4a8_unpack",
+      "has_cb": false,
+      "bits": 6,
+      "scalar_scenario": "wide",
+      "scalar_types": [
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64"
+      ],
+      "scalar_div16": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "548f8f7732e31c9d638c6ee5815c42b35ba07634ca2afb921f71ddd71ed06811",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-17.expected.source": "4ab744ce8dc22c92069626d91a6bd3f55a96642041412d5e64f56fe8374e7331",
+        "case-17.expected.ttir": "877e507c33615fed0f4002125a6c880abfd3a0a29d942f13d117761ae9577a9f"
+      },
+      "expected_sha256": "877e507c33615fed0f4002125a6c880abfd3a0a29d942f13d117761ae9577a9f",
+      "raw_sha256": "4ab744ce8dc22c92069626d91a6bd3f55a96642041412d5e64f56fe8374e7331"
+    },
+    {
+      "index": 18,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 6,
+      "scalar_scenario": "dynamic32",
+      "scalar_types": [
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "71a136ca3ccd113b1ffe0e3530995fd3da5cd627b6cf33ec4c594c234e5a4380",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-18.expected.source": "52019d8ff68362b4a18a01e54b92175c9409ed9ff8842dd9fdf26ca2383e9617",
+        "case-18.expected.ttir": "6a8366bf72ae7dbd1bb8cec26db3f847957370dac408f07d24cfc2a745e4c83b",
+        "case-18.expected.ttgir": "f7b1df3011c0681506abed2395a4ea58fa3384643b260afa207ee8bb0110f707",
+        "case-18.expected.llvm.mlir": "29ad49d6aff35f8fb81f58b1726bb0552326ba13cdd6f5a64246287962196aa8",
+        "case-18.expected.llir": "b89c1297313f0f5925bdc15e68fc654c5e9657a2c6faaa512b0bb2f0557c2c41",
+        "case-18.expected.ptx": "870060c2d4f4ebb410552273c585de4446abc36449740b92bf8caabf34098a46",
+        "case-18.expected.cubin": "55010f4d26e0d913ea158262581b5e4b76fe43253a63ac5a64075da8ea4bb1b4"
+      },
+      "expected_sha256": "6a8366bf72ae7dbd1bb8cec26db3f847957370dac408f07d24cfc2a745e4c83b",
+      "raw_sha256": "52019d8ff68362b4a18a01e54b92175c9409ed9ff8842dd9fdf26ca2383e9617"
+    },
+    {
+      "index": 19,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 6,
+      "scalar_scenario": "dynamic32",
+      "scalar_types": [
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32",
+        "i32"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "f81b622050f3989b7b15049a2ebc6ecc6c22a01f087eb9c2b53689fd755141ac",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-19.expected.source": "296e3b1b3a8d6c6111d6b1e553898a93414a6c0303d4adb7f10bef41a0602251",
+        "case-19.expected.ttir": "8f585c92f9f082cfb8a4c4dbf7dd88bf8bcc875e51fa1794142f72afec366ef2"
+      },
+      "expected_sha256": "8f585c92f9f082cfb8a4c4dbf7dd88bf8bcc875e51fa1794142f72afec366ef2",
+      "raw_sha256": "296e3b1b3a8d6c6111d6b1e553898a93414a6c0303d4adb7f10bef41a0602251"
+    },
+    {
+      "index": 20,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 6,
+      "scalar_scenario": "one",
+      "scalar_types": [
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "4637295ecdb6a9c101b97163330bfda3b5554f918286d27301dd3ec29237c36d",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-20.expected.source": "a87e2965a819fbb115cadaf72af9933d6ccc109c548fadb4fd7740205d690295",
+        "case-20.expected.ttir": "4b9fc88a82c0d2405084cf5188c56b90d0aaf1356dbe881dc83198202344fa56"
+      },
+      "expected_sha256": "4b9fc88a82c0d2405084cf5188c56b90d0aaf1356dbe881dc83198202344fa56",
+      "raw_sha256": "a87e2965a819fbb115cadaf72af9933d6ccc109c548fadb4fd7740205d690295"
+    },
+    {
+      "index": 21,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 6,
+      "scalar_scenario": "one",
+      "scalar_types": [
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one",
+        "one"
+      ],
+      "scalar_div16": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "a6fb37e7fb2d5fd7513bdb4e26e3130fdccf6793deba779d413c102054f8f6dc",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-21.expected.source": "edda80910aabce23b77ced8f740d3e6b6318a26c55ed542e9db273cf79f0547c",
+        "case-21.expected.ttir": "7d524ebe6a2c52bc9d646d964bf82f5dee74d09674513a06760f234959040b8f"
+      },
+      "expected_sha256": "7d524ebe6a2c52bc9d646d964bf82f5dee74d09674513a06760f234959040b8f",
+      "raw_sha256": "edda80910aabce23b77ced8f740d3e6b6318a26c55ed542e9db273cf79f0547c"
+    },
+    {
+      "index": 22,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 6,
+      "scalar_scenario": "wide",
+      "scalar_types": [
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64"
+      ],
+      "scalar_div16": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "pointer_div16": [
+        true,
+        true,
+        true,
+        true
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "49555c4b53cc564a646c42be648fe99d642f0287c98afb2173953c2710210cf2",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-22.expected.source": "cdb479c6f2b1877bbd661204a09f59d50752ed5fc9833910117dd199cf19111d",
+        "case-22.expected.ttir": "b7c6001e706e9fbca18845b702d7931fcbbcaffba4f3fc20015e10d125cf55a6"
+      },
+      "expected_sha256": "b7c6001e706e9fbca18845b702d7931fcbbcaffba4f3fc20015e10d125cf55a6",
+      "raw_sha256": "cdb479c6f2b1877bbd661204a09f59d50752ed5fc9833910117dd199cf19111d"
+    },
+    {
+      "index": 23,
+      "operation": "w4a8_unpack",
+      "has_cb": true,
+      "bits": 6,
+      "scalar_scenario": "wide",
+      "scalar_types": [
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64",
+        "i64"
+      ],
+      "scalar_div16": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "pointer_div16": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "source_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "ast_digest": "38fed207df501163a8e6151f947c3ca194d8fcbaf601997056710f7fdd13cb23",
+      "private_functions": [],
+      "block_n": 32,
+      "block_kh": 128,
+      "files": {
+        "case-23.expected.source": "e397438965be09ed2ed4897fa0f05e3c66e527ab764db2127b7d824ba9a8bf3b",
+        "case-23.expected.ttir": "20f1696bff3a3bf1756329124a078eeeb74cd5e11644d9d2662428ffce913a00"
+      },
+      "expected_sha256": "20f1696bff3a3bf1756329124a078eeeb74cd5e11644d9d2662428ffce913a00",
+      "raw_sha256": "e397438965be09ed2ed4897fa0f05e3c66e527ab764db2127b7d824ba9a8bf3b"
+    }
+  ],
+  "compiled": [
+    {
+      "index": 0,
+      "metadata": {
+        "tensordesc_meta": [],
+        "num_warps": 4,
+        "shared": 0,
+        "tmem_size": 0,
+        "global_scratch_size": 0,
+        "global_scratch_align": 1,
+        "profile_scratch_size": 0,
+        "profile_scratch_align": 1,
+        "name": "_dequant_int4_grouped_to_int8_kernel"
+      },
+      "ttgir_pipeline": "any(convert-triton-to-tritongpu{enable-source-remat=false num-ctas=1 num-warps=4 target=cuda:89 threads-per-warp=32},tritongpu-coalesce,tritongpu-F32DotTC{emu-tf32=true},triton-nvidia-gpu-plan-cta,tritongpu-remove-layout-conversions,tritongpu-optimize-thread-locality,tritongpu-accelerate-matmul,tritongpu-remove-layout-conversions,tritongpu-optimize-dot-operands{hoist-layout-conversion=true},triton-nvidia-optimize-descriptor-encoding,triton-loop-aware-cse,tritongpu-fuse-nested-loops,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},triton-licm,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},tritongpu-combine-tensor-select-and-if,nvgpu-warp-specialization{dump-intermediate-steps=false num-stages=3},tritongpu-assign-latencies{num-stages=3},tritongpu-schedule-loops,tritongpu-pipeline{dump-intermediate-steps=false num-stages=3},canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},triton-loop-aware-cse,tritongpu-prefetch,tritongpu-optimize-dot-operands{hoist-layout-conversion=true},tritongpu-coalesce-async-copy,triton-nvidia-optimize-tmem-layouts,tritongpu-remove-layout-conversions,triton-nvidia-interleave-tmem,tritongpu-reduce-data-duplication,tritongpu-reorder-instructions,triton-loop-aware-cse,symbol-dce,triton-nvidia-gpu-fence-insertion{compute-capability=89},triton-nvidia-mma-lowering,sccp,cse,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true})",
+      "llir_pipeline": "any(tritongpu-combine-tensor-select-and-if,tritongpu-allocate-warp-groups,convert-scf-to-cf{allow-pattern-rollback=true},gluon-inline,allocate-shared-memory-nv{compute-capability=89 ptx-version=87},triton-tensor-memory-allocation,triton-nvidia-check-matmul-two-cta,tritongpu-global-scratch-memory-allocation,triton-nvidia-gpu-proxy-fence-insertion{compute-capability=89},convert-triton-gpu-to-llvm{compute-capability=89 ptx-version=87},canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},cse,convert-nv-gpu-to-llvm,convert-warp-specialize-to-llvm,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},cse,symbol-dce,convert-nvvm-to-llvm,enable-line-info)",
+      "cubin_error": null,
+      "files": {
+        "case-0.expected.source": "7f68e025981400b9f8461689cfe904c5e899f267041f84b621cf60b3621fe266",
+        "case-0.expected.ttir": "7c61b02d9fb8a08dbdee671bb1f064d9e622f10440b144ae8304e57ca159a978",
+        "case-0.expected.ttgir": "ca74190efe1bcec67a96e28c04eb2e03971425cca48aee878d89aebb74ee9a39",
+        "case-0.expected.llvm.mlir": "3b368d18f4bff1e1d625eda2403a68f4f46ce25428aa11c4109636ff0ff1289f",
+        "case-0.expected.llir": "bbea0ba81e26151a9ba1637306c87a802dad63cdb332cb1c5d94a9737fa1f640",
+        "case-0.expected.ptx": "d8ce66968107c16c180dc4bb561f55abffee037c226ef39bf2c3386afe005f13",
+        "case-0.expected.cubin": "e5a8d216b3e81a2917ac1f5c346ff1b2eab1a8dc6948ec1d9486d3b096732060"
+      }
+    },
+    {
+      "index": 6,
+      "metadata": {
+        "tensordesc_meta": [],
+        "num_warps": 4,
+        "shared": 0,
+        "tmem_size": 0,
+        "global_scratch_size": 0,
+        "global_scratch_align": 1,
+        "profile_scratch_size": 0,
+        "profile_scratch_align": 1,
+        "name": "_dequant_int4_grouped_to_int8_kernel"
+      },
+      "ttgir_pipeline": "any(convert-triton-to-tritongpu{enable-source-remat=false num-ctas=1 num-warps=4 target=cuda:89 threads-per-warp=32},tritongpu-coalesce,tritongpu-F32DotTC{emu-tf32=true},triton-nvidia-gpu-plan-cta,tritongpu-remove-layout-conversions,tritongpu-optimize-thread-locality,tritongpu-accelerate-matmul,tritongpu-remove-layout-conversions,tritongpu-optimize-dot-operands{hoist-layout-conversion=true},triton-nvidia-optimize-descriptor-encoding,triton-loop-aware-cse,tritongpu-fuse-nested-loops,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},triton-licm,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},tritongpu-combine-tensor-select-and-if,nvgpu-warp-specialization{dump-intermediate-steps=false num-stages=3},tritongpu-assign-latencies{num-stages=3},tritongpu-schedule-loops,tritongpu-pipeline{dump-intermediate-steps=false num-stages=3},canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},triton-loop-aware-cse,tritongpu-prefetch,tritongpu-optimize-dot-operands{hoist-layout-conversion=true},tritongpu-coalesce-async-copy,triton-nvidia-optimize-tmem-layouts,tritongpu-remove-layout-conversions,triton-nvidia-interleave-tmem,tritongpu-reduce-data-duplication,tritongpu-reorder-instructions,triton-loop-aware-cse,symbol-dce,triton-nvidia-gpu-fence-insertion{compute-capability=89},triton-nvidia-mma-lowering,sccp,cse,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true})",
+      "llir_pipeline": "any(tritongpu-combine-tensor-select-and-if,tritongpu-allocate-warp-groups,convert-scf-to-cf{allow-pattern-rollback=true},gluon-inline,allocate-shared-memory-nv{compute-capability=89 ptx-version=87},triton-tensor-memory-allocation,triton-nvidia-check-matmul-two-cta,tritongpu-global-scratch-memory-allocation,triton-nvidia-gpu-proxy-fence-insertion{compute-capability=89},convert-triton-gpu-to-llvm{compute-capability=89 ptx-version=87},canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},cse,convert-nv-gpu-to-llvm,convert-warp-specialize-to-llvm,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},cse,symbol-dce,convert-nvvm-to-llvm,enable-line-info)",
+      "cubin_error": null,
+      "files": {
+        "case-6.expected.source": "7cc2b97992323d4169fed6926fcfb5b49ee5be2b809faa840116909c4509262c",
+        "case-6.expected.ttir": "72b2a94e05f4c3ea72dc820e3b8de5a8d5b16fa6b9214893001f559558aeae23",
+        "case-6.expected.ttgir": "c9daee28540f0c0e25abde6d5ba5cbaff066f20ab91079dfbb09aba1a6eda641",
+        "case-6.expected.llvm.mlir": "e7a5c9dc667aad41ec34ffd93e34648c7b27ecfe05b09191cf74b5d57b394d93",
+        "case-6.expected.llir": "6c0b288e4be892bd2dd3b4aa82f9996acd132f3fdff91555c31b03306f95d1ae",
+        "case-6.expected.ptx": "9e6bedf735a42c5a30174102a2cb3974010c23bc8b8b39fe341408ce49398a83",
+        "case-6.expected.cubin": "e98dc3d44bb632041abdc7713ff7ff288a69757c4fe33cd1ed5322bcc3f37240"
+      }
+    },
+    {
+      "index": 12,
+      "metadata": {
+        "tensordesc_meta": [],
+        "num_warps": 4,
+        "shared": 0,
+        "tmem_size": 0,
+        "global_scratch_size": 0,
+        "global_scratch_align": 1,
+        "profile_scratch_size": 0,
+        "profile_scratch_align": 1,
+        "name": "_dequant_int4_grouped_to_int8_kernel"
+      },
+      "ttgir_pipeline": "any(convert-triton-to-tritongpu{enable-source-remat=false num-ctas=1 num-warps=4 target=cuda:89 threads-per-warp=32},tritongpu-coalesce,tritongpu-F32DotTC{emu-tf32=true},triton-nvidia-gpu-plan-cta,tritongpu-remove-layout-conversions,tritongpu-optimize-thread-locality,tritongpu-accelerate-matmul,tritongpu-remove-layout-conversions,tritongpu-optimize-dot-operands{hoist-layout-conversion=true},triton-nvidia-optimize-descriptor-encoding,triton-loop-aware-cse,tritongpu-fuse-nested-loops,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},triton-licm,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},tritongpu-combine-tensor-select-and-if,nvgpu-warp-specialization{dump-intermediate-steps=false num-stages=3},tritongpu-assign-latencies{num-stages=3},tritongpu-schedule-loops,tritongpu-pipeline{dump-intermediate-steps=false num-stages=3},canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},triton-loop-aware-cse,tritongpu-prefetch,tritongpu-optimize-dot-operands{hoist-layout-conversion=true},tritongpu-coalesce-async-copy,triton-nvidia-optimize-tmem-layouts,tritongpu-remove-layout-conversions,triton-nvidia-interleave-tmem,tritongpu-reduce-data-duplication,tritongpu-reorder-instructions,triton-loop-aware-cse,symbol-dce,triton-nvidia-gpu-fence-insertion{compute-capability=89},triton-nvidia-mma-lowering,sccp,cse,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true})",
+      "llir_pipeline": "any(tritongpu-combine-tensor-select-and-if,tritongpu-allocate-warp-groups,convert-scf-to-cf{allow-pattern-rollback=true},gluon-inline,allocate-shared-memory-nv{compute-capability=89 ptx-version=87},triton-tensor-memory-allocation,triton-nvidia-check-matmul-two-cta,tritongpu-global-scratch-memory-allocation,triton-nvidia-gpu-proxy-fence-insertion{compute-capability=89},convert-triton-gpu-to-llvm{compute-capability=89 ptx-version=87},canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},cse,convert-nv-gpu-to-llvm,convert-warp-specialize-to-llvm,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},cse,symbol-dce,convert-nvvm-to-llvm,enable-line-info)",
+      "cubin_error": null,
+      "files": {
+        "case-12.expected.source": "b858a60fb0873fdf48e42f29aecb3b064bd2ba91c2e5aab27c37a797d442e1ad",
+        "case-12.expected.ttir": "1ce1eb0b6a011cc377bac92bf3e05188ef6f3154b198a5dbd625e2ff31a2d544",
+        "case-12.expected.ttgir": "5b1fb7210f043777614cf94e398317151455df80b0d234230668a7270816701f",
+        "case-12.expected.llvm.mlir": "f7af94e78858ed912db8aed90d682ccb56f769ac6adedb923d618a4b41188677",
+        "case-12.expected.llir": "cf84f191ff2d8a2aa6ef5cfce7462b8915555e4cc1066b1d90fb66a1da306ea7",
+        "case-12.expected.ptx": "906448d7b2ca61e84c49afafc9747d5c5330183adb7ec47add326de8c7403665",
+        "case-12.expected.cubin": "01ea53ba118477f7047938771db9cf378b619ca8e61228ee55293c68f242de82"
+      }
+    },
+    {
+      "index": 18,
+      "metadata": {
+        "tensordesc_meta": [],
+        "num_warps": 4,
+        "shared": 0,
+        "tmem_size": 0,
+        "global_scratch_size": 0,
+        "global_scratch_align": 1,
+        "profile_scratch_size": 0,
+        "profile_scratch_align": 1,
+        "name": "_dequant_int4_grouped_to_int8_kernel"
+      },
+      "ttgir_pipeline": "any(convert-triton-to-tritongpu{enable-source-remat=false num-ctas=1 num-warps=4 target=cuda:89 threads-per-warp=32},tritongpu-coalesce,tritongpu-F32DotTC{emu-tf32=true},triton-nvidia-gpu-plan-cta,tritongpu-remove-layout-conversions,tritongpu-optimize-thread-locality,tritongpu-accelerate-matmul,tritongpu-remove-layout-conversions,tritongpu-optimize-dot-operands{hoist-layout-conversion=true},triton-nvidia-optimize-descriptor-encoding,triton-loop-aware-cse,tritongpu-fuse-nested-loops,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},triton-licm,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},tritongpu-combine-tensor-select-and-if,nvgpu-warp-specialization{dump-intermediate-steps=false num-stages=3},tritongpu-assign-latencies{num-stages=3},tritongpu-schedule-loops,tritongpu-pipeline{dump-intermediate-steps=false num-stages=3},canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},triton-loop-aware-cse,tritongpu-prefetch,tritongpu-optimize-dot-operands{hoist-layout-conversion=true},tritongpu-coalesce-async-copy,triton-nvidia-optimize-tmem-layouts,tritongpu-remove-layout-conversions,triton-nvidia-interleave-tmem,tritongpu-reduce-data-duplication,tritongpu-reorder-instructions,triton-loop-aware-cse,symbol-dce,triton-nvidia-gpu-fence-insertion{compute-capability=89},triton-nvidia-mma-lowering,sccp,cse,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true})",
+      "llir_pipeline": "any(tritongpu-combine-tensor-select-and-if,tritongpu-allocate-warp-groups,convert-scf-to-cf{allow-pattern-rollback=true},gluon-inline,allocate-shared-memory-nv{compute-capability=89 ptx-version=87},triton-tensor-memory-allocation,triton-nvidia-check-matmul-two-cta,tritongpu-global-scratch-memory-allocation,triton-nvidia-gpu-proxy-fence-insertion{compute-capability=89},convert-triton-gpu-to-llvm{compute-capability=89 ptx-version=87},canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},cse,convert-nv-gpu-to-llvm,convert-warp-specialize-to-llvm,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},cse,symbol-dce,convert-nvvm-to-llvm,enable-line-info)",
+      "cubin_error": null,
+      "files": {
+        "case-18.expected.source": "52019d8ff68362b4a18a01e54b92175c9409ed9ff8842dd9fdf26ca2383e9617",
+        "case-18.expected.ttir": "6a8366bf72ae7dbd1bb8cec26db3f847957370dac408f07d24cfc2a745e4c83b",
+        "case-18.expected.ttgir": "f7b1df3011c0681506abed2395a4ea58fa3384643b260afa207ee8bb0110f707",
+        "case-18.expected.llvm.mlir": "29ad49d6aff35f8fb81f58b1726bb0552326ba13cdd6f5a64246287962196aa8",
+        "case-18.expected.llir": "b89c1297313f0f5925bdc15e68fc654c5e9657a2c6faaa512b0bb2f0557c2c41",
+        "case-18.expected.ptx": "870060c2d4f4ebb410552273c585de4446abc36449740b92bf8caabf34098a46",
+        "case-18.expected.cubin": "55010f4d26e0d913ea158262581b5e4b76fe43253a63ac5a64075da8ea4bb1b4"
+      }
+    }
+  ],
+  "ttir_pipeline": "any(inline{default-pipeline=canonicalize inlining-threshold=4294967295 max-iterations=4 },triton-rewrite-tensor-pointer,triton-rewrite-tensor-descriptor-to-pointer,canonicalize{  max-iterations=10 max-num-rewrites=-1 region-simplify=normal test-convergence=false top-down=true},triton-combine,triton-reorder-broadcast,cse,symbol-dce,triton-loop-unroll)",
+  "options": {
+    "num_warps": 4,
+    "num_ctas": 1,
+    "num_stages": 3,
+    "warp_size": 32,
+    "maxnreg": null,
+    "ptx_version": null,
+    "ptx_options": null,
+    "ir_override": null,
+    "enable_fp_fusion": true,
+    "enable_reflect_ftz": true,
+    "launch_cooperative_grid": false,
+    "launch_pdl": false,
+    "supported_fp8_dtypes": [
+      "fp8e4b15",
+      "fp8e4nv",
+      "fp8e5"
+    ],
+    "deprecated_fp8_dot_operand_dtypes": [],
+    "default_dot_input_precision": "tf32",
+    "allowed_dot_input_precisions": [
+      "tf32",
+      "tf32x3",
+      "ieee",
+      "bf16x3",
+      "bf16x6"
+    ],
+    "max_num_imprecise_acc_default": 0,
+    "extern_libs": [
+      [
+        "libdevice",
+        "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/triton/backends/nvidia/lib/libdevice.10.bc"
+      ]
+    ],
+    "debug": false,
+    "backend_name": "cuda",
+    "sanitize_overflow": true,
+    "arch": "sm89",
+    "instrumentation_mode": ""
+  },
+  "options_hash": "5201b6b52cc0fab222ffa80f023a969480b31ac4d4c56b136ddab9e639632ee1",
+  "function_cache_keys": {
+    "w4a8": "b39c2a7a503684075dc995460fb505baf0ec7437289938d225540d925a3c736b"
+  },
+  "compiler_source_files": [
+    {
+      "reference_path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "copy": "compiler-source/comfy_kitchen/backends/triton/w4a8_int8.py",
+      "sha256": "6528efcf03ddc59e055033b8e7d78b51e4daf222e752abc3e7b1d323fa601cc8",
+      "size": 6496,
+      "mtime_ns": 1792830478005012029
+    }
+  ],
+  "external_libraries": [
+    {
+      "name": "libdevice",
+      "path": "/home/thhel/git/ComfyUI/.venv/lib/python3.12/site-packages/triton/backends/nvidia/lib/libdevice.10.bc",
+      "sha256": "5c2fae37c86e68c3a38605a95f512d7d12d5f3db986310be47f57304aa72a5ee"
+    }
+  ]
+}

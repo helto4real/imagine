@@ -108,3 +108,30 @@ projection under Kitchen 0.2.40, and the dispatch traces are identical. Rust's
 `prefix_cache_key` now puts the batch size first; the component test checks it
 exactly against the new fixture and, with the batch column removed, against the
 previous one. All 46 Qwen Image 2.1 tests pass.
+
+The previous root's fixtures under `runtime/` had drifted: its `primitives.json`
+is the Kitchen 0.2.38 merge (the bundle's copy predates it) and the bundle's
+`backend-contract.json` predates `fixtures/kitchen-0238-backend-contract.json`.
+The new root links the upgraded `primitives.json` from `moss-20261018` and the
+versioned 0.2.38 backend contract. Two H3 examples no longer compiled against the
+current H3 API (`SecondStage` upscale/model fields, motion `capture` and `Window`
+arguments), which stopped `cargo test` before any test ran; both are updated.
+
+Triton cubins embed the modification time of the Kitchen source they compile, in
+their DWARF line table (`ptxas -lineinfo` reads it from the source path). Installing
+Kitchen 0.2.40 on 2026-10-24 rewrote unchanged Triton sources with new times, so
+cubin hashes captured earlier no longer match although every stage up to PTX is
+byte-identical and the pinned `ptxas` is unchanged. The original Triton run today
+produces exactly the Rust compiler's cubins. Recaptured from the new reference:
+the W4A8 frontend (`fixtures/reference-20261027/kitchen-0240-w4a8-frontend.json`,
+differing only in four cubin hashes and the recorded source time) and the INT8 AOT
+probe (`build_int8_aot.py`, 225 cubins, no candidate mismatch).
+
+### Item 8: ConvRot INT8 shared-memory estimate
+
+`convrot::fused_shared_memory_bytes` copied Kitchen 0.2.38's Python estimate, which
+did not follow the kernel launcher's block-size rule; Kitchen 0.2.39 corrected the
+Python copy. Rust now follows the launcher rule, checked against
+`tools/reference_kitchen_convrot_shared_memory.py`, which evaluates Kitchen 0.2.40's
+own function over 75 row/width cases. On the RTX 4070 Ti SUPER the old and new
+estimates select the same kernels.

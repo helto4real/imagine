@@ -508,9 +508,13 @@ fn fixtures() -> &'static Value {
         let registry: Value =
             serde_json::from_str(include_str!("../fixtures/kitchen-0238-registry.json")).unwrap();
         data["binding_tables"]["backends"] = registry["backends"].clone();
-        let w4a8: Value =
-            serde_json::from_str(include_str!("../fixtures/kitchen-0238-w4a8-frontend.json"))
-                .unwrap();
+        // Its cubins embed the Kitchen source's modification time (DWARF line table);
+        // reinstalling Kitchen 0.2.40 changed only that, so this capture supersedes
+        // kitchen-0238-w4a8-frontend.json, which stays as the previous evidence.
+        let w4a8: Value = serde_json::from_str(include_str!(
+            "../fixtures/reference-20261027/kitchen-0240-w4a8-frontend.json"
+        ))
+        .unwrap();
         data["triton_w4a8_specialization"] = w4a8["cases"].clone();
         data["triton_w4a8_function_cache_keys"] = w4a8["function_cache_keys"].clone();
         let diagnostics: Value =
