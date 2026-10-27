@@ -1,9 +1,11 @@
 use super::*;
 use crate::components as c;
+/// `images` are reference images to edit with (Moss-Image-Edit), RGBA in [0, 1].
 pub(super) fn generate(
     rt: &Runtime,
     aimdo: &Aimdo,
     r: &Request,
+    images: &[Tensor],
     observer: &mut Observer<'_>,
 ) -> Result<Tensor, Error> {
     let dev = Device::Cuda(0);
@@ -70,6 +72,45 @@ pub(super) fn generate(
     drop(patcher);
     drop(text);
     rt.native.cuda_soft_empty_cache(0)?;
+    // The edit encoder encodes the references after the prompt; Flux2's latent
+    // format leaves them as encoded.
+    let reference_latents = if images.is_empty() {
+        Vec::new()
+    } else {
+        let vae = load_vae(rt, aimdo, r, &pins, observer)?;
+        let mut latents = Vec::with_capacity(images.len());
+        for pixels in images {
+            let pixels = q::vae_crop_pixels(&pixels.f_narrow(-1, 0, 3)?)?.f_movedim_int(-1, 1)?;
+            latents.push(flux2_vae(
+                rt,
+                &vae,
+                q::VaeOperation::Encode,
+                &pixels,
+                &mut manager,
+                &mut memory,
+                (&r.vae, observer),
+            )?);
+        }
+        manager.unload_all(dev, &mut memory)?;
+        drop(vae);
+        rt.native.cuda_soft_empty_cache(0)?;
+        latents
+    };
+    // Each condition carries the references, so the original counts their tokens
+    // once per condition, and once in the minimum.
+    let reference_shape = [
+        1,
+        128,
+        reference_latents
+            .iter()
+            .map(|l| l.size()[2] * l.size()[3])
+            .sum::<i64>(),
+    ];
+    let reference_memory = if reference_latents.is_empty() {
+        0.
+    } else {
+        m::moss_memory_required(&reference_shape, Kind::BFloat16, true)
+    };
     observer(Event::Phase("loading_model"))?;
     let model = observe_load("dit", &r.diffusion_model, observer, || {
         let params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
@@ -107,8 +148,8 @@ pub(super) fn generate(
     manager
         .load(
             std::slice::from_ref(&patcher),
-            m::moss_memory_required(&doubled, Kind::BFloat16, true),
-            Some(m::moss_memory_required(&shape, Kind::BFloat16, true)),
+            m::moss_memory_required(&doubled, Kind::BFloat16, true) + 2. * reference_memory,
+            Some(m::moss_memory_required(&shape, Kind::BFloat16, true) + reference_memory),
             false,
             false,
             &mut memory,
@@ -147,6 +188,17 @@ pub(super) fn generate(
             &Tensor::f_zeros(shape, (Kind::Float, dev))?,
             1.,
         )?;
+        // Keys and values of the references, computed once for both conditions.
+        let reference_kv = if reference_latents.is_empty() {
+            None
+        } else {
+            let refs = reference_latents
+                .iter()
+                .map(|l| l.f_to_device_(dev, Kind::BFloat16, false, false))
+                .collect::<Result<Vec<_>, _>>()?;
+            let mut exec = m::MossStaticExecution::bind(rt, &params, attention())?;
+            Some(unsafe { dit.preprocess_refs(rt, &refs, &mut exec)? })
+        };
         let condition = |context| q::FullAreaCondition {
             context,
             attention_mask: None,
@@ -173,6 +225,10 @@ pub(super) fn generate(
                     observer(Event::Step(step.i + 1))?;
                     preview.update(&r.model, step.i + 1, step.denoised, observer)
                 })),
+                references: reference_kv.as_ref().map(|kv| m::MossReferences {
+                    kv,
+                    layout: m::MossEditLayout::TextStart,
+                }),
             })
         };
         let out = q::sample_euler(input, &sigmas, Default::default(), &mut denoiser)?;
@@ -184,14 +240,45 @@ pub(super) fn generate(
     drop(model);
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("saving_output"))?;
-    let model = observe_load("vae", &r.vae, observer, || {
+    let vae = load_vae(rt, aimdo, r, &pins, observer)?;
+    let out = flux2_vae(
+        rt,
+        &vae,
+        q::VaeOperation::Decode,
+        &latent,
+        &mut manager,
+        &mut memory,
+        (&r.vae, observer),
+    )?;
+    manager.unload_all(dev, &mut memory)?;
+    Ok(out)
+}
+fn load_vae<'a>(
+    rt: &'a Runtime,
+    aimdo: &Aimdo,
+    r: &Request,
+    pins: &c::HostPins,
+    observer: &mut Observer<'_>,
+) -> Result<std::rc::Rc<c::StaticModel<'a, c::ComponentBuffers>>, Error> {
+    observe_load("vae", &r.vae, observer, || {
         Ok(c::StaticModel::new(
             m::static_moss_component(rt, "vae", load(rt, aimdo, &r.vae, "vae", &r.model)?)?
                 .with_shared_pins(pins.clone()),
             rt,
             None,
         ))
-    })?;
+    })
+}
+/// One Flux2 VAE encode or decode under the original memory policy.
+fn flux2_vae<'a>(
+    rt: &'a Runtime,
+    model: &std::rc::Rc<c::StaticModel<'a, c::ComponentBuffers>>,
+    op: q::VaeOperation,
+    input: &Tensor,
+    manager: &mut Manager<'a>,
+    memory: &mut c::StaticMemoryServices,
+    diagnostic: (&std::path::Path, &mut Observer<'_>),
+) -> Result<Tensor, Error> {
     let patcher = model.patcher();
     manager
         .load(
@@ -200,23 +287,23 @@ pub(super) fn generate(
             None,
             false,
             false,
-            &mut memory,
+            memory,
         )
-        .map_err(|error| load_failure("vae", &r.vae, observer, error))?;
+        .map_err(|error| load_failure("vae", diagnostic.0, diagnostic.1, error))?;
     let mut exec = m::MossStaticExecution::bind(rt, &PreparedParameters::default(), attention())?;
     let mut services = m::ManagedFlux2Vae {
         runtime: rt,
         model: model.clone(),
         patcher,
-        manager: &mut manager,
-        memory: &mut memory,
+        manager,
+        memory,
         execution: &mut exec,
         config: Default::default(),
-        device: dev,
+        device: Device::Cuda(0),
         force_full_load: false,
     };
-    let out = q::ImageVaePolicy {
-        device: dev,
+    q::ImageVaePolicy {
+        device: Device::Cuda(0),
         dtype: Kind::BFloat16,
         output_device: Device::Cpu,
         output_kind: Kind::Float,
@@ -225,12 +312,9 @@ pub(super) fn generate(
         latent_channels: 128,
     }
     .execute_with_memory(
-        q::VaeOperation::Decode,
-        &latent,
+        op,
+        input,
         &mut services,
         q::ImageVaeMemory::Flux2 { amd: false },
-    )?;
-    drop(services);
-    manager.unload_all(dev, &mut memory)?;
-    Ok(out)
+    )
 }

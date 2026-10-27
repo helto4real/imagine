@@ -1,5 +1,7 @@
 //! Explicit static MOSS services; source compiler/vbars/async offload are disabled.
-use super::{MossDiT, MossExecution, MossInputs, MossLifecycle, moss_memory_required};
+use super::{
+    MossDiT, MossExecution, MossInputs, MossLifecycle, MossReferences, moss_memory_required,
+};
 use crate::models::qwen_image21::{
     EulerExecution, EulerStep, FullAreaCondition, FullAreaExecution, SamplingObserver,
     TextEncoderExecution, VaeExecution, flow_denoised, full_area_cfg, host_available_memory,
@@ -185,6 +187,9 @@ pub struct MossDenoiserConfig<'a> {
     pub execution: MossStaticExecution,
     pub generator: crate::native::Generator,
     pub observer: Option<SamplingObserver<'a>>,
+    /// Edit references both conditions attend to, as the original gives the
+    /// negative prompt the references too.
+    pub references: Option<MossReferences<'a>>,
 }
 pub struct MossDenoiser<'a> {
     config: MossDenoiserConfig<'a>,
@@ -204,6 +209,7 @@ struct Forward<'a, 'b> {
     dtype: Kind,
     flash: bool,
     multiplier: f64,
+    references: Option<MossReferences<'a>>,
 }
 impl FullAreaExecution for Forward<'_, '_> {
     fn free_memory(&mut self, device: Device) -> Result<f64, Error> {
@@ -247,7 +253,7 @@ impl FullAreaExecution for Forward<'_, '_> {
                     latent: &input,
                     timestep: &timestep,
                     context: &context,
-                    references: None,
+                    references: self.references,
                 },
                 self.exec,
             )
@@ -273,6 +279,7 @@ impl EulerExecution for MossDenoiser<'_> {
                 dtype: config.compute_dtype,
                 flash: config.flash_attention_memory,
                 multiplier: config.multiplier,
+                references: config.references,
             },
         )
     }

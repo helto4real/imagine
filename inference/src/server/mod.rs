@@ -176,7 +176,7 @@ pub fn generate(
         || moss
             && (r.sampling.sampler != "euler"
                 || !matches!(r.sampling.scheduler.as_str(), "normal" | "sgm_uniform")
-                || !images.is_empty())
+                || images.len() > 4)
     {
         return Err(Error::Native("Unsupported inference selection".into()));
     }
@@ -211,7 +211,7 @@ pub fn generate(
     let _grad = tch::no_grad_guard();
     let _inference = crate::native::inference_mode(true)?;
     let out = if moss {
-        moss::generate(rt, aimdo, r, observer)
+        moss::generate(rt, aimdo, r, images, observer)
     } else {
         qwen::generate(rt, aimdo, r, images, observer)
     }?;
