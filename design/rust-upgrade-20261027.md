@@ -190,3 +190,34 @@ every block's attention. `MossEditLayout` selects Moss-Image-Edit's text-start
 frames or ai-toolkit's image frame. All 32 edit cases (CPU/CUDA, BF16/INT8,
 fused/split q/k/v, both layouts, one and two references) match exactly, including
 the precomputed keys/values and lifecycle events.
+
+### Item 1: MOSS editing — product path
+
+The Rust worker accepts up to four MOSS references: it encodes them with the Flux2
+VAE after the prompt (centered 16-pixel crop, RGB), counts their tokens once per
+condition in the DiT memory estimate as `estimate_memory` does, computes their
+keys and values once and gives them to both conditions with the text-start layout.
+The `moss-edit` profile takes one to four references and adds the Moss-Image-Edit
+LoRA with the author's workflow settings (30 steps, CFG 4, euler/normal, empty
+negative prompt); the output follows the first reference's aspect at a 1024 long
+side. References use the shared preparation (Lanczos shrink to 1 MP, center crop to
+multiples of 32). MOSS's model metadata still reports no references, so the UI does
+not offer MOSS editing without the LoRA. The author's workflow also applies a
+skip-layer guidance node from its own pack; that is not part of ComfyUI core and is
+not ported. Until item 2, the reference encode uses the unfused Flux2 VAE path,
+while `426f5eea` encodes through the fused strip path.
+
+Candidate builds: Tomas chose to promote the whole of main. Production's Rust core
+is `source_base` `cd0ef53` with nine core files from `b30b480` and three patches;
+main already contains all of them (the MOSS LoRA patch's file was later changed by
+item 3). A working-copy lock with `source_base`/`core_revision` at the candidate
+commit and no core patches builds it; the lock is restored afterwards. Candidates are
+frozen as `comfyui/products/rust-candidate-20261027-<commit>`.
+
+Live check on `rust-candidate-20261027-dd90cf7` through the MCP: a MOSS 1024²
+image of a woman in a pink dress, then `moss-edit` with the author's example
+instruction ("Change only the pink dress to bright red. Keep the character, face,
+hair, pose, background and composition unchanged."): the dress turned bright red
+with face, pose, accessories, background and composition unchanged, 25.6 s for
+30 steps. The first candidate failed because the reference encode reused Qwen's
+crop, which pads to four channels; fixed in `dd90cf7`.
