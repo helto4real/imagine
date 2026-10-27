@@ -1,0 +1,382 @@
+{
+ "schema": 1,
+ "source": "comfy_kitchen/backends/cuda/__init__.py",
+ "source_sha256": "a3dcaf4c3483d41a85b4ec189e99346272b609e40c98acb1e9a0ccdbe4764c8e",
+ "cases": [
+  {
+   "rows": 1,
+   "width": 256,
+   "bytes": 17408
+  },
+  {
+   "rows": 1,
+   "width": 512,
+   "bytes": 18432
+  },
+  {
+   "rows": 1,
+   "width": 1024,
+   "bytes": 20480
+  },
+  {
+   "rows": 1,
+   "width": 2560,
+   "bytes": 26624
+  },
+  {
+   "rows": 1,
+   "width": 3072,
+   "bytes": 28672
+  },
+  {
+   "rows": 1,
+   "width": 3584,
+   "bytes": 30720
+  },
+  {
+   "rows": 1,
+   "width": 4096,
+   "bytes": 32768
+  },
+  {
+   "rows": 1,
+   "width": 6144,
+   "bytes": 40960
+  },
+  {
+   "rows": 1,
+   "width": 6400,
+   "bytes": 41984
+  },
+  {
+   "rows": 1,
+   "width": 8192,
+   "bytes": 49152
+  },
+  {
+   "rows": 1,
+   "width": 12287,
+   "bytes": 65532
+  },
+  {
+   "rows": 1,
+   "width": 12288,
+   "bytes": 65536
+  },
+  {
+   "rows": 1,
+   "width": 13824,
+   "bytes": 71680
+  },
+  {
+   "rows": 1,
+   "width": 16384,
+   "bytes": 81920
+  },
+  {
+   "rows": 1,
+   "width": 24576,
+   "bytes": 114688
+  },
+  {
+   "rows": 2,
+   "width": 256,
+   "bytes": 3072
+  },
+  {
+   "rows": 2,
+   "width": 512,
+   "bytes": 6144
+  },
+  {
+   "rows": 2,
+   "width": 1024,
+   "bytes": 8192
+  },
+  {
+   "rows": 2,
+   "width": 2560,
+   "bytes": 14336
+  },
+  {
+   "rows": 2,
+   "width": 3072,
+   "bytes": 16384
+  },
+  {
+   "rows": 2,
+   "width": 3584,
+   "bytes": 22528
+  },
+  {
+   "rows": 2,
+   "width": 4096,
+   "bytes": 24576
+  },
+  {
+   "rows": 2,
+   "width": 6144,
+   "bytes": 32768
+  },
+  {
+   "rows": 2,
+   "width": 6400,
+   "bytes": 41984
+  },
+  {
+   "rows": 2,
+   "width": 8192,
+   "bytes": 49152
+  },
+  {
+   "rows": 2,
+   "width": 12287,
+   "bytes": 65532
+  },
+  {
+   "rows": 2,
+   "width": 12288,
+   "bytes": 81920
+  },
+  {
+   "rows": 2,
+   "width": 13824,
+   "bytes": 88064
+  },
+  {
+   "rows": 2,
+   "width": 16384,
+   "bytes": 98304
+  },
+  {
+   "rows": 2,
+   "width": 24576,
+   "bytes": 131072
+  },
+  {
+   "rows": 7,
+   "width": 256,
+   "bytes": 3072
+  },
+  {
+   "rows": 7,
+   "width": 512,
+   "bytes": 6144
+  },
+  {
+   "rows": 7,
+   "width": 1024,
+   "bytes": 8192
+  },
+  {
+   "rows": 7,
+   "width": 2560,
+   "bytes": 14336
+  },
+  {
+   "rows": 7,
+   "width": 3072,
+   "bytes": 16384
+  },
+  {
+   "rows": 7,
+   "width": 3584,
+   "bytes": 22528
+  },
+  {
+   "rows": 7,
+   "width": 4096,
+   "bytes": 24576
+  },
+  {
+   "rows": 7,
+   "width": 6144,
+   "bytes": 32768
+  },
+  {
+   "rows": 7,
+   "width": 6400,
+   "bytes": 41984
+  },
+  {
+   "rows": 7,
+   "width": 8192,
+   "bytes": 49152
+  },
+  {
+   "rows": 7,
+   "width": 12287,
+   "bytes": 65532
+  },
+  {
+   "rows": 7,
+   "width": 12288,
+   "bytes": 81920
+  },
+  {
+   "rows": 7,
+   "width": 13824,
+   "bytes": 88064
+  },
+  {
+   "rows": 7,
+   "width": 16384,
+   "bytes": 98304
+  },
+  {
+   "rows": 7,
+   "width": 24576,
+   "bytes": 131072
+  },
+  {
+   "rows": 512,
+   "width": 256,
+   "bytes": 3072
+  },
+  {
+   "rows": 512,
+   "width": 512,
+   "bytes": 6144
+  },
+  {
+   "rows": 512,
+   "width": 1024,
+   "bytes": 8192
+  },
+  {
+   "rows": 512,
+   "width": 2560,
+   "bytes": 14336
+  },
+  {
+   "rows": 512,
+   "width": 3072,
+   "bytes": 16384
+  },
+  {
+   "rows": 512,
+   "width": 3584,
+   "bytes": 22528
+  },
+  {
+   "rows": 512,
+   "width": 4096,
+   "bytes": 24576
+  },
+  {
+   "rows": 512,
+   "width": 6144,
+   "bytes": 32768
+  },
+  {
+   "rows": 512,
+   "width": 6400,
+   "bytes": 41984
+  },
+  {
+   "rows": 512,
+   "width": 8192,
+   "bytes": 49152
+  },
+  {
+   "rows": 512,
+   "width": 12287,
+   "bytes": 65532
+  },
+  {
+   "rows": 512,
+   "width": 12288,
+   "bytes": 81920
+  },
+  {
+   "rows": 512,
+   "width": 13824,
+   "bytes": 88064
+  },
+  {
+   "rows": 512,
+   "width": 16384,
+   "bytes": 98304
+  },
+  {
+   "rows": 512,
+   "width": 24576,
+   "bytes": 131072
+  },
+  {
+   "rows": 4096,
+   "width": 256,
+   "bytes": 3072
+  },
+  {
+   "rows": 4096,
+   "width": 512,
+   "bytes": 6144
+  },
+  {
+   "rows": 4096,
+   "width": 1024,
+   "bytes": 8192
+  },
+  {
+   "rows": 4096,
+   "width": 2560,
+   "bytes": 14336
+  },
+  {
+   "rows": 4096,
+   "width": 3072,
+   "bytes": 16384
+  },
+  {
+   "rows": 4096,
+   "width": 3584,
+   "bytes": 22528
+  },
+  {
+   "rows": 4096,
+   "width": 4096,
+   "bytes": 24576
+  },
+  {
+   "rows": 4096,
+   "width": 6144,
+   "bytes": 32768
+  },
+  {
+   "rows": 4096,
+   "width": 6400,
+   "bytes": 41984
+  },
+  {
+   "rows": 4096,
+   "width": 8192,
+   "bytes": 49152
+  },
+  {
+   "rows": 4096,
+   "width": 12287,
+   "bytes": 65532
+  },
+  {
+   "rows": 4096,
+   "width": 12288,
+   "bytes": 81920
+  },
+  {
+   "rows": 4096,
+   "width": 13824,
+   "bytes": 88064
+  },
+  {
+   "rows": 4096,
+   "width": 16384,
+   "bytes": 98304
+  },
+  {
+   "rows": 4096,
+   "width": 24576,
+   "bytes": 131072
+  }
+ ]
+}

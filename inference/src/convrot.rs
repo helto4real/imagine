@@ -310,16 +310,16 @@ pub fn max_dynamic_shared_memory(native: &Kitchen, device: usize) -> Result<i64,
     Ok(limit)
 }
 
+/// Dynamic shared memory of Kitchen's fused ConvRot INT8 quantizer, from the block
+/// size its launcher selects (Kitchen 0.2.39+ mirrors the same rule).
 pub fn fused_shared_memory_bytes(rows: i64, width: i64) -> i64 {
-    let block_threads = if rows == 1 {
-        512
-    } else {
-        match width {
-            256 => 64,
-            2560 => 640,
-            6144 => 768,
-            _ => 1024,
-        }
+    let block_threads = match (rows, width) {
+        (1, _) => 512,
+        (_, 256) => 64,
+        (_, ..=3072) => 128,
+        (_, ..=6144) => 256,
+        (_, ..12288) => 512,
+        _ => 1024,
     };
     (width + (block_threads / 64) * 2 * 256) * 4
 }
@@ -481,4 +481,26 @@ pub fn quantize_activation(
     let seed = seed.into();
     let rotated = crate::int8_utils::rotate_activation(x, h, group)?;
     crate::quantization::int8_rowwise(native, &rotated, seed)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn fused_shared_memory_matches_kitchen_launch_rule() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/reference-20261027/kitchen-convrot-shared-memory.json"
+        ))
+        .unwrap();
+        for case in fixture["cases"].as_array().unwrap() {
+            let (rows, width) = (
+                case["rows"].as_i64().unwrap(),
+                case["width"].as_i64().unwrap(),
+            );
+            assert_eq!(
+                super::fused_shared_memory_bytes(rows, width),
+                case["bytes"].as_i64().unwrap(),
+                "rows {rows}, width {width}"
+            );
+        }
+    }
 }
