@@ -301,3 +301,22 @@ earlier +2.8 % and the control's 73.4 s median were run-to-run variation, not a
 regression. The control build cannot start with today's `config` because it
 rejects the `moss-edit` profile; the driver parks that profile while a control
 server runs.
+
+### Candidate bench (`94d206e`, items 1 and 3–8, Kitchen 0.2.38)
+
+`comfyui/bench/candidate-94d206e-20261027T222312Z`, same order and four runs per
+workload as the control. Every image is identical to the control's, worker GPU
+peaks are unchanged and all runs are deterministic.
+
+| Workload | Warm median (control) | Warm median (candidate) | Worker RSS peak (control → candidate) |
+| --- | ---: | ---: | ---: |
+| `moss-t2i` | 33.2 s | 32.2 s | 11,133 → 11,238 MiB |
+| `moss-sheet` | 40.2 s | 39.7 s | 11,174 → 11,567 MiB |
+| `qwen-t2i` | 52.7 s | 51.3 s | 11,268 → 12,412 MiB |
+| `qwen-edit` | 73.4 s | 71.9 s | 12,512 → 13,829 MiB |
+
+Worker RSS again grows across the `qwen-edit` runs when they follow the MOSS and
+`qwen-t2i` workloads in one server process (12,204 → 13,829 MiB; the control grew
+10,929 → 12,512). The interleaved rounds, which restart the server before Qwen,
+showed no growth with either build, so this is an effect of the run order; its
+size differs between runs and is not yet explained.
