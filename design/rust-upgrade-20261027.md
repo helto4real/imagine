@@ -154,3 +154,11 @@ fused q/k/v slices (`layers.0.proj.q`); the test compares the whole alias map,
 including order, with dict semantics. Our checkpoint uses fused q/k/v, and every
 module of the Moss-Image-Edit LoRA (bare `layers.N.proj.{q,k,v,o,ffn_up_gate,ffn_down}`)
 now resolves; previously none of its names had a mapping.
+
+### Item 5: MOSS peak memory
+
+Following `067f8533`, the MOSS block releases its normed input, q/k/v (including a
+fused projection, which lives only in its chunks), the attention output and the
+FFN input as soon as each is used; the text blocks release q/k/v and the attention
+output before their FFN. Outputs are unchanged (the complete MOSS DiT test is
+exact); the peak-memory effect is measured with the candidate worker in Phase 3.

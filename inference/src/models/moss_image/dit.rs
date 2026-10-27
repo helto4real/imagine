@@ -338,6 +338,8 @@ impl TextBlock {
         let qkv = unsafe { linear(&self.qkv, rt, &norm(x, &self.norms[0])?, e)? }.f_chunk(3, -1)?;
         let attn = unsafe { self.attn.forward(rt, &qkv[0], &qkv[1], &qkv[2], pe, e)? };
         let x = x.f_add(&unsafe { linear(&self.proj, rt, &attn, e)? })?;
+        // Release attention operands before the FFN, as the original does.
+        drop((qkv, attn));
         e.check_interrupt()?;
         let y = norm(&x, &self.norms[1])?;
         let hidden = unsafe { linear(&self.up, rt, &y, e)? };
@@ -381,33 +383,40 @@ impl Block {
         e: &mut E,
     ) -> Result<Tensor, Error> {
         let y = unsafe { mod_norm(rt, x, &self.norms[0], &m[1], &m[0], e)? };
-        let q = unsafe { linear(&self.q, rt, &y, e)? };
-        let parts = if let (Some(k), Some(v)) = (&self.k, &self.v) {
-            vec![q, unsafe { linear(k, rt, &y, e)? }, unsafe {
-                linear(v, rt, &y, e)?
-            }]
-        } else {
-            q.f_chunk(3, -1)?
+        // A fused projection's output lives only in its chunks.
+        let parts = {
+            let q = unsafe { linear(&self.q, rt, &y, e)? };
+            if let (Some(k), Some(v)) = (&self.k, &self.v) {
+                vec![q, unsafe { linear(k, rt, &y, e)? }, unsafe {
+                    linear(v, rt, &y, e)?
+                }]
+            } else {
+                q.f_chunk(3, -1)?
+            }
         };
+        // Each intermediate is released once used, as the original does, which
+        // lowers peak memory.
+        drop(y);
         let attn = unsafe {
             self.attn
                 .forward(rt, &parts[0], &parts[1], &parts[2], pe, e)?
         };
-        let x = residual(
-            x,
-            &unsafe { linear(&self.o, rt, &attn, e)? },
-            &m[2],
-            e.training(),
-        )?;
+        drop(parts);
+        let out = unsafe { linear(&self.o, rt, &attn, e)? };
+        drop(attn);
+        let x = residual(x, &out, &m[2], e.training())?;
+        drop(out);
         let y = unsafe { mod_norm(rt, &x, &self.norms[1], &m[4], &m[3], e)? };
-        let y = unsafe { linear(&self.up, rt, &y, e)? };
+        let hidden = unsafe { linear(&self.up, rt, &y, e)? };
+        drop(y);
         let training = e.training();
         let y = unsafe {
             self.down
-                .input_act(rt, &y, "situ", None, 0., training, &mut || {
+                .input_act(rt, &hidden, "situ", None, 0., training, &mut || {
                     e.check_interrupt()
                 })?
         };
+        drop(hidden);
         residual(&x, &y, &m[5], training)
     }
 }
