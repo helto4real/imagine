@@ -22,6 +22,37 @@ struct Menu {
     dismissed: bool,
     popup: Option<egui::Rect>,
     context: Option<pc::Context>,
+    /// The keyboard moved the selection; scroll it into view.
+    reveal: bool,
+}
+impl Completion {
+    fn row(&self) -> String {
+        if self.catalog.is_some() {
+            format!("{} · {}", self.label, self.kind)
+        } else {
+            format!("{} · {} · {}", self.tag, self.label, self.kind)
+        }
+    }
+}
+/// Popup content width that fits the longest row on one line: at least the
+/// field's width, at most the window's. Rows wrap only when the window is narrower.
+fn popup_width(ui: &egui::Ui, items: &[Completion], field: f32) -> f32 {
+    let style = ui.style();
+    let font = egui::TextStyle::Button.resolve(style);
+    let widest = ui.fonts_mut(|f| {
+        items
+            .iter()
+            .map(|item| {
+                f.layout_no_wrap(item.row(), font.clone(), egui::Color32::PLACEHOLDER)
+                    .size()
+                    .x
+            })
+            .fold(0., f32::max)
+    });
+    let frame = style.spacing.menu_margin.sum().x + 2.;
+    let row = widest + 2. * style.spacing.button_padding.x + style.spacing.scroll.allocated_width();
+    row.max(field.max(220.) - frame)
+        .min(ui.ctx().content_rect().width() - 16. - frame)
 }
 
 pub(super) fn reference_tag(alias: &str) -> String {
@@ -307,6 +338,7 @@ fn textarea_inner(
         let mut pick = None;
         ui.input_mut(|input| {
             let modifiers = egui::Modifiers::NONE;
+            let before = menu.selected;
             if input.consume_key(modifiers, egui::Key::ArrowDown) {
                 menu.selected = (menu.selected + 1) % menu.items.len();
             }
@@ -319,6 +351,7 @@ fn textarea_inner(
             if input.consume_key(modifiers, egui::Key::End) {
                 menu.selected = menu.items.len() - 1;
             }
+            menu.reveal |= menu.selected != before;
             if input.consume_key(modifiers, egui::Key::Enter) {
                 pick = Some(menu.selected);
             }
@@ -425,32 +458,32 @@ fn textarea_inner(
     }
     if !menu.dismissed && !menu.items.is_empty() && helto::shown(ui, privacy) {
         let mut pick = None;
+        let width = popup_width(ui, &menu.items, response.rect.width());
+        let reveal = std::mem::take(&mut menu.reveal);
         if let Some(popup) = egui::Popup::from_response(&response)
             .id(key.with("popup"))
-            .width(response.rect.width().max(220.))
             .show(|ui| {
+                // The area keeps last frame's size; set this frame's width.
+                ui.set_width(width);
                 egui::ScrollArea::vertical()
                     .max_height(220.)
+                    .auto_shrink([false, true])
                     .show(ui, |ui| {
                         for (i, item) in menu.items.iter().enumerate() {
                             let r = ui
                                 .push_id(&item.id, |ui| {
-                                    ui.selectable_label(
-                                        i == menu.selected,
-                                        format!(
-                                            "{} · {}",
-                                            if item.catalog.is_some() {
-                                                item.label.clone()
-                                            } else {
-                                                format!("{} · {}", item.tag, item.label)
-                                            },
-                                            item.kind
-                                        ),
+                                    ui.add(
+                                        egui::Button::selectable(i == menu.selected, item.row())
+                                            .wrap_mode(egui::TextWrapMode::Wrap)
+                                            .min_size(egui::vec2(ui.available_width(), 0.)),
                                     )
                                 })
                                 .inner;
                             #[cfg(feature = "ui-preview")]
                             super::qa::control(ui, format!("reference-completion-{}", item.id), &r);
+                            if reveal && i == menu.selected {
+                                r.scroll_to_me(None);
+                            }
                             let r = r.on_hover_text(&item.description);
                             if r.clicked() {
                                 pick = Some(i);
@@ -627,6 +660,78 @@ mod tests {
             }
         }
         assert!(bounds[1..].windows(2).all(|v| v[0] == v[1]), "{bounds:?}");
+    }
+    #[test]
+    fn completion_popup_fits_long_rows_beyond_a_narrow_field() {
+        fn texts<'a>(shape: &'a egui::Shape, out: &mut Vec<&'a egui::epaint::TextShape>) {
+            match shape {
+                egui::Shape::Text(t) => out.push(t),
+                egui::Shape::Vec(v) => v.iter().for_each(|s| texts(s, out)),
+                _ => {}
+            }
+        }
+        let mut p = super::super::media_picker::tests::project();
+        p.creative.references[0].alias = "keeper".into();
+        p.creative.references[0].name =
+            "Own keeper of the far northern lighthouse at the end of the long pier".into();
+        let ctx = egui::Context::default();
+        let mut text = "@".to_owned();
+        let mut field = egui::Rect::NOTHING;
+        let mut shapes = Vec::new();
+        for frame in 0..4 {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1000., 700.),
+                )),
+                focused: true,
+                ..Default::default()
+            };
+            let mut output = ctx.run_ui(input, |ui| {
+                ui.set_width(300.);
+                let r = textarea(
+                    ui,
+                    &mut text,
+                    3,
+                    "Own prompt",
+                    false,
+                    true,
+                    Source {
+                        creative: &p.creative,
+                        scope: egui::Id::new("own-test"),
+                    },
+                );
+                if frame == 0 {
+                    r.request_focus();
+                    let mut state = egui::TextEdit::load_state(ui.ctx(), r.id).unwrap_or_default();
+                    state
+                        .cursor
+                        .set_char_range(Some(egui::text::CCursorRange::one(
+                            egui::text::CCursor::new(1),
+                        )));
+                    state.store(ui.ctx(), r.id);
+                }
+                field = r.rect;
+            });
+            output.textures_delta.clear();
+            shapes = output.shapes;
+        }
+        let row = shapes
+            .iter()
+            .find_map(|clipped| {
+                let mut found = Vec::new();
+                texts(&clipped.shape, &mut found);
+                found
+                    .into_iter()
+                    .find(|t| t.galley.text().contains("far northern"))
+                    .map(|t| (clipped.clip_rect, t))
+            })
+            .expect("the completion row is shown");
+        let (clip, shape) = row;
+        let rect = shape.visual_bounding_rect();
+        assert_eq!(shape.galley.rows.len(), 1, "the row wraps");
+        assert!(rect.width() > field.width(), "{rect:?} {field:?}");
+        assert!(clip.contains_rect(rect), "clipped: {rect:?} in {clip:?}");
     }
     #[test]
     fn completion_boundaries_and_unicode_caret() {
