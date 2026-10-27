@@ -177,6 +177,21 @@ tests except `group_norm_silu_pad3d`, whose native call gained `stats` and
 must move to 0.2.40 with the image worker, so an H3 old-vs-new run is needed.
 Tomas chose to do MOSS editing (item 1) first; item 2 follows items 6 and 7.
 
+Status 2026-10-28: the work is on branch `kitchen-0240-wip` (`3c1d8e1`), not on
+main. Done there and exact against 426f5eea with Kitchen 0.2.40: the fused Flux2
+VAE (strips, in-place halving, level buffer; fp16 and bf16), the
+`group_norm_silu_pad3d` 0.2.40 contract (`stats`, served rule, row-interleaved
+input, overlapping `out`; 1,314 binding cases), `group_norm_stats3d`, eager bodies
+for `rms_gated_residual` and the two modulated INT8 projections, and regenerated
+signature/contract tables. Against a full 0.2.40 `primitives.json` capture eleven
+suite tests still fail: dtype-set order in registry messages differs between the
+contract and primitives captures (four tests), Triton cubin hashes carry Kitchen
+source times (two), and real 0.2.40 changes not yet ported: the W4A8 layout's
+`mma_packed` parameter, new INT8 no-activation rejections, eager
+`group_norm_silu_pad3d` argument-binding failures, the structured-metadata corpus
+size and the registry capability table. H3 must move with the image worker; a
+real H3 video run needs a video profile, whose prompts are private.
+
 ### Item 1: MOSS editing — DiT
 
 `tools/reference_moss_dit_edit.py` runs the `426f5eea` MOSS DiT on the same bounded
