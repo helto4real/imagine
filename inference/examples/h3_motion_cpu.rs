@@ -30,7 +30,7 @@ fn main() -> Result<(), Error> {
     let audio = Tensor::f_arange(64 * shape.audio_latent_t(), (Kind::Float, Device::Cpu))?
         .f_view([1, 32, 2, shape.audio_latent_t()])?
         .f_div_scalar(1000.)?;
-    let artifact = motion::capture(&video, &audio, shape, shape, 0)?;
+    let artifact = motion::capture(&video, &audio, shape, shape, 0, None)?;
     let schedule = ModelSampling {
         flavor: Flavor::AudioVideo,
         config: Config {
@@ -114,27 +114,32 @@ fn main() -> Result<(), Error> {
             } else {
                 None
             };
-            let n =
-                3 + if method == c::Method::MotionContext {
-                    7 + if include_audio { 74 } else { 0 }
-                } else {
-                    0
-                } + sampled.audio_latent_t() * 2
-                    + sampled.video_latent_t();
+            // The MotionContext guide is the only keyframe block; there are no references.
+            let keyframes = if method == c::Method::MotionContext {
+                7 + if include_audio { 74 } else { 0 }
+            } else {
+                0
+            };
+            let n = 3 + keyframes + sampled.audio_latent_t() * 2 + sampled.video_latent_t();
             let q = Tensor::f_arange(n * 2, (Kind::Float, Device::Cpu))?
                 .f_view([1, 1, n, 2])?
                 .f_div_scalar(1000.)?;
             let k = q.f_flip([2])?;
             let val = q.f_sin()?;
-            let out = motion::Window::new(&input, sampled, 3).run(&q, &k, &val, |q, k, v| {
-                Ok(q.f_matmul(&k.f_transpose(-2, -1)?)?
-                    .f_div_scalar(2f64.sqrt())?
-                    .f_softmax(-1, Kind::Float)?
-                    .f_matmul(v)?
-                    .f_transpose(1, 2)?
-                    .f_contiguous()?
-                    .f_view([1, -1, 2])?)
-            })?;
+            let out = motion::Window::new(&input, sampled, 3, keyframes, 0)?.run(
+                &q,
+                &k,
+                &val,
+                |q, k, v| {
+                    Ok(q.f_matmul(&k.f_transpose(-2, -1)?)?
+                        .f_div_scalar(2f64.sqrt())?
+                        .f_softmax(-1, Kind::Float)?
+                        .f_matmul(v)?
+                        .f_transpose(1, 2)?
+                        .f_contiguous()?
+                        .f_view([1, -1, 2])?)
+                },
+            )?;
             cases.push(json!({"method":method,"include_audio":include_audio,"n":n,"output":values(&out),"prefix_video":values(&v),"prefix_audio":values(&a),"mask":mask.as_ref().map(values),"mask_probe":mask_probe}));
         }
     }

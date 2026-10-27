@@ -24,6 +24,8 @@ fn main() -> Result<(), Error> {
         },
         profile: p::Profile::AvNoReferenceV2,
         handoff: Handoff::ContinueLatent,
+        upscale: None,
+        model_file: None,
     };
     let spec = Sampling {
         first,
