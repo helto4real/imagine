@@ -56,8 +56,8 @@ running stack, 1 cold and 3 warm runs per workload
 \* MOSS was already resident from a preceding smoke run.
 
 Every workload was deterministic across its runs. Open observation: `qwen-edit`
-worker RSS rose 10,929 → 11,931 → 12,227 → 12,512 MiB over four identical runs;
-check whether the candidate behaves the same (reference host cache or growth).
+worker RSS rose 10,929 → 11,931 → 12,227 → 12,512 MiB over four identical runs.
+The interleaved runs below did not reproduce it with either build.
 H3 is not in this baseline; it shares the Kitchen library, so an H3 baseline is
 recorded before item 2.
 
@@ -221,3 +221,28 @@ hair, pose, background and composition unchanged."): the dress turned bright red
 with face, pose, accessories, background and composition unchanged, 25.6 s for
 30 steps. The first candidate failed because the reference encode reused Qwen's
 crop, which pads to four channels; fixed in `dd90cf7`.
+
+### Candidate bench (`dd90cf7`)
+
+One sequential run (`comfyui/bench/candidate-dd90cf7-20261027T193907Z`, four runs
+per workload, after the control): every image is identical to the control's and
+worker GPU peaks are unchanged. Warm medians: `moss-t2i` 31.6 s (−4.6 %),
+`moss-sheet` 40.7 s (+1.2 %), `qwen-t2i` 52.7 s (0 %), `qwen-edit` 75.4 s (+2.8 %).
+
+The `qwen-edit` difference was checked with interleaved rounds (control, candidate,
+candidate, control, …; server restarted per round, three `qwen-t2i` then three
+`qwen-edit` runs; `comfyui/bench/ab-*`, driver
+`comfyui/rust-upgrade-20261027/ab/run_ab.sh`). Six rounds completed before Tomas
+stopped it as conclusive:
+
+| `qwen-edit` | Rounds | Warm runs (s) | Warm median | Mean of all runs |
+| --- | --- | --- | ---: | ---: |
+| Control | 1, 4, 5 | 75.3 74.4 · 75.9 74.9 · 75.9 75.9 | 75.6 | 75.5 |
+| Candidate | 2, 3, 6 | 74.9 75.4 · 75.8 76.4 · 75.3 75.8 | 75.6 | 75.7 |
+
+`qwen-t2i` warm runs were 52.8–55.8 s with both builds. Images, GPU peaks
+(9,512/9,962 MiB) and worker RSS (10.8–11.6 GiB, no growth across runs) match. The
+earlier +2.8 % and the control's 73.4 s median were run-to-run variation, not a
+regression. The control build cannot start with today's `config` because it
+rejects the `moss-edit` profile; the driver parks that profile while a control
+server runs.
