@@ -10,19 +10,19 @@ use imagine_inference::{
 use serde_json::{Value, json};
 use std::{path::Path, sync::Arc};
 use tch::{Device, Kind, Tensor};
-struct Threads(i32);
+pub(super) struct Threads(pub(super) i32);
 impl Drop for Threads {
     fn drop(&mut self) {
         tch::set_num_threads(self.0);
     }
 }
 
-struct Exec {
-    training: bool,
-    patched: bool,
-    events: Vec<String>,
-    operations: usize,
-    replacements: Vec<Value>,
+pub(super) struct Exec {
+    pub(super) training: bool,
+    pub(super) patched: bool,
+    pub(super) events: Vec<String>,
+    pub(super) operations: usize,
+    pub(super) replacements: Vec<Value>,
 }
 impl m::MossExecution for Exec {
     fn training(&self) -> bool {
@@ -103,7 +103,7 @@ impl m::MossExecution for Exec {
     }
 }
 /// The group's prepared parameters and DiT, from its weight factories.
-fn group_model(
+pub(super) fn group_model(
     rt: &Runtime,
     group: &Value,
     label: &str,

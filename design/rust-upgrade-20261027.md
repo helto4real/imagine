@@ -235,6 +235,33 @@ cases (NTK scales; a collapsed, shifted axis; the same with Moss-Image-Edit and
 ai-toolkit references) match `426f5eea` exactly. The worker passes the defaults;
 no product setting exposes the options yet.
 
+### Item 6: MOSS color/depth control
+
+The adapter is darask0's MOSS-Image color/depth control
+(`darask0/MOSS-Image-color-depth-control`, revision `357d7cc1`, Apache-2.0,
+`moss-control.safetensors` sha256 `e5c0c3ef…`), stored with its README, training
+config and example maps in `models/loras/moss/MOSS-Image-color-depth-control/`. It
+replaces `video_embedder` with a `[3072, 384]` weight (noise, color and depth
+latents) and adds rank-64 LoRAs.
+
+- Loading (`b751dd4`): `convert_moss_control_lora` turns the widened embedder into
+  `set` patches, `calculate_weight` replaces a weight whose shape a `set` changes and
+  `calculate_shape` reports it; a lowvram weight whose patches change its shape is
+  patched at once, as ModelPatcher does. Fixtures: `moss-control-lora.json`
+  (conversion, MOSS key map, set math) and `moss-control-offload.json` (the original
+  static clone/manager lifecycle with a widened weight). `reference_lora_weight.py`
+  now finds Kitchen's setters by class instead of by line number.
+- Sampling: `moss_control_latent` (`MOSSImageControl`), `moss_concat_cond`
+  (`MOSSImage.concat_cond`), `moss_control_spans` (the timestep-range split and the
+  sampler's float32 gate) and `c_concat` in full-area conditions, concatenated before
+  the model's dtype cast. Fixture `moss-control.json`: control latents, concat
+  conditions, spans over 49 sigmas including every boundary, and the DiT with a
+  widened embedder; all exact. A sigma admitted by no or several spans is reported
+  instead of sampled; it occurs only exactly at a boundary.
+- Worker: a loaded control adapter without maps gets zero control channels, as
+  ComfyUI gives. The product has no input for the maps yet; that needs a decision on
+  how a profile takes them.
+
 ### Candidate bench (`dd90cf7`)
 
 One sequential run (`comfyui/bench/candidate-dd90cf7-20261027T193907Z`, four runs

@@ -837,6 +837,7 @@ fn generate(
                         })
                         .transpose()?,
                     image_slots: Some(context.image_slots.clone()),
+                    concat: None,
                 })
             };
         let step_seconds = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));

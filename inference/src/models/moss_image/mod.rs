@@ -14,6 +14,8 @@ mod vae;
 pub use vae::*;
 mod sampling;
 pub use sampling::*;
+mod control;
+pub use control::*;
 mod execution;
 pub use execution::*;
 mod vae_attention;

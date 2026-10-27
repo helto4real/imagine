@@ -235,6 +235,7 @@ pub(super) fn full_condition(
             })
             .transpose()?,
         image_slots: Some(c.image_slots.clone()),
+        concat: None,
     })
 }
 /// Same managed VAE path for reference encoding and final decoding.

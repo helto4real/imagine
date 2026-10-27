@@ -180,6 +180,15 @@ pub(super) fn generate(
             Tensor::f_from_slice(&r.sampling.custom_sigmas)?
         }
         .f_to_device(dev)?;
+        // A control adapter widens the video embedder; without maps its extra
+        // channels are zeros, as MOSSImage.concat_cond gives.
+        let embedder = match &params["video_embedder.weight"] {
+            value @ crate::execution_value::Value::Quantized(_) => {
+                value.as_quantized()?.params.original_shape[1]
+            }
+            value => value.as_tensor()?.size()[1],
+        };
+        let control = m::MossControl::new(None, embedder, &shape, dev, (0., 0.), &sampling)?;
         let mut rng = rt.native.generator(Device::Cpu, r.seed)?;
         let noise = rng.randn(&shape, Kind::Float)?.f_to_device(dev)?;
         let input = q::flow_noise_scaling(
@@ -204,6 +213,7 @@ pub(super) fn generate(
             attention_mask: None,
             reference_latents: None,
             image_slots: None,
+            concat: None,
         };
         let negative = condition(contexts.pop().unwrap());
         let positive = condition(contexts.pop().unwrap());
@@ -230,6 +240,7 @@ pub(super) fn generate(
                     layout: m::MossEditLayout::TextStart,
                 }),
                 rope: Default::default(),
+                control,
             })
         };
         let out = q::sample_euler(input, &sigmas, Default::default(), &mut denoiser)?;

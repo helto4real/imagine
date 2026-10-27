@@ -1,6 +1,6 @@
 //! Explicit static MOSS services; source compiler/vbars/async offload are disabled.
 use super::{
-    MossDiT, MossExecution, MossInputs, MossLifecycle, MossReferences, MossRope,
+    MossControl, MossDiT, MossExecution, MossInputs, MossLifecycle, MossReferences, MossRope,
     moss_memory_required,
 };
 use crate::models::qwen_image21::{
@@ -193,6 +193,8 @@ pub struct MossDenoiserConfig<'a> {
     pub references: Option<MossReferences<'a>>,
     /// Scale ROPE's options for the generated image.
     pub rope: MossRope,
+    /// Color/depth control for a widened video embedder.
+    pub control: Option<MossControl>,
 }
 pub struct MossDenoiser<'a> {
     config: MossDenoiserConfig<'a>,
@@ -239,7 +241,24 @@ impl FullAreaExecution for Forward<'_, '_> {
         condition: &FullAreaCondition,
         _branches: &[usize],
     ) -> Result<Tensor, Error> {
-        let input = x.f_to_kind(self.dtype)?;
+        // BaseModel concatenates c_concat in the input's dtype, then casts both.
+        let input = match &condition.concat {
+            Some(concat) => Tensor::f_cat(
+                &[
+                    x.shallow_clone(),
+                    crate::patching::cast_to_device(
+                        &self.rt.native,
+                        concat,
+                        x.device(),
+                        x.kind(),
+                        false,
+                    )?,
+                ],
+                1,
+            )?,
+            None => x.shallow_clone(),
+        }
+        .f_to_kind(self.dtype)?;
         let context = crate::patching::cast_to_device(
             &self.rt.native,
             &condition.context,
@@ -270,6 +289,13 @@ impl FullAreaExecution for Forward<'_, '_> {
 impl EulerExecution for MossDenoiser<'_> {
     fn denoise(&mut self, x: &Tensor, sigma: &Tensor) -> Result<Tensor, Error> {
         let config = &mut self.config;
+        if let Some(control) = &config.control {
+            let concat = control.concat(sigma.f_double_value(&[0])? as f32)?;
+            config.positive.concat = Some(concat.shallow_clone());
+            if let Some(negative) = &mut config.negative {
+                negative.concat = Some(concat.shallow_clone());
+            }
+        }
         full_area_cfg(
             x,
             sigma,

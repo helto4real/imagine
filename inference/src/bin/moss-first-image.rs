@@ -92,6 +92,7 @@ fn condition(context: Tensor) -> q::FullAreaCondition {
         attention_mask: None,
         reference_latents: None,
         image_slots: None,
+        concat: None,
     }
 }
 fn memory_record(
@@ -324,6 +325,7 @@ fn execute(
                 })),
                 references: None,
                 rope: Default::default(),
+                control: None,
             })
         };
         let sampled = q::sample_euler(input, &sigmas, Default::default(), &mut denoiser)?;

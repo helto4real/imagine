@@ -108,3 +108,195 @@ fn moss_control_adapters_convert_and_load_through_the_moss_key_map_like_426f5eea
         }
     }
 }
+fn control_fixture() -> Value {
+    serde_json::from_str(include_str!(
+        "../../fixtures/reference-20261027/moss-control.json"
+    ))
+    .unwrap()
+}
+fn optional(v: &Value, dev: Device) -> Option<tch::Tensor> {
+    (!v.is_null()).then(|| super::binding_tests::restore(v, dev).as_tensor().unwrap())
+}
+fn compare(actual: Option<tch::Tensor>, expected: &Value, label: &str) {
+    match actual {
+        None => assert!(expected.is_null(), "{label}: expected an output"),
+        Some(t) => super::binding_tests::check(
+            &imagine_inference::execution_value::Value::tensor(t),
+            expected,
+            Device::Cpu,
+            label,
+        ),
+    }
+}
+#[test]
+fn moss_control_latents_concat_conds_and_timestep_spans_match_426f5eea() {
+    let _grad = tch::no_grad_guard();
+    let f = control_fixture();
+    for c in f["latents"].as_array().unwrap() {
+        let label = c["label"].as_str().unwrap();
+        let (color, depth) = (
+            optional(&c["color"], Device::Cpu),
+            optional(&c["depth"], Device::Cpu),
+        );
+        let control = m::moss_control_latent(
+            color.as_ref(),
+            depth.as_ref(),
+            c["strength"].as_f64().unwrap(),
+        )
+        .unwrap();
+        compare(control, &c["control"], &format!("latent/{label}"));
+    }
+    for c in f["concats"].as_array().unwrap() {
+        let label = c["label"].as_str().unwrap();
+        let noise = c["noise"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| d.as_i64().unwrap())
+            .collect::<Vec<_>>();
+        let image = optional(&c["image"], Device::Cpu);
+        let out = m::moss_concat_cond(
+            &noise,
+            c["channels"].as_i64().unwrap(),
+            image.as_ref(),
+            Device::Cpu,
+        )
+        .unwrap();
+        compare(out, &c["output"], &format!("concat/{label}"));
+    }
+    let sampling = m::MossSampling::moss().unwrap();
+    let sigmas = f["sigmas"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s.as_f64().unwrap() as f32)
+        .collect::<Vec<_>>();
+    for c in f["spans"].as_array().unwrap() {
+        let (start, end) = (c["start"].as_f64().unwrap(), c["end"].as_f64().unwrap());
+        let spans = m::moss_control_spans(start, end, &sampling);
+        let expected = c["entries"].as_array().unwrap();
+        assert_eq!(spans.len(), expected.len(), "{start}..{end}");
+        for (span, e) in spans.iter().zip(expected) {
+            assert_eq!(
+                span.control,
+                e["control"].as_bool().unwrap(),
+                "{start}..{end}"
+            );
+            assert_eq!(
+                span.sigma_start,
+                e["sigma_start"].as_f64(),
+                "{start}..{end}"
+            );
+            assert_eq!(span.sigma_end, e["sigma_end"].as_f64(), "{start}..{end}");
+            let active = sigmas.iter().map(|&s| span.active(s)).collect::<Vec<_>>();
+            assert_eq!(json!(active), e["active"], "{start}..{end}");
+        }
+        // A sampling run admits exactly one span per sigma, or reports the gap.
+        let control = m::MossControl::new(
+            Some(&tch::Tensor::zeros(
+                [1, 4, 2, 2],
+                (tch::Kind::Float, Device::Cpu),
+            )),
+            8,
+            &[1, 4, 2, 2],
+            Device::Cpu,
+            (start, end),
+            &sampling,
+        )
+        .unwrap()
+        .unwrap();
+        for (i, &sigma) in sigmas.iter().enumerate() {
+            let admitted = expected.iter().filter(|e| e["active"][i] == true).count();
+            assert_eq!(
+                control.concat(sigma).is_ok(),
+                admitted == 1,
+                "{start}..{end} at {sigma}"
+            );
+        }
+    }
+}
+#[test]
+fn moss_dit_with_a_widened_video_embedder_matches_426f5eea() {
+    use super::moss_dit_tests::{Exec, Threads, group_model};
+    use imagine_inference::{execution::Runtime, triton_compiler::Compiler};
+    use std::{path::Path, sync::Arc};
+    let _threads = Threads(tch::get_num_threads());
+    tch::set_num_threads(2);
+    let _directory = super::triton_file_cache_tests::OwnDirectory::create();
+    let own = std::env::current_dir().unwrap();
+    let native = kitchen();
+    let compiler = Arc::new(unsafe {
+        Compiler::open(
+            Path::new(&std::env::var("IMAGINE_TRITON_COMPILER_PROFILE").unwrap()),
+            &own.join("cache"),
+            &own.join("work"),
+            native.clone(),
+        )
+        .unwrap()
+    });
+    let rt = Runtime::frozen(native, compiler).unwrap();
+    let _grad = tch::no_grad_guard();
+    for group in control_fixture()["models"].as_array().unwrap() {
+        let label = group["label"].as_str().unwrap();
+        let dev = if label.starts_with("cpu/") {
+            Device::Cpu
+        } else {
+            Device::Cuda(0)
+        };
+        let (mut params, _) = group_model(&rt, group, label, dev);
+        params.values.insert(
+            "video_embedder.weight".into(),
+            super::binding_tests::restore(&group["widened"], dev),
+        );
+        let c = &group["config"];
+        let n = |key: &str| c[key].as_i64().unwrap();
+        let model = m::MossDiT::from_parameters(
+            m::MossConfig {
+                dim: n("dim"),
+                ffn_dim: n("ffn_dim"),
+                heads: n("num_heads"),
+                layers: n("num_layers") as usize,
+                text_dim: n("text_dim"),
+                latent_channels: n("latent_channels"),
+                fused_qkv: false,
+            },
+            &params,
+        )
+        .unwrap();
+        let args = group["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| super::binding_tests::restore(v, dev).as_tensor().unwrap())
+            .collect::<Vec<_>>();
+        // BaseModel: cat([x, c_concat]) in the input's dtype, then the model dtype.
+        let input = tch::Tensor::cat(&[&args[0], &args[1]], 1).to_kind(tch::Kind::BFloat16);
+        let mut exec = Exec {
+            training: false,
+            patched: false,
+            events: vec![],
+            operations: 0,
+            replacements: vec![],
+        };
+        let output = unsafe {
+            model.forward(
+                &rt,
+                &m::MossInputs {
+                    latent: &input,
+                    timestep: &args[2],
+                    context: &args[3],
+                    references: None,
+                    rope: Default::default(),
+                },
+                &mut exec,
+            )
+        }
+        .unwrap_or_else(|err| panic!("{label}: {err}"));
+        super::binding_tests::check(
+            &imagine_inference::execution_value::Value::tensor(output),
+            &group["output"],
+            dev,
+            &format!("{label}/widened"),
+        );
+    }
+}

@@ -117,6 +117,7 @@ fn qwen_image21_original_full_area_cfg_condition_batches_memory_and_order_match(
                 } else {
                     0
                 }]),
+                concat: None,
             }
         };
         let positive = condition(0);

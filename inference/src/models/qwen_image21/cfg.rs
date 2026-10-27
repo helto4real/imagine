@@ -9,6 +9,8 @@ pub struct FullAreaCondition {
     pub attention_mask: Option<Tensor>,
     pub reference_latents: Option<Vec<Tensor>>,
     pub image_slots: Option<Vec<i64>>,
+    /// `c_concat` (CONDNoiseShape): extra input channels concatenated to the latent.
+    pub concat: Option<Tensor>,
 }
 fn repeat_batch(tensor: &Tensor, batch: i64) -> Result<Tensor, Error> {
     let size = tensor.size()[0];
@@ -43,6 +45,11 @@ impl FullAreaCondition {
                 .map(|refs| refs.iter().map(|r| repeat_batch(r, batch)).collect())
                 .transpose()?,
             image_slots: self.image_slots.clone(),
+            concat: self
+                .concat
+                .as_ref()
+                .map(|c| repeat_batch(c, batch))
+                .transpose()?,
         })
     }
     fn can_concat(&self, other: &Self) -> bool {
@@ -63,6 +70,11 @@ impl FullAreaCondition {
                 _ => false,
             }
             && self.image_slots == other.image_slots
+            && match (&self.concat, &other.concat) {
+                (None, None) => true,
+                (Some(a), Some(b)) => regular(a, b),
+                _ => false,
+            }
     }
     fn concat(conditions: &[&Self]) -> Result<Self, Error> {
         let first = conditions[0];
@@ -94,6 +106,16 @@ impl FullAreaCondition {
                 })
                 .transpose()?,
             image_slots: first.image_slots.clone(),
+            concat: first
+                .concat
+                .as_ref()
+                .map(|_| {
+                    cat(conditions
+                        .iter()
+                        .map(|c| c.concat.as_ref().unwrap())
+                        .collect())
+                })
+                .transpose()?,
         })
     }
 }
