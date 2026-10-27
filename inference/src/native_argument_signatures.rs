@@ -1,4 +1,4 @@
-// Generated native signatures from comfy_kitchen/backends/cuda/_C.abi3.so, SHA256 ffbc49b384dfb9e75c946f442a8888b9bbc7a7d0d05223f7c8ef1a1bc9602652.
+// Generated native signatures from comfy_kitchen/backends/cuda/_C.abi3.so, SHA256 a82d02945ebb4e00b1bab815dd7b3f89209b45d002eb4c5f3cabe2118c048283.
 pub(crate) const NA3D_SIGNATURE: &str = "na3d(q: ndarray[device='cuda'], k: ndarray[device='cuda'], v: ndarray[device='cuda'], out: ndarray[device='cuda'], batch: int, t_size: int, h_size: int, w_size: int, num_heads: int, head_dim: int, kt: int, kh: int, kw: int, causal_t: int, causal_h: int, causal_w: int, scale: float, dtype_code: int, stream_ptr: int) -> None";
 pub(crate) const NA3D_INVOKED: &str = "PyCapsule, PyCapsule, PyCapsule, PyCapsule, int, int, int, int, int, int, int, int, int, int, int, int, float, int, int";
 pub(crate) const QUANTIZE_INT8_ROWWISE_SIGNATURE: &str = "quantize_int8_rowwise(input: ndarray[shape=(*, *), device='cuda'], output: ndarray[dtype=int8, shape=(*, *), device='cuda'], scales: ndarray[dtype=float32, shape=(*, *), device='cuda'], stochastic: bool, seed: int, stream_ptr: int) -> None";

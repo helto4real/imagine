@@ -34,7 +34,7 @@ def capture(torch,devices,bits):
         if shared:
             base,views=shared;c['shared']=dict(base=encode(base),views=views)
         selected=[];launches=[];saved={}
-        for name in ['cutlass_fp16_conv3d','group_norm_silu_pad3d']:
+        for name in ['cutlass_fp16_conv3d','group_norm_silu_pad3d','group_norm_stats3d']:
             saved[name]=getattr(native._C,name)
             def wrap(*args,_name=name,**kwargs):
                 launches.append(_name);return saved[_name](*args,**kwargs)
@@ -54,6 +54,12 @@ def capture(torch,devices,bits):
         if shared:c['post_base']=encode(shared[0])
         c['backend_calls']=selected;c['native_calls']=launches;c['post_args']=[encode(v)for v in args];c['post_kwargs']=[[k,encode(v)]for k,v in kw.items()]
         result['conv_bindings'if op.startswith('fp16_conv3d')else'group_norm_bindings'].append(c)
+    def interleaved(c,h,w,dtype,dev):
+        # Kitchen 0.2.40 reads a row-interleaved NHWC view in place: two half-width
+        # frames whose rows alternate inside each row slot, as the Flux2 VAE's halving.
+        base=data((1,h,w,2*c),dev,dtype,43).reshape(-1)
+        x=base.as_strided((1,c,1,h,w),(h*w*2*c,1,h*w*2*c,w*2*c,c),w*c)
+        return x,base,dict(shape=list(x.shape),strides=list(x.stride()),offset=x.storage_offset(),dtype=str(x.dtype))
     backends=[(dev,b)for dev in devices for b in (['eager','cuda']if dev.startswith('cuda')else['eager'])]
     for (dev,b),dtype in itertools.product(backends,[torch.float32,torch.float16,torch.bfloat16]):
         for c,k,kernel,step,n,affine,in_layout in [(3,8,1,1,1,False,'standard'),(3,8,3,1,1,True,'cl'),(8,16,1,2,2,True,'window'),(8,8,3,1,1,False,'window'),(10,8,1,1,1,True,'cl'),(8,7,1,1,1,True,'standard'),(8,8,1,1,1,True,'misaligned')]:
@@ -92,6 +98,41 @@ def capture(torch,devices,bits):
             elif failure=='weight_size':kw['weight']=data((7,),dev,torch.float32,5)
             elif failure=='bad_out':op+='_out';kw['out']=data((1,8,2,3,5),dev,dtype)
             record(op,kw,b,failure)
+        # Kitchen 0.2.40: per-frame statistics, row strips normalized with their
+        # frame's statistics, row-interleaved inputs and an out that overlaps x.
+        for c,g in [(8,2),(16,4)]:
+            for lay in ['standard','cl','interleaved']:
+                if lay=='interleaved':x,base,view=interleaved(c,6,4,dtype,dev)
+                else:x,base,view=layout(data((1,c,1,6,4),dev,dtype,3),lay)
+                record('group_norm_stats3d',dict(x=x,num_groups=g,eps=1e-5),b,f'stats/{c}/{lay}',shared=(base,{'x':view})if base is not None else None)
+            frame=data((1,c,1,6,4),dev,dtype,3).contiguous(memory_format=torch.channels_last_3d)
+            stats=ck.registry.get_implementation('group_norm_stats3d',backend='eager',kwargs=dict(x=frame,num_groups=g,eps=1e-6))(x=frame,num_groups=g,eps=1e-6)
+            for top,bottom,rows in [(1,0,(0,3)),(0,0,(1,5)),(0,1,(3,6))]:
+                def strip():
+                    return dict(x=frame[:,:,:,rows[0]:rows[1]],weight=data((c,),dev,torch.float32,5),bias=data((c,),dev,torch.float32,11),
+                                num_groups=g,eps=1e-6,pad=[1,1,top,bottom,0],silu=True,zero_pad=True,stats=stats.clone())
+                record('group_norm_silu_pad3d',strip(),b,f'strip/{c}/{rows}')
+                kw=strip();shape=(1,c,1,rows[1]-rows[0]+top+bottom,6);kw['out']=data(shape,dev,dtype,31).contiguous(memory_format=torch.channels_last_3d)
+                stats_out=kw.pop('stats');kw['stats']=stats_out
+                record('group_norm_silu_pad3d_out',kw,b,f'strip-out/{c}/{rows}')
+            x,base,view=interleaved(c,6,4,dtype,dev)
+            record('group_norm_silu_pad3d',dict(x=x,weight=data((c,),dev,torch.float32,5),bias=None,num_groups=g,eps=1e-6,pad=[1,1,1,1,0],silu=True,zero_pad=True,stats=None),
+                   b,f'interleaved/{c}',shared=(base,{'x':view}))
+            x,base,view=interleaved(c,6,4,dtype,dev)
+            record('group_norm_silu_pad3d',dict(x=x,weight=data((c,),dev,torch.float32,5),bias=None,num_groups=g,eps=1e-6,pad=[0,0,0,0,0],silu=True,zero_pad=True,stats=stats.clone()),
+                   b,f'interleaved-stats/{c}',shared=(base,{'x':view}))
+            # An out that is x itself: frames are written in no fixed order, so via a copy.
+            if b=='cuda':
+                x=data((1,c,1,6,4),dev,dtype,7).contiguous(memory_format=torch.channels_last_3d)
+                view=dict(shape=list(x.shape),strides=list(x.stride()),offset=x.storage_offset(),dtype=str(x.dtype))
+                record('group_norm_silu_pad3d',dict(x=x,weight=data((c,),dev,torch.float32,5),bias=None,num_groups=g,eps=1e-6,pad=[0]*5,silu=True,zero_pad=True,out=x),b,f'overlap/{c}',
+                       shared=(x,{'x':view,'out':view}))
+        for failure in ['stats_shape','stats_dtype','stats_groups_zero']:
+            x=data((1,8,1,4,4),dev,dtype);kw=dict(x=x,weight=data((8,),dev,torch.float32,5),bias=None,num_groups=2,eps=1e-6,pad=[0]*5,silu=True,zero_pad=True,stats=torch.zeros(1,2,2,device=dev))
+            if failure=='stats_shape':kw['stats']=torch.zeros(1,4,2,device=dev)
+            elif failure=='stats_dtype':kw['stats']=torch.zeros(1,2,2,device=dev,dtype=torch.float64)
+            else:kw['num_groups']=0;kw['stats']=torch.zeros(1,0,2,device=dev)
+            record('group_norm_silu_pad3d',kw,b,failure)
     return result
 
 if __name__=='__main__':

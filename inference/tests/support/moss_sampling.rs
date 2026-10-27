@@ -76,6 +76,7 @@ fn moss_original_discrete_flow_schedules_percent_mapping_and_model_vae_memory_es
             .collect::<Vec<_>>();
         let memory = ImageVaeMemory::Flux2 {
             amd: call["amd"].as_bool().unwrap(),
+            fused: false,
         };
         let dtype = kind(call["dtype"].as_str().unwrap());
         assert_eq!(

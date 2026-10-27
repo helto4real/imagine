@@ -143,6 +143,20 @@ pub(super) fn eager() -> BTreeMap<String, FunctionConstraints> {
             ),
         ),
         (
+            "group_norm_stats3d".into(),
+            f(
+                vec![p(
+                    "x",
+                    Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                    None,
+                    vec![ShapeRule::ExactDims(5)],
+                )],
+                &["*", "cpu", "cuda", "hpu", "meta", "mps", "xpu"],
+                None,
+                &[],
+            ),
+        ),
+        (
             "quantize_per_tensor_fp8".into(),
             f(
                 vec![
@@ -902,6 +916,41 @@ pub(super) fn eager() -> BTreeMap<String, FunctionConstraints> {
             ),
         ),
         (
+            "rms_gated_residual".into(),
+            f(
+                vec![
+                    p(
+                        "activation",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p(
+                        "norm_weight",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p(
+                        "residual",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p(
+                        "gate",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p("eps", Some(&["float"]), None, vec![]),
+                ],
+                &["*", "cpu", "cuda", "hpu", "meta", "mps", "xpu"],
+                None,
+                &[],
+            ),
+        ),
+        (
             "quantize_int8_rowwise".into(),
             f(
                 vec![
@@ -1148,6 +1197,99 @@ pub(super) fn eager() -> BTreeMap<String, FunctionConstraints> {
                     ),
                     p(
                         "bias",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p("convrot", Some(&["bool"]), None, vec![]),
+                    p("convrot_groupsize", Some(&["int"]), None, vec![]),
+                ],
+                &["*", "cpu", "cuda", "hpu", "meta", "mps", "xpu"],
+                None,
+                &[],
+            ),
+        ),
+        (
+            "int8_linear_modulated".into(),
+            f(
+                vec![
+                    p(
+                        "x",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p("weight", Some(&["torch.int8"]), None, vec![]),
+                    p(
+                        "weight_scale",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p(
+                        "bias",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p(
+                        "modulation_scale",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p(
+                        "out_dtype",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p("convrot", Some(&["bool"]), None, vec![]),
+                    p("convrot_groupsize", Some(&["int"]), None, vec![]),
+                ],
+                &["*", "cpu", "cuda", "hpu", "meta", "mps", "xpu"],
+                None,
+                &[],
+            ),
+        ),
+        (
+            "int8_linear_rms_modulated".into(),
+            f(
+                vec![
+                    p(
+                        "x",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p("weight", Some(&["torch.int8"]), None, vec![]),
+                    p(
+                        "weight_scale",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p(
+                        "bias",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p(
+                        "modulation_scale",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p(
+                        "norm_weight",
+                        Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
+                        None,
+                        vec![],
+                    ),
+                    p("norm_eps", Some(&["float"]), None, vec![]),
+                    p(
+                        "out_dtype",
                         Some(&["torch.bfloat16", "torch.float16", "torch.float32"]),
                         None,
                         vec![],
@@ -2746,6 +2888,20 @@ pub(super) fn cuda() -> BTreeMap<String, FunctionConstraints> {
                         vec![],
                     ),
                 ],
+                &["cuda"],
+                None,
+                &[],
+            ),
+        ),
+        (
+            "group_norm_stats3d".into(),
+            f(
+                vec![p(
+                    "x",
+                    Some(&["torch.bfloat16", "torch.float16"]),
+                    None,
+                    vec![ShapeRule::ExactDims(5)],
+                )],
                 &["cuda"],
                 None,
                 &[],

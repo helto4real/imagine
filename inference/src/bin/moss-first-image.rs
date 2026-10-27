@@ -371,7 +371,11 @@ fn execute(
         manager: &mut manager,
         memory: &mut memory,
         execution: &mut execution,
-        config: Default::default(),
+        // The first-image comparison is against 446ef4e, before the fused path.
+        config: m::Flux2VaeConfig {
+            fused_norm: false,
+            ..Default::default()
+        },
         device: dev,
         force_full_load: false,
     };
@@ -388,7 +392,10 @@ fn execute(
         q::VaeOperation::Decode,
         &latent,
         &mut services,
-        q::ImageVaeMemory::Flux2 { amd: false },
+        q::ImageVaeMemory::Flux2 {
+            amd: false,
+            fused: false,
+        },
     )?;
     drop(services);
     times.insert("vae_decode", phase(rt, start)?);

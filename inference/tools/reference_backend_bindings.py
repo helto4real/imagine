@@ -126,6 +126,18 @@ def capture(torch, devices, bits):
             record('int8_linear',dict(x=data((4,64),dev,dtype),weight=qdata((17,64),dev),weight_scale=torch.tensor(0.03125,device=dev),out_dtype=dtype),backend,disable=True)
         else:
             for group in [0,64]:record('dequantize_int8_embedding',dict(q=qdata((17,64),dev),scale=torch.full((17,1),0.03125,device=dev),indices=torch.tensor([[1,3],[3,5]],device=dev),group_size=group,output_dtype_code={torch.float32:0,torch.float16:1,torch.bfloat16:2}[dtype]),backend)
+        if backend=='eager':
+            # Kitchen 0.2.40's portable references: batch-one modulated INT8
+            # projections (with and without RMSNorm) and the gated residual.
+            for convrot in [False,True]:
+                width=256 if convrot else 64
+                kw=dict(weight=qdata((17,width),dev),weight_scale=torch.full((17,),0.03125,device=dev),out_dtype=dtype,convrot=convrot,convrot_groupsize=256)
+                record('int8_linear_modulated',dict(x=data((4,width),dev,dtype),modulation_scale=data((width,),dev,dtype,5),bias=data((17,),dev,dtype),**kw),backend)
+                record('int8_linear_rms_modulated',dict(x=data((2,4,width),dev,dtype),norm_weight=torch.full((width,),0.9,device=dev,dtype=dtype),norm_eps=1e-6,
+                       modulation_scale=data((1,1,width),dev,dtype,5),bias=None,**kw),backend)
+            record('int8_linear_modulated',dict(x=data((4,64),dev,dtype),modulation_scale=data((2,64),dev,dtype,5),weight=qdata((17,64),dev),weight_scale=torch.full((17,),0.03125,device=dev)),backend)
+            record('rms_gated_residual',dict(activation=data((2,3,64),dev,dtype),norm_weight=data((64,),dev,dtype,3),residual=data((2,3,64),dev,dtype,9),gate=data((2,1,64),dev,dtype,13)),backend)
+            record('rms_gated_residual',dict(activation=data((2,3,64),dev,dtype),norm_weight=data((64,),dev,dtype,3),residual=data((2,3,64),dev,dtype,9),gate=data((2,1,64),dev,dtype,13),eps=1e-3),backend)
         for op,mod,nc in itertools.product(['adaln','rms_adaln'],['vector','batch','general','full'],[False,True]):
             x=data((2,1,3,4,64),dev,dtype)
             if nc:x=x.transpose(2,3).contiguous().transpose(2,3)

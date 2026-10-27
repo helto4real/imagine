@@ -248,6 +248,7 @@ fn eager_group(
     padding: &[i64],
     silu: bool,
     zero_pad: bool,
+    stats: Option<&Tensor>,
 ) -> Result<Tensor, Error> {
     if padding
         .iter()
@@ -266,37 +267,80 @@ fn eager_group(
         let w = w.f_to_kind(x.kind())?;
         let bias = bias.map(|b| b.f_to_kind(x.kind())).transpose()?;
         let v = y.f_permute([0, 2, 1, 3, 4])?.f_reshape([b * t, c, h, ww])?;
-        if groups == 0 {
-            return Err(error(
-                "ZeroDivisionError",
-                "integer division or modulo by zero",
-            ));
+        if let Some(stats) = stats {
+            // A short stats tensor would broadcast silently.
+            if stats.size() != [b * t, groups, 2] {
+                return Err(error(
+                    "ValueError",
+                    format!(
+                        "group_norm_silu_pad3d: stats must be [{}, {groups}, 2]",
+                        b * t
+                    ),
+                ));
+            }
+            // Per-(frame, channel) scale and shift in fp32, rounded once like
+            // group_norm's output.
+            if groups == 0 {
+                return Err(error(
+                    "ZeroDivisionError",
+                    "integer division or modulo by zero",
+                ));
+            }
+            let per = |i: i64| -> Result<Tensor, Error> {
+                Ok(stats.f_select(-1, i)?.f_repeat_interleave_self_int(
+                    c.div_euclid(groups),
+                    Some(1),
+                    None,
+                )?)
+            };
+            let scale = per(1)?.f_mul(&w.f_to_kind(Kind::Float)?)?;
+            let mut shift = per(0)?.f_neg()?.f_mul(&scale)?;
+            if let Some(bias) = &bias {
+                shift = shift.f_add(&bias.f_to_kind(Kind::Float)?)?;
+            }
+            y = shift
+                .f_unsqueeze(-1)?
+                .f_unsqueeze(-1)?
+                .f_addcmul(
+                    &v.f_to_kind(Kind::Float)?,
+                    &scale.f_unsqueeze(-1)?.f_unsqueeze(-1)?,
+                )?
+                .f_to_kind(x.kind())?
+                .f_view_([b, t, c, h, ww].as_slice())?
+                .f_permute([0, 2, 1, 3, 4])?;
+        } else {
+            if groups == 0 {
+                return Err(error(
+                    "ZeroDivisionError",
+                    "integer division or modulo by zero",
+                ));
+            }
+            if (b * t * c).div_euclid(groups) * h * ww == 1 {
+                return Err(error(
+                    "ValueError",
+                    format!(
+                        "Expected more than 1 value per channel when training, got input size [{}, {c}, {h}, {ww}]",
+                        b * t
+                    ),
+                ));
+            }
+            y = aten(
+                rt,
+                "aten::group_norm",
+                "",
+                &[
+                    Value::tensor(v),
+                    Value::Int(groups),
+                    Value::tensor(w),
+                    opt(bias.as_ref()),
+                    Value::Float(eps),
+                ],
+                &vec![],
+            )?
+            .as_tensor()?
+            .f_view_([b, t, c, h, ww].as_slice())?
+            .f_permute([0, 2, 1, 3, 4])?;
         }
-        if (b * t * c).div_euclid(groups) * h * ww == 1 {
-            return Err(error(
-                "ValueError",
-                format!(
-                    "Expected more than 1 value per channel when training, got input size [{}, {c}, {h}, {ww}]",
-                    b * t
-                ),
-            ));
-        }
-        y = aten(
-            rt,
-            "aten::group_norm",
-            "",
-            &[
-                Value::tensor(v),
-                Value::Int(groups),
-                Value::tensor(w),
-                opt(bias.as_ref()),
-                Value::Float(eps),
-            ],
-            &vec![],
-        )?
-        .as_tensor()?
-        .f_view_([b, t, c, h, ww].as_slice())?
-        .f_permute([0, 2, 1, 3, 4])?;
     }
     if silu {
         y = y.f_silu()?;
@@ -338,6 +382,80 @@ struct Group<'a> {
     silu: bool,
     zero_pad: bool,
     out: Option<&'a Tensor>,
+    stats: Option<&'a Tensor>,
+}
+/// Elements between image rows when x is a single frame with packed NHWC rows
+/// that sit farther apart than W * C (a row-interleaved view the kernels read in
+/// place); None otherwise.
+fn ndhwc_row_stride(x: &Tensor) -> Result<Option<i64>, Error> {
+    let [b, c, t, h, w] = unpack::<5>(&x.size())?;
+    let s = x.stride();
+    Ok((t == 1
+        && s[1] == 1
+        && s[4] == c
+        && s[3] > w * c
+        && s[3] % 8 == 0
+        && (b == 1 || s[0] == h * s[3]))
+        .then_some(s[3]))
+}
+/// Kitchen `_storage_bounds`: the byte range a view's elements span.
+fn storage_bounds(x: &Tensor) -> (i64, i64) {
+    let (mut lo, mut hi) = (x.storage_offset(), x.storage_offset());
+    for (size, stride) in x.size().into_iter().zip(x.stride()) {
+        let extent = (size - 1) * stride;
+        lo += extent.min(0);
+        hi += extent.max(0);
+    }
+    let element = x.kind().elt_size_in_bytes() as i64;
+    (lo * element, (hi + 1) * element - 1)
+}
+/// Kitchen `_interleaved_disjoint`: same-layout views whose rows sit side by side
+/// within a shared period never share an element.
+fn interleaved_disjoint(x: &Tensor, y: &Tensor) -> bool {
+    let strides = x.stride();
+    if x.size() != y.size() || strides != y.stride() {
+        return false;
+    }
+    if strides.last() != Some(&1) {
+        return false;
+    }
+    let shape = x.size();
+    let (mut extent, mut i) = (1, strides.len());
+    while i > 0 && strides[i - 1] == extent {
+        extent *= shape[i - 1];
+        i -= 1;
+    }
+    let outer = shape[..i]
+        .iter()
+        .zip(&strides[..i])
+        .filter(|(size, _)| **size > 1)
+        .map(|(_, s)| *s)
+        .collect::<Vec<_>>();
+    let Some(&period) = outer.iter().min() else {
+        return false;
+    };
+    if period <= 0 || outer.iter().any(|s| s % period != 0) {
+        return false;
+    }
+    let delta = (x.storage_offset() - y.storage_offset()).abs();
+    delta >= extent && delta + extent <= period
+}
+/// Kitchen `_tensors_overlap`.
+fn tensors_overlap(x: &Tensor, y: &Tensor) -> bool {
+    if x.numel() == 0 || y.numel() == 0 || x.device() != y.device() {
+        return false;
+    }
+    // The storage's data pointer, as untyped_storage().data_ptr() gives it.
+    let base =
+        |t: &Tensor| t.data_ptr() as i64 - t.storage_offset() * t.kind().elt_size_in_bytes() as i64;
+    if base(x) != base(y) {
+        return false;
+    }
+    let ((x0, x1), (y0, y1)) = (storage_bounds(x), storage_bounds(y));
+    if x0.max(y0) > x1.min(y1) {
+        return false;
+    }
+    !interleaved_disjoint(x, y)
 }
 fn cuda_group(rt: &Runtime, g: &Group<'_>) -> Result<Tensor, Error> {
     use KernelArg::{Bool, Float, Int, Tensor as T};
@@ -351,6 +469,7 @@ fn cuda_group(rt: &Runtime, g: &Group<'_>) -> Result<Tensor, Error> {
         silu,
         zero_pad,
         out,
+        stats,
     } = *g;
     let [b, c, t, h, ww] = unpack::<5>(&x.size())?;
     let [l, r, tp, bt, f] = unpack::<5>(padding)?;
@@ -360,6 +479,7 @@ fn cuda_group(rt: &Runtime, g: &Group<'_>) -> Result<Tensor, Error> {
             "group_norm_silu_pad3d: padding must be non-negative",
         ));
     }
+    // The affine parameters may be fp32; every path wants x's dtype.
     let w = w
         .map(|w| w.f_to_kind(x.kind())?.f_contiguous())
         .transpose()?;
@@ -371,27 +491,40 @@ fn cuda_group(rt: &Runtime, g: &Group<'_>) -> Result<Tensor, Error> {
     } else {
         bias.map(Tensor::shallow_clone)
     };
-    let mut unsupported = c % 8 != 0;
-    if !unsupported {
-        if c == 0 {
-            return Err(error("ZeroDivisionError", "integer modulo by zero"));
-        }
-        unsupported = 256 % (c / 8) != 0;
+    if let Some(stats) = stats
+        && (stats.size() != [b * t, groups, 2]
+            || stats.kind() != Kind::Float
+            || stats.device() != x.device())
+    {
+        return Err(error(
+            "ValueError",
+            format!(
+                "group_norm_silu_pad3d: stats must be float32 [{}, {groups}, 2] on {}",
+                b * t,
+                match x.device() {
+                    Device::Cuda(i) => format!("cuda:{i}"),
+                    other => crate::execution_value::device_name(other),
+                }
+            ),
+        ));
     }
-    if !unsupported && w.is_some() {
+    let mut served = !(c % 8 != 0 || c > 2048);
+    if served && w.is_some() {
         if groups == 0 {
             return Err(error("ZeroDivisionError", "integer modulo by zero"));
         }
-        unsupported = c % groups != 0 || groups > 1024;
+        served = c % groups == 0 && groups <= 1024;
     }
-    unsupported =
-        unsupported || (!zero_pad && (l.max(r) >= ww || tp.max(bt) >= h)) || b * (t + f) > 65535;
+    served = served && (zero_pad || (l.max(r) < ww && tp.max(bt) < h)) && b * (t + f) <= 65535;
     let mut x = x.shallow_clone();
-    if !unsupported {
+    let mut row_stride = if served { ndhwc_row_stride(&x)? } else { None };
+    if served && row_stride.is_none() {
+        row_stride = Some(ww * c);
         x = cl(rt, &x)?;
-        unsupported = !aligned(&x);
     }
-    if unsupported {
+    // The kernels issue 16-byte vector loads.
+    served = served && aligned(&x);
+    if !served {
         let res = eager_group(
             rt,
             &x,
@@ -402,6 +535,7 @@ fn cuda_group(rt: &Runtime, g: &Group<'_>) -> Result<Tensor, Error> {
             padding,
             silu,
             zero_pad,
+            stats,
         )?;
         return match out {
             None => Ok(res),
@@ -412,8 +546,10 @@ fn cuda_group(rt: &Runtime, g: &Group<'_>) -> Result<Tensor, Error> {
             }
         };
     }
+    // Frames are written in no particular order, so an out overlapping x goes via
+    // a copy.
     let direct = match out {
-        Some(o) => packed(rt, o)? && aligned(o),
+        Some(o) => packed(rt, o)? && aligned(o) && !tensors_overlap(o, &x),
         None => false,
     };
     let dst = if direct {
@@ -427,19 +563,25 @@ fn cuda_group(rt: &Runtime, g: &Group<'_>) -> Result<Tensor, Error> {
         )?
     };
     let placeholder = cuda_linear::empty(x.device(), Kind::Float)?;
-    let (w, bias, ws) = if let Some(w) = w {
-        let chunks = (h * ww + 1023) / 1024;
-        let ws = Tensor::f_empty(
-            [2 * b * t * (chunks * c + groups)],
-            (Kind::Float, x.device()),
-        )?;
-        (w, bias.unwrap(), ws)
-    } else {
-        (
+    let (w, bias, ws) = match w {
+        None => (
             placeholder.shallow_clone(),
             placeholder.shallow_clone(),
-            placeholder,
-        )
+            placeholder.shallow_clone(),
+        ),
+        Some(w) if stats.is_none() => {
+            let chunks = (h * ww + 1023) / 1024;
+            let ws = Tensor::f_empty(
+                [2 * b * t * (chunks * c + groups)],
+                (Kind::Float, x.device()),
+            )?;
+            (w, bias.unwrap(), ws)
+        }
+        Some(w) => (w, bias.unwrap(), placeholder.shallow_clone()),
+    };
+    let stats = match stats {
+        Some(s) => s.f_contiguous()?,
+        None => placeholder,
     };
     unsafe {
         rt.native.call_unchecked(
@@ -450,6 +592,7 @@ fn cuda_group(rt: &Runtime, g: &Group<'_>) -> Result<Tensor, Error> {
                 T(&bias),
                 T(&dst),
                 T(&ws),
+                T(&stats),
                 Int(b),
                 Int(c),
                 Int(t),
@@ -464,6 +607,7 @@ fn cuda_group(rt: &Runtime, g: &Group<'_>) -> Result<Tensor, Error> {
                 Int(f),
                 Bool(silu),
                 Bool(zero_pad),
+                Int(row_stride.unwrap()),
                 Int(quantization::dtype_code(x.kind())?),
                 Int(stream(rt, &x)?),
             ],
@@ -478,6 +622,64 @@ fn cuda_group(rt: &Runtime, g: &Group<'_>) -> Result<Tensor, Error> {
         _ => Ok(dst),
     }
 }
+/// Per-frame GroupNorm (mean, rstd) of x [B, C, T, H, W] as float32
+/// [B*T, groups, 2], eagerly.
+fn eager_group_stats(x: &Tensor, groups: i64, eps: f64) -> Result<Tensor, Error> {
+    let [b, _, t, _, _] = unpack::<5>(&x.size())?;
+    let frames = x
+        .f_permute([0, 2, 1, 3, 4])?
+        .f_reshape([b * t, groups, -1])?
+        .f_to_kind(Kind::Float)?;
+    let (var, mean) = frames.f_var_mean_dim([-1i64].as_slice(), false, false)?;
+    Ok(Tensor::f_stack(
+        &[mean, var.f_add_scalar(eps)?.f_rsqrt()?],
+        -1,
+    )?)
+}
+fn cuda_group_stats(rt: &Runtime, x: &Tensor, groups: i64, eps: f64) -> Result<Tensor, Error> {
+    use KernelArg::{Float, Int, Tensor as T};
+    let [b, c, t, h, ww] = unpack::<5>(&x.size())?;
+    let mut served = !(c % 8 != 0 || c > 2048);
+    if served {
+        if groups == 0 {
+            return Err(error("ZeroDivisionError", "integer modulo by zero"));
+        }
+        served = c % groups == 0 && groups <= 1024 && b * t <= 65535;
+    }
+    let mut x = x.shallow_clone();
+    let mut row_stride = if served { ndhwc_row_stride(&x)? } else { None };
+    if served && row_stride.is_none() {
+        row_stride = Some(ww * c);
+        x = cl(rt, &x)?;
+    }
+    if !(served && aligned(&x)) {
+        return eager_group_stats(&x, groups, eps);
+    }
+    let chunks = (h * ww + 1023) / 1024;
+    let ws = Tensor::f_empty([2 * b * t * chunks * c], (Kind::Float, x.device()))?;
+    let stats = Tensor::f_empty([b * t, groups, 2], (Kind::Float, x.device()))?;
+    unsafe {
+        rt.native.call_unchecked(
+            "group_norm_stats3d",
+            &[
+                T(&x),
+                T(&ws),
+                T(&stats),
+                Int(b),
+                Int(c),
+                Int(t),
+                Int(h),
+                Int(ww),
+                Int(groups),
+                Float(eps),
+                Int(row_stride.unwrap()),
+                Int(quantization::dtype_code(x.kind())?),
+                Int(stream(rt, &x)?),
+            ],
+        )?;
+    }
+    Ok(stats)
+}
 pub(super) fn install(rt: &Runtime) {
     for backend in ["eager", "cuda"] {
         let cuda = backend == "cuda";
@@ -486,6 +688,7 @@ pub(super) fn install(rt: &Runtime) {
             "fp16_conv3d_out",
             "group_norm_silu_pad3d",
             "group_norm_silu_pad3d_out",
+            "group_norm_stats3d",
         ] {
             rt.backends
                 .bind_reference(backend, op, body(move |rt, a, k| run(rt, cuda, op, a, k)));
@@ -494,6 +697,15 @@ pub(super) fn install(rt: &Runtime) {
 }
 fn run(rt: &Runtime, cuda: bool, op: &str, a: &[Value], k: &Kwargs) -> Result<Value, Error> {
     let x = tensor(a, k, 0, "x")?;
+    if op == "group_norm_stats3d" {
+        let groups = integer(get(a, k, 1, "num_groups"), 0)?;
+        let eps = real(get(a, k, 2, "eps"), 0.)?;
+        return Ok(Value::tensor(if cuda {
+            cuda_group_stats(rt, &x, groups, eps)?
+        } else {
+            eager_group_stats(&x, groups, eps)?
+        }));
+    }
     let w = optional_tensor(a, k, 1, "weight")?;
     let b = optional_tensor(a, k, 2, "bias")?;
     let is_out = op.ends_with("_out");
@@ -540,6 +752,11 @@ fn run(rt: &Runtime, cuda: bool, op: &str, a: &[Value], k: &Kwargs) -> Result<Va
             None
         };
         let ot = ov.map(Value::as_tensor).transpose()?;
+        // stats follows out where the signature has one.
+        let stats = get(a, k, if cuda || is_out { 9 } else { 8 }, "stats")
+            .filter(|v| !matches!(v, Value::None))
+            .map(Value::as_tensor)
+            .transpose()?;
         let v = if cuda {
             cuda_group(
                 rt,
@@ -553,6 +770,7 @@ fn run(rt: &Runtime, cuda: bool, op: &str, a: &[Value], k: &Kwargs) -> Result<Va
                     silu,
                     zero_pad: zp,
                     out: ot.as_ref(),
+                    stats: stats.as_ref(),
                 },
             )?
         } else {
@@ -566,6 +784,7 @@ fn run(rt: &Runtime, cuda: bool, op: &str, a: &[Value], k: &Kwargs) -> Result<Va
                 &padding,
                 silu,
                 zp,
+                stats.as_ref(),
             )?
         };
         if is_out {

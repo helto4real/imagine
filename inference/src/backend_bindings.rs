@@ -304,6 +304,14 @@ pub(super) fn install(rt: &Runtime) {
             .bind_reference("cuda", op, body(move |rt, a, k| run(rt, true, op, a, k)));
     }
     for op in [
+        "rms_gated_residual",
+        "int8_linear_modulated",
+        "int8_linear_rms_modulated",
+    ] {
+        rt.backends
+            .bind_reference("eager", op, body(move |rt, a, k| modulated(rt, op, a, k)));
+    }
+    for op in [
         "dequantize_mxfp8",
         "dequantize_int8_embedding",
         "stochastic_rounding_fp8",
@@ -316,6 +324,86 @@ pub(super) fn install(rt: &Runtime) {
     }
 }
 
+/// Kitchen 0.2.40's portable eager references: `rms_gated_residual` and the
+/// batch-one modulated INT8 projections.
+fn modulated(rt: &Runtime, op: &str, a: &[Value], k: &Kwargs) -> Result<Value, Error> {
+    let rms_norm = |x: Value, weight: Value, eps: f64| -> Result<Value, Error> {
+        let width = *x
+            .as_tensor()?
+            .size()
+            .last()
+            .ok_or_else(|| Error::ReferenceException {
+                class: "IndexError",
+                message: "tuple index out of range".into(),
+            })?;
+        unsafe {
+            rt.op(
+                "aten::rms_norm.default",
+                &[
+                    x,
+                    Value::List(vec![Value::Int(width)]),
+                    weight,
+                    Value::Float(eps),
+                ],
+                &vec![],
+            )
+        }
+    };
+    if op == "rms_gated_residual" {
+        let activation = required(a, k, 0, "activation")?.clone();
+        let weight = required(a, k, 1, "norm_weight")?.clone();
+        let residual = tensor(a, k, 2, "residual")?;
+        let gate = tensor(a, k, 3, "gate")?;
+        let eps = real(get(a, k, 4, "eps"), 1e-5)?;
+        let normalized = rms_norm(activation, weight, eps)?.as_tensor()?;
+        return Ok(Value::tensor(residual.f_add(&gate.f_mul(&normalized)?)?));
+    }
+    // int8_linear_rms_modulated takes the norm first, then int8_linear_modulated's
+    // arguments.
+    let (x, rest) = if op == "int8_linear_rms_modulated" {
+        let x = required(a, k, 0, "x")?.clone();
+        let weight = required(a, k, 1, "norm_weight")?.clone();
+        let eps = real(get(a, k, 2, "norm_eps"), 0.)?;
+        (rms_norm(x, weight, eps)?, 3)
+    } else {
+        (required(a, k, 0, "x")?.clone(), 1)
+    };
+    let names = [
+        "modulation_scale",
+        "weight",
+        "weight_scale",
+        "bias",
+        "out_dtype",
+        "convrot",
+        "convrot_groupsize",
+    ];
+    let value = |i: usize| get(a, k, rest + i, names[i]).cloned();
+    let x = x.as_tensor()?;
+    let scale = required(a, k, rest, names[0])?.as_tensor()?;
+    let width = *x.size().last().unwrap();
+    if scale.numel() as i64 != width {
+        return Err(Error::ReferenceException {
+            class: "ValueError",
+            message: format!(
+                "modulation_scale must contain one batch-one row of {width} values, got {}",
+                scale.numel()
+            ),
+        });
+    }
+    let mut shape = vec![1; x.dim() - 1];
+    shape.push(width);
+    let x = x.f_mul(&scale.f_reshape(&shape)?.f_add_scalar(1.)?)?;
+    let args = vec![
+        Value::tensor(x),
+        value(1).unwrap_or(Value::None),
+        value(2).unwrap_or(Value::None),
+        value(3).unwrap_or(Value::None),
+        value(4).unwrap_or(Value::DType(Kind::BFloat16)),
+        value(5).unwrap_or(Value::Bool(false)),
+        value(6).unwrap_or(Value::Int(256)),
+    ];
+    run(rt, false, "int8_linear", &args, &vec![])
+}
 fn run(rt: &Runtime, cuda: bool, op: &str, a: &[Value], k: &Kwargs) -> Result<Value, Error> {
     use KernelArg::{Int, Tensor as T};
     let first_name = match op {
