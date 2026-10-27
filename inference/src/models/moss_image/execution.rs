@@ -247,6 +247,7 @@ impl FullAreaExecution for Forward<'_, '_> {
                     latent: &input,
                     timestep: &timestep,
                     context: &context,
+                    references: None,
                 },
                 self.exec,
             )

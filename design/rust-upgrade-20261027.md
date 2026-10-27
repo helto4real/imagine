@@ -176,3 +176,17 @@ tests except `group_norm_silu_pad3d`, whose native call gained `stats` and
 `row_stride` arguments. Because both workers share the Rust Kitchen bindings, H3
 must move to 0.2.40 with the image worker, so an H3 old-vs-new run is needed.
 Tomas chose to do MOSS editing (item 1) first; item 2 follows items 6 and 7.
+
+### Item 1: MOSS editing — DiT
+
+`tools/reference_moss_dit_edit.py` runs the `426f5eea` MOSS DiT on the same bounded
+synthetic models as the previous fixture and adds reference edits
+(`fixtures/reference-20261027/moss-dit.json`). Its 72 ordinary forwards, events and
+operation counts are identical to the previous reference, so the RoPE rewrite and
+the memory changes do not alter outputs. `MossDiT::preprocess_refs` embeds the
+reference latents and runs every block at t = 0 (reference i on r = i + 1, f = 0),
+recording each block's keys and values; `MossInputs::references` appends them to
+every block's attention. `MossEditLayout` selects Moss-Image-Edit's text-start
+frames or ai-toolkit's image frame. All 32 edit cases (CPU/CUDA, BF16/INT8,
+fused/split q/k/v, both layouts, one and two references) match exactly, including
+the precomputed keys/values and lifecycle events.

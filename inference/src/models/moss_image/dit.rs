@@ -46,6 +46,23 @@ pub struct MossInputs<'a> {
     pub latent: &'a Tensor,
     pub timestep: &'a Tensor,
     pub context: &'a Tensor,
+    pub references: Option<MossReferences<'a>>,
+}
+/// Where an edit LoRA was trained to place its references on RoPE's frame axis.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MossEditLayout {
+    /// Moss-Image-Edit: the references sit at the text start; text and image keep
+    /// their frames.
+    TextStart,
+    /// ai-toolkit with its kv_cache: the image moves to frame 0 with the references.
+    ImageFrame,
+}
+/// Reference images as the keys and values `MossDiT::preprocess_refs` computed for
+/// every block: [batch, blocks, 2, tokens, dim].
+#[derive(Clone, Copy)]
+pub struct MossReferences<'a> {
+    pub kv: &'a Tensor,
+    pub layout: MossEditLayout,
 }
 pub type MossOriginalBlock<'a, E> =
     dyn FnMut(&Tensor, &[Tensor], &Tensor, &mut E) -> Result<Tensor, Error> + 'a;
@@ -179,19 +196,52 @@ pub fn moss_rope(
     device: Device,
     fp64: bool,
 ) -> Result<Tensor, Error> {
+    moss_rope_ids(
+        &sequence_ids(h, w, text, 0, device)?,
+        head_dim,
+        device,
+        fp64,
+    )
+}
+/// (r, f, h, w) of the image then the text: the image sits after the text on f,
+/// its rows and columns centered; `offset` shifts both along f.
+fn sequence_ids(h: i64, w: i64, text: i64, offset: i64, device: Device) -> Result<Tensor, Error> {
     let ids = Tensor::f_zeros([h * w + text, 4], (Kind::Float, device))?;
-    let _ = ids.f_narrow(0, 0, h * w)?.f_select(1, 1)?.f_fill_(text)?;
+    let _ = ids
+        .f_narrow(0, 0, h * w)?
+        .f_select(1, 1)?
+        .f_fill_(text + offset)?;
+    ids.f_narrow(0, 0, h * w)?
+        .f_narrow(1, 2, 2)?
+        .f_copy_(&centered(h, w, device)?)?;
+    ids.f_narrow(0, h * w, text)?
+        .f_select(1, 1)?
+        .f_copy_(&Tensor::f_arange(text, (Kind::Float, device))?.f_add_scalar(offset)?)?;
+    Ok(ids)
+}
+/// Reference i on r = i + 1 and f = 0, its rows and columns centered.
+fn reference_ids(shapes: &[(i64, i64)], device: Device) -> Result<Tensor, Error> {
+    let mut parts = Vec::new();
+    for (i, &(h, w)) in shapes.iter().enumerate() {
+        let ids = Tensor::f_zeros([h * w, 4], (Kind::Float, device))?;
+        let _ = ids.f_select(1, 0)?.f_fill_((i + 1) as i64)?;
+        ids.f_narrow(1, 2, 2)?.f_copy_(&centered(h, w, device)?)?;
+        parts.push(ids);
+    }
+    Ok(Tensor::f_cat(&parts, 0)?)
+}
+/// [h * w, 2] centered (row, column) coordinates in row-major order.
+fn centered(h: i64, w: i64, device: Device) -> Result<Tensor, Error> {
     let rows = Tensor::f_arange(h, (Kind::Float, device))?
         .f_sub_scalar((h - 1) as f64 / 2.)?
         .f_repeat_interleave_self_int(w, Some(0), None)?;
     let cols = Tensor::f_arange(w, (Kind::Float, device))?
         .f_sub_scalar((w - 1) as f64 / 2.)?
         .f_repeat([h])?;
-    ids.f_narrow(0, 0, h * w)?.f_select(1, 2)?.f_copy_(&rows)?;
-    ids.f_narrow(0, 0, h * w)?.f_select(1, 3)?.f_copy_(&cols)?;
-    ids.f_narrow(0, h * w, text)?
-        .f_select(1, 1)?
-        .f_copy_(&Tensor::f_arange(text, (Kind::Float, device))?)?;
+    Ok(Tensor::f_stack(&[rows, cols], 1)?)
+}
+fn moss_rope_ids(ids: &Tensor, head_dim: i64, device: Device, fp64: bool) -> Result<Tensor, Error> {
+    let n = ids.size()[0];
     let ids = ids.f_unsqueeze(0)?;
     let dim = head_dim / 4;
     let mut axes = Vec::new();
@@ -222,7 +272,7 @@ pub fn moss_rope(
                 ],
                 -1,
             )?
-            .f_reshape([1, h * w + text, dim / 2, 2, 2])?
+            .f_reshape([1, n, dim / 2, 2, 2])?
             .f_to_device_(device, Kind::Float, false, false)?,
         );
     }
@@ -230,6 +280,26 @@ pub fn moss_rope(
         .f_unsqueeze(1)?
         .f_transpose(1, 2)?
         .f_contiguous()?)
+}
+/// ComfyUI `repeat_to_batch_size` on the first dimension.
+fn repeat_to_batch_size(x: &Tensor, batch: i64) -> Result<Tensor, Error> {
+    let n = x.size()[0];
+    Ok(if n > batch {
+        x.f_narrow(0, 0, batch)?
+    } else if n < batch {
+        let mut repeats = vec![1; x.dim()];
+        repeats[0] = (batch + n - 1) / n;
+        x.f_repeat(&repeats)?.f_narrow(0, 0, batch)?
+    } else {
+        x.shallow_clone()
+    })
+}
+/// Reference keys and values a block appends to its own, and where it records its
+/// own keys and values for references.
+#[derive(Clone, Copy, Default)]
+struct BlockKv<'a> {
+    references: Option<&'a Tensor>,
+    out: Option<&'a Tensor>,
 }
 struct AttentionNorms {
     q: Tensor,
@@ -249,12 +319,12 @@ impl AttentionNorms {
     unsafe fn forward<E: MossExecution>(
         &self,
         rt: &Runtime,
-        q: &Tensor,
-        k: &Tensor,
-        v: &Tensor,
+        qkv: &[Tensor],
         pe: &Tensor,
+        kv: BlockKv<'_>,
         e: &mut E,
     ) -> Result<Tensor, Error> {
+        let (q, k, v) = (&qkv[0], &qkv[1], &qkv[2]);
         let shape = q.size();
         let mut q = q.f_view([shape[0], shape[1], self.heads, -1])?;
         let mut k = k.f_view([shape[0], shape[1], self.heads, -1])?;
@@ -283,14 +353,17 @@ impl AttentionNorms {
             k = out.pop().unwrap().as_tensor()?;
             q = out.pop().unwrap().as_tensor()?;
         }
-        e.attention(
-            rt,
-            &q.f_flatten(2, -1)?,
-            &k.f_flatten(2, -1)?,
-            v,
-            self.heads,
-            &self.path,
-        )
+        let (mut k, mut v) = (k.f_flatten(2, -1)?, v.shallow_clone());
+        if let Some(out) = kv.out {
+            out.f_select(1, 0)?.f_copy_(&k)?;
+            out.f_select(1, 1)?.f_copy_(&v)?;
+        }
+        if let Some(kv) = kv.references {
+            // The references' keys and values, computed once.
+            k = Tensor::f_cat(&[k, kv.f_select(1, 0)?], 1)?;
+            v = Tensor::f_cat(&[v, kv.f_select(1, 1)?], 1)?;
+        }
+        e.attention(rt, &q.f_flatten(2, -1)?, &k, &v, self.heads, &self.path)
     }
 }
 unsafe fn linear<E: MossExecution>(
@@ -336,7 +409,7 @@ impl TextBlock {
     ) -> Result<Tensor, Error> {
         e.check_interrupt()?;
         let qkv = unsafe { linear(&self.qkv, rt, &norm(x, &self.norms[0])?, e)? }.f_chunk(3, -1)?;
-        let attn = unsafe { self.attn.forward(rt, &qkv[0], &qkv[1], &qkv[2], pe, e)? };
+        let attn = unsafe { self.attn.forward(rt, &qkv, pe, BlockKv::default(), e)? };
         let x = x.f_add(&unsafe { linear(&self.proj, rt, &attn, e)? })?;
         // Release attention operands before the FFN, as the original does.
         drop((qkv, attn));
@@ -380,6 +453,7 @@ impl Block {
         x: &Tensor,
         m: &[Tensor],
         pe: &Tensor,
+        kv: BlockKv<'_>,
         e: &mut E,
     ) -> Result<Tensor, Error> {
         let y = unsafe { mod_norm(rt, x, &self.norms[0], &m[1], &m[0], e)? };
@@ -397,10 +471,7 @@ impl Block {
         // Each intermediate is released once used, as the original does, which
         // lowers peak memory.
         drop(y);
-        let attn = unsafe {
-            self.attn
-                .forward(rt, &parts[0], &parts[1], &parts[2], pe, e)?
-        };
+        let attn = unsafe { self.attn.forward(rt, &parts, pe, kv, e)? };
         drop(parts);
         let out = unsafe { linear(&self.o, rt, &attn, e)? };
         drop(attn);
@@ -478,14 +549,26 @@ impl MossDiT {
     ) -> Result<Tensor, Error> {
         let shape = a.latent.size();
         let (b, h, w) = (shape[0], shape[2], shape[3]);
-        let pe = moss_rope(
-            h,
-            w,
-            a.context.size()[1],
+        let text = a.context.size()[1];
+        // ai-toolkit puts the references on the image's frame, Moss-Image-Edit at
+        // the text start; shifting the rest keeps them at f = 0, where their keys
+        // were computed.
+        let offset = match a.references {
+            Some(r) if r.layout == MossEditLayout::ImageFrame => -text,
+            _ => 0,
+        };
+        let pe = moss_rope_ids(
+            &sequence_ids(h, w, text, offset, a.latent.device())?,
             self.config.dim / self.config.heads,
             a.latent.device(),
             true,
         )?;
+        // One set of references serves the whole batch.
+        let references = match a.references {
+            Some(r) if r.kv.size()[0] == 1 => Some(r.kv.f_expand([b, -1, -1, -1, -1], false)?),
+            Some(r) => Some(repeat_to_batch_size(r.kv, b)?),
+            None => None,
+        };
         let t = timestep_embedding(a.timestep, 256, 10000., 1000.)?.f_to_kind(a.latent.kind())?;
         let vec = unsafe { linear(&self.time[0], rt, &t, e)? }.f_silu()?;
         let vec = unsafe { linear(&self.time[1], rt, &vec, e)? };
@@ -521,16 +604,24 @@ impl MossDiT {
                 total_blocks: self.blocks.len(),
                 block_index: i,
             };
+            let layer = references
+                .as_ref()
+                .map(|kv| kv.f_select(1, i as i64))
+                .transpose()?;
+            let kv = BlockKv {
+                references: layer.as_ref(),
+                out: None,
+            };
             x = match e.replace_block(
                 &state,
                 &x,
                 &vec,
                 &modulation,
                 &pe,
-                &mut |x, m, pe, e| unsafe { block.forward(rt, x, m, pe, e) },
+                &mut |x, m, pe, e| unsafe { block.forward(rt, x, m, pe, kv, e) },
             )? {
                 Some(x) => x,
-                None => unsafe { block.forward(rt, &x, &modulation, &pe, e)? },
+                None => unsafe { block.forward(rt, &x, &modulation, &pe, kv, e)? },
             };
         }
         e.lifecycle(MossLifecycle::QueueEnd)?;
@@ -548,5 +639,63 @@ impl MossDiT {
         Ok(unsafe { linear(&self.final_linear, rt, &x, e)? }
             .f_transpose(1, 2)?
             .f_reshape([b, self.config.latent_channels, h, w])?)
+    }
+    /// Keys and values of every block for reference latents that attend only to
+    /// each other at t = 0, which depend on the references alone: computed once
+    /// per job as [batch, blocks, 2, tokens, dim] for `MossReferences`.
+    ///
+    /// # Safety
+    /// As for `forward`.
+    pub unsafe fn preprocess_refs<E: MossExecution>(
+        &self,
+        rt: &Runtime,
+        refs: &[Tensor],
+        e: &mut E,
+    ) -> Result<Tensor, Error> {
+        let batch = refs.iter().map(|r| r.size()[0]).max().unwrap_or(1);
+        let mut tokens = Vec::with_capacity(refs.len());
+        for r in refs {
+            let r = repeat_to_batch_size(r, batch)?;
+            tokens.push(unsafe {
+                linear(&self.video, rt, &r.f_flatten(2, -1)?.f_transpose(1, 2)?, e)?
+            });
+        }
+        let mut x = Tensor::f_cat(&tokens, 1)?;
+        let device = x.device();
+        let shapes = refs
+            .iter()
+            .map(|r| (r.size()[2], r.size()[3]))
+            .collect::<Vec<_>>();
+        let pe = moss_rope_ids(
+            &reference_ids(&shapes, device)?,
+            self.config.dim / self.config.heads,
+            device,
+            true,
+        )?;
+        let zero = Tensor::f_zeros([1], (Kind::Float, device))?;
+        let t = timestep_embedding(&zero, 256, 10000., 1000.)?.f_to_kind(x.kind())?;
+        let vec = unsafe { linear(&self.time[0], rt, &t, e)? }.f_silu()?;
+        let vec = unsafe { linear(&self.time[1], rt, &vec, e)? };
+        let modulation = unsafe { linear(&self.modulation, rt, &vec, e)? }
+            .f_unflatten(-1, [6, -1])?
+            .f_unsqueeze(2)?
+            .f_unbind(1)?;
+        let s = x.size();
+        let kv = Tensor::f_empty(
+            [s[0], self.blocks.len() as i64, 2, s[1], s[2]],
+            (x.kind(), device),
+        )?;
+        e.lifecycle(MossLifecycle::Queue)?;
+        for (i, block) in self.blocks.iter().enumerate() {
+            e.lifecycle(MossLifecycle::Block(i))?;
+            let out = kv.f_select(1, i as i64)?;
+            let kv = BlockKv {
+                references: None,
+                out: Some(&out),
+            };
+            x = unsafe { block.forward(rt, &x, &modulation, &pe, kv, e)? };
+        }
+        e.lifecycle(MossLifecycle::QueueEnd)?;
+        Ok(kv)
     }
 }
