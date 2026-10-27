@@ -250,7 +250,14 @@ pub fn calculate_weight(
                     }
                 }
             }
-            PatchValue::Set(v) => weight.f_copy_(&v.as_tensor()?)?,
+            PatchValue::Set(v) => {
+                let v = v.as_tensor()?;
+                if v.size() != weight.size() {
+                    weight = cast_to_device(native, &v, weight.device(), weight.kind(), true)?;
+                } else {
+                    weight.f_copy_(&v)?;
+                }
+            }
             PatchValue::ModelAsLora(target) => {
                 let orig = originals
                     .and_then(|m| m.get(key))

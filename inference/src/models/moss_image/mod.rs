@@ -24,4 +24,4 @@ mod vae_checkpoint;
 pub use vae_checkpoint::*;
 
 mod patching;
-pub use patching::{component_patch_owner, moss_key_map};
+pub use patching::{component_patch_owner, convert_moss_control_lora, moss_key_map};

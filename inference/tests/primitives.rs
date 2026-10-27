@@ -391,6 +391,8 @@ mod comfy_sdpa_tests;
 mod model_management_tests;
 #[path = "support/moss_conditioning.rs"]
 mod moss_conditioning_tests;
+#[path = "support/moss_control.rs"]
+mod moss_control_tests;
 #[path = "support/moss_delta.rs"]
 mod moss_delta_tests;
 #[path = "support/moss_dit.rs"]

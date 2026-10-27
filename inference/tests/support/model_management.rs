@@ -506,6 +506,23 @@ fn assert_json_numbers(a: &Value, b: &Value, label: &str) {
 
 #[test]
 fn qwen_image21_original_shared_static_clones_patch_switches_and_forced_cpu_patches_match() {
+    let f: Value = serde_json::from_str(include_str!(
+        "../../fixtures/qwen-image21-shared-ownership.json"
+    ))
+    .unwrap();
+    static_ownership_cases(&f);
+}
+#[test]
+fn moss_control_widened_static_patches_load_lowvram_and_switch_like_426f5eea() {
+    let f: Value = serde_json::from_str(include_str!(
+        "../../fixtures/reference-20261027/moss-control-offload.json"
+    ))
+    .unwrap();
+    static_ownership_cases(&f);
+}
+/// Static clone/manager lifecycles: the case's own patch selections, or one adapter
+/// at 0.375 (A) and -0.5 (B) on every unit.
+fn static_ownership_cases(f: &Value) {
     use super::{
         binding_tests::{check, restore},
         kitchen,
@@ -529,10 +546,6 @@ fn qwen_image21_original_shared_static_clones_patch_switches_and_forced_cpu_patc
     });
     let rt = Arc::new(Runtime::frozen(native.clone(), compiler).unwrap());
     let _grad = tch::no_grad_guard();
-    let f: Value = serde_json::from_str(include_str!(
-        "../../fixtures/qwen-image21-shared-ownership.json"
-    ))
-    .unwrap();
     assert_eq!(f["safety"]["real_model_constructor"], false);
     for (c, own_runtime) in f["cases"]
         .as_array()
@@ -580,17 +593,31 @@ fn qwen_image21_original_shared_static_clones_patch_switches_and_forced_cpu_patc
             c["model_size"].as_u64().unwrap()
         );
         let root = model.patcher();
-        let adapter = p::Adapter {
-            name: c["adapter"]["name"].as_str().unwrap().into(),
-            weights: c["adapter"]["weights"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|v| restore(v, Device::Cpu))
-                .collect(),
-        };
-        let patched = |strength| {
+        let patched = |handle: &str, strength| {
             let mut owner = p::PatchOwner::new();
+            if let Some(selection) = c["selections"][handle].as_object() {
+                for (key, patches) in selection {
+                    let patches = patches.as_array().unwrap().iter().map(|v| {
+                        let mut patch = p::Patch::new(
+                            super::qwen_lora_tests::patch_value(&v["value"], Device::Cpu),
+                            v["strength"].as_f64().unwrap(),
+                        );
+                        patch.model_strength = v["model_strength"].as_f64().unwrap();
+                        patch
+                    });
+                    owner.patches.insert(key.clone(), patches.collect());
+                }
+                return owner;
+            }
+            let adapter = p::Adapter {
+                name: c["adapter"]["name"].as_str().unwrap().into(),
+                weights: c["adapter"]["weights"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| restore(v, Device::Cpu))
+                    .collect(),
+            };
             for i in 0..3 {
                 owner.patches.insert(
                     format!("unit{i}.weight"),
@@ -602,9 +629,9 @@ fn qwen_image21_original_shared_static_clones_patch_switches_and_forced_cpu_patc
             }
             owner
         };
-        let first = model.with_patches(&root, patched(0.375)).unwrap();
+        let first = model.with_patches(&root, patched("a", 0.375)).unwrap();
         let same = model.clone_patcher(&first).unwrap();
-        let second = model.with_patches(&first, patched(-0.5)).unwrap();
+        let second = model.with_patches(&first, patched("b", -0.5)).unwrap();
         let mut handles = BTreeMap::from([
             ("root".to_owned(), root),
             ("a".into(), first),

@@ -58,7 +58,7 @@ pub fn calculate_shape_metadata(patches: &[Patch], mut shape: Value) -> Result<V
                     shape = tuple(reshape)?;
                 }
             }
-            PatchValue::Diff { weight, pad: true } => {
+            PatchValue::Diff { weight, pad: true } | PatchValue::Set(weight) => {
                 shape = size_metadata(&weight.as_tensor()?.size())
             }
             _ => {}

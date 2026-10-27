@@ -2,7 +2,7 @@
 use crate::{
     checkpoint::PreparedParameters,
     native::Error,
-    patching::{self, PatchOwner, SelectedLora, Target},
+    patching::{self, LoraState, PatchOwner, SelectedLora, Target},
 };
 pub fn moss_key_map(weights: &[(String, Vec<i64>)]) -> Vec<(String, Target)> {
     let mut mapping = Vec::new();
@@ -55,6 +55,25 @@ pub fn moss_key_map(weights: &[(String, Vec<i64>)]) -> Vec<(String, Target)> {
     }
     mapping
 }
+/// ComfyUI `convert_moss_control_lora`: a MOSS-Image control adapter's widened
+/// `video_embedder` replaces the model's; its other keys gain the model prefix.
+pub fn convert_moss_control_lora(lora: &LoraState) -> LoraState {
+    if !(lora.contains_key("video_embedder.weight")
+        && lora.contains_key("layers.0.proj.q.lora_A.weight"))
+    {
+        return lora.clone();
+    }
+    lora.iter()
+        .map(|(key, value)| {
+            let to = match key.as_str() {
+                "video_embedder.weight" => "diffusion_model.video_embedder.set_weight".into(),
+                "video_embedder.bias" => "diffusion_model.video_embedder.bias.set_weight".into(),
+                _ => format!("diffusion_model.{key}"),
+            };
+            (to, value.clone())
+        })
+        .collect()
+}
 pub fn component_patch_owner(
     state: &PreparedParameters,
     loras: &[SelectedLora],
@@ -66,10 +85,14 @@ pub fn component_patch_owner(
         .iter()
         .map(|p| (format!("diffusion_model.{}", p.name), p.shape.clone()))
         .collect::<Vec<_>>();
+    let loras = loras
+        .iter()
+        .map(|(lora, model, clip)| (convert_moss_control_lora(lora), *model, *clip))
+        .collect::<Vec<_>>();
     patching::bind_component(
         "diffusion_model.",
         state,
-        loras,
+        &loras,
         &moss_key_map(&weights),
         false,
     )

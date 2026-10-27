@@ -11,8 +11,11 @@ definitions('comfy/float.py',['stochastic_rounding']);comfy.float=NS(stochastic_
 definitions('comfy/model_patcher.py',['patch_weight_to_device'],owner='ModelPatcher')
 definitions('comfy/model_management.py',['lora_compute_dtype']);namespace['LORA_COMPUTE_DTYPES']={};namespace['should_use_fp16']=lambda device:device is not None and device.type=='cuda';mm.lora_compute_dtype=namespace['lora_compute_dtype']
 ops_tree=ast.parse((a.comfy/'comfy/ops.py').read_text())
+# The setters of MixedPrecisionOps.Linear, found by class rather than line.
+mixed=next(n for n in ast.walk(ops_tree)if isinstance(n,ast.ClassDef)and n.name=='MixedPrecisionOps')
+linear=next(n for n in mixed.body if isinstance(n,ast.ClassDef)and n.name=='Linear')
 for name in ['convert_weight','set_weight']:
- node=next(n for n in ast.walk(ops_tree)if isinstance(n,ast.FunctionDef)and n.name==name and 1500<n.lineno<1570)
+ node=next(n for n in linear.body if isinstance(n,ast.FunctionDef)and n.name==name)
  exec(compile(ast.Module(body=[node],type_ignores=[]),str(a.comfy/'comfy/ops.py'),'exec'),namespace)
 class QuantModule(torch.nn.Module):
  convert_weight=namespace['convert_weight'];set_weight=namespace['set_weight']

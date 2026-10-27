@@ -467,6 +467,12 @@ pub fn prepare_patched_offload_modules(
         ModelCastDtype::Kind(Kind::BFloat16),
     )
 }
+fn changes_shape(patches: &[crate::patching::Patch], value: &Value) -> Result<bool, Error> {
+    let (shape, _, _) = parameter_shape_kind(value)?;
+    let metadata =
+        crate::patching::calculate_shape_metadata(patches, crate::patching::size_metadata(&shape))?;
+    Ok(!crate::patching::shape_metadata_matches(&metadata, &shape)?)
+}
 pub fn prepare_component_patched_modules(
     parameters: &PreparedParameters,
     owner: &crate::patching::PatchOwner,
@@ -480,14 +486,9 @@ pub fn prepare_component_patched_modules(
                 let value = &parameters[name];
                 let (shape, kind, quantized) = parameter_shape_kind(value)?;
                 let elements = shape.iter().product::<i64>() as u64;
-                if let Some(patches) = owner.patches.get(name) {
-                    let metadata = crate::patching::calculate_shape_metadata(
-                        patches,
-                        crate::patching::size_metadata(&shape),
-                    )?;
-                    if !crate::patching::shape_metadata_matches(&metadata, &shape)? {
-                        return Err(gap("Static offload forced shape-changing patch lifecycle"));
-                    }
+                if owner.patches.contains_key(name) {
+                    // low_vram_patch_estimate_vram counts the unpatched weight, also
+                    // for a patch that changes its shape.
                     module.offload_bytes = patched_module_offload_bytes(
                         module.offload_bytes,
                         &[elements],
@@ -776,10 +777,12 @@ impl<B: ModelBuffers> StaticOffload<B> {
                 if next.resident.contains(&m.name) {
                     self.forced_lowvram.remove(name);
                 }
-                if force
-                    && next.lowvram_passes.contains_key(&m.name)
+                // A lowvram weight is patched now when forced or when its patches
+                // change its shape; otherwise it gets a lazy LowVramPatch.
+                if next.lowvram_passes.contains_key(&m.name)
                     && !self.placement.lowvram_passes.contains_key(&m.name)
                     && let Some(patches) = self.patch_owner.patches.get(name)
+                    && (force || changes_shape(patches, &self.parameters[name])?)
                 {
                     let base = self.parameters[name].clone();
                     let patched = unsafe {

@@ -6,14 +6,14 @@ use imagine_inference::{execution_value::Value as V, patching as p};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use tch::{Device, Kind};
-fn value(v: &Value, dev: Device) -> V {
+pub(super) fn value(v: &Value, dev: Device) -> V {
     if let Some(v) = v.as_array() {
         V::List(v.iter().map(|v| value(v, dev)).collect())
     } else {
         restore(v, dev)
     }
 }
-fn patch_value(v: &Value, dev: Device) -> p::PatchValue {
+pub(super) fn patch_value(v: &Value, dev: Device) -> p::PatchValue {
     if v["type"] == "adapter" {
         return p::PatchValue::Adapter(p::Adapter {
             name: v["name"].as_str().unwrap().into(),
@@ -71,7 +71,7 @@ fn original_rank_three_adapter_integer_alpha_preserves_division_rounding_unsigne
     assert_eq!(fixture["math"].as_array().unwrap().len(), 576);
     run_math(&native, &fixture);
 }
-fn run_math(native: &imagine_inference::native::Kitchen, f: &Value) {
+pub(super) fn run_math(native: &imagine_inference::native::Kitchen, f: &Value) {
     for c in f["math"].as_array().unwrap() {
         let dev = if c["weight"]["device"].as_str().unwrap().starts_with("cuda") {
             Device::Cuda(0)
@@ -189,7 +189,7 @@ fn original_merged_oft_boft_tensor_constraints_dora_dtype_truth_errors_and_diagn
     assert_eq!(fixture["math"].as_array().unwrap().len(), 1440);
     run_math(&native, &fixture);
 }
-fn assert_patch(actual: &p::PatchValue, expected: &Value) {
+pub(super) fn assert_patch(actual: &p::PatchValue, expected: &Value) {
     match actual {
         p::PatchValue::Adapter(a) => {
             assert_eq!(a.name, expected["name"].as_str().unwrap());
