@@ -80,7 +80,7 @@ pub(super) fn generate(
         let vae = load_vae(rt, aimdo, r, &pins, observer)?;
         let mut latents = Vec::with_capacity(images.len());
         for pixels in images {
-            let pixels = q::vae_crop_pixels(&pixels.f_narrow(-1, 0, 3)?)?.f_movedim_int(-1, 1)?;
+            let pixels = flux2_crop_pixels(&pixels.f_narrow(-1, 0, 3)?)?.f_movedim_int(-1, 1)?;
             latents.push(flux2_vae(
                 rt,
                 &vae,
@@ -317,4 +317,17 @@ fn flux2_vae<'a>(
         &mut services,
         q::ImageVaeMemory::Flux2 { amd: false },
     )
+}
+/// The original VAE.vae_encode_crop_pixels for Flux2: a centered crop of each
+/// spatial dimension to the 16-pixel compression, keeping the RGB channels.
+fn flux2_crop_pixels(pixels: &Tensor) -> Result<Tensor, Error> {
+    let shape = pixels.size();
+    let mut out = pixels.shallow_clone();
+    for (axis, &dim) in shape.iter().enumerate().take(shape.len() - 1).skip(1) {
+        let size = dim / 16 * 16;
+        if size != dim {
+            out = out.f_narrow(axis as i64, dim % 16 / 2, size)?;
+        }
+    }
+    Ok(out)
 }
