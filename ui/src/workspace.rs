@@ -903,7 +903,7 @@ impl ImagineApp {
                                     .fixed_decimals(0),
                             )
                             .labelled_by(label.id)
-                            .on_hover_text("Ending early keeps the layout and frees the details")
+                            .on_hover_text("Share of the steps that follow the maps. Ending early keeps the layout and frees the details.")
                             .changed()
                         {
                             settings.control_end = (percent / 100.).clamp(0., 1.);

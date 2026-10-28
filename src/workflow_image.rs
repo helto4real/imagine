@@ -41,6 +41,28 @@ pub fn prepare(bytes: &[u8], pixels: u32) -> Result<Vec<u8>> {
     let image = image.crop_imm((w - cw) / 2, (h - ch) / 2, cw, ch);
     encode(&image)
 }
+/// A MOSS edit reference at the output size: scaled (Lanczos) to cover
+/// `width` × `height` and center-cropped. ComfyUI's MOSS edit encoder uses
+/// references at the size they come in, and edits keep their layout only when
+/// that size is the output's.
+pub fn cover(bytes: &[u8], width: u32, height: u32) -> Result<Vec<u8>> {
+    let image = image::load_from_memory(bytes)?;
+    let (w, h) = (image.width(), image.height());
+    if w == 0 || h == 0 || width == 0 || height == 0 {
+        bail!("reference dimensions are too small")
+    }
+    let scale = (f64::from(width) / f64::from(w)).max(f64::from(height) / f64::from(h));
+    let (sw, sh) = (
+        ((f64::from(w) * scale).round() as u32).max(width),
+        ((f64::from(h) * scale).round() as u32).max(height),
+    );
+    let image = if (sw, sh) != (w, h) {
+        image.resize_exact(sw, sh, FilterType::Lanczos3)
+    } else {
+        image
+    };
+    encode(&image.crop_imm((sw - width) / 2, (sh - height) / 2, width, height))
+}
 pub fn encode(image: &DynamicImage) -> Result<Vec<u8>> {
     let mut bytes = Cursor::new(Vec::new());
     image.write_to(&mut bytes, ImageFormat::Png)?;
@@ -64,6 +86,27 @@ mod tests {
         ] {
             assert_eq!(dimensions(w, h, cap), expected);
         }
+    }
+
+    #[test]
+    fn moss_references_cover_the_output_and_crop_the_center() {
+        let original =
+            image::RgbaImage::from_fn(60, 40, |x, _| image::Rgba([x as u8 * 4, 0, 0, 255]));
+        let bytes = encode(&DynamicImage::ImageRgba8(original.clone())).unwrap();
+        // Same aspect scales; a wider output crops top and bottom; same size is untouched.
+        for (w, h) in [(120, 80), (120, 40), (60, 40), (32, 64)] {
+            let out = image::load_from_memory(&cover(&bytes, w, h).unwrap()).unwrap();
+            assert_eq!((out.width(), out.height()), (w, h));
+        }
+        let same = image::load_from_memory(&cover(&bytes, 60, 40).unwrap())
+            .unwrap()
+            .to_rgba8();
+        assert_eq!(same, original);
+        // A tall output keeps the middle columns.
+        let tall = image::load_from_memory(&cover(&bytes, 20, 40).unwrap())
+            .unwrap()
+            .to_rgba8();
+        assert_eq!(tall.get_pixel(0, 0), original.get_pixel(20, 0));
     }
 
     #[test]

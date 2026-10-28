@@ -66,13 +66,20 @@ Mask2Former regions:
   scikit-image's coffee photo (`examples/mask2former_released.rs`: cup, dining
   table, floor, spoon). The CUDA capture waits for the GPU.
 - Contract and worker: `inputs.color_map` / `inputs.depth_map` (asset ids) and
-  `model_options.moss_control` (strength, start, end; `MOSSImageControl`'s
-  defaults 1, 0, 1) for MOSS text to image. MOSS edits take up to four
+  `model_options.moss_control` (strength, start, end; defaults 1, 0, 1) for MOSS
+  text to image. Start and end are shares of the sampling steps, as the
+  adapter's authors count them: ComfyUI's sigma percent left only the last
+  steps free at "50 %" with MOSS's shifted schedule, so ending early barely
+  changed the image. Strength scales the control latent as `MOSSImageControl`
+  does. MOSS edits take up to four
   references. The server adds the edit LoRA (`MOSS_EDIT_LORA`) to MOSS edits
   and the control adapter (`MOSS_CONTROL_LORA`) when maps are present, as
   verified library files for library selections. Maps follow the references
   in the worker payload (`map_roles`, `map_lengths`, `map_shapes`, `control`)
-  and are VAE-encoded like references. Untested on the GPU yet.
+  and are VAE-encoded like references. MOSS edit references are scaled
+  (Lanczos, cover and center crop) to the output size: ComfyUI's MOSS edit
+  encoder uses them at the size they come in, and a smaller reference lost the
+  scene in live runs while one at the output size kept it.
 - UI (`4e9861b`, `6ac78c1`, `aa26ae5`): MOSS modes (Text, Edit, Control) in the
   image desk, depth and region map cards with strength, end and Layout/Exact,
   output size from the source (its size, its aspect at the long side, or the

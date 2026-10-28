@@ -202,12 +202,13 @@ pub(super) fn generate(
             }
             value => value.as_tensor()?.size()[1],
         };
-        let control = m::MossControl::new(
+        let control = control_by_steps(
             control_latent.as_ref(),
             embedder,
             &shape,
             dev,
-            (r.control.start, r.control.end),
+            r.control,
+            &Vec::<f32>::try_from(sigmas.f_to_device(Device::Cpu)?.f_to_kind(Kind::Float)?)?,
             &sampling,
         )?;
         if control_latent.is_some() && control.is_none() {
@@ -291,6 +292,57 @@ pub(super) fn generate(
     manager.unload_all(dev, &mut memory)?;
     Ok(out)
 }
+/// The control by sampling step, as the adapter's authors count it: steps
+/// `round(start·n)..round(end·n)` carry the maps and the others zeros, each span
+/// gated by the schedule's own sigmas (one model call per step with Euler).
+fn control_by_steps(
+    latent: Option<&Tensor>,
+    embedder: i64,
+    noise: &[i64],
+    device: Device,
+    control: Control,
+    sigmas: &[f32],
+    sampling: &m::MossSampling,
+) -> Result<Option<m::MossControl>, Error> {
+    let steps = sigmas.len().saturating_sub(1);
+    let first = (control.start * steps as f64).round() as usize;
+    let last = ((control.end * steps as f64).round() as usize).min(steps);
+    let Some(latent) = latent.filter(|_| first < last) else {
+        return m::MossControl::new(None, embedder, noise, device, (0., 0.), sampling);
+    };
+    if sigmas[..steps].windows(2).any(|s| s[1] >= s[0]) {
+        return Err(Error::Native(
+            "Control maps need a strictly decreasing sigma schedule".into(),
+        ));
+    }
+    let bound = |i: Option<usize>| i.map(|i| f64::from(sigmas[i]));
+    let span = |control, start: Option<usize>, end: Option<usize>| m::MossControlSpan {
+        control,
+        sigma_start: bound(start),
+        sigma_end: bound(end),
+    };
+    let mut spans = Vec::with_capacity(3);
+    if first > 0 {
+        spans.push(span(false, None, Some(first - 1)));
+    }
+    spans.push(span(
+        true,
+        (first > 0).then_some(first),
+        (last < steps).then(|| last - 1),
+    ));
+    if last < steps {
+        spans.push(span(false, Some(last), None));
+    }
+    let mut out = Vec::with_capacity(spans.len());
+    for span in spans {
+        let image = span.control.then_some(latent);
+        let Some(concat) = m::moss_concat_cond(noise, embedder, image, device)? else {
+            return Ok(None);
+        };
+        out.push((span, concat));
+    }
+    Ok(Some(m::MossControl { spans: out }))
+}
 fn load_vae<'a>(
     rt: &'a Runtime,
     aimdo: &Aimdo,
@@ -372,4 +424,52 @@ fn flux2_crop_pixels(pixels: &Tensor) -> Result<Tensor, Error> {
         }
     }
     Ok(out)
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn control_spans_follow_the_steps_and_admit_one_span_per_sigma() {
+        let sigmas = [1.0f32, 0.9, 0.75, 0.5, 0.25, 0.];
+        let sampling = m::MossSampling {
+            shift: 5.,
+            multiplier: 1.,
+            sigmas: Tensor::from_slice(&[0.5f32, 1.]),
+        };
+        let latent = Tensor::ones([1, 256, 2, 2], (Kind::Float, Device::Cpu));
+        let noise = [1, 128, 2, 2];
+        let carried = |start, end| {
+            let control = control_by_steps(
+                Some(&latent),
+                384,
+                &noise,
+                Device::Cpu,
+                Control {
+                    strength: 1.,
+                    start,
+                    end,
+                },
+                &sigmas,
+                &sampling,
+            )
+            .unwrap()
+            .unwrap();
+            sigmas[..5]
+                .iter()
+                .map(|&s| {
+                    control
+                        .concat(s)
+                        .unwrap()
+                        .sum(Kind::Float)
+                        .double_value(&[])
+                        > 0.
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(carried(0., 1.), [true; 5]);
+        assert_eq!(carried(0., 0.5), [true, true, true, false, false]);
+        assert_eq!(carried(0.2, 0.6), [false, true, true, false, false]);
+        assert_eq!(carried(0.5, 0.5), [false; 5]);
+    }
 }

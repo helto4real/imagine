@@ -40,6 +40,8 @@ emit(dict(type='ready',protocol=1,attention='checkpoint_preferences'))
 while True:
  try:h=json.loads(read());body=read()
  except Exception:break
+ if h['model'] in ('moss-image-sft-int8','moss-image-sft-bf16'):
+  assert all(shape==[h['height'],h['width']] for shape in h['reference_shapes'])
  maps=h.get('map_lengths',[])
  assert sum(h['reference_lengths'])+sum(maps)==len(body)
  assert len(h.get('map_shapes',[]))==len(maps)==len(h.get('map_roles',[]))
@@ -248,6 +250,32 @@ async fn moss_control_maps_reach_the_worker_as_raw_rgba_after_the_references() {
             .unwrap();
         r.maps.push((role, png.into_inner().into()));
     }
+    engine.generate(&r).await.unwrap();
+    engine.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn moss_edit_references_reach_the_worker_at_the_output_size() {
+    let (_dir, mut engine, _) = fake();
+    let defaults = contract::model(contract::MOSS).unwrap()["defaults"].clone();
+    let mut r = request();
+    r.model = contract::MOSS.into();
+    r.model_options = serde_json::from_value(defaults["model_options"].clone()).unwrap();
+    r.sampling = serde_json::from_value(defaults["sampling"].clone()).unwrap();
+    r.model_options
+        .moss_image
+        .as_mut()
+        .unwrap()
+        .loras
+        .push(contract::Lora {
+            path: contract::MOSS_EDIT_LORA.into(),
+            strength: 0.5,
+        });
+    let mut png = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::new_rgb8(600, 400)
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+    r.references.push(png.into_inner().into());
     engine.generate(&r).await.unwrap();
     engine.stop().await.unwrap();
 }

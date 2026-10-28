@@ -579,14 +579,19 @@ fn request_frame(request: &ImagePass, fallback_root: &Path) -> Result<(Value, Ve
     };
     let mut payload = Vec::new();
     let mut lengths = Vec::new();
+    let moss = crate::model_spec::is_moss(&request.model);
     for reference in &request.references {
-        let prepared = crate::workflow_image::prepare(
-            reference,
-            request
-                .model_options
-                .qwen_image_2_1
-                .reference_max_pixels_per_image,
-        )?;
+        let prepared = if moss {
+            crate::workflow_image::cover(reference, request.width, request.height)?
+        } else {
+            crate::workflow_image::prepare(
+                reference,
+                request
+                    .model_options
+                    .qwen_image_2_1
+                    .reference_max_pixels_per_image,
+            )?
+        };
         if payload.len() + prepared.len() > MAX_PAYLOAD {
             bail!(EngineError("comfy_input_too_large"));
         }
