@@ -67,11 +67,10 @@ Mask2Former regions:
   table, floor, spoon). The CUDA capture waits for the GPU.
 - Contract and worker: `inputs.color_map` / `inputs.depth_map` (asset ids) and
   `model_options.moss_control` (strength, start, end; defaults 1, 0, 1) for MOSS
-  text to image. Start and end are shares of the sampling steps, as the
-  adapter's authors count them: ComfyUI's sigma percent left only the last
-  steps free at "50 %" with MOSS's shifted schedule, so ending early barely
-  changed the image. Strength scales the control latent as `MOSSImageControl`
-  does. MOSS edits take up to four
+  text to image, as `MOSSImageControl` takes them. ComfyUI's sampling percent
+  is a share of the steps with MOSS's `normal` schedule (timesteps are linear;
+  a step-count gate gave bit-identical live images), so "ends at 50 %" frees
+  the second half of the steps as the adapter's authors describe. MOSS edits take up to four
   references. The server adds the edit LoRA (`MOSS_EDIT_LORA`) to MOSS edits
   and the control adapter (`MOSS_CONTROL_LORA`) when maps are present, as
   verified library files for library selections. Maps follow the references

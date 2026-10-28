@@ -62,8 +62,8 @@ pub struct Request {
     #[serde(default)]
     pub control: Control,
 }
-/// The MOSS color/depth control adapter's settings: `MOSSImageControl`'s strength
-/// and the shares of the sampling steps the maps span.
+/// The MOSS color/depth control adapter's settings, as `MOSSImageControl` takes
+/// them: the maps' strength and the sampling percents it spans.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct Control {
     pub strength: f64,

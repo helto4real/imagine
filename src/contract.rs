@@ -123,15 +123,14 @@ pub struct ModelOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub moss_control: Option<ControlOptions>,
 }
-/// How the MOSS control maps steer sampling: `MOSSImageControl`'s strength, and
-/// the share of the sampling steps they span (as the adapter's authors count it,
-/// not ComfyUI's sigma percent).
+/// How the MOSS control maps steer sampling, as `MOSSImageControl` takes it. With
+/// MOSS's `normal` schedule the sampling percents are shares of the steps.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct ControlOptions {
     /// 0 is no control, 1 the trained strength.
     pub strength: f32,
-    /// Shares of the sampling steps where the maps start and stop.
+    /// Sampling percents where the maps start and stop.
     pub start: f32,
     pub end: f32,
 }
