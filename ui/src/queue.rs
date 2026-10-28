@@ -6,6 +6,7 @@ pub(super) struct Snapshot {
     pub prompt: String,
     pub preferences: Preferences,
     pub references: Vec<ReferenceView>,
+    pub maps: [Option<ReferenceView>; 2],
 }
 
 pub(super) struct Job {
@@ -171,13 +172,25 @@ impl ImagineApp {
         prompts
             .iter()
             .map(|prompt| {
-                let request = self.apply_model_selection(client::make_request(
-                    prompt,
-                    &self.effective_negative_prompt(),
-                    &references,
-                    metadata,
-                    &self.prefs.generation,
-                )?)?;
+                let request = if client::has_moss_modes(metadata) {
+                    client::make_moss_request(
+                        prompt,
+                        &self.effective_negative_prompt(),
+                        &references,
+                        self.control_maps(),
+                        metadata,
+                        &self.prefs.generation,
+                    )
+                } else {
+                    client::make_request(
+                        prompt,
+                        &self.effective_negative_prompt(),
+                        &references,
+                        metadata,
+                        &self.prefs.generation,
+                    )
+                };
+                let request = self.apply_model_selection(request?)?;
                 Ok((
                     Submission {
                         upscale_source: None,
@@ -190,6 +203,7 @@ impl ImagineApp {
                         prompt: prompt.clone(),
                         preferences: self.prefs.clone(),
                         references: self.image.references.clone(),
+                        maps: [self.image.color_map.clone(), self.image.depth_map.clone()],
                     },
                 ))
             })
@@ -566,9 +580,11 @@ impl ImagineApp {
             prompt: std::mem::take(&mut self.image.prompt),
             preferences: self.prefs.clone(),
             references: std::mem::take(&mut self.image.references),
+            maps: [self.image.color_map.take(), self.image.depth_map.take()],
         });
         self.image.prompt = snapshot.prompt;
         self.image.references = snapshot.references;
+        [self.image.color_map, self.image.depth_map] = snapshot.maps;
         self.prefs.generation = snapshot.preferences.generation;
         self.prefs.model_group = snapshot.preferences.model_group;
         let group_settings = snapshot

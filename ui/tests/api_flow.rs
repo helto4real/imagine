@@ -207,6 +207,7 @@ async fn client_uses_proxy_api_defaults_references_retry_and_output_folder() {
         aspect_ratio: "3:4".into(),
         max_side: 1024,
         reference_max_pixels_per_image: 1_000_000,
+        ..Default::default()
     };
     let request = make_request("  Exact prompt  ", "negative", &refs, &meta, &settings).unwrap();
     assert_eq!(request["operation"], "image_edit");

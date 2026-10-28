@@ -686,6 +686,7 @@ fn preferences_survive_folder_change_and_app_restart() {
         aspect_ratio: "9:16".into(),
         max_side: 1024,
         reference_max_pixels_per_image: 2_000_000,
+        ..Default::default()
     };
     app.save_preferences();
     let folder = root.path().join("selected-images");
@@ -1816,5 +1817,74 @@ fn hide_previews_reveals_the_hovered_panel_and_keeps_every_private_surface_on_a_
             "{workspace:?}: private content outside a canvas at {:?}",
             helto::outside_canvas(&ctx)
         );
+    }
+}
+
+#[test]
+fn headless_moss_modes() {
+    use crate::settings::MossMode;
+    let root = tempfile::tempdir().unwrap();
+    let (w, h) = (192, 128);
+    let depth: Vec<u8> = (0..w * h)
+        .flat_map(|i| {
+            let v = (255 - (i / w) * 255 / h) as u8;
+            [v, v, v, 255]
+        })
+        .collect();
+    let regions: Vec<u8> = (0..w * h)
+        .flat_map(|i| match ((i % w) * 3 / w, (i / w) * 2 / h) {
+            (0, _) => [224, 86, 122, 255],
+            (1, 0) => [43, 182, 115, 255],
+            (1, _) => [107, 114, 128, 255],
+            _ => [58, 91, 217, 255],
+        })
+        .collect();
+    for (mode, name) in [
+        (MossMode::TextToImage, "moss-text"),
+        (MossMode::Edit, "moss-edit"),
+        (MossMode::Control, "moss-control"),
+    ] {
+        let ctx = egui::Context::default();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        app.metadata =
+            Some(imagine_server::contract::model(imagine_server::contract::MOSS).unwrap());
+        app.prefs.generation.moss_mode = mode;
+        for (role, pixels) in [(MapRole::Depth, &depth), (MapRole::Color, &regions)] {
+            let texture = ctx.load_texture(
+                role.label(),
+                egui::ColorImage::from_rgba_unmultiplied([w, h], pixels),
+                Default::default(),
+            );
+            *app.map_mut(role) = Some(ReferenceView {
+                number: 0,
+                id: role.label().into(),
+                name: format!("{}.png", role.label()),
+                texture,
+            });
+        }
+        assert!(app.moss_modes());
+        assert_eq!(app.reference_limit(), 4);
+        let mut combined = egui::FullOutput::default();
+        for _ in 0..3 {
+            combined.append(ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1280., 800.),
+                    )),
+                    ..Default::default()
+                },
+                |ui| app.content(ui),
+            ));
+        }
+        if let Some(dir) = std::env::var_os("IMAGINE_UI_PREVIEW_DIR") {
+            let dir = PathBuf::from(dir);
+            std::fs::create_dir_all(&dir).unwrap();
+            render(&ctx, combined, 1280, 800)
+                .save(dir.join(format!("{name}.png")))
+                .unwrap();
+        } else {
+            combined.textures_delta.clear();
+        }
     }
 }

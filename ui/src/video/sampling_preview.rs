@@ -775,6 +775,7 @@ mod tests {
                 prompt: String::new(),
                 preferences: app.prefs.clone(),
                 references: vec![],
+                maps: [None, None],
             },
         )]);
         assert_eq!(app.sampling_preview_current_job().as_deref(), Some("job-a"));

@@ -118,6 +118,16 @@ pub const ASPECT_RATIOS: [&str; 9] = [
     "1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9",
 ];
 
+/// What a MOSS generation starts from: the prompt, references to edit (the edit
+/// LoRA) or control maps (the color/depth adapter).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MossMode {
+    #[default]
+    TextToImage,
+    Edit,
+    Control,
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct GenerationSettings {
@@ -131,6 +141,11 @@ pub struct GenerationSettings {
     pub aspect_ratio: String,
     pub max_side: u32,
     pub reference_max_pixels_per_image: u32,
+    pub moss_mode: MossMode,
+    /// How strongly the control maps steer (1 is the trained strength) and the
+    /// sampling percent at which they stop.
+    pub control_strength: f32,
+    pub control_end: f32,
 }
 impl Default for GenerationSettings {
     fn default() -> Self {
@@ -144,6 +159,9 @@ impl Default for GenerationSettings {
             aspect_ratio: "16:9".into(),
             max_side: 1600,
             reference_max_pixels_per_image: 1_000_000,
+            moss_mode: MossMode::TextToImage,
+            control_strength: 1.,
+            control_end: 1.,
         }
     }
 }
@@ -985,6 +1003,9 @@ mod tests {
                 aspect_ratio: "3:4".into(),
                 max_side: 1024,
                 reference_max_pixels_per_image: 2_500_000,
+                moss_mode: MossMode::Control,
+                control_strength: 0.75,
+                control_end: 0.5,
             },
         };
         p.save(root.path()).unwrap();

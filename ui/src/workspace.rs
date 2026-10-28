@@ -718,7 +718,205 @@ impl ImagineApp {
         }
     }
 
+    /// Whether the image desk shows MOSS's modes for the selected model.
+    pub(super) fn moss_modes(&self) -> bool {
+        self.workspace == Workspace::Image
+            && self.metadata.as_ref().is_some_and(client::has_moss_modes)
+    }
+    fn moss_mode_switch(&mut self, ui: &mut Ui) {
+        use crate::settings::MossMode;
+        let editable = self.editable();
+        ui.horizontal(|ui| {
+            for (mode, label) in [
+                (MossMode::TextToImage, "Text"),
+                (MossMode::Edit, "Edit"),
+                (MossMode::Control, "Control"),
+            ] {
+                let active = self.prefs.generation.moss_mode == mode;
+                if ui
+                    .add_enabled_ui(editable, |ui| helto::select_button(ui, label, active))
+                    .inner
+                    .clicked()
+                    && !active
+                {
+                    self.prefs.generation.moss_mode = mode;
+                    self.prefs_dirty = true;
+                }
+            }
+        });
+        ui.separator();
+    }
+    /// MOSS text to image: start an edit or a control from here.
+    fn moss_start(&mut self, ui: &mut Ui) {
+        use crate::settings::MossMode;
+        let blocked = if self.client.is_none() {
+            Some("Not connected to Imagine.")
+        } else if !self.editable() {
+            Some("Wait for the current generation.")
+        } else {
+            None
+        };
+        ui.add_space(4.);
+        let start = |ui: &mut Ui, icon, label: &str| {
+            ui.horizontal(|ui| {
+                let clicked = helto::action(ui, icon, label, false, blocked).clicked();
+                ui.label(RichText::new(label).color(helto::DIM));
+                clicked
+            })
+            .inner
+        };
+        if start(ui, Icon::Edit, "Add references to edit") {
+            self.prefs.generation.moss_mode = MossMode::Edit;
+            self.prefs_dirty = true;
+            self.choose_references(ui.ctx());
+        }
+        for role in [MapRole::Depth, MapRole::Color] {
+            if start(ui, Icon::Plus, &format!("Add a {}", role.label())) {
+                self.prefs.generation.moss_mode = MossMode::Control;
+                self.prefs_dirty = true;
+                self.choose_map(ui.ctx(), role);
+            }
+        }
+    }
+    /// MOSS control: the depth and region maps and how strongly they steer.
+    fn control_panel(&mut self, ui: &mut Ui) {
+        let editable = self.editable() && !self.image.uploading;
+        if self.image.uploading {
+            ui.spinner();
+        }
+        egui::ScrollArea::vertical()
+            .id_salt("control-maps")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                for (role, title, detail) in [
+                    (MapRole::Depth, "Depth", "Near is light"),
+                    (MapRole::Color, "Regions", "Colors are labels"),
+                ] {
+                    egui::Frame::new()
+                        .fill(helto::FIELD)
+                        .stroke(Stroke::new(1., helto::RAISED))
+                        .corner_radius(5)
+                        .inner_margin(8)
+                        .show(ui, |ui| {
+                            ui.set_width(ui.available_width());
+                            ui.horizontal(|ui| {
+                                ui.vertical(|ui| {
+                                    ui.label(title);
+                                    ui.label(RichText::new(detail).color(helto::DIM));
+                                });
+                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                    let present = self.map(role).is_some();
+                                    if present
+                                        && ui
+                                            .add_enabled_ui(editable, |ui| {
+                                                helto::icon_button(
+                                                    ui,
+                                                    Icon::Trash,
+                                                    &format!("Remove the {}", role.label()),
+                                                    false,
+                                                )
+                                            })
+                                            .inner
+                                            .clicked()
+                                    {
+                                        *self.map_mut(role) = None;
+                                    }
+                                    let verb = if present { "Replace" } else { "Add" };
+                                    if ui
+                                        .add_enabled_ui(editable, |ui| {
+                                            helto::icon_button(
+                                                ui,
+                                                Icon::Import,
+                                                &format!("{verb} the {}", role.label()),
+                                                false,
+                                            )
+                                        })
+                                        .inner
+                                        .clicked()
+                                    {
+                                        self.choose_map(ui.ctx(), role);
+                                    }
+                                });
+                            });
+                            if let Some(map) = self.map(role) {
+                                let width = ui.available_width();
+                                let size = map.texture.size_vec2();
+                                let height = (width * size.y / size.x.max(1.)).min(220.);
+                                let texture = map.texture.clone();
+                                private_image(
+                                    ui,
+                                    &texture,
+                                    egui::vec2(height * size.x / size.y.max(1.), height),
+                                    self.prefs.privacy_mode,
+                                )
+                                .on_hover_text(format!("{} × {} px", size.x, size.y));
+                            }
+                        });
+                    ui.add_space(6.);
+                }
+                ui.label(helto::section("Control"));
+                let settings = &mut self.prefs.generation;
+                let before = (settings.control_strength, settings.control_end);
+                egui::Grid::new("control-settings")
+                    .num_columns(2)
+                    .spacing([10., 8.])
+                    .show(ui, |ui| {
+                        let label = ui.label("Strength");
+                        ui.add_enabled(
+                            editable,
+                            egui::Slider::new(&mut settings.control_strength, 0.0..=2.0)
+                                .fixed_decimals(2),
+                        )
+                        .labelled_by(label.id)
+                        .on_hover_text("1 is the trained strength");
+                        ui.end_row();
+                        let label = ui.label("Ends at");
+                        let mut percent = settings.control_end * 100.;
+                        if ui
+                            .add_enabled(
+                                editable,
+                                egui::Slider::new(&mut percent, 0.0..=100.0)
+                                    .suffix("%")
+                                    .fixed_decimals(0),
+                            )
+                            .labelled_by(label.id)
+                            .on_hover_text("Ending early keeps the layout and frees the details")
+                            .changed()
+                        {
+                            settings.control_end = (percent / 100.).clamp(0., 1.);
+                        }
+                        ui.end_row();
+                        ui.label("");
+                        ui.horizontal(|ui| {
+                            for (label, end) in [("Layout", 0.5), ("Exact", 1.)] {
+                                if ui
+                                    .add_enabled_ui(editable, |ui| {
+                                        helto::select_button(ui, label, settings.control_end == end)
+                                    })
+                                    .inner
+                                    .clicked()
+                                {
+                                    settings.control_end = end;
+                                }
+                            }
+                        });
+                        ui.end_row();
+                    });
+                if (settings.control_strength, settings.control_end) != before {
+                    self.prefs_dirty = true;
+                }
+            });
+    }
     fn reference_panel(&mut self, ui: &mut Ui) {
+        if self.moss_modes() {
+            use crate::settings::MossMode;
+            self.moss_mode_switch(ui);
+            match self.prefs.generation.moss_mode {
+                MossMode::TextToImage => return self.moss_start(ui),
+                MossMode::Control => return self.control_panel(ui),
+                MossMode::Edit => {}
+            }
+        }
         let editable = self.editable();
         let editing = self.workspace == Workspace::ImageEdit;
         ui.horizontal(|ui| {
@@ -909,6 +1107,16 @@ impl ImagineApp {
                 Some("Wait for the current generation before adding references.".into());
             return;
         }
+        // Dropped images are references: MOSS edits them.
+        if self.moss_modes() {
+            use crate::settings::MossMode;
+            if self.prefs.generation.moss_mode == MossMode::Control {
+                self.image.error = Some("Add maps with the depth and region buttons.".into());
+                return;
+            }
+            self.prefs.generation.moss_mode = MossMode::Edit;
+            self.prefs_dirty = true;
+        }
         self.desk_mut().uploading = true;
         self.desk_mut().error = None;
         let _ = self.tx.send(Message::Picked(self.workspace, dropped));
@@ -928,6 +1136,19 @@ impl ImagineApp {
                 .show(ui, |ui| {
                     ui.scope(|ui| {
                         self.model_controls(ui);
+                        if self.moss_modes() {
+                            use crate::settings::MossMode;
+                            let adapter = match self.prefs.generation.moss_mode {
+                                MossMode::Edit => Some("Moss-Image-Edit LoRA · added for editing"),
+                                MossMode::Control => {
+                                    Some("Color/depth adapter · added for control")
+                                }
+                                MossMode::TextToImage => None,
+                            };
+                            if let Some(adapter) = adapter {
+                                ui.label(RichText::new(adapter).color(helto::DIM));
+                            }
+                        }
                         ui.add_space(8.);
                         let privacy = self.prefs.privacy_mode;
                         if self.workspace == Workspace::CharacterSheet {

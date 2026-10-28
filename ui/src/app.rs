@@ -37,6 +37,8 @@ enum Message {
     Folder(Option<PathBuf>),
     Uploaded(Workspace, Result<Reference, Failure>),
     UploadsFinished(Workspace),
+    PickedMap(MapRole, Option<PathBuf>),
+    UploadedMap(MapRole, Result<Reference, Failure>),
     Progress(Workspace, Progress),
     Finished(Workspace, Result<Completed, Failure>),
     Cancelled(Workspace, String, Result<(), Failure>),
@@ -45,6 +47,20 @@ enum Message {
 fn send(tx: &Sender<Message>, ctx: &egui::Context, msg: Message) {
     let _ = tx.send(msg);
     ctx.request_repaint();
+}
+/// The MOSS control maps of the image desk.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MapRole {
+    Color,
+    Depth,
+}
+impl MapRole {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Color => "region map",
+            Self::Depth => "depth map",
+        }
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Workspace {
@@ -71,6 +87,8 @@ struct GenerationDesk {
     character_description: String,
     clothing_description: String,
     references: Vec<ReferenceView>,
+    color_map: Option<ReferenceView>,
+    depth_map: Option<ReferenceView>,
     reference_directory: Option<PathBuf>,
     pending: Option<Submission>,
     working: bool,
@@ -94,6 +112,8 @@ impl Default for GenerationDesk {
             character_description: String::new(),
             clothing_description: String::new(),
             references: Vec::new(),
+            color_map: None,
+            depth_map: None,
             reference_directory: None,
             pending: None,
             working: false,
@@ -287,8 +307,34 @@ impl ImagineApp {
             9
         } else if self.workspace == Workspace::CharacterSheet {
             8
+        } else if let Some(max) = self
+            .metadata
+            .as_ref()
+            .filter(|m| client::has_moss_modes(m))
+            .and_then(|m| m["constraints"]["reference_images"]["max_count"].as_u64())
+        {
+            max as usize
         } else {
             10
+        }
+    }
+    fn map(&self, role: MapRole) -> Option<&ReferenceView> {
+        match role {
+            MapRole::Color => self.image.color_map.as_ref(),
+            MapRole::Depth => self.image.depth_map.as_ref(),
+        }
+    }
+    fn map_mut(&mut self, role: MapRole) -> &mut Option<ReferenceView> {
+        match role {
+            MapRole::Color => &mut self.image.color_map,
+            MapRole::Depth => &mut self.image.depth_map,
+        }
+    }
+    /// Asset IDs of the image desk's control maps.
+    fn control_maps(&self) -> client::ControlMaps<'_> {
+        client::ControlMaps {
+            color: self.image.color_map.as_ref().map(|m| m.id.as_str()),
+            depth: self.image.depth_map.as_ref().map(|m| m.id.as_str()),
         }
     }
     /// Why the current desk's input cannot be generated.
@@ -477,6 +523,34 @@ impl ImagineApp {
                 },
                 Message::UploadsFinished(workspace) => {
                     self.desk_for_mut(workspace).uploading = false
+                }
+                Message::PickedMap(_, None) => self.image.uploading = false,
+                Message::PickedMap(role, Some(path)) => {
+                    let Some(client) = self.client.clone() else {
+                        self.image.uploading = false;
+                        continue;
+                    };
+                    let tx = self.tx.clone();
+                    let ctx = ctx.clone();
+                    std::thread::spawn(move || {
+                        let result = runtime().block_on(client.upload(&path));
+                        send(&tx, &ctx, Message::UploadedMap(role, result));
+                    });
+                }
+                Message::UploadedMap(role, result) => {
+                    self.image.uploading = false;
+                    match result {
+                        Ok(map) => {
+                            let texture = texture(ctx, &map.preview, &map.id);
+                            *self.map_mut(role) = Some(ReferenceView {
+                                number: 0,
+                                id: map.id,
+                                name: map.name,
+                                texture,
+                            });
+                        }
+                        Err(e) => self.image.error = Some(e.message),
+                    }
                 }
                 Message::Folder(Some(folder)) => {
                     self.picking_folder = false;
@@ -733,6 +807,22 @@ impl ImagineApp {
             }
             let files = dialog.pick_files().unwrap_or_default();
             send(&tx, &ctx, Message::Picked(workspace, files));
+        });
+    }
+    fn choose_map(&mut self, ctx: &egui::Context, role: MapRole) {
+        self.image.uploading = true;
+        self.image.error = None;
+        let directory = self.image.reference_directory.clone();
+        let tx = self.tx.clone();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let mut dialog = rfd::FileDialog::new()
+                .set_title(format!("Select a {}", role.label()))
+                .add_filter("Images", &["png", "jpg", "jpeg", "webp"]);
+            if let Some(directory) = directory {
+                dialog = dialog.set_directory(directory);
+            }
+            send(&tx, &ctx, Message::PickedMap(role, dialog.pick_file()));
         });
     }
     fn choose_folder(&mut self, ctx: &egui::Context) {

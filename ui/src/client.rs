@@ -619,8 +619,13 @@ pub fn make_request(
     if prompt.trim().is_empty() {
         bail!("Enter a prompt.");
     }
-    if metadata["constraints"]["reference_images"]["max_count"] == 0 && !refs.is_empty() {
-        bail!("MOSS currently supports text-to-image only. Remove reference images.");
+    if let Some(max) = metadata["constraints"]["reference_images"]["max_count"].as_u64()
+        && refs.len() as u64 > max
+    {
+        if max == 0 {
+            bail!("This model takes no reference images. Remove them.");
+        }
+        bail!("This model takes up to {max} reference images. Remove some.");
     }
     if refs.len() > 10 {
         bail!("Up to ten reference images.");
@@ -695,6 +700,60 @@ pub fn make_request(
         json!(settings.seed)
     };
     Ok(request)
+}
+/// Whether the model offers MOSS's modes: text to image, edit and control maps.
+pub fn has_moss_modes(metadata: &Value) -> bool {
+    metadata["constraints"]["control_maps"].is_object()
+}
+/// MOSS control maps by asset ID.
+#[derive(Clone, Copy, Default)]
+pub struct ControlMaps<'a> {
+    pub color: Option<&'a str>,
+    pub depth: Option<&'a str>,
+}
+/// A MOSS request in the selected mode: references only when editing (the server
+/// adds the edit LoRA), maps and their control only in control mode (the server
+/// adds the color/depth adapter).
+pub fn make_moss_request(
+    prompt: &str,
+    negative: &str,
+    refs: &[String],
+    maps: ControlMaps<'_>,
+    metadata: &Value,
+    settings: &GenerationSettings,
+) -> Result<Value> {
+    use crate::settings::MossMode;
+    match settings.moss_mode {
+        MossMode::TextToImage => make_request(prompt, negative, &[], metadata, settings),
+        MossMode::Edit => {
+            if refs.is_empty() {
+                bail!("Add a reference image to edit.");
+            }
+            make_request(prompt, negative, refs, metadata, settings)
+        }
+        MossMode::Control => {
+            if maps.color.is_none() && maps.depth.is_none() {
+                bail!("Add a depth or region map.");
+            }
+            let (strength, end) = (settings.control_strength, settings.control_end);
+            if !strength.is_finite() || !(0.0..=10.0).contains(&strength) {
+                bail!("Control strength must be 0–10.");
+            }
+            if !end.is_finite() || !(0.0..=1.0).contains(&end) {
+                bail!("The control must end between 0 and 100%.");
+            }
+            let mut request = make_request(prompt, negative, &[], metadata, settings)?;
+            if let Some(id) = maps.color {
+                request["inputs"]["color_map"] = json!(id);
+            }
+            if let Some(id) = maps.depth {
+                request["inputs"]["depth_map"] = json!(id);
+            }
+            request["model_options"]["moss_control"] =
+                json!({"strength": strength, "start": 0., "end": end});
+            Ok(request)
+        }
+    }
 }
 pub struct EditSource<'a> {
     pub asset_id: &'a str,
@@ -954,7 +1013,10 @@ pub fn error_message(code: &str) -> String {
         "imagine_upstream_unavailable" => "The proxy cannot reach Imagine. Start ./start-server.sh and retry.",
         "unsupported_resolution"=>"This server does not accept the selected image size. Restart the updated server or choose a supported size.",
         "unsupported_sampling"=>"Choose a sampler and scheduler supported by this backend, positive steps and finite CFG.",
-        "unsupported_moss_configuration"=>"MOSS currently supports text-to-image with Euler and normal or sgm_uniform, without references or LoRAs.",
+        "unsupported_moss_configuration"=>"MOSS supports Euler with normal or sgm_uniform and up to four reference images.",
+        "unsupported_control_maps"=>"Control maps work with MOSS text to image only. Remove the references or the maps.",
+        "invalid_control_options"|"unexpected_control_options"=>"Check the control strength and end, and add a depth or region map.",
+        "moss_adapter_missing"=>"The MOSS edit LoRA or color/depth adapter is missing from the model library. Add it under loras/moss and refresh Models.",
         "runtime_suspended"=>"The server is suspended. Resume it through the API before generating.",
         "model_weights_missing"=>"Model files are missing. Check QWEN_MODEL_ROOT on the server.",
         "frozen_binary_unavailable"|"frozen_binary_hash_mismatch"=>"The frozen inference engine is missing or has changed on the server.",
@@ -1247,6 +1309,70 @@ mod tests {
             job_progress(&value),
             Progress::Status { sampling: None, .. }
         ));
+    }
+
+    #[test]
+    fn moss_modes_send_references_only_to_edit_and_maps_only_to_control() {
+        use crate::settings::MossMode;
+        let meta = imagine_server::contract::model(imagine_server::contract::MOSS).unwrap();
+        assert!(has_moss_modes(&meta));
+        assert!(!has_moss_modes(
+            &imagine_server::contract::model(MODEL).unwrap()
+        ));
+        let refs = vec!["a".to_string(), "b".to_string()];
+        let maps = ControlMaps {
+            color: Some("regions"),
+            depth: Some("depth"),
+        };
+        let mut settings = GenerationSettings {
+            max_side: 1024,
+            ..Default::default()
+        };
+        let request = |settings: &GenerationSettings, maps| {
+            make_moss_request("test", "", &refs, maps, &meta, settings)
+        };
+        let check = |request: Value| {
+            let request: imagine_server::contract::JobRequest =
+                serde_json::from_value(request).unwrap();
+            assert_eq!(request.validate(), Ok(()));
+            request
+        };
+        let text = check(request(&settings, maps).unwrap());
+        assert_eq!(
+            text.operation,
+            imagine_server::contract::Operation::TextToImage
+        );
+        assert!(text.inputs.reference_images.is_empty() && !text.inputs.has_control_maps());
+        settings.moss_mode = MossMode::Edit;
+        let edit = check(request(&settings, maps).unwrap());
+        assert_eq!(
+            edit.operation,
+            imagine_server::contract::Operation::ImageEdit
+        );
+        assert_eq!(edit.inputs.reference_images, refs);
+        assert!(!edit.inputs.has_control_maps());
+        assert!(make_moss_request("test", "", &[], maps, &meta, &settings).is_err());
+        assert!(
+            make_moss_request("test", "", &vec!["a".into(); 5], maps, &meta, &settings).is_err()
+        );
+        settings.moss_mode = MossMode::Control;
+        settings.control_strength = 0.75;
+        settings.control_end = 0.5;
+        let control = check(request(&settings, maps).unwrap());
+        assert!(control.inputs.reference_images.is_empty());
+        assert_eq!(control.inputs.color_map.as_deref(), Some("regions"));
+        assert_eq!(control.inputs.depth_map.as_deref(), Some("depth"));
+        assert_eq!(
+            control.model_options.moss_control,
+            Some(imagine_server::contract::ControlOptions {
+                strength: 0.75,
+                start: 0.,
+                end: 0.5,
+            })
+        );
+        assert!(request(&settings, ControlMaps::default()).is_err());
+        settings.control_end = 1.5;
+        assert!(request(&settings, maps).is_err());
     }
 
     #[test]
