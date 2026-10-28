@@ -40,6 +40,11 @@ emit(dict(type='ready',protocol=1,attention='checkpoint_preferences'))
 while True:
  try:h=json.loads(read());body=read()
  except Exception:break
+ if h['type']=='maps':
+  hh,ww=h['shape']
+  assert len(body)==hh*ww*4 and h['depth_model'].endswith('annotators/depth-anything-v2-small')
+  emit(dict(type='result',id=h['id']),bytes([200,200,200])*hh*ww+bytes([230,25,75])*hh*ww)
+  continue
  if h['model'] in ('moss-image-sft-int8','moss-image-sft-bf16'):
   assert all(shape==[h['height'],h['width']] for shape in h['reference_shapes'])
  maps=h.get('map_lengths',[])
@@ -277,5 +282,36 @@ async fn moss_edit_references_reach_the_worker_at_the_output_size() {
         .unwrap();
     r.references.push(png.into_inner().into());
     engine.generate(&r).await.unwrap();
+    engine.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn control_maps_come_back_as_depth_and_region_pngs_at_the_photo_size() {
+    let (dir, mut engine, _) = fake();
+    let mut photo = std::io::Cursor::new(Vec::new());
+    image::DynamicImage::new_rgb8(96, 64)
+        .write_to(&mut photo, image::ImageFormat::Png)
+        .unwrap();
+    let photo = photo.into_inner();
+    // Without the map models nothing reaches the worker.
+    let missing = engine.control_maps(&photo, 96, 64).await.unwrap_err();
+    assert_eq!(
+        missing
+            .downcast_ref::<imagine_server::engine::EngineError>()
+            .map(|e| e.0),
+        Some("control_map_models_missing")
+    );
+    for model in [contract::DEPTH_MAP_MODEL, contract::REGION_MAP_MODEL] {
+        let path = dir.path().join("models").join(model);
+        std::fs::create_dir_all(&path).unwrap();
+        std::fs::write(path.join("model.safetensors"), b"synthetic").unwrap();
+    }
+    let [depth, regions] = engine.control_maps(&photo, 96, 64).await.unwrap();
+    for (png, pixel) in [(depth, [200, 200, 200]), (regions, [230, 25, 75])] {
+        let image = image::load_from_memory(&png).unwrap().to_rgb8();
+        assert_eq!(image.dimensions(), (96, 64));
+        assert_eq!(image.get_pixel(5, 5).0, pixel);
+    }
+    assert!(engine.control_maps(&photo, 64, 64).await.is_err());
     engine.stop().await.unwrap();
 }

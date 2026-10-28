@@ -50,6 +50,15 @@ pub trait Backend: Send {
     ) -> EngineFuture<'a, crate::short_av::Av> {
         Box::pin(async { anyhow::bail!(EngineError("h3_runtime_unavailable")) })
     }
+    /// MOSS control maps for a photo at its own size: depth and region PNGs.
+    fn control_maps<'a>(
+        &'a mut self,
+        _photo: &'a [u8],
+        _width: u32,
+        _height: u32,
+    ) -> EngineFuture<'a, [Vec<u8>; 2]> {
+        Box::pin(async { anyhow::bail!(EngineError("unsupported_control_maps")) })
+    }
     fn stage(&mut self, _stage: Option<&str>) {}
     fn mark_idle(&mut self) {}
     fn begin_job(&mut self, _id: &str) {}

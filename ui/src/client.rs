@@ -54,6 +54,8 @@ pub enum OutputRole {
     Sheet,
     Portrait,
     Views,
+    DepthMap,
+    RegionMap,
 }
 impl OutputRole {
     pub fn name(self) -> &'static str {
@@ -62,6 +64,8 @@ impl OutputRole {
             Self::Sheet => "character_sheet",
             Self::Portrait => "portrait",
             Self::Views => "turnaround",
+            Self::DepthMap => "depth_map",
+            Self::RegionMap => "region_map",
         }
     }
 }
@@ -415,6 +419,8 @@ impl Client {
         });
         let roles = if submission.request["operation"] == "character_sheet" {
             sheet_roles(&result)?
+        } else if submission.request["operation"] == "control_maps" {
+            vec![OutputRole::DepthMap, OutputRole::RegionMap]
         } else {
             vec![OutputRole::Image]
         };
@@ -813,6 +819,41 @@ fn moss_mode_request(
         }
     }
 }
+/// Whether the server makes MOSS control maps from a photo.
+pub fn makes_control_maps(metadata: &Value) -> bool {
+    metadata["constraints"]["control_maps"]["from_photo"] == true
+}
+/// A job that makes the depth and region maps from the photo `source` at the
+/// output size (the photo is scaled to cover it and center-cropped).
+pub fn make_control_maps_request(
+    source: &str,
+    (width, height): (u32, u32),
+    metadata: &Value,
+) -> Result<Value> {
+    if !makes_control_maps(metadata) {
+        bail!("This server cannot make control maps. Update Imagine.");
+    }
+    let mut request = Value::Object(
+        metadata
+            .get("defaults")
+            .and_then(Value::as_object)
+            .cloned()
+            .context("The server did not provide default settings.")?,
+    );
+    request["model"] = metadata
+        .get("model")
+        .or_else(|| metadata.get("id"))
+        .cloned()
+        .context("Missing model ID.")?;
+    request["operation"] = json!("control_maps");
+    request["prompt"] = json!("");
+    request["negative_prompt"] = json!("");
+    request["inputs"] = json!({"source_image": source});
+    request["width"] = json!(width);
+    request["height"] = json!(height);
+    request["seed"] = Value::Null;
+    Ok(request)
+}
 pub struct EditSource<'a> {
     pub asset_id: &'a str,
     pub width: u32,
@@ -1074,6 +1115,7 @@ pub fn error_message(code: &str) -> String {
         "unsupported_moss_configuration"=>"MOSS supports Euler with normal or sgm_uniform and up to four reference images.",
         "unsupported_control_maps"=>"Control maps work with MOSS text to image only. Remove the references or the maps.",
         "invalid_control_options"|"unexpected_control_options"=>"Check the control strength and end, and add a depth or region map.",
+        "control_map_models_missing"=>"The depth or region model is missing. Add them under annotators in the model folder.",
         "moss_adapter_missing"=>"The MOSS edit LoRA or color/depth adapter is missing from the model library. Add it under loras/moss and refresh Models.",
         "runtime_suspended"=>"The server is suspended. Resume it through the API before generating.",
         "model_weights_missing"=>"Model files are missing. Check QWEN_MODEL_ROOT on the server.",
@@ -1454,6 +1496,24 @@ mod tests {
         settings.moss_mode = MossMode::Control;
         settings.control_end = 1.5;
         assert!(request(&settings, maps).is_err());
+    }
+
+    #[test]
+    fn control_map_jobs_reach_the_contract_with_the_photo_and_output_size() {
+        let meta = imagine_server::contract::model(imagine_server::contract::MOSS).unwrap();
+        assert!(makes_control_maps(&meta));
+        let request = make_control_maps_request("photo", (1024, 768), &meta).unwrap();
+        let request: imagine_server::contract::JobRequest =
+            serde_json::from_value(request).unwrap();
+        assert_eq!(request.validate(), Ok(()));
+        assert_eq!(
+            request.operation,
+            imagine_server::contract::Operation::ControlMaps
+        );
+        assert_eq!((request.width, request.height), (1024, 768));
+        assert_eq!(request.inputs.source_image.as_deref(), Some("photo"));
+        let qwen = imagine_server::contract::model(MODEL).unwrap();
+        assert!(make_control_maps_request("photo", (1024, 768), &qwen).is_err());
     }
 
     #[test]

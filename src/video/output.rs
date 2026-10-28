@@ -266,6 +266,8 @@ impl Pending {
             "character_sheet" => "_character_sheet",
             "portrait" => "_portrait",
             "turnaround" => "_turnaround",
+            "depth_map" => "_depth",
+            "region_map" => "_regions",
             _ => return Err("invalid_image_output"),
         };
         if group.is_some_and(|g| {

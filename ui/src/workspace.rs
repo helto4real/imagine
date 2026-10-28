@@ -774,7 +774,12 @@ impl ImagineApp {
             self.prefs_dirty = true;
             self.choose_references(ui.ctx());
         }
-        for role in [MapRole::Depth, MapRole::Color] {
+        let photo = self
+            .metadata
+            .as_ref()
+            .is_some_and(client::makes_control_maps);
+        let roles = [MapRole::Source, MapRole::Depth, MapRole::Color];
+        for role in roles.into_iter().filter(|&r| photo || r != MapRole::Source) {
             if start(ui, Icon::Plus, &format!("Add a {}", role.label())) {
                 self.prefs.generation.moss_mode = MossMode::Control;
                 self.prefs_dirty = true;
@@ -792,6 +797,10 @@ impl ImagineApp {
             .id_salt("control-maps")
             .auto_shrink([false, false])
             .show(ui, |ui| {
+                if self.metadata.as_ref().is_some_and(client::makes_control_maps) {
+                    self.source_card(ui, editable);
+                    ui.add_space(6.);
+                }
                 for (role, title, detail) in [
                     (MapRole::Depth, "Depth", "Near is light"),
                     (MapRole::Color, "Regions", "Colors are labels"),
@@ -804,10 +813,7 @@ impl ImagineApp {
                         .show(ui, |ui| {
                             ui.set_width(ui.available_width());
                             ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label(title);
-                                    ui.label(RichText::new(detail).color(helto::DIM));
-                                });
+                                ui.label(title);
                                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                                     let present = self.map(role).is_some();
                                     if present
@@ -861,6 +867,7 @@ impl ImagineApp {
                                     }
                                 });
                             });
+                            ui.label(RichText::new(detail).color(helto::DIM));
                             if let Some(map) = self.map(role) {
                                 let width = ui.available_width();
                                 let size = map.texture.size_vec2();
@@ -928,6 +935,88 @@ impl ImagineApp {
                 if (settings.control_strength, settings.control_end) != before {
                     self.prefs_dirty = true;
                 }
+            });
+    }
+    /// The photo the depth and region maps are made from.
+    fn source_card(&mut self, ui: &mut Ui, editable: bool) {
+        let making = self.image.making_maps;
+        egui::Frame::new()
+            .fill(helto::FIELD)
+            .stroke(Stroke::new(1., helto::RAISED))
+            .corner_radius(5)
+            .inner_margin(8)
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                let present = self.image.source_photo.is_some();
+                ui.horizontal(|ui| {
+                    ui.label("Source");
+                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                        let enabled = editable && !making;
+                        if present
+                            && ui
+                                .add_enabled_ui(enabled, |ui| {
+                                    helto::icon_button(
+                                        ui,
+                                        Icon::Trash,
+                                        "Remove the source photo",
+                                        false,
+                                    )
+                                })
+                                .inner
+                                .clicked()
+                        {
+                            self.image.source_photo = None;
+                        }
+                        let verb = if present { "Replace" } else { "Add" };
+                        if ui
+                            .add_enabled_ui(enabled, |ui| {
+                                helto::icon_button(
+                                    ui,
+                                    Icon::Import,
+                                    &format!("{verb} the source photo"),
+                                    false,
+                                )
+                            })
+                            .inner
+                            .clicked()
+                        {
+                            self.choose_map(ui.ctx(), MapRole::Source);
+                        }
+                    });
+                });
+                ui.label(RichText::new("Maps from a photo").color(helto::DIM));
+                let Some(photo) = &self.image.source_photo else {
+                    return;
+                };
+                let size = photo.texture.size_vec2();
+                let height = (ui.available_width() * size.y / size.x.max(1.)).min(220.);
+                let texture = photo.texture.clone();
+                let [w, h] = photo.size;
+                private_image(
+                    ui,
+                    &texture,
+                    egui::vec2(height * size.x / size.y.max(1.), height),
+                    self.prefs.privacy_mode,
+                )
+                .on_hover_text(format!("{w} × {h} px"));
+                ui.horizontal(|ui| {
+                    let blocked = if making {
+                        Some("The maps are being made.")
+                    } else if !editable {
+                        Some("Wait for the current generation.")
+                    } else {
+                        None
+                    };
+                    if helto::action(ui, Icon::Generate, "Make maps", false, blocked).clicked() {
+                        self.make_maps(ui.ctx());
+                    }
+                    if making {
+                        ui.spinner();
+                        ui.label(RichText::new("Making depth and region maps").color(helto::DIM));
+                    } else {
+                        ui.label("Make maps");
+                    }
+                });
             });
     }
     fn reference_panel(&mut self, ui: &mut Ui) {

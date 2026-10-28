@@ -685,12 +685,18 @@ impl Store {
             let saved = pending
                 .publish_image(&info.bytes, role, &info.mime, group.as_deref())
                 .map_err(crate::engine::EngineError)?;
-            if role == "character_sheet" {
+            // The first output names the group the others share.
+            let suffix = match role {
+                "character_sheet" => Some("_character_sheet"),
+                "depth_map" => Some("_depth"),
+                _ => None,
+            };
+            if let Some(suffix) = suffix {
                 group = saved
                     .path
                     .file_stem()
                     .and_then(|v| v.to_str())
-                    .and_then(|v| v.strip_suffix("_character_sheet"))
+                    .and_then(|v| v.strip_suffix(suffix))
                     .map(str::to_owned);
             }
             let id = id("asset");

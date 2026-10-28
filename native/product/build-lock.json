@@ -38,6 +38,7 @@
     "inference/src/h3_product/wire.rs",
     "inference/src/server/image_preview.rs",
     "inference/src/server/load_error.rs",
+    "inference/src/server/maps.rs",
     "inference/src/server/mod.rs",
     "inference/src/server/moss.rs",
     "inference/src/server/preview_callback.rs",

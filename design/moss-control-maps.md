@@ -84,7 +84,17 @@ Mask2Former regions:
   output size from the source (its size, its aspect at the long side, or the
   ratio), and a paint tool: marks on image desk references (sent as a marked
   copy, original kept) and region-map editing or painting from empty.
-- Next: GPU checks (full inference suite, CUDA captures, live MOSS runs with
-  the adapter's example maps), then the map-generation call (worker frame and
-  HTTP route) and the source-photo card. Generating maps in the product moves the core lock (the models
+- GPU checks (2026-10-28): full inference suite 517/517; both map models exact
+  on CUDA; live MOSS control and edit runs through the UI's API path
+  (`/home/thhel/Pictures/test/moss-live-20261028/`). The adapter's mannequin
+  example maps draw mannequins without region prompts, as its README says;
+  maps from a real photo give real people.
+- Core lock moved to `d08d3af` with Pillow ABI 2 (`9ceacc3`).
+- Map generation: the job operation `control_maps` takes `inputs.source_image`
+  and the output size; the server scales the photo to cover it, the worker's
+  `maps` frame returns the depth and region maps (pinned model hashes checked
+  before loading, models under `annotators/` in the model root), and the two
+  are published as `image_NNNN_depth.png` and `image_NNNN_regions.png`. The UI's
+  control panel has a Source card with Make maps.
+- Next: a live check of Make maps, then region prompts. Generating maps in the product moves the core lock (the models
   and Pillow ABI 2 are newer than `core_revision`).

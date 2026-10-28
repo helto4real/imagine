@@ -1858,7 +1858,11 @@ fn headless_moss_modes() {
             MossMode::Edit => crate::settings::SizeMode::Aspect,
             _ => crate::settings::SizeMode::Source,
         };
-        for (role, pixels) in [(MapRole::Depth, &depth), (MapRole::Color, &regions)] {
+        for (role, pixels) in [
+            (MapRole::Source, &depth),
+            (MapRole::Depth, &depth),
+            (MapRole::Color, &regions),
+        ] {
             let texture = ctx.load_texture(
                 role.label(),
                 egui::ColorImage::from_rgba_unmultiplied([w, h], pixels),

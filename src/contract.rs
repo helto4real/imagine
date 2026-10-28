@@ -66,6 +66,8 @@ pub enum Operation {
     TextToVideo,
     ImageToVideo,
     ReferenceToVideo,
+    /// MOSS control maps (depth and regions) from `inputs.source_image`.
+    ControlMaps,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
@@ -104,6 +106,9 @@ pub struct Inputs {
     /// MOSS control: depth with near white, at the output size.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub depth_map: Option<String>,
+    /// The photo control maps are made from (`control_maps`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_image: Option<String>,
 }
 impl Inputs {
     pub fn has_control_maps(&self) -> bool {
@@ -114,6 +119,9 @@ impl Inputs {
 /// edits and the color/depth control adapter for control maps.
 pub const MOSS_EDIT_LORA: &str = "moss/Moss-Image-Edit/adapter_model.safetensors";
 pub const MOSS_CONTROL_LORA: &str = "moss/MOSS-Image-color-depth-control/moss-control.safetensors";
+/// Model directories (relative to the model root) that make control maps.
+pub const DEPTH_MAP_MODEL: &str = "annotators/depth-anything-v2-small";
+pub const REGION_MAP_MODEL: &str = "annotators/mask2former-swin-large-coco-panoptic";
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct ModelOptions {
@@ -232,6 +240,33 @@ impl JobRequest {
         }
         if crate::model_spec::model(&self.model).is_none() {
             return Err("unknown_model");
+        }
+        // Control maps from a photo at the output size: no prompt, references,
+        // maps or sampling of their own.
+        if self.operation == Operation::ControlMaps || self.inputs.source_image.is_some() {
+            let i = &self.inputs;
+            if self.operation != Operation::ControlMaps
+                || !crate::model_spec::is_moss(&self.model)
+                || i.source_image.is_none()
+                || !i.reference_images.is_empty()
+                || i.has_control_maps()
+                || i.start_image.is_some()
+                || i.end_image.is_some()
+                || i.mask.is_some()
+                || i.pose_guide.is_some()
+                || self.character_sheet.is_some()
+                || self.model_options.moss_control.is_some()
+                || self.video.is_some()
+            {
+                return Err("unsupported_control_maps");
+            }
+            if !(64..=4096).contains(&self.width) || !(64..=4096).contains(&self.height) {
+                return Err("unsupported_resolution");
+            }
+            if self.output.format != "png" || self.output.count != 1 {
+                return Err("unsupported_output");
+            }
+            return Ok(());
         }
         if !matches!(
             self.operation,
@@ -472,6 +507,7 @@ impl JobRequest {
             .chain(self.inputs.start_image.iter())
             .chain(self.inputs.color_map.iter())
             .chain(self.inputs.depth_map.iter())
+            .chain(self.inputs.source_image.iter())
     }
     /// The LoRAs MOSS adds itself for this request (edit LoRA, control adapter)
     /// that its workflow does not list yet.
@@ -580,7 +616,7 @@ pub fn model(id: &str) -> Option<Value> {
                     "samplers":spec.architecture.samplers(), "schedulers":spec.architecture.schedulers(),
                     "output_formats":["png"],"max_output_count":1,"loras":true,
                     "reference_images":{"max_count":4},
-                    "control_maps":{"color":true,"depth":true,"operations":["text_to_image"],
+                    "control_maps":{"color":true,"depth":true,"operations":["text_to_image"],"from_photo":true,
                         "options":schemars::schema_for!(ControlOptions)}
                 }, "character_sheet":crate::model_adapter::sheet_capabilities(crate::model_adapter::SheetStrategy::MossSinglePass),
                 "request_schema":schemars::schema_for!(JobRequest)

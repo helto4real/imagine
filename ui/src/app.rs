@@ -58,6 +58,7 @@ enum Message {
     UploadsFinished(Workspace),
     PickedMap(MapRole, Option<PathBuf>),
     UploadedMap(MapRole, Result<Reference, Failure>),
+    MapsMade(Result<Completed, Failure>),
     PaintLoaded(
         painter::PaintTarget,
         Result<crate::paint_canvas::Pixels, Failure>,
@@ -77,12 +78,15 @@ fn send(tx: &Sender<Message>, ctx: &egui::Context, msg: Message) {
 enum MapRole {
     Color,
     Depth,
+    /// The photo the maps are made from.
+    Source,
 }
 impl MapRole {
     fn label(self) -> &'static str {
         match self {
             Self::Color => "region map",
             Self::Depth => "depth map",
+            Self::Source => "source photo",
         }
     }
 }
@@ -113,6 +117,9 @@ struct GenerationDesk {
     references: Vec<ReferenceView>,
     color_map: Option<ReferenceView>,
     depth_map: Option<ReferenceView>,
+    source_photo: Option<ReferenceView>,
+    /// Maps are being made from the source photo.
+    making_maps: bool,
     reference_directory: Option<PathBuf>,
     pending: Option<Submission>,
     working: bool,
@@ -138,6 +145,8 @@ impl Default for GenerationDesk {
             references: Vec::new(),
             color_map: None,
             depth_map: None,
+            source_photo: None,
+            making_maps: false,
             reference_directory: None,
             pending: None,
             working: false,
@@ -348,13 +357,52 @@ impl ImagineApp {
         match role {
             MapRole::Color => self.image.color_map.as_ref(),
             MapRole::Depth => self.image.depth_map.as_ref(),
+            MapRole::Source => self.image.source_photo.as_ref(),
         }
     }
     fn map_mut(&mut self, role: MapRole) -> &mut Option<ReferenceView> {
         match role {
             MapRole::Color => &mut self.image.color_map,
             MapRole::Depth => &mut self.image.depth_map,
+            MapRole::Source => &mut self.image.source_photo,
         }
+    }
+    /// Makes the depth and region maps from the source photo at the output size.
+    fn make_maps(&mut self, ctx: &egui::Context) {
+        let (Some(client), Some(metadata), Some(photo)) = (
+            self.client.clone(),
+            self.metadata.as_ref(),
+            self.image.source_photo.as_ref(),
+        ) else {
+            return;
+        };
+        let request = self
+            .prefs
+            .generation
+            .dimensions_for(Some(photo.size))
+            .and_then(|size| client::make_control_maps_request(&photo.id, size, metadata));
+        let request = match request {
+            Ok(request) => request,
+            Err(e) => {
+                self.image.error = Some(e.to_string());
+                return;
+            }
+        };
+        self.image.making_maps = true;
+        self.image.error = None;
+        let submission = Submission {
+            upscale_source: None,
+            request,
+            key: uuid::Uuid::new_v4().to_string(),
+            folder: self.prefs.output_folder.clone(),
+            job: None,
+        };
+        let tx = self.tx.clone();
+        let ctx = ctx.clone();
+        std::thread::spawn(move || {
+            let result = runtime().block_on(client.generate(submission, |_| {}));
+            send(&tx, &ctx, Message::MapsMade(result));
+        });
     }
     /// The pixel size a MOSS edit or control can take its output size from: the
     /// first reference, or the depth map, else the region map.
@@ -364,8 +412,9 @@ impl ImagineApp {
             MossMode::Edit => self.image.references.first().map(|r| r.size),
             MossMode::Control => self
                 .image
-                .depth_map
+                .source_photo
                 .as_ref()
+                .or(self.image.depth_map.as_ref())
                 .or(self.image.color_map.as_ref())
                 .map(|m| m.size),
             MossMode::TextToImage => None,
@@ -472,6 +521,33 @@ impl ImagineApp {
                         let mut settings = library.settings.clone();
                         settings.root = path;
                         self.load_library(ctx, Some(settings));
+                    }
+                }
+                Message::MapsMade(result) => {
+                    self.image.making_maps = false;
+                    match result {
+                        Ok(completed) => {
+                            for asset in completed.assets {
+                                let slot = match asset.role {
+                                    OutputRole::DepthMap => &mut self.image.depth_map,
+                                    OutputRole::RegionMap => &mut self.image.color_map,
+                                    _ => continue,
+                                };
+                                *slot = Some(ReferenceView {
+                                    number: 0,
+                                    texture: texture(ctx, &asset.preview, &asset.asset_id),
+                                    size: [asset.preview.width as u32, asset.preview.height as u32],
+                                    name: asset
+                                        .file
+                                        .file_name()
+                                        .map(|n| n.to_string_lossy().into_owned())
+                                        .unwrap_or_default(),
+                                    id: asset.asset_id,
+                                    marks: None,
+                                });
+                            }
+                        }
+                        Err(e) => self.image.error = Some(e.message),
                     }
                 }
                 Message::PaintLoaded(target, result) => self.paint_loaded(target, result),

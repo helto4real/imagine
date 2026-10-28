@@ -55,6 +55,7 @@ impl From<Vec<Artifact>> for Generated {
 }
 enum Task<'a> {
     Image,
+    ControlMaps,
     CharacterSheet(
         &'a character_sheet::CharacterSheet,
         model_adapter::SheetStrategy,
@@ -63,7 +64,9 @@ enum Task<'a> {
 impl<'a> Task<'a> {
     fn resolve(request: &'a JobRequest) -> Result<Self> {
         request.validate().map_err(anyhow::Error::msg)?;
-        Ok(if request.operation == Operation::CharacterSheet {
+        Ok(if request.operation == Operation::ControlMaps {
+            Self::ControlMaps
+        } else if request.operation == Operation::CharacterSheet {
             Self::CharacterSheet(
                 request.character_sheet.as_ref().context("sheet input")?,
                 model_adapter::sheet_strategy(&request.model).map_err(anyhow::Error::msg)?,
@@ -171,6 +174,31 @@ async fn generate_images(
         }
     }
     match task {
+        Task::ControlMaps => {
+            let id = request
+                .inputs
+                .source_image
+                .as_ref()
+                .context("source image")?;
+            let photo = store.read_image_asset(id, owner).await?;
+            let (width, height) = (request.width, request.height);
+            let photo = tokio::task::spawn_blocking(move || {
+                crate::workflow_image::cover(&photo, width, height)
+            })
+            .await??;
+            engine.stage(Some("control_maps"));
+            let [depth, regions] = engine.control_maps(&photo, width, height).await?;
+            Ok(vec![
+                Artifact {
+                    role: "depth_map",
+                    bytes: depth,
+                },
+                Artifact {
+                    role: "region_map",
+                    bytes: regions,
+                },
+            ])
+        }
         Task::Image => Ok(vec![Artifact {
             role: "image",
             bytes: engine.generate(&pass).await?,

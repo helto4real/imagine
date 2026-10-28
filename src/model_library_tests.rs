@@ -493,6 +493,22 @@ fn moss_defaults_keep_its_encoder_and_vae_but_explicit_cross_family_choices_are_
     request.inputs.depth_map = None;
     assert_eq!(request.validate(), Err("unexpected_control_options"));
     request.model_options.moss_control = None;
+    // Control maps come from one photo, without prompt, references or maps.
+    let mut maps = request.clone();
+    maps.operation = contract::Operation::ControlMaps;
+    maps.prompt.clear();
+    maps.inputs.source_image = Some("photo".into());
+    maps.validate().unwrap();
+    assert_eq!(maps.asset_ids().collect::<Vec<_>>(), [&"photo".to_string()]);
+    assert_eq!(crate::model_adapter::output_count(&maps), 2);
+    maps.inputs.depth_map = Some("depth".into());
+    assert_eq!(maps.validate(), Err("unsupported_control_maps"));
+    maps.inputs.depth_map = None;
+    maps.inputs.source_image = None;
+    assert_eq!(maps.validate(), Err("unsupported_control_maps"));
+    maps.inputs.source_image = Some("photo".into());
+    maps.operation = contract::Operation::TextToImage;
+    assert_eq!(maps.validate(), Err("unsupported_control_maps"));
     // Library selections resolve the adapters as verified library files.
     assert_eq!(
         library

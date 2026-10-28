@@ -4,6 +4,7 @@
 pub mod component_error;
 mod image_preview;
 mod load_error;
+pub mod maps;
 #[path = "../../../shared/model_spec.rs"]
 pub mod model_spec;
 mod moss;

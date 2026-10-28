@@ -131,8 +131,43 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         };
         let payload = read(&mut input, MAX_PAYLOAD)?;
         let value: Value = serde_json::from_slice(&header)?;
-        if value["protocol"] != 1 || value["type"] != "generate" {
+        if value["protocol"] != 1 || !matches!(value["type"].as_str(), Some("generate" | "maps")) {
             return Err("Invalid frame".into());
+        }
+        if value["type"] == "maps" {
+            let id = value["id"]
+                .as_str()
+                .ok_or("Missing request identity")?
+                .to_owned();
+            // The photo arrives as RGBA8; the maps return as RGB8, depth first.
+            let result = (|| -> Result<(Value, Vec<u8>), Box<dyn std::error::Error>> {
+                let request: server::maps::MapsRequest = serde_json::from_value(value.clone())?;
+                let [h, w] = request.shape;
+                if h <= 0 || w <= 0 || h > 8192 || w > 8192 || payload.len() as i64 != h * w * 4 {
+                    return Err("Invalid RGBA photo size".into());
+                }
+                let rgb: Vec<u8> = payload
+                    .chunks_exact(4)
+                    .flat_map(|p| [p[0], p[1], p[2]])
+                    .collect();
+                let maps = server::maps::control_maps(&request, &rgb)?;
+                rt.native.cuda_soft_empty_cache(0)?;
+                let mut bytes = maps.depth;
+                bytes.extend(maps.regions);
+                Ok((json!({"type":"result","id":id}), bytes))
+            })();
+            match result {
+                Ok((header, bytes)) => write(&mut output, header, &bytes)?,
+                Err(_) => {
+                    write(
+                        &mut output,
+                        json!({"type":"error","id":id,"code":"rust_control_maps_failed"}),
+                        &[],
+                    )?;
+                    return Ok(());
+                }
+            }
+            continue;
         }
         let id = value["id"]
             .as_str()

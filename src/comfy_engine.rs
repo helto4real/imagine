@@ -443,6 +443,64 @@ impl PipeBackend {
         }
     }
 }
+impl PipeBackend {
+    /// Depth and region maps from the Rust worker for a photo already at the
+    /// output size, as PNGs.
+    async fn run_maps(&mut self, photo: &[u8], width: u32, height: u32) -> Result<[Vec<u8>; 2]> {
+        if self.rust_runtime.is_none() {
+            bail!(EngineError("unsupported_control_maps"));
+        }
+        let root = &self.config.model_root;
+        let models = [
+            root.join(contract::DEPTH_MAP_MODEL),
+            root.join(contract::REGION_MAP_MODEL),
+        ];
+        if models
+            .iter()
+            .any(|m| !m.join("model.safetensors").is_file())
+        {
+            bail!(EngineError("control_map_models_missing"));
+        }
+        let image = image::load_from_memory(photo)?.to_rgba8();
+        if image.dimensions() != (width, height) {
+            bail!(EngineError("unexpected_output_dimensions"));
+        }
+        let header = json!({"protocol":1,"type":"maps","id":uuid::Uuid::new_v4().to_string(),
+            "depth_model":models[0],"region_model":models[1],"shape":[height,width]});
+        self.ready().await?;
+        self.phase("inference");
+        let id = header["id"].as_str().unwrap();
+        write_frame(self.input.as_mut().unwrap(), &header, image.as_raw()).await?;
+        let (event, body) = read_frame(self.output.as_mut().unwrap()).await?;
+        match event {
+            Event::Result { id: event_id } if event_id == id => {
+                let size = width as usize * height as usize * 3;
+                if body.len() != 2 * size {
+                    bail!(EngineError("rust_invalid_output"));
+                }
+                let png = |rgb: &[u8]| -> Result<Vec<u8>> {
+                    let mut out = std::io::Cursor::new(Vec::new());
+                    image::write_buffer_with_format(
+                        &mut out,
+                        rgb,
+                        width,
+                        height,
+                        image::ColorType::Rgb8,
+                        image::ImageFormat::Png,
+                    )?;
+                    Ok(out.into_inner())
+                };
+                Ok([png(&body[..size])?, png(&body[size..])?])
+            }
+            Event::Error {
+                id: Some(event_id),
+                code,
+                ..
+            } if event_id == id => bail!(self.error(worker_error(&code))),
+            _ => bail!(EngineError("comfy_protocol_error")),
+        }
+    }
+}
 impl Backend for PipeBackend {
     fn h3_model_root(&self) -> Option<std::path::PathBuf> {
         self.rust_runtime
@@ -486,6 +544,21 @@ impl Backend for PipeBackend {
                         error
                     }
                 })
+        })
+    }
+    fn control_maps<'a>(
+        &'a mut self,
+        photo: &'a [u8],
+        width: u32,
+        height: u32,
+    ) -> EngineFuture<'a, [Vec<u8>; 2]> {
+        Box::pin(async move {
+            tokio::time::timeout(
+                Duration::from_secs(900),
+                self.run_maps(photo, width, height),
+            )
+            .await
+            .context(EngineError("generation_timeout"))?
         })
     }
     fn stage(&mut self, stage: Option<&str>) {

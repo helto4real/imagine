@@ -43,6 +43,8 @@ pub fn sheet_strategy(model: &str) -> Result<SheetStrategy, &'static str> {
 pub fn output_count(request: &JobRequest) -> usize {
     if request.operation == crate::contract::Operation::CharacterSheet {
         sheet_strategy(&request.model).map_or(1, |s| s.output_roles().len())
+    } else if request.operation == crate::contract::Operation::ControlMaps {
+        2
     } else {
         1
     }
