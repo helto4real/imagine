@@ -184,8 +184,19 @@ which validates the toolchain. The Kitchen 0.2.40 bridge is `612fcc11…`
   place (`row_stride`), and an `out` overlapping x written through a copy (Kitchen's
   `_tensors_overlap`); `group_norm_stats3d` is bound for both backends.
   `reference_conv_bindings.py` adds 231 cases (statistics, strips with their frame's
-  statistics, interleaved inputs, overlap, stats errors); the dev root's
-  `primitives.json` is the previous merge with both binding categories recaptured.
+  statistics, interleaved inputs, overlap, stats errors). Eager bodies were added for
+  the three new portable references (`rms_gated_residual`, `int8_linear_modulated`,
+  `int8_linear_rms_modulated`), with cases in `reference_backend_bindings.py`.
+- Corpus: the dev root's `primitives.json` is one full 0.2.40 capture
+  (`reference_primitives.py`, 3.5 minutes). The 0.2.38 refreshes the test loader
+  layered over the old baseline are dropped; two exceptions stay: the W4A8 frontend
+  recapture and `kitchen-0240-triton-source-times.json` (compiler modes and
+  environment cache), whose cubins differ from a fresh capture only by the
+  reinstalled sources' modification times while every earlier stage is identical.
+  Selection errors compare set literals sorted, as the backend contract renders them
+  (CPython iterates a set of dtypes in address order). The GEMV capture's trace
+  wrapper now passes keyword arguments (Kitchen calls the GEMV with `residual=`), and
+  W4A8 layouts carry `mma_packed` (false; Kitchen has had it since 0.2.38).
 - Flux2 VAE (d07dff45): on CUDA in fp16/bf16 the encoder and decoder run the fused
   path: GroupNorm statistics per frame, row strips with a one-row halo
   (`STRIP_ELEMS` 2^24), the stride-2 downsample in strips, the in-place C → C/2
@@ -198,23 +209,13 @@ which validates the toolchain. The Kitchen 0.2.40 bridge is `612fcc11…`
   446ef4e fixture still passes with the fused path off. MOSS images change by
   design, since ComfyUI now decodes in fp16.
 - H3 shares the Rust bindings, so its worker moves to the same bridge. The H3
-  component parity tests pass on 0.2.40. A real H3 video run was not made: the video
-  MCP tools author storyboards from a profile's own prompts, which are private.
+  component parity tests pass on 0.2.40; the H3 old-versus-new run is below.
 
-Status 2026-10-28: the work is on branch `kitchen-0240-wip` (`3c1d8e1`), not on
-main. Done there and exact against 426f5eea with Kitchen 0.2.40: the fused Flux2
-VAE (strips, in-place halving, level buffer; fp16 and bf16), the
-`group_norm_silu_pad3d` 0.2.40 contract (`stats`, served rule, row-interleaved
-input, overlapping `out`; 1,314 binding cases), `group_norm_stats3d`, eager bodies
-for `rms_gated_residual` and the two modulated INT8 projections, and regenerated
-signature/contract tables. Against a full 0.2.40 `primitives.json` capture eleven
-suite tests still fail: dtype-set order in registry messages differs between the
-contract and primitives captures (four tests), Triton cubin hashes carry Kitchen
-source times (two), and real 0.2.40 changes not yet ported: the W4A8 layout's
-`mma_packed` parameter, new INT8 no-activation rejections, eager
-`group_norm_silu_pad3d` argument-binding failures, the structured-metadata corpus
-size and the registry capability table. H3 must move with the image worker; a
-real H3 video run needs a video profile, whose prompts are private.
+The complete suite passes against Kitchen 0.2.40 (511 tests; `b440f58`, merged as
+`4f82dee`). Main now needs the dev root's 0.2.40 environment: `env.sh` points at
+`kitchen-0240/kitchen-manylinux/libimagine_kitchen.so`, `runtime/primitives.json`
+at `primitives-0240-full.json` and `runtime/backend-contract.json` at the 0.2.40
+fixture.
 
 ### Item 1: MOSS editing — DiT
 
