@@ -830,6 +830,9 @@ impl ImagineApp {
                                             .clicked()
                                     {
                                         *self.map_mut(role) = None;
+                                        if role == MapRole::Color {
+                                            self.image.region_colors.clear();
+                                        }
                                     }
                                     if role == MapRole::Color
                                         && ui
@@ -884,6 +887,7 @@ impl ImagineApp {
                         });
                     ui.add_space(6.);
                 }
+                self.region_prompts_panel(ui, editable);
                 ui.label(helto::section("Control"));
                 let settings = &mut self.prefs.generation;
                 let before = (settings.control_strength, settings.control_end);
@@ -936,6 +940,48 @@ impl ImagineApp {
                     self.prefs_dirty = true;
                 }
             });
+    }
+    /// One prompt per color of the region map, sent as MOSS's layout prompt.
+    fn region_prompts_panel(&mut self, ui: &mut Ui, editable: bool) {
+        if self.image.color_map.is_none() || self.image.region_colors.is_empty() {
+            return;
+        }
+        ui.label(helto::section("Region prompts"));
+        let privacy = self.prefs.privacy_mode;
+        let colors = self.image.region_colors.clone();
+        for (index, (color, share)) in colors.into_iter().enumerate() {
+            let text = self.image.region_prompts.entry(color).or_default();
+            ui.horizontal(|ui| {
+                let name = format!("Region {}", index + 1);
+                super::painter::swatch(ui, color, 16., false, &name);
+                ui.label(&name);
+                ui.label(RichText::new(format!("{:.0}%", share * 100.)).color(helto::DIM));
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if ui
+                        .add_enabled_ui(editable, |ui| {
+                            helto::select_button(ui, "Person", text.character)
+                        })
+                        .inner
+                        .on_hover_text("A person or animal rather than a thing")
+                        .clicked()
+                    {
+                        text.character = !text.character;
+                    }
+                });
+            });
+            ui.add_enabled_ui(editable, |ui| {
+                helto::textarea(
+                    ui,
+                    &mut text.prompt,
+                    2,
+                    &format!("region-prompt-{index}"),
+                    privacy,
+                    false,
+                );
+            });
+            ui.add_space(4.);
+        }
+        ui.add_space(4.);
     }
     /// The photo the depth and region maps are made from.
     fn source_card(&mut self, ui: &mut Ui, editable: bool) {

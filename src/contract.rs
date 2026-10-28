@@ -109,6 +109,20 @@ pub struct Inputs {
     /// The photo control maps are made from (`control_maps`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_image: Option<String>,
+    /// MOSS control: what each color of the color map shows. They become MOSS's
+    /// native layout prompt, each region's box taken from the map.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub regions: Vec<RegionPrompt>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct RegionPrompt {
+    /// The region's color in the color map, `#rrggbb`.
+    pub color: String,
+    pub prompt: String,
+    /// A person or animal (MOSS's "character") rather than a thing ("object").
+    #[serde(default)]
+    pub character: bool,
 }
 impl Inputs {
     pub fn has_control_maps(&self) -> bool {
@@ -408,6 +422,20 @@ impl JobRequest {
                 && self.operation == Operation::TextToImage)
         {
             return Err("unsupported_control_maps");
+        }
+        if !self.inputs.regions.is_empty() {
+            let mut colors = std::collections::BTreeSet::new();
+            if self.inputs.color_map.is_none()
+                || self.inputs.regions.len() > 24
+                || self.inputs.regions.iter().any(|r| {
+                    let color = crate::moss_layout::parse_color(&r.color);
+                    color.is_none_or(|c| c == [0, 0, 0] || !colors.insert(c))
+                        || r.prompt.trim().is_empty()
+                        || r.prompt.chars().count() > 2000
+                })
+            {
+                return Err("invalid_region_prompts");
+            }
         }
         if let Some(c) = self.model_options.moss_control {
             if !self.inputs.has_control_maps() {

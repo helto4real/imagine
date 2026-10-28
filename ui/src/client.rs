@@ -748,11 +748,20 @@ pub fn make_request(
 pub fn has_moss_modes(metadata: &Value) -> bool {
     metadata["constraints"]["control_maps"].is_object()
 }
-/// MOSS control maps by asset ID.
+/// MOSS control maps by asset ID, and what the color map's regions show.
 #[derive(Clone, Copy, Default)]
 pub struct ControlMaps<'a> {
     pub color: Option<&'a str>,
     pub depth: Option<&'a str>,
+    pub regions: &'a [RegionText<'a>],
+}
+/// One region of the color map: its color, its prompt and whether it is a
+/// person or animal.
+#[derive(Clone, Copy)]
+pub struct RegionText<'a> {
+    pub color: [u8; 3],
+    pub prompt: &'a str,
+    pub character: bool,
 }
 /// A MOSS request in the selected mode: references only when editing (the server
 /// adds the edit LoRA), maps and their control only in control mode (the server
@@ -812,6 +821,22 @@ fn moss_mode_request(
             }
             if let Some(id) = maps.depth {
                 request["inputs"]["depth_map"] = json!(id);
+            }
+            let regions: Vec<_> = maps
+                .regions
+                .iter()
+                .filter(|r| !r.prompt.trim().is_empty())
+                .map(|r| {
+                    let [red, green, blue] = r.color;
+                    json!({"color": format!("#{red:02x}{green:02x}{blue:02x}"),
+                        "prompt": r.prompt, "character": r.character})
+                })
+                .collect();
+            if !regions.is_empty() {
+                if maps.color.is_none() {
+                    bail!("Region prompts need a region map.");
+                }
+                request["inputs"]["regions"] = json!(regions);
             }
             request["model_options"]["moss_control"] =
                 json!({"strength": strength, "start": 0., "end": end});
@@ -1420,9 +1445,22 @@ mod tests {
             &imagine_server::contract::model(MODEL).unwrap()
         ));
         let refs = vec!["a".to_string(), "b".to_string()];
+        let regions = [
+            RegionText {
+                color: [230, 25, 75],
+                prompt: "a firefighter in a yellow uniform",
+                character: true,
+            },
+            RegionText {
+                color: [60, 180, 75],
+                prompt: " ",
+                character: false,
+            },
+        ];
         let maps = ControlMaps {
             color: Some("regions"),
             depth: Some("depth"),
+            regions: &regions,
         };
         let mut settings = GenerationSettings {
             max_side: 1024,
@@ -1471,6 +1509,20 @@ mod tests {
         assert!(control.inputs.reference_images.is_empty());
         assert_eq!(control.inputs.color_map.as_deref(), Some("regions"));
         assert_eq!(control.inputs.depth_map.as_deref(), Some("depth"));
+        // Empty region prompts are left out; regions need the region map.
+        assert_eq!(
+            control.inputs.regions,
+            [imagine_server::contract::RegionPrompt {
+                color: "#e6194b".into(),
+                prompt: "a firefighter in a yellow uniform".into(),
+                character: true,
+            }]
+        );
+        let no_map = ControlMaps {
+            color: None,
+            ..maps
+        };
+        assert!(make_moss_request("test", "", &refs, no_map, None, &meta, &settings).is_err());
         assert_eq!(
             control.model_options.moss_control,
             Some(imagine_server::contract::ControlOptions {

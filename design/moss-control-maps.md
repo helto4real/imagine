@@ -100,6 +100,13 @@ Mask2Former regions:
   the astronaut photo at 1024 × 1024 in 4 s, published as
   `image_0053_depth.png` / `image_0053_regions.png`; MOSS control with them
   kept the photo's composition.
-- Next: region prompts (one prompt per region, with the region names the
-  worker already derives). Generating maps in the product moves the core lock (the models
+- Region prompts: `inputs.regions` (`#rrggbb` color, prompt, character) with a
+  color map. The server writes MOSS's native layout prompt as ComfyUI's
+  `MOSSImageLayoutPrompt` does (byte-identical in a direct-Python check): the
+  scene prompt as the summary and one item per region, its box from where its
+  color lies in the map once covered and center-cropped to the output, regions
+  cropped away left out. Region prompts are decrypted like the prompt. The UI
+  lists the map's flat colors (at least 0.2 %, black excluded) with a prompt
+  and a Person toggle each. Hayate's `isolate_until` attention isolation has
+  no ComfyUI counterpart and is not part of this. Generating maps in the product moves the core lock (the models
   and Pillow ABI 2 are newer than `core_revision`).

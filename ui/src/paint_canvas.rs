@@ -26,6 +26,26 @@ pub const REGION_PALETTE: [[u8; 3]; 12] = [
     [170, 110, 40],
 ];
 
+/// The flat region colors of a color map, largest first: exact colors covering at
+/// least 0.2 % (antialiased edges fall below), black excluded, at most 24.
+pub fn flat_colors(rgba: &[u8]) -> Vec<([u8; 3], f32)> {
+    let mut counts = std::collections::HashMap::<[u8; 3], usize>::new();
+    let total = rgba.len() / 4;
+    for p in rgba.chunks_exact(4) {
+        let c = [p[0], p[1], p[2]];
+        if c != [0, 0, 0] && p[3] >= 128 {
+            *counts.entry(c).or_default() += 1;
+        }
+    }
+    let mut list: Vec<_> = counts
+        .into_iter()
+        .map(|(c, n)| (c, n as f32 / total.max(1) as f32))
+        .filter(|&(_, share)| share >= 0.002)
+        .collect();
+    list.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+    list.truncate(24);
+    list
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PaintKind {
     Marks,
@@ -386,6 +406,13 @@ mod tests {
         assert_eq!(canvas.composite(), canvas.layer);
     }
 
+    #[test]
+    fn flat_colors_skip_black_and_antialiased_edges() {
+        let mut rgba = [[230u8, 25, 75, 255]; 600].concat();
+        rgba.extend([[0, 0, 0, 255]; 399].concat());
+        rgba.extend([200, 100, 50, 255]);
+        assert_eq!(flat_colors(&rgba), vec![([230, 25, 75], 0.6)]);
+    }
     #[test]
     fn large_images_paint_downscaled_and_export_png() {
         let big = Pixels::new(4096, 1024, [10, 20, 30, 255]).fitted();

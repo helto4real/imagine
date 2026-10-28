@@ -139,7 +139,13 @@ impl Painter {
         }
     }
 }
-fn swatch(ui: &mut Ui, color: [u8; 3], size: f32, selected: bool, label: &str) -> egui::Response {
+pub(super) fn swatch(
+    ui: &mut Ui,
+    color: [u8; 3],
+    size: f32,
+    selected: bool,
+    label: &str,
+) -> egui::Response {
     let (rect, response) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::click());
     response.widget_info(|| {
         egui::WidgetInfo::selected(egui::WidgetType::RadioButton, true, selected, label)
@@ -315,6 +321,7 @@ impl ImagineApp {
                 }
             }
             PaintTarget::RegionMap => {
+                self.image.region_colors = crate::paint_canvas::flat_colors(&saved.layer.bytes());
                 self.image.color_map = Some(ReferenceView {
                     number: 0,
                     name: "region-map.png".into(),

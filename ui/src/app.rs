@@ -58,6 +58,7 @@ enum Message {
     UploadsFinished(Workspace),
     PickedMap(MapRole, Option<PathBuf>),
     UploadedMap(MapRole, Result<Reference, Failure>),
+    RegionColors(Vec<([u8; 3], f32)>),
     MapsMade(Result<Completed, Failure>),
     PaintLoaded(
         painter::PaintTarget,
@@ -90,6 +91,12 @@ impl MapRole {
         }
     }
 }
+/// The prompt of one color map region.
+#[derive(Clone, Default)]
+struct RegionText {
+    prompt: String,
+    character: bool,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Workspace {
     Image,
@@ -120,6 +127,10 @@ struct GenerationDesk {
     source_photo: Option<ReferenceView>,
     /// Maps are being made from the source photo.
     making_maps: bool,
+    /// The color map's region colors with their shares, largest first.
+    region_colors: Vec<([u8; 3], f32)>,
+    /// What each region color shows; kept when the map changes.
+    region_prompts: std::collections::BTreeMap<[u8; 3], RegionText>,
     reference_directory: Option<PathBuf>,
     pending: Option<Submission>,
     working: bool,
@@ -147,6 +158,8 @@ impl Default for GenerationDesk {
             depth_map: None,
             source_photo: None,
             making_maps: false,
+            region_colors: Vec::new(),
+            region_prompts: Default::default(),
             reference_directory: None,
             pending: None,
             working: false,
@@ -420,11 +433,30 @@ impl ImagineApp {
             MossMode::TextToImage => None,
         }
     }
+    /// The prompts of the color map's current regions.
+    fn region_texts(&self) -> Vec<client::RegionText<'_>> {
+        self.image
+            .region_colors
+            .iter()
+            .filter_map(|(color, _)| {
+                let text = self.image.region_prompts.get(color)?;
+                Some(client::RegionText {
+                    color: *color,
+                    prompt: &text.prompt,
+                    character: text.character,
+                })
+            })
+            .collect()
+    }
     /// Asset IDs of the image desk's control maps.
-    fn control_maps(&self) -> client::ControlMaps<'_> {
+    fn control_maps<'a>(
+        &'a self,
+        regions: &'a [client::RegionText<'a>],
+    ) -> client::ControlMaps<'a> {
         client::ControlMaps {
             color: self.image.color_map.as_ref().map(|m| m.id.as_str()),
             depth: self.image.depth_map.as_ref().map(|m| m.id.as_str()),
+            regions,
         }
     }
     /// Why the current desk's input cannot be generated.
@@ -523,6 +555,7 @@ impl ImagineApp {
                         self.load_library(ctx, Some(settings));
                     }
                 }
+                Message::RegionColors(colors) => self.image.region_colors = colors,
                 Message::MapsMade(result) => {
                     self.image.making_maps = false;
                     match result {
@@ -530,7 +563,11 @@ impl ImagineApp {
                             for asset in completed.assets {
                                 let slot = match asset.role {
                                     OutputRole::DepthMap => &mut self.image.depth_map,
-                                    OutputRole::RegionMap => &mut self.image.color_map,
+                                    OutputRole::RegionMap => {
+                                        self.image.region_colors =
+                                            crate::paint_canvas::flat_colors(&asset.preview.pixels);
+                                        &mut self.image.color_map
+                                    }
                                     _ => continue,
                                 };
                                 *slot = Some(ReferenceView {
@@ -655,7 +692,16 @@ impl ImagineApp {
                     let ctx = ctx.clone();
                     std::thread::spawn(move || {
                         let result = runtime().block_on(client.upload(&path));
+                        let ok = result.is_ok();
                         send(&tx, &ctx, Message::UploadedMap(role, result));
+                        // Region colors come from the full map, not its thumbnail.
+                        if ok
+                            && role == MapRole::Color
+                            && let Ok(map) = client::load_preview(&path)
+                        {
+                            let colors = crate::paint_canvas::flat_colors(&map.pixels);
+                            send(&tx, &ctx, Message::RegionColors(colors));
+                        }
                     });
                 }
                 Message::UploadedMap(role, result) => {

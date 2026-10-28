@@ -173,6 +173,21 @@ async fn generate_images(
                 .push((role, store.read_image_asset(id, owner).await?.into()));
         }
     }
+    // Region prompts turn the prompt into MOSS's layout prompt.
+    if let Some((_, map)) = pass.maps.iter().find(|(role, _)| *role == "color")
+        && !request.inputs.regions.is_empty()
+    {
+        let (map, regions, prompt) = (
+            map.clone(),
+            request.inputs.regions.clone(),
+            pass.prompt.clone(),
+        );
+        let (width, height) = (pass.width, pass.height);
+        pass.prompt = tokio::task::spawn_blocking(move || {
+            crate::moss_layout::layout_prompt(&prompt, &regions, &map, width, height)
+        })
+        .await??;
+    }
     match task {
         Task::ControlMaps => {
             let id = request

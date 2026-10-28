@@ -484,6 +484,28 @@ fn moss_defaults_keep_its_encoder_and_vae_but_explicit_cross_family_choices_are_
         request.asset_ids().collect::<Vec<_>>(),
         [&"depth".to_string()]
     );
+    // Region prompts name colors of the color map, each once, never black.
+    let region = |color: &str, prompt: &str| contract::RegionPrompt {
+        color: color.into(),
+        prompt: prompt.into(),
+        character: false,
+    };
+    request.inputs.regions = vec![region("#e6194b", "a person")];
+    assert_eq!(request.validate(), Err("invalid_region_prompts"));
+    request.inputs.color_map = Some("regions".into());
+    request.add_moss_adapters();
+    request.validate().unwrap();
+    for bad in [
+        vec![region("#000000", "black")],
+        vec![region("e6194b", "no hash")],
+        vec![region("#e6194b", " ")],
+        vec![region("#e6194b", "a"), region("#E6194B", "same")],
+    ] {
+        request.inputs.regions = bad;
+        assert_eq!(request.validate(), Err("invalid_region_prompts"));
+    }
+    request.inputs.regions.clear();
+    request.inputs.color_map = None;
     request.model_options.moss_control = Some(contract::ControlOptions {
         strength: 1.,
         start: 0.6,

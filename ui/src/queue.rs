@@ -167,6 +167,7 @@ impl ImagineApp {
             .metadata
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Reconnect to load model settings."))?;
+        let regions = self.region_texts();
         let references: Vec<_> = self
             .image
             .references
@@ -182,7 +183,7 @@ impl ImagineApp {
                         prompt,
                         &self.effective_negative_prompt(),
                         &references,
-                        self.control_maps(),
+                        self.control_maps(&regions),
                         self.moss_source(),
                         metadata,
                         &self.prefs.generation,

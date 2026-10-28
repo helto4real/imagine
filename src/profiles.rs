@@ -457,6 +457,11 @@ fn check_sheet_canvas(value: &Value) -> Result<(), Fault> {
     Ok(())
 }
 fn decrypt_sheet(request: &mut JobRequest) -> Result<(), Fault> {
+    // Region prompts are prompts: private ones arrive encrypted like the prompt.
+    for region in &mut request.inputs.regions {
+        region.prompt = crate::privacy::decrypt(&region.prompt)
+            .map_err(|_| invalid("private_prompt_unavailable"))?;
+    }
     if let Some(sheet) = &mut request.character_sheet {
         sheet.character_description = decrypt_description(&sheet.character_description)
             .map_err(|_| invalid("private_prompt_unavailable"))?;

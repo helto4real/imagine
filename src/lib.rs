@@ -73,3 +73,4 @@ pub mod video_destination;
 
 #[path = "../shared/model_spec.rs"]
 pub mod model_spec;
+pub mod moss_layout;

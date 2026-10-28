@@ -1877,15 +1877,25 @@ fn headless_moss_modes() {
                 marks: None,
             });
         }
+        app.image.region_colors = crate::paint_canvas::flat_colors(&regions);
+        app.image.region_prompts.insert(
+            [224, 86, 122],
+            RegionText {
+                prompt: "A firefighter in a yellow uniform".into(),
+                character: true,
+            },
+        );
         assert!(app.moss_modes());
         assert_eq!(app.reference_limit(), 4);
+        // Control shows all of its cards and region prompts.
+        let height = if mode == MossMode::Control { 1700 } else { 800 };
         let mut combined = egui::FullOutput::default();
         for _ in 0..3 {
             combined.append(ctx.run_ui(
                 egui::RawInput {
                     screen_rect: Some(egui::Rect::from_min_size(
                         egui::Pos2::ZERO,
-                        egui::vec2(1280., 800.),
+                        egui::vec2(1280., height as f32),
                     )),
                     ..Default::default()
                 },
@@ -1895,7 +1905,7 @@ fn headless_moss_modes() {
         if let Some(dir) = std::env::var_os("IMAGINE_UI_PREVIEW_DIR") {
             let dir = PathBuf::from(dir);
             std::fs::create_dir_all(&dir).unwrap();
-            render(&ctx, combined, 1280, 800)
+            render(&ctx, combined, 1280, height)
                 .save(dir.join(format!("{name}.png")))
                 .unwrap();
         } else {
