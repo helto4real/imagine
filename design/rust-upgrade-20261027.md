@@ -414,3 +414,17 @@ The Qwen difference is not Kitchen 0.2.40. Profiled on 2026-10-28:
 
 A clean old-versus-new image bench needs a quiet machine with free memory, run
 interleaved; under today's conditions the two builds are indistinguishable.
+
+## Phase 4: build lock moved (2026-10-28)
+
+Tomas approved moving the product build lock. `native/product/build-lock.json` now
+restores the Rust core from main `167bf84` (`source_base` and `core_revision`)
+without core patches, since main contains all of them. Image and H3 workers load
+the Kitchen 0.2.40 bridge `612fcc11…` from the product artifact store
+(`comfyui/h3-main-20261020/artifacts/612fcc11…/libimagine_kitchen.so`), and the
+image reference revision is ComfyUI `426f5eea`. Checks: `test_product_build.py`
+(15) and `test_restore_native_inputs.py` (5) pass, the start scripts parse, and
+`./build-product.sh` prepares server, UI and proxy (release `server-dq9064jo`,
+runtime naming only the new bridge). The system compiler and `libcuda` differences
+it reports were already present and are recorded, not blocking. Services were not
+restarted by this step.
