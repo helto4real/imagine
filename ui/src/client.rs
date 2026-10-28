@@ -940,6 +940,13 @@ pub fn make_edit_request(
     let mut ids = vec![source.asset_id.to_owned()];
     ids.extend(references.iter().map(|(_, asset)| asset.clone()));
     let mut request = make_request(prompt, negative, &ids, metadata, settings)?;
+    request["width"] = json!(source.width);
+    request["height"] = json!(source.height);
+    // MOSS's edit LoRA reads the source and references in order and knows no
+    // image labels: the instruction goes as written.
+    if has_moss_modes(metadata) {
+        return Ok(request);
+    }
     let mut binding = String::from(
         "Edit <image1>, the source image, according to the instruction below. Other images are references whose use is defined by that instruction.\n",
     );
@@ -952,8 +959,6 @@ pub fn make_edit_request(
     binding.push_str("\nInstruction:\n");
     binding.push_str(prompt);
     request["prompt"] = json!(binding);
-    request["width"] = json!(source.width);
-    request["height"] = json!(source.height);
     Ok(request)
 }
 

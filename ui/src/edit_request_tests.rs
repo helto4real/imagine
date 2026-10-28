@@ -111,3 +111,33 @@ fn edit_rejects_unsupported_source_geometry() {
         );
     }
 }
+
+#[test]
+fn moss_edits_send_the_instruction_as_written_with_the_source_first() {
+    let prompt = "change the color of the dress to blue";
+    let value = make_edit_request(
+        prompt,
+        "",
+        EditSource {
+            asset_id: "source",
+            width: 512,
+            height: 288,
+        },
+        &[(1, "first".into())],
+        &imagine_server::contract::model(imagine_server::contract::MOSS).unwrap(),
+        &GenerationSettings::default(),
+    )
+    .unwrap();
+    assert_eq!(value["prompt"], prompt);
+    assert_eq!(value["operation"], "image_edit");
+    assert_eq!(
+        value["inputs"]["reference_images"],
+        json!(["source", "first"])
+    );
+    assert_eq!(
+        (value["width"].as_u64(), value["height"].as_u64()),
+        (Some(512), Some(288))
+    );
+    let typed: imagine_server::contract::JobRequest = serde_json::from_value(value).unwrap();
+    typed.validate().unwrap();
+}
