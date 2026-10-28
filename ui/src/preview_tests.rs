@@ -847,6 +847,7 @@ fn headless_layout_and_recoverable_job_state() {
             name: "reference.png".into(),
             texture: texture(&ctx, &sample, "synthetic-reference"),
             size: [32, 32],
+            marks: None,
         });
         app.image.result = Some(Results {
             assets: vec![ResultView {
@@ -1330,6 +1331,7 @@ fn headless_character_sheet_layout_and_privacy() {
             name: "synthetic-reference".into(),
             texture: texture(&ctx, &sample, "ref"),
             size: [32, 32],
+            marks: None,
         });
         if progress {
             app.sheet.working = true;
@@ -1868,6 +1870,7 @@ fn headless_moss_modes() {
                 name: format!("{}.png", role.label()),
                 texture,
                 size: [1536, 1024],
+                marks: None,
             });
         }
         assert!(app.moss_modes());

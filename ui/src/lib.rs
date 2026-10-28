@@ -15,6 +15,7 @@ pub fn video_catalog_folder() -> std::path::PathBuf {
 pub mod enhancement_types;
 pub mod helto;
 mod icons;
+pub mod paint_canvas;
 #[path = "../../shared/private_storage.rs"]
 pub mod private_storage;
 pub mod settings;

@@ -167,7 +167,12 @@ impl ImagineApp {
             .metadata
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Reconnect to load model settings."))?;
-        let references: Vec<_> = self.image.references.iter().map(|r| r.id.clone()).collect();
+        let references: Vec<_> = self
+            .image
+            .references
+            .iter()
+            .map(|r| r.sent_id().to_owned())
+            .collect();
         // Validate the entire series before creating any queue rows or admitting work.
         prompts
             .iter()

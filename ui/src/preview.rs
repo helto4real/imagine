@@ -36,6 +36,7 @@ impl ImagineApp {
                 name: format!("reference-{index}.png"),
                 texture: texture(ctx, &sample, &format!("synthetic-reference-{index}")),
                 size: [1536, 1024],
+                marks: None,
             });
         }
         app.image.result = Some(Results {

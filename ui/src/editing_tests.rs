@@ -515,6 +515,7 @@ fn headless_edit_layout_and_privacy() {
                 name: "synthetic.png".into(),
                 texture: source.clone(),
                 size: [1024, 1024],
+                marks: None,
             });
         }
         app.prefs.privacy_mode = private;

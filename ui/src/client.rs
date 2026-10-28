@@ -32,7 +32,7 @@ impl Failure {
             retryable: true,
         }
     }
-    fn terminal(message: impl Into<String>) -> Self {
+    pub(crate) fn terminal(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
             retryable: false,
@@ -324,6 +324,34 @@ impl Client {
             preview,
             size,
         })
+    }
+    /// An asset's full pixels.
+    pub async fn image(&self, id: &str) -> std::result::Result<Preview, Failure> {
+        let response = self
+            .get(&format!("/v1/assets/{id}"))
+            .send()
+            .await
+            .map_err(|_| Failure::retry("Could not download the image. Retry."))?;
+        if !response.status().is_success() {
+            return Err(Failure::retry("Could not download the image. Retry."));
+        }
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|_| Failure::retry("The image download was interrupted. Retry."))?;
+        decode(&bytes, false).map_err(|_| Failure::terminal("The image is unreadable."))
+    }
+    /// Stores PNG bytes as a new asset and returns its ID.
+    pub async fn upload_png(&self, png: Vec<u8>) -> std::result::Result<String, Failure> {
+        let value = Self::json(
+            self.post("/v1/assets")
+                .header(reqwest::header::CONTENT_TYPE, "image/png")
+                .body(png)
+                .send()
+                .await,
+        )
+        .await?;
+        identifier(&value["id"])
     }
     pub async fn cancel(&self, job: &str) -> std::result::Result<(), Failure> {
         Self::json(self.post(&format!("/v1/jobs/{job}/cancel")).send().await).await?;

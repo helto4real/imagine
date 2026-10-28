@@ -21,6 +21,24 @@ struct ReferenceView {
     name: String,
     texture: egui::TextureHandle,
     size: [u32; 2],
+    /// A painted copy (MOSS edit references).
+    marks: Option<painter::Marks>,
+}
+impl ReferenceView {
+    /// The asset the model gets: the marked copy when it is sent.
+    fn sent_id(&self) -> &str {
+        self.marks
+            .as_ref()
+            .filter(|m| m.send)
+            .map_or(&self.id, |m| &m.id)
+    }
+    /// The picture shown for the reference: the marked copy when it is sent.
+    fn shown_texture(&self) -> &egui::TextureHandle {
+        self.marks
+            .as_ref()
+            .filter(|m| m.send)
+            .map_or(&self.texture, |m| &m.texture)
+    }
 }
 enum Message {
     SamplingPreview {
@@ -40,6 +58,11 @@ enum Message {
     UploadsFinished(Workspace),
     PickedMap(MapRole, Option<PathBuf>),
     UploadedMap(MapRole, Result<Reference, Failure>),
+    PaintLoaded(
+        painter::PaintTarget,
+        Result<crate::paint_canvas::Pixels, Failure>,
+    ),
+    PaintSaved(painter::PaintTarget, Result<painter::Saved, Failure>),
     Progress(Workspace, Progress),
     Finished(Workspace, Result<Completed, Failure>),
     Cancelled(Workspace, String, Result<(), Failure>),
@@ -178,6 +201,7 @@ pub struct ImagineApp {
     settings_open: bool,
     settings_error: Option<String>,
     queue: queue::Queue,
+    painter: Option<painter::Painter>,
     tx: Sender<Message>,
     rx: Receiver<Message>,
 }
@@ -241,6 +265,7 @@ impl ImagineApp {
             picking_folder: false,
             connection_error: None,
             workspace: Workspace::Image,
+            painter: None,
             settings_open: false,
             settings_error: None,
             queue: queue::Queue::default(),
@@ -449,6 +474,8 @@ impl ImagineApp {
                         self.load_library(ctx, Some(settings));
                     }
                 }
+                Message::PaintLoaded(target, result) => self.paint_loaded(target, result),
+                Message::PaintSaved(target, result) => self.paint_saved(ctx, target, result),
                 Message::ClipboardFailed => {
                     self.report_error("Could not preserve the clipboard after closing Imagine. Keep the app open and copy again.".into());
                 }
@@ -527,6 +554,7 @@ impl ImagineApp {
                             name: reference.name,
                             texture,
                             size: reference.size,
+                            marks: None,
                         });
                     }
                     Err(e) => {
@@ -565,6 +593,7 @@ impl ImagineApp {
                                 name: map.name,
                                 texture,
                                 size: map.size,
+                                marks: None,
                             });
                         }
                         Err(e) => self.image.error = Some(e.message),
@@ -900,6 +929,8 @@ impl ImagineApp {
     }
 }
 
+#[path = "painter.rs"]
+mod painter;
 #[path = "workspace.rs"]
 mod workspace;
 

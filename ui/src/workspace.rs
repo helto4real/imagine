@@ -517,6 +517,10 @@ impl ImagineApp {
     }
 
     fn image_workspace(&mut self, ui: &mut Ui, rect: Rect) {
+        if self.workspace == Workspace::Image && self.painter.is_some() {
+            self.paint_workspace(ui, rect);
+            return;
+        }
         if self.workspace == Workspace::ImageEdit {
             self.edit_workspace(ui, rect);
             return;
@@ -821,6 +825,25 @@ impl ImagineApp {
                                     {
                                         *self.map_mut(role) = None;
                                     }
+                                    if role == MapRole::Color
+                                        && ui
+                                            .add_enabled_ui(editable, |ui| {
+                                                helto::icon_button(
+                                                    ui,
+                                                    Icon::Edit,
+                                                    if present {
+                                                        "Edit regions"
+                                                    } else {
+                                                        "Paint a region map"
+                                                    },
+                                                    false,
+                                                )
+                                            })
+                                            .inner
+                                            .clicked()
+                                    {
+                                        self.paint_regions(ui.ctx());
+                                    }
                                     let verb = if present { "Replace" } else { "Add" };
                                     if ui
                                         .add_enabled_ui(editable, |ui| {
@@ -947,6 +970,8 @@ impl ImagineApp {
         let mut remove = None;
         let mut swap = None;
         let mut moved = None;
+        let mut paint = None;
+        let paintable = self.workspace == Workspace::Image;
         if ui.ctx().input(|i| !i.raw.hovered_files.is_empty()) {
             ui.label(RichText::new("Drop images to add references").color(helto::ACCENT));
         }
@@ -994,7 +1019,7 @@ impl ImagineApp {
                                     |ui| {
                                         private_image(
                                             ui,
-                                            &reference.texture,
+                                            reference.shown_texture(),
                                             egui::vec2(width, width * 1.05),
                                             self.prefs.privacy_mode,
                                         )
@@ -1053,6 +1078,21 @@ impl ImagineApp {
                                 {
                                     remove = Some(index);
                                 }
+                                if paintable
+                                    && ui
+                                        .add_enabled_ui(editable, |ui| {
+                                            helto::icon_button(
+                                                ui,
+                                                Icon::Edit,
+                                                "Paint on reference",
+                                                reference.marks.as_ref().is_some_and(|m| m.send),
+                                            )
+                                        })
+                                        .inner
+                                        .clicked()
+                                {
+                                    paint = Some(index);
+                                }
                             });
                         });
                         if editable {
@@ -1072,7 +1112,9 @@ impl ImagineApp {
                     });
                 }
             });
-        if let Some(index) = remove {
+        if let Some(index) = paint {
+            self.paint_reference(ui.ctx(), index);
+        } else if let Some(index) = remove {
             self.desk_mut().references.remove(index);
         } else if let Some((a, b)) = swap {
             self.desk_mut().references.swap(a, b);
