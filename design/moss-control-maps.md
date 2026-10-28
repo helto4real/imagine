@@ -108,5 +108,9 @@ Mask2Former regions:
   cropped away left out. Region prompts are decrypted like the prompt. The UI
   lists the map's flat colors (at least 0.2 %, black excluded) with a prompt
   and a Person toggle each. Hayate's `isolate_until` attention isolation has
-  no ComfyUI counterpart and is not part of this. Generating maps in the product moves the core lock (the models
+  no ComfyUI counterpart and is not part of this.
+- Live (2026-10-28): with a prompt per figure the adapter's mannequin maps give
+  a real man waving (the woman's body stays partly mannequin-like at end 0.5);
+  on the astronaut photo's maps each region took its prompt (brick wall,
+  banner, potted plant in place of the shuttle model). Generating maps in the product moves the core lock (the models
   and Pillow ABI 2 are newer than `core_revision`).
