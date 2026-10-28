@@ -2,7 +2,7 @@
 """Original transformers Depth Anything V2 (DINOv2 backbone, DPT neck and head) and its
 DPTImageProcessor, from the locked site: a bounded synthetic model on CPU and CUDA, the
 processor on synthetic images, and the released Small weights on one synthetic image
-(hashes only), followed by the depth map Imagine makes from the prediction.
+(hashes only, on CPU or CUDA), followed by the depth map Imagine makes from the prediction.
 
 No network: the processor and the released weights load from --weights. The depth map
 is the transformers example's: the prediction resized to the image with bicubic
@@ -20,7 +20,8 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--site', type=Path, required=True)
 p.add_argument('--weights', type=Path, required=True)
 p.add_argument('--output', type=Path, required=True)
-p.add_argument('--cpu-only', action='store_true', help='Leave out the CUDA model and the released weights')
+p.add_argument('--cpu-only', action='store_true', help='Leave out the CUDA synthetic model')
+p.add_argument('--released-device', choices=['cpu', 'cuda', 'none'], default='cuda')
 a = p.parse_args()
 project = Path(__file__).resolve().parents[2]
 manifest = json.loads((reference_dir(project) / 'source-manifest.json').read_text())
@@ -104,15 +105,16 @@ with torch.no_grad():
         pixels = processor(images=image(height, width, offset), return_tensors='pt')['pixel_values']
         processed.append(dict(height=height, width=width, offset=offset, pixel_values=encode(pixels, hashed=True)))
     real = None
-    if not a.cpu_only:
-      released = DepthAnythingForDepthEstimation.from_pretrained(a.weights, torch_dtype=torch.float32).to('cuda').eval()
-      released_attention = released.backbone.config._attn_implementation
-      pixels = processor(images=image(480, 640, 1), return_tensors='pt')['pixel_values'].to('cuda')
-      predicted = released(pixel_values=pixels).predicted_depth
-      resized, mapped = depth_map(predicted[0], 480, 640)
-      real = dict(height=480, width=640, offset=1, attention=released_attention, predicted_depth=encode(predicted, hashed=True),
-                resized=encode(resized, hashed=True), depth_map=encode(mapped, hashed=True),
-                depth_map_range=[int(mapped.min()), int(mapped.max())])
+    if a.released_device != 'none':
+        device = a.released_device
+        released = DepthAnythingForDepthEstimation.from_pretrained(a.weights, dtype=torch.float32).to(device).eval()
+        released_attention = released.backbone.config._attn_implementation
+        pixels = processor(images=image(480, 640, 1), return_tensors='pt')['pixel_values'].to(device)
+        predicted = released(pixel_values=pixels).predicted_depth
+        resized, mapped = depth_map(predicted[0], 480, 640)
+        real = dict(device=device, height=480, width=640, offset=1, attention=released_attention,
+                    predicted_depth=encode(predicted, hashed=True), resized=encode(resized, hashed=True),
+                    depth_map=encode(mapped, hashed=True), depth_map_range=[int(mapped.min()), int(mapped.max())])
 a.output.write_text(json.dumps(dict(schema=1, sources=sources, weights=weights, models=models, processed=processed,
                                     released=real), separators=(',', ':')) + '\n')
 print('Captured', sum(len(m['calls']) for m in models), 'synthetic forwards,', len(processed), 'processed images; released',
