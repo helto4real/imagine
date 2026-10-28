@@ -380,3 +380,23 @@ round, two renders each; `h3/ab.sh`):
 
 Earlier sequential renders: 0.2.40 113.3, 113.2, 108.7 s; 0.2.38 88.4, 92.1,
 102.7, 102.6, 118.4 s. No difference is visible beyond this variation.
+
+### Image bench on Kitchen 0.2.40 (`72d625d`)
+
+`comfyui/bench/candidate-72d625d-20261028T062113Z`. Qwen images are identical to the control's; MOSS images change by design
+(fp16 fused VAE). Worker GPU peaks are within 10 MiB and device peaks are lower.
+
+| Workload | Control | `94d206e` (0.2.38) | `72d625d` (0.2.40) |
+| --- | ---: | ---: | ---: |
+| `moss-t2i` warm median | 33.2 s | 32.2 s | 31.7 s |
+| `moss-sheet` warm median | 40.2 s | 39.7 s | 40.2 s |
+| `qwen-t2i` warm median | 52.7 s | 51.3 s | **72.3 s** |
+| `qwen-edit` warm median | 73.4 s | 71.9 s | **94.0 s** |
+
+Qwen is about 40% (t2i) and 30% (edit) slower with Kitchen 0.2.40, run to run
+within 1 s, so this is not noise; it fails the acceptance limit and blocks moving
+the build lock. The Wan VAE's group norm is not the cause: 0.2.40 now serves its
+channel counts (96, 192, 384) natively, and that kernel is 5–10x faster than the
+eager path 0.2.38 used (`group_norm_silu_pad3d`, bf16, 1×C×1×H×W at the VAE's
+sizes). Next: a per-kernel profile of one Qwen step on both bridges (INT8 linear,
+quantization and attention routes).
