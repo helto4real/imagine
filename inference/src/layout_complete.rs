@@ -300,6 +300,8 @@ impl Runtime {
                 let mut fields = BTreeMap::from([
                     ("group_size".into(), ScalarField::Integer(group)),
                     ("convrot_groupsize".into(), ScalarField::Integer(rotation)),
+                    // Packed MMA weights come only from an explicit packing step.
+                    ("mma_packed".into(), ScalarField::Bool(false)),
                     ("transposed".into(), ScalarField::Bool(false)),
                 ]);
                 for (i, n) in [(3, "correction"), (4, "codebook")] {
@@ -322,6 +324,7 @@ impl Runtime {
                         "codebook",
                         "group_size",
                         "convrot_groupsize",
+                        "mma_packed",
                         "transposed",
                     ],
                 );

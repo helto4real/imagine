@@ -2,7 +2,7 @@ use super::{fixtures, kitchen};
 use imagine_inference::{execution::Runtime, execution_value::Value, triton_compiler::Compiler};
 use std::{collections::BTreeMap, path::Path, sync::Arc};
 #[test]
-fn all_original_registered_callables_preserve_1004_argument_binding_failures_before_body_execution()
+fn all_original_registered_callables_preserve_1044_argument_binding_failures_before_body_execution()
 {
     let _root = super::triton_file_cache_tests::OwnDirectory::create();
     let own = std::env::current_dir().unwrap();
@@ -26,7 +26,7 @@ fn all_original_registered_callables_preserve_1004_argument_binding_failures_bef
             .as_array()
             .unwrap()
             .len(),
-        1004
+        1044
     );
     for c in fixtures()["backend_signature_errors"].as_array().unwrap() {
         let op = c["operation"].as_str().unwrap();

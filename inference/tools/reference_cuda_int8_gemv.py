@@ -25,9 +25,9 @@ def capture(torch, native, bits):
             names=['int8_linear_m1','int8_gemv_dequant','quantize_int8_rowwise','quantize_int8_rowwise_convrot','quantize_int8_rowwise_convrot64']
             for name in names:
                 saved[name]=getattr(native._C,name)
-                def traced(*args,_name=name):
+                def traced(*args,_name=name,**kwargs):
                     calls.append(_name)
-                    return saved[_name](*args)
+                    return saved[_name](*args,**kwargs)
                 setattr(native._C,name,traced)
             try:
                 value=native.int8_linear(x,w,ws,bias,out,convrot=rotate,convrot_groupsize=group,residual=r,residual_scale=rs)
