@@ -26,6 +26,8 @@ fn fixture() -> Value {
 }
 #[test]
 fn mask2former_synthetic_model_matches_transformers() {
+    // CUDA models need the native library, which loads torch's CUDA backend.
+    let _native = super::kitchen();
     let _threads = super::moss_dit_tests::Threads(tch::get_num_threads());
     tch::set_num_threads(2);
     let _grad = tch::no_grad_guard();

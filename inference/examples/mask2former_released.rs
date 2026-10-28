@@ -24,6 +24,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("cuda") => Device::Cuda(0),
         _ => Device::Cpu,
     };
+    // CUDA captures need the native library, which loads torch's CUDA backend.
+    let _native = match dev {
+        Device::Cuda(_) => Some(unsafe {
+            imagine_inference::native::Kitchen::load(Path::new(&std::env::var(
+                "IMAGINE_KITCHEN_LIBRARY",
+            )?))?
+        }),
+        _ => None,
+    };
     tch::set_num_threads(2);
     let rgb = std::fs::read(rgb)?;
     let (h, w) = (

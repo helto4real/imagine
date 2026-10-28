@@ -40,6 +40,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("sdpa") => d::DinoAttention::Sdpa,
         _ => d::DinoAttention::Eager,
     };
+    // CUDA captures need the native library, which loads torch's CUDA backend.
+    let _native = match dev {
+        Device::Cuda(_) => Some(unsafe {
+            imagine_inference::native::Kitchen::load(Path::new(&std::env::var(
+                "IMAGINE_KITCHEN_LIBRARY",
+            )?))?
+        }),
+        _ => None,
+    };
     tch::set_num_threads(2);
     let _grad = tch::no_grad_guard();
     let (h, w, o) = (
