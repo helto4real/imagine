@@ -163,7 +163,7 @@ FFN input as soon as each is used; the text blocks release q/k/v and the attenti
 output before their FFN. Outputs are unchanged (the complete MOSS DiT test is
 exact); the peak-memory effect is measured with the candidate worker in Phase 3.
 
-### Item 2: Kitchen 0.2.40 (deferred)
+### Item 2: Kitchen 0.2.40 and the fused Flux2 VAE
 
 The bridge build toolchain was reassembled in the dev root from verified inputs:
 the pinned manylinux image (`comfyui/native-toolchain/manylinux-ca4cca0a`), the
@@ -171,11 +171,35 @@ CUDA 13.0 wheels named in the stage-1 evidence (`nvcc`/`crt`/`nvvm` 13.0.88,
 `cccl` 13.0.85, `runtime` 13.0.96; headers identical to the verified tree) and the
 two pinned PyTorch sources `prepare_kitchen.py` checks. Rebuilt with today's
 native sources, the Kitchen 0.2.38 bridge passes the complete suite (503/503),
-which validates the toolchain. The Kitchen 0.2.40 bridge (`612fcc11…`) passes all
-tests except `group_norm_silu_pad3d`, whose native call gained `stats` and
-`row_stride` arguments. Because both workers share the Rust Kitchen bindings, H3
-must move to 0.2.40 with the image worker, so an H3 old-vs-new run is needed.
-Tomas chose to do MOSS editing (item 1) first; item 2 follows items 6 and 7.
+which validates the toolchain. The Kitchen 0.2.40 bridge is `612fcc11…`
+(staged as `comfyui/rust-upgrade-20261027/artifacts/612fcc11…/libimagine_kitchen.so`).
+
+- Bindings: `backend_signatures.rs`, `backend_contract/tables.rs` and
+  `native_argument_signatures.rs` regenerated from 0.2.40 (60 eager, 60 CUDA and 28
+  Triton signatures; new `group_norm_stats3d`, `rms_gated_residual`,
+  `int8_linear_modulated`, `int8_linear_rms_modulated`); backend contract fixture
+  `fixtures/reference-20261027/kitchen-0240-backend-contract.json`.
+  `group_norm_silu_pad3d` follows 0.2.40: per-frame `stats` (eager and CUDA), the new
+  served rule (C ≤ 2048 instead of 256 % (C/8)), row-interleaved NHWC input read in
+  place (`row_stride`), and an `out` overlapping x written through a copy (Kitchen's
+  `_tensors_overlap`); `group_norm_stats3d` is bound for both backends.
+  `reference_conv_bindings.py` adds 231 cases (statistics, strips with their frame's
+  statistics, interleaved inputs, overlap, stats errors); the dev root's
+  `primitives.json` is the previous merge with both binding categories recaptured.
+- Flux2 VAE (d07dff45): on CUDA in fp16/bf16 the encoder and decoder run the fused
+  path: GroupNorm statistics per frame, row strips with a one-row halo
+  (`STRIP_ELEMS` 2^24), the stride-2 downsample in strips, the in-place C → C/2
+  halving with interleaved hidden/output views, and the decoder's one shared level
+  buffer. 426f5eea makes fp16 the Flux2 VAE's first working dtype, so the MOSS worker
+  now encodes and decodes in fp16, and the decode estimate drops the 4x BatchNorm
+  multiplier where the fused path serves. Fixture
+  `fixtures/reference-20261027/moss-vae-fused.json` (fp16 and bf16, 2^14 and 2^24
+  strip sizes, encode 64×96, decode 4×6 and a batch of two): exact. The old
+  446ef4e fixture still passes with the fused path off. MOSS images change by
+  design, since ComfyUI now decodes in fp16.
+- H3 shares the Rust bindings, so its worker moves to the same bridge. The H3
+  component parity tests pass on 0.2.40. A real H3 video run was not made: the video
+  MCP tools author storyboards from a profile's own prompts, which are private.
 
 Status 2026-10-28: the work is on branch `kitchen-0240-wip` (`3c1d8e1`), not on
 main. Done there and exact against 426f5eea with Kitchen 0.2.40: the fused Flux2

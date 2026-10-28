@@ -41,6 +41,20 @@ impl q::VaeExecution for Exec {
 #[test]
 fn moss_original_flux2_vae_encode_decode_bn_packing_persistent_buffer_dtypes_and_manual_casts_match()
  {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../fixtures/moss-vae.json")).unwrap();
+    // 446ef4e predates the fused path.
+    assert_eq!(run(&fixture, false), 18);
+}
+#[test]
+fn moss_fused_flux2_vae_strips_halving_and_level_buffer_match_426f5eea() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../fixtures/reference-20261027/moss-vae-fused.json"
+    ))
+    .unwrap();
+    assert_eq!(run(&fixture, true), 12);
+}
+fn run(fixture: &Value, fused: bool) -> usize {
     let _directory = super::triton_file_cache_tests::OwnDirectory::create();
     let own = std::env::current_dir().unwrap();
     let _threads = Threads(tch::get_num_threads());
@@ -57,8 +71,6 @@ fn moss_original_flux2_vae_encode_decode_bn_packing_persistent_buffer_dtypes_and
     });
     let rt = Runtime::frozen(native, compiler).unwrap();
     let _grad = tch::no_grad_guard();
-    let fixture: Value =
-        serde_json::from_str(include_str!("../../fixtures/moss-vae.json")).unwrap();
     let mut count = 0;
     for group in fixture["groups"].as_array().unwrap() {
         let dev = device(group["device"].as_str().unwrap());
@@ -133,6 +145,8 @@ fn moss_original_flux2_vae_encode_decode_bn_packing_persistent_buffer_dtypes_and
             m::Flux2VaeConfig {
                 dim: 32,
                 decoder_dim: 32,
+                fused_norm: fused,
+                strip_elements: group["strip_elements"].as_i64().unwrap_or(1 << 24),
                 ..m::Flux2VaeConfig::default()
             },
             p,
@@ -152,13 +166,15 @@ fn moss_original_flux2_vae_encode_decode_bn_packing_persistent_buffer_dtypes_and
                 dev,
                 &format!("{dev:?}/{dtype:?}/{i}"),
             );
-            assert_eq!(
-                json!(e.operations),
-                call["operations"],
-                "{dev:?}/{dtype:?}/{i}/interrupt-boundaries"
-            );
+            if !call["operations"].is_null() {
+                assert_eq!(
+                    json!(e.operations),
+                    call["operations"],
+                    "{dev:?}/{dtype:?}/{i}/interrupt-boundaries"
+                );
+            }
             count += 1;
         }
     }
-    assert_eq!(count, 18);
+    count
 }

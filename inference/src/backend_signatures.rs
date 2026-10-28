@@ -88,6 +88,7 @@ pub(crate) fn signature(
                 "pad",
                 "silu",
                 "zero_pad",
+                "stats",
             ],
             7,
         ),
@@ -102,9 +103,11 @@ pub(crate) fn signature(
                 "silu",
                 "zero_pad",
                 "out",
+                "stats",
             ],
             9,
         ),
+        ("eager", "group_norm_stats3d") => (&["x", "num_groups", "eps"], 3),
         ("eager", "int8_linear") => (
             &[
                 "x",
@@ -121,6 +124,34 @@ pub(crate) fn signature(
                 "residual_scale",
             ],
             3,
+        ),
+        ("eager", "int8_linear_modulated") => (
+            &[
+                "x",
+                "modulation_scale",
+                "weight",
+                "weight_scale",
+                "bias",
+                "out_dtype",
+                "convrot",
+                "convrot_groupsize",
+            ],
+            4,
+        ),
+        ("eager", "int8_linear_rms_modulated") => (
+            &[
+                "x",
+                "norm_weight",
+                "norm_eps",
+                "modulation_scale",
+                "weight",
+                "weight_scale",
+                "bias",
+                "out_dtype",
+                "convrot",
+                "convrot_groupsize",
+            ],
+            6,
         ),
         ("eager", "na3d") => (&["q", "k", "v", "kernel_size", "is_causal", "scale"], 4),
         ("eager", "prepare_int4_weight_for_int8_linear") => (&["weight"], 1),
@@ -174,6 +205,9 @@ pub(crate) fn signature(
             1,
         ),
         ("eager", "rms_adaln") => (&["x", "scale", "shift", "eps"], 3),
+        ("eager", "rms_gated_residual") => {
+            (&["activation", "norm_weight", "residual", "gate", "eps"], 4)
+        }
         ("eager", "rms_rope") => (&["q", "k", "freqs_cis", "q_scale", "k_scale", "epsilon"], 4),
         ("eager", "rms_rope1") => (&["x", "freqs_cis", "scale", "epsilon"], 3),
         ("eager", "rms_rope1_") => (&["x", "freqs_cis", "scale", "epsilon"], 3),
@@ -388,6 +422,7 @@ pub(crate) fn signature(
                 "silu",
                 "zero_pad",
                 "out",
+                "stats",
             ],
             7,
         ),
@@ -402,9 +437,11 @@ pub(crate) fn signature(
                 "silu",
                 "zero_pad",
                 "out",
+                "stats",
             ],
             9,
         ),
+        ("cuda", "group_norm_stats3d") => (&["x", "num_groups", "eps"], 3),
         ("cuda", "int8_linear") => (
             &[
                 "x",

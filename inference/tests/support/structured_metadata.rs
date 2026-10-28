@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use tch::Device;
 #[test]
 fn original_structured_values_preserve_hashability_lazy_diagnostics_and_na_tensor_validation() {
-    compare("structured_metadata", 13072);
+    compare("structured_metadata", 14592);
 }
 #[test]
 fn original_sol_values_preserve_range_iteration_python_comparisons_truthiness_and_diagnostics() {

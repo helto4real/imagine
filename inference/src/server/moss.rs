@@ -314,9 +314,10 @@ fn flux2_vae<'a>(
         device: Device::Cuda(0),
         force_full_load: false,
     };
+    // 426f5eea runs the Flux2 VAE in fp16, its first working dtype, where served.
     q::ImageVaePolicy {
         device: Device::Cuda(0),
-        dtype: Kind::BFloat16,
+        dtype: Kind::Half,
         output_device: Device::Cpu,
         output_kind: Kind::Float,
         default_kind: Kind::Float,
@@ -327,7 +328,10 @@ fn flux2_vae<'a>(
         op,
         input,
         &mut services,
-        q::ImageVaeMemory::Flux2 { amd: false },
+        q::ImageVaeMemory::Flux2 {
+            amd: false,
+            fused: true,
+        },
     )
 }
 /// The original VAE.vae_encode_crop_pixels for Flux2: a centered crop of each

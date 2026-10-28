@@ -496,25 +496,10 @@ fn fixtures() -> &'static Value {
             .expect("Explicit synthetic fixture path required");
         let mut data: Value =
             serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-        // Retain the original baseline corpus while refreshing only categories
-        // affected by the source-locked Kitchen 0.2.38 upgrade.
-        let zero: Value =
-            serde_json::from_str(include_str!("../fixtures/kitchen-0238-zero-k.json")).unwrap();
-        data["controlled_cuda_int8_linear_zero_k"] = zero["runs"].clone();
-        let activation: Value = serde_json::from_str(include_str!(
-            "../fixtures/kitchen-0238-activation-values.json"
-        ))
-        .unwrap();
-        data["input_activation_values"] = activation["input_activation_values"].clone();
-        let signatures: Value =
-            serde_json::from_str(include_str!("../fixtures/kitchen-0238-signatures.json")).unwrap();
-        data["backend_signature_errors"] = signatures["cases"].clone();
-        let registry: Value =
-            serde_json::from_str(include_str!("../fixtures/kitchen-0238-registry.json")).unwrap();
-        data["binding_tables"]["backends"] = registry["backends"].clone();
-        // Its cubins embed the Kitchen source's modification time (DWARF line table);
-        // reinstalling Kitchen 0.2.40 changed only that, so this capture supersedes
-        // kitchen-0238-w4a8-frontend.json, which stays as the previous evidence.
+        // The corpus is one Kitchen 0.2.40 capture; the 0.2.38 refreshes that
+        // were layered over the earlier baseline are part of it. Cubins embed the
+        // Kitchen source's modification time (DWARF line table); reinstalling
+        // Kitchen 0.2.40 changed only that, so these captures stay.
         let w4a8: Value = serde_json::from_str(include_str!(
             "../fixtures/reference-20261027/kitchen-0240-w4a8-frontend.json"
         ))
@@ -522,18 +507,13 @@ fn fixtures() -> &'static Value {
         data["triton_w4a8_specialization"] = w4a8["cases"].clone();
         data["triton_w4a8_function_cache_keys"] = w4a8["function_cache_keys"].clone();
         data["triton_w4a8_compiler_source_files"] = w4a8["compiler_source_files"].clone();
-        let diagnostics: Value =
-            serde_json::from_str(include_str!("../fixtures/kitchen-0238-diagnostics.json"))
-                .unwrap();
-        let diagnostic = &diagnostics["triton_int8_unsupported"];
-        let case = data["triton_int8_bindings"]
-            .as_array_mut()
-            .unwrap()
-            .iter_mut()
-            .find(|c| c["label"] == "unsupported_act")
-            .unwrap();
-        case["error"] = diagnostic["error"].clone();
-        case["message"] = diagnostic["message"].clone();
+        let times: Value = serde_json::from_str(include_str!(
+            "../fixtures/reference-20261027/kitchen-0240-triton-source-times.json"
+        ))
+        .unwrap();
+        for category in ["triton_compiler_modes", "triton_environment_cache"] {
+            data[category] = times[category].clone();
+        }
         data
     })
 }

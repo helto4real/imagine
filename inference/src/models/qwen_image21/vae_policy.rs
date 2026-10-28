@@ -179,6 +179,9 @@ pub enum ImageVaeMemory {
     /// multiplier on decode. The AMD ratio is a source hardware predicate.
     Flux2 {
         amd: bool,
+        /// ComfyUI d07dff45: the fused strip decode needs no 4x BatchNorm-latent
+        /// multiplier.
+        fused: bool,
     },
 }
 impl ImageVaeMemory {
@@ -191,7 +194,7 @@ impl ImageVaeMemory {
                 };
                 (factor * shape[2] * shape[3]) as f64 * dtype.elt_size_in_bytes() as f64
             }
-            Self::Flux2 { amd } => {
+            Self::Flux2 { amd, fused } => {
                 let ratio = if amd { 2.73 } else { 1. };
                 match operation {
                     VaeOperation::Encode => {
@@ -203,7 +206,7 @@ impl ImageVaeMemory {
                         (2178 * shape[2] * shape[3] * 64) as f64
                             * dtype.elt_size_in_bytes() as f64
                             * ratio
-                            * 4.
+                            * if fused { 1. } else { 4. }
                     }
                 }
             }

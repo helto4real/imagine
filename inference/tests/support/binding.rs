@@ -310,11 +310,35 @@ pub(super) fn kwargs(v: &Value, dev: Device) -> Kwargs {
         .map(|p| (p[0].as_str().unwrap().into(), restore(&p[1], dev)))
         .collect()
 }
+/// Set literals with their members sorted, as the backend contract renders them:
+/// CPython iterates a set of dtypes in an order that follows the objects'
+/// addresses in that process, not the source.
+fn sorted_sets(message: &str) -> String {
+    let mut out = String::new();
+    let mut rest = message;
+    while let Some(start) = rest.find('{') {
+        let Some(len) = rest[start..].find('}') else {
+            break;
+        };
+        out.push_str(&rest[..start]);
+        let mut members = rest[start + 1..start + len].split(", ").collect::<Vec<_>>();
+        members.sort_unstable();
+        out.push('{');
+        out.push_str(&members.join(", "));
+        out.push('}');
+        rest = &rest[start + len + 1..];
+    }
+    out.push_str(rest);
+    out
+}
 pub(super) fn reference_error(e: Error, c: &Value) {
     match e {
         Error::Selection(e) => {
             assert_eq!(e.exception_class(), c["error"].as_str().unwrap());
-            assert_eq!(e.to_string(), c["message"].as_str().unwrap());
+            assert_eq!(
+                sorted_sets(&e.to_string()),
+                sorted_sets(c["message"].as_str().unwrap())
+            );
         }
         e => assert_reference_error(e, c),
     }

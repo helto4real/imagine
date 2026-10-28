@@ -36,9 +36,18 @@ fn leaves(v: &V) -> Vec<V> {
 }
 fn arguments(c: &Value, dev: Device) -> (Vec<V>, Kwargs, Option<V>) {
     let base = (!c["shared"].is_null()).then(|| restore(&c["shared"]["base"], dev));
+    // Arguments with the same view of the base are one object, as `out=x` is.
+    let made = std::cell::RefCell::new(Vec::<(Value, V)>::new());
     let make = |key: &str, v: &Value| {
         let view = &c["shared"]["views"][key];
-        if view.is_null() {
+        if let Some((_, same)) = made
+            .borrow()
+            .iter()
+            .find(|(w, _)| !view.is_null() && w == view)
+        {
+            return same.clone();
+        }
+        let value = if view.is_null() {
             restore(v, dev)
         } else {
             let raw = base
@@ -57,7 +66,11 @@ fn arguments(c: &Value, dev: Device) -> (Vec<V>, Kwargs, Option<V>) {
             } else {
                 t
             })
+        };
+        if !view.is_null() {
+            made.borrow_mut().push((view.clone(), value.clone()));
         }
+        value
     };
     let k = c["kwargs"]
         .as_array()

@@ -28,7 +28,7 @@ for backend,module in [('eager',eager),('cuda',cuda),('triton',triton)]:
   for omitted in required:
    if any(p.kind==inspect.Parameter.POSITIONAL_ONLY for p in params):continue
    kw={p.name:None for p in required if p.name!=omitted.name};record([],kw,'missing_'+omitted.name)
-expected_counts={'eager':56,'cuda':59,'triton':28}
+expected_counts={'eager':60,'cuda':60,'triton':28}
 assert dict(collections.Counter(s['backend']for s in signatures))==expected_counts and not unresolved
 if a.rust_output or a.check_rust:
  out=['//! Generated from the locked registered Python function signatures.','//! Validation only; each body still owns its original defaults and operations.',"pub(crate) fn signature(backend:&str,operation:&str)->Option<(&'static [&'static str],usize)>{","Some(match (backend,operation){"]
