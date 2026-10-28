@@ -128,6 +128,16 @@ pub enum MossMode {
     Edit,
     Control,
 }
+/// How a MOSS edit or control sizes its output from its source (the first
+/// reference or map): its own size, its aspect at the max side, or the ratio.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SizeMode {
+    Source,
+    Aspect,
+    #[default]
+    Custom,
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct GenerationSettings {
@@ -142,6 +152,7 @@ pub struct GenerationSettings {
     pub max_side: u32,
     pub reference_max_pixels_per_image: u32,
     pub moss_mode: MossMode,
+    pub size_mode: SizeMode,
     /// How strongly the control maps steer (1 is the trained strength) and the
     /// sampling percent at which they stop.
     pub control_strength: f32,
@@ -160,6 +171,7 @@ impl Default for GenerationSettings {
             max_side: 1600,
             reference_max_pixels_per_image: 1_000_000,
             moss_mode: MossMode::TextToImage,
+            size_mode: SizeMode::Custom,
             control_strength: 1.,
             control_end: 1.,
         }
@@ -186,6 +198,31 @@ impl GenerationSettings {
         } else {
             (short, self.max_side)
         })
+    }
+    /// The output size for a source `[width, height]`: its own size (scaled to
+    /// fit 4096) or its aspect at the max side, multiples of 32; the ratio
+    /// without a source or in custom mode.
+    pub fn dimensions_for(&self, source: Option<[u32; 2]>) -> Result<(u32, u32)> {
+        let Some([w, h]) = source.filter(|&[w, h]| w > 0 && h > 0) else {
+            return self.dimensions();
+        };
+        let (long, short) = (w.max(h) as f64, w.min(h) as f64);
+        let target = match self.size_mode {
+            SizeMode::Custom => return self.dimensions(),
+            SizeMode::Source => long.min(4096.),
+            SizeMode::Aspect => {
+                if !(256..=4096).contains(&self.max_side) || !self.max_side.is_multiple_of(32) {
+                    bail!("Max side must be 256–4096 px and a multiple of 32.");
+                }
+                self.max_side as f64
+            }
+        };
+        let align = |n: f64| ((n / 32.).floor() as u32 * 32).max(32);
+        let (long, short) = (align(target), align(target * short / long));
+        if long < 256 {
+            bail!("The source is smaller than 256 px. Choose Aspect or Custom.");
+        }
+        Ok(if w >= h { (long, short) } else { (short, long) })
     }
     pub fn validate(&self) -> Result<()> {
         self.dimensions()?;
@@ -920,6 +957,34 @@ mod tests {
         assert_eq!(old.sheet_width, 1536);
     }
     #[test]
+    fn source_sizes_keep_orientation_fit_4096_and_reject_tiny_sources() {
+        let mut settings = GenerationSettings {
+            size_mode: SizeMode::Source,
+            ..Default::default()
+        };
+        assert_eq!(
+            settings.dimensions_for(Some([768, 1024])).unwrap(),
+            (768, 1024)
+        );
+        assert_eq!(
+            settings.dimensions_for(Some([6000, 4000])).unwrap(),
+            (4096, 2720)
+        );
+        assert!(settings.dimensions_for(Some([200, 150])).is_err());
+        assert_eq!(
+            settings.dimensions_for(None).unwrap(),
+            settings.dimensions().unwrap()
+        );
+        settings.size_mode = SizeMode::Aspect;
+        settings.max_side = 1280;
+        assert_eq!(
+            settings.dimensions_for(Some([768, 1024])).unwrap(),
+            (960, 1280)
+        );
+        settings.max_side = 1000;
+        assert!(settings.dimensions_for(Some([768, 1024])).is_err());
+    }
+    #[test]
     fn dimensions_match_aio_presets_and_ties_to_even() {
         // Values independently obtained from AIO services/dimensions.py.
         let expected = [
@@ -1004,6 +1069,7 @@ mod tests {
                 max_side: 1024,
                 reference_max_pixels_per_image: 2_500_000,
                 moss_mode: MossMode::Control,
+                size_mode: SizeMode::Aspect,
                 control_strength: 0.75,
                 control_end: 0.5,
             },

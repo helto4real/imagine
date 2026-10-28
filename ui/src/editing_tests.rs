@@ -14,6 +14,7 @@ fn upload(desk: &mut Desk, id: &str) {
                     height: 32,
                     pixels: vec![128; 32 * 32 * 4],
                 },
+                size: [32, 32],
             }),
         ))
         .unwrap();
@@ -513,6 +514,7 @@ fn headless_edit_layout_and_privacy() {
                 id: format!("ref-{number}"),
                 name: "synthetic.png".into(),
                 texture: source.clone(),
+                size: [1024, 1024],
             });
         }
         app.prefs.privacy_mode = private;

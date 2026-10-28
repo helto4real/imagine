@@ -84,6 +84,8 @@ pub struct Reference {
     pub id: String,
     pub name: String,
     pub preview: Preview,
+    /// The image's own width and height in pixels.
+    pub size: [u32; 2],
 }
 pub enum Progress {
     Submitted(String),
@@ -295,8 +297,14 @@ impl Client {
         Ok(body)
     }
     pub async fn upload(&self, path: &Path) -> std::result::Result<Reference, Failure> {
-        let (_bytes, _mime, preview) =
+        let (bytes, _mime, preview) =
             read_reference(path).map_err(|e| Failure::terminal(e.to_string()))?;
+        let size = image::ImageReader::new(std::io::Cursor::new(&bytes))
+            .with_guessed_format()
+            .ok()
+            .and_then(|r| r.into_dimensions().ok())
+            .map(|(w, h)| [w, h])
+            .ok_or_else(|| Failure::terminal("The selected image is unreadable."))?;
         let path = std::path::absolute(path)
             .map_err(|_| Failure::terminal("Could not resolve the selected image."))?;
         let value = Self::json(
@@ -314,6 +322,7 @@ impl Client {
                 .to_string_lossy()
                 .into(),
             preview,
+            size,
         })
     }
     pub async fn cancel(&self, job: &str) -> std::result::Result<(), Failure> {
@@ -714,7 +723,28 @@ pub struct ControlMaps<'a> {
 /// A MOSS request in the selected mode: references only when editing (the server
 /// adds the edit LoRA), maps and their control only in control mode (the server
 /// adds the color/depth adapter).
+///
+/// `source` is the size of the first reference or map, which edits and controls
+/// can take their output size from.
 pub fn make_moss_request(
+    prompt: &str,
+    negative: &str,
+    refs: &[String],
+    maps: ControlMaps<'_>,
+    source: Option<[u32; 2]>,
+    metadata: &Value,
+    settings: &GenerationSettings,
+) -> Result<Value> {
+    use crate::settings::MossMode;
+    let mut request = moss_mode_request(prompt, negative, refs, maps, metadata, settings)?;
+    if settings.moss_mode != MossMode::TextToImage {
+        let (width, height) = settings.dimensions_for(source)?;
+        request["width"] = json!(width);
+        request["height"] = json!(height);
+    }
+    Ok(request)
+}
+fn moss_mode_request(
     prompt: &str,
     negative: &str,
     refs: &[String],
@@ -1329,7 +1359,7 @@ mod tests {
             ..Default::default()
         };
         let request = |settings: &GenerationSettings, maps| {
-            make_moss_request("test", "", &refs, maps, &meta, settings)
+            make_moss_request("test", "", &refs, maps, None, &meta, settings)
         };
         let check = |request: Value| {
             let request: imagine_server::contract::JobRequest =
@@ -1351,9 +1381,18 @@ mod tests {
         );
         assert_eq!(edit.inputs.reference_images, refs);
         assert!(!edit.inputs.has_control_maps());
-        assert!(make_moss_request("test", "", &[], maps, &meta, &settings).is_err());
+        assert!(make_moss_request("test", "", &[], maps, None, &meta, &settings).is_err());
         assert!(
-            make_moss_request("test", "", &vec!["a".into(); 5], maps, &meta, &settings).is_err()
+            make_moss_request(
+                "test",
+                "",
+                &vec!["a".into(); 5],
+                maps,
+                None,
+                &meta,
+                &settings
+            )
+            .is_err()
         );
         settings.moss_mode = MossMode::Control;
         settings.control_strength = 0.75;
@@ -1371,6 +1410,20 @@ mod tests {
             })
         );
         assert!(request(&settings, ControlMaps::default()).is_err());
+        // Edits and controls can take their size from the source; text never does.
+        use crate::settings::SizeMode;
+        settings.size_mode = SizeMode::Source;
+        let sized = |settings: &GenerationSettings| {
+            let r = make_moss_request("test", "", &refs, maps, Some([1500, 1000]), &meta, settings)
+                .unwrap();
+            (r["width"].as_u64().unwrap(), r["height"].as_u64().unwrap())
+        };
+        assert_eq!(sized(&settings), (1472, 992));
+        settings.size_mode = SizeMode::Aspect;
+        assert_eq!(sized(&settings), (1024, 672));
+        settings.moss_mode = MossMode::TextToImage;
+        assert_eq!(sized(&settings), (1024, 576));
+        settings.moss_mode = MossMode::Control;
         settings.control_end = 1.5;
         assert!(request(&settings, maps).is_err());
     }

@@ -178,6 +178,7 @@ impl ImagineApp {
                         &self.effective_negative_prompt(),
                         &references,
                         self.control_maps(),
+                        self.moss_source(),
                         metadata,
                         &self.prefs.generation,
                     )

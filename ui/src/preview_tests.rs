@@ -846,6 +846,7 @@ fn headless_layout_and_recoverable_job_state() {
             id: "synthetic-reference".into(),
             name: "reference.png".into(),
             texture: texture(&ctx, &sample, "synthetic-reference"),
+            size: [32, 32],
         });
         app.image.result = Some(Results {
             assets: vec![ResultView {
@@ -1202,6 +1203,7 @@ fn sheet_upload_limits_retry_cancel_and_capability_guard() {
                     height: 1,
                     pixels: vec![0, 0, 0, 255],
                 },
+                size: [1, 1],
             }),
         ))
         .unwrap();
@@ -1327,6 +1329,7 @@ fn headless_character_sheet_layout_and_privacy() {
             id: "ref".into(),
             name: "synthetic-reference".into(),
             texture: texture(&ctx, &sample, "ref"),
+            size: [32, 32],
         });
         if progress {
             app.sheet.working = true;
@@ -1849,6 +1852,10 @@ fn headless_moss_modes() {
         app.metadata =
             Some(imagine_server::contract::model(imagine_server::contract::MOSS).unwrap());
         app.prefs.generation.moss_mode = mode;
+        app.prefs.generation.size_mode = match mode {
+            MossMode::Edit => crate::settings::SizeMode::Aspect,
+            _ => crate::settings::SizeMode::Source,
+        };
         for (role, pixels) in [(MapRole::Depth, &depth), (MapRole::Color, &regions)] {
             let texture = ctx.load_texture(
                 role.label(),
@@ -1860,6 +1867,7 @@ fn headless_moss_modes() {
                 id: role.label().into(),
                 name: format!("{}.png", role.label()),
                 texture,
+                size: [1536, 1024],
             });
         }
         assert!(app.moss_modes());

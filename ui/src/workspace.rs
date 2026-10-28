@@ -1328,6 +1328,14 @@ impl ImagineApp {
         let before = self.prefs.generation.clone();
         let before_width = self.prefs.sheet_width;
         let sheet = self.workspace == Workspace::CharacterSheet;
+        // MOSS edits and controls can size their output from their source.
+        let source = self.moss_source();
+        let source_label = match self.prefs.generation.moss_mode {
+            crate::settings::MossMode::Edit => "Reference",
+            _ => "Source",
+        };
+        let sized = self.moss_modes()
+            && self.prefs.generation.moss_mode != crate::settings::MossMode::TextToImage;
         let settings = &mut self.prefs.generation;
         let field_width = (ui.available_width() - 80.).max(90.);
         egui::Grid::new("image-settings")
@@ -1369,34 +1377,70 @@ impl ImagineApp {
                     );
                     ui.end_row();
                 } else {
-                    let label = ui.label("Ratio");
-                    egui::ComboBox::from_id_salt("aspect-ratio")
-                        .width(field_width)
-                        .selected_text(&settings.aspect_ratio)
-                        .show_ui(ui, |ui| {
-                            for ratio in crate::settings::ASPECT_RATIOS {
-                                ui.selectable_value(
-                                    &mut settings.aspect_ratio,
-                                    ratio.to_owned(),
-                                    ratio,
-                                );
-                            }
-                        })
-                        .response
-                        .labelled_by(label.id);
-                    ui.end_row();
-                    let label = ui.label("Max side");
-                    ui.add_sized(
-                        [field_width, 32.],
-                        egui::DragValue::new(&mut settings.max_side)
-                            .range(256..=4096)
-                            .speed(32.),
-                    )
-                    .labelled_by(label.id)
-                    .on_hover_text("Pixels · multiples of 32");
-                    ui.end_row();
+                    use crate::settings::SizeMode;
+                    let mode = if sized {
+                        let label = ui.label("Size");
+                        let name = |mode| match mode {
+                            SizeMode::Source => source_label,
+                            SizeMode::Aspect => "Aspect",
+                            SizeMode::Custom => "Custom",
+                        };
+                        egui::ComboBox::from_id_salt("size-mode")
+                            .width(field_width)
+                            .selected_text(name(settings.size_mode))
+                            .show_ui(ui, |ui| {
+                                for mode in [SizeMode::Source, SizeMode::Aspect, SizeMode::Custom] {
+                                    ui.selectable_value(&mut settings.size_mode, mode, name(mode));
+                                }
+                            })
+                            .response
+                            .labelled_by(label.id);
+                        ui.end_row();
+                        settings.size_mode
+                    } else {
+                        SizeMode::Custom
+                    };
+                    if mode == SizeMode::Custom {
+                        let label = ui.label("Ratio");
+                        egui::ComboBox::from_id_salt("aspect-ratio")
+                            .width(field_width)
+                            .selected_text(&settings.aspect_ratio)
+                            .show_ui(ui, |ui| {
+                                for ratio in crate::settings::ASPECT_RATIOS {
+                                    ui.selectable_value(
+                                        &mut settings.aspect_ratio,
+                                        ratio.to_owned(),
+                                        ratio,
+                                    );
+                                }
+                            })
+                            .response
+                            .labelled_by(label.id);
+                        ui.end_row();
+                    }
+                    if mode != SizeMode::Source {
+                        let label = ui.label(if mode == SizeMode::Aspect {
+                            "Long side"
+                        } else {
+                            "Max side"
+                        });
+                        ui.add_sized(
+                            [field_width, 32.],
+                            egui::DragValue::new(&mut settings.max_side)
+                                .range(256..=4096)
+                                .speed(32.),
+                        )
+                        .labelled_by(label.id)
+                        .on_hover_text("Pixels · multiples of 32");
+                        ui.end_row();
+                    }
                     ui.label("");
-                    if let Ok((w, h)) = settings.dimensions() {
+                    let dimensions = if sized {
+                        settings.dimensions_for(source)
+                    } else {
+                        settings.dimensions()
+                    };
+                    if let Ok((w, h)) = dimensions {
                         ui.label(RichText::new(format!("{w} × {h} px")).color(helto::DIM));
                     }
                     ui.end_row();
@@ -1428,7 +1472,12 @@ impl ImagineApp {
                     ui.end_row();
                 }
             });
-        if !sheet && let Err(e) = settings.dimensions() {
+        let dimensions = if sized {
+            settings.dimensions_for(source)
+        } else {
+            settings.dimensions()
+        };
+        if !sheet && let Err(e) = dimensions {
             ui.colored_label(helto::ERROR, e.to_string());
         }
         if *settings != before || self.prefs.sheet_width != before_width {

@@ -20,6 +20,7 @@ struct ReferenceView {
     id: String,
     name: String,
     texture: egui::TextureHandle,
+    size: [u32; 2],
 }
 enum Message {
     SamplingPreview {
@@ -330,6 +331,21 @@ impl ImagineApp {
             MapRole::Depth => &mut self.image.depth_map,
         }
     }
+    /// The pixel size a MOSS edit or control can take its output size from: the
+    /// first reference, or the depth map, else the region map.
+    fn moss_source(&self) -> Option<[u32; 2]> {
+        use crate::settings::MossMode;
+        match self.prefs.generation.moss_mode {
+            MossMode::Edit => self.image.references.first().map(|r| r.size),
+            MossMode::Control => self
+                .image
+                .depth_map
+                .as_ref()
+                .or(self.image.color_map.as_ref())
+                .map(|m| m.size),
+            MossMode::TextToImage => None,
+        }
+    }
     /// Asset IDs of the image desk's control maps.
     fn control_maps(&self) -> client::ControlMaps<'_> {
         client::ControlMaps {
@@ -510,6 +526,7 @@ impl ImagineApp {
                             id: reference.id,
                             name: reference.name,
                             texture,
+                            size: reference.size,
                         });
                     }
                     Err(e) => {
@@ -547,6 +564,7 @@ impl ImagineApp {
                                 id: map.id,
                                 name: map.name,
                                 texture,
+                                size: map.size,
                             });
                         }
                         Err(e) => self.image.error = Some(e.message),
