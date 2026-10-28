@@ -59,6 +59,37 @@ pub struct Request {
     pub zero_negative_conditioning: bool,
     #[serde(default)]
     pub sampling_preview: Option<preview::Settings>,
+    #[serde(default)]
+    pub control: Control,
+}
+/// The MOSS color/depth control adapter's settings, as `MOSSImageControl` takes
+/// them: the maps' strength and the sampling percents it spans.
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub struct Control {
+    pub strength: f64,
+    pub start: f64,
+    pub end: f64,
+}
+impl Default for Control {
+    fn default() -> Self {
+        Self {
+            strength: 1.,
+            start: 0.,
+            end: 1.,
+        }
+    }
+}
+/// MOSS control maps, RGBA in [0, 1] `[1, h, w, 4]`: one flat color per region and
+/// depth with near white.
+#[derive(Default)]
+pub struct ControlMaps {
+    pub color: Option<Tensor>,
+    pub depth: Option<Tensor>,
+}
+impl ControlMaps {
+    pub fn is_empty(&self) -> bool {
+        self.color.is_none() && self.depth.is_none()
+    }
 }
 pub enum Event {
     Phase(&'static str),
@@ -152,6 +183,7 @@ pub fn generate(
     aimdo: &Aimdo,
     r: &Request,
     images: &[Tensor],
+    maps: &ControlMaps,
     observer: &mut Observer<'_>,
 ) -> Result<Tensor, Error> {
     let moss = model_spec::is_moss(&r.model);
@@ -177,8 +209,18 @@ pub fn generate(
             && (r.sampling.sampler != "euler"
                 || !matches!(r.sampling.scheduler.as_str(), "normal" | "sgm_uniform")
                 || images.len() > 4)
+        || !maps.is_empty() && (!moss || !images.is_empty())
     {
         return Err(Error::Native("Unsupported inference selection".into()));
+    }
+    let c = r.control;
+    if ![c.strength, c.start, c.end].iter().all(|v| v.is_finite())
+        || !(0.0..=10.0).contains(&c.strength)
+        || !(0.0..=1.0).contains(&c.start)
+        || !(0.0..=1.0).contains(&c.end)
+        || c.start > c.end
+    {
+        return Err(Error::Native("Invalid control settings".into()));
     }
     let s = &r.sampling.custom_sigmas;
     if !s.is_empty()
@@ -211,7 +253,7 @@ pub fn generate(
     let _grad = tch::no_grad_guard();
     let _inference = crate::native::inference_mode(true)?;
     let out = if moss {
-        moss::generate(rt, aimdo, r, images, observer)
+        moss::generate(rt, aimdo, r, images, maps, observer)
     } else {
         qwen::generate(rt, aimdo, r, images, observer)
     }?;

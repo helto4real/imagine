@@ -71,7 +71,7 @@ impl Architecture {
     pub fn operations(self) -> &'static [&'static str] {
         match self {
             Self::QwenImage21 => &["text_to_image", "image_edit", "character_sheet"],
-            Self::MossImage => &["text_to_image", "character_sheet"],
+            Self::MossImage => &["text_to_image", "image_edit", "character_sheet"],
         }
     }
     pub fn lora_components(self) -> &'static [&'static str] {

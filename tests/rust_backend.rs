@@ -22,6 +22,7 @@ fn request() -> ImagePass {
         height: 128,
         seed: 42,
         references: vec![],
+        maps: vec![],
     }
 }
 fn fake() -> (tempfile::TempDir, Comfy, watch::Receiver<EngineState>) {
@@ -39,7 +40,13 @@ emit(dict(type='ready',protocol=1,attention='checkpoint_preferences'))
 while True:
  try:h=json.loads(read());body=read()
  except Exception:break
- assert sum(h['reference_lengths'])==len(body)
+ maps=h.get('map_lengths',[])
+ assert sum(h['reference_lengths'])+sum(maps)==len(body)
+ assert len(h.get('map_shapes',[]))==len(maps)==len(h.get('map_roles',[]))
+ assert all(n==shape[0]*shape[1]*4 for n,shape in zip(maps,h.get('map_shapes',[])))
+ if maps:
+  assert h['map_roles']==['color','depth'] and h['map_shapes']==[[128,256],[64,128]]
+  assert h['control']==dict(strength=0.75,start=0.0,end=0.5) and h['reference_lengths']==[]
  assert len(h['reference_shapes'])==len(h['reference_lengths'])
  assert all(n==shape[0]*shape[1]*4 for n,shape in zip(h['reference_lengths'],h['reference_shapes']))
  emit(dict(type='phase',id=h['id'],phase='inference'))
@@ -210,4 +217,37 @@ async fn unsupported_sampler_and_missing_runtime_reject_but_rebuild_needs_no_new
         .await
         .unwrap()
         .unwrap();
+}
+
+#[tokio::test]
+async fn moss_control_maps_reach_the_worker_as_raw_rgba_after_the_references() {
+    let (_dir, mut engine, _) = fake();
+    let defaults = contract::model(contract::MOSS).unwrap()["defaults"].clone();
+    let mut r = request();
+    r.model = contract::MOSS.into();
+    r.model_options = serde_json::from_value(defaults["model_options"].clone()).unwrap();
+    r.sampling = serde_json::from_value(defaults["sampling"].clone()).unwrap();
+    r.model_options
+        .moss_image
+        .as_mut()
+        .unwrap()
+        .loras
+        .push(contract::Lora {
+            path: contract::MOSS_CONTROL_LORA.into(),
+            strength: 0.5,
+        });
+    r.model_options.moss_control = Some(contract::ControlOptions {
+        strength: 0.75,
+        start: 0.,
+        end: 0.5,
+    });
+    for (role, (w, h)) in [("color", (256, 128)), ("depth", (128, 64))] {
+        let mut png = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::new_rgb8(w, h)
+            .write_to(&mut png, image::ImageFormat::Png)
+            .unwrap();
+        r.maps.push((role, png.into_inner().into()));
+    }
+    engine.generate(&r).await.unwrap();
+    engine.stop().await.unwrap();
 }

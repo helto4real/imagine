@@ -65,4 +65,14 @@ Mask2Former regions:
   colors exact in `cargo test`; the released Swin-L weights exact on CPU on
   scikit-image's coffee photo (`examples/mask2former_released.rs`: cup, dining
   table, floor, spoon). The CUDA capture waits for the GPU.
-- Then server/contract, UI, live checks.
+- Contract and worker: `inputs.color_map` / `inputs.depth_map` (asset ids) and
+  `model_options.moss_control` (strength, start, end; `MOSSImageControl`'s
+  defaults 1, 0, 1) for MOSS text to image. MOSS edits take up to four
+  references. The server adds the edit LoRA (`MOSS_EDIT_LORA`) to MOSS edits
+  and the control adapter (`MOSS_CONTROL_LORA`) when maps are present, as
+  verified library files for library selections. Maps follow the references
+  in the worker payload (`map_roles`, `map_lengths`, `map_shapes`, `control`)
+  and are VAE-encoded like references. Untested on the GPU yet.
+- Next: the map-generation call (worker frame and HTTP route), then the UI and
+  live checks. Generating maps in the product moves the core lock (the models
+  and Pillow ABI 2 are newer than `core_revision`).

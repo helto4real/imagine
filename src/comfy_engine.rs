@@ -255,22 +255,27 @@ impl PipeBackend {
             crate::engine::validate_selection("rust", &request.model, &request.sampling)?;
             header["model"] = json!(request.model);
             let mut raw = Vec::new();
-            let mut shapes = Vec::new();
-            let mut lengths = Vec::new();
             let mut offset = 0;
-            for n in header["reference_lengths"].as_array().unwrap() {
-                let end = offset + n.as_u64().unwrap() as usize;
-                let image = image::load_from_memory(&payload[offset..end])?.to_rgba8();
-                shapes.push([image.height(), image.width()]);
-                lengths.push(image.as_raw().len());
-                raw.extend(image.into_raw());
-                offset = end;
-                if raw.len() > MAX_PAYLOAD {
-                    bail!(EngineError("rust_input_too_large"))
+            for kind in ["reference", "map"] {
+                let Some(encoded) = header[format!("{kind}_lengths")].as_array().cloned() else {
+                    continue;
+                };
+                let mut shapes = Vec::new();
+                let mut lengths = Vec::new();
+                for n in encoded {
+                    let end = offset + n.as_u64().unwrap() as usize;
+                    let image = image::load_from_memory(&payload[offset..end])?.to_rgba8();
+                    shapes.push([image.height(), image.width()]);
+                    lengths.push(image.as_raw().len());
+                    raw.extend(image.into_raw());
+                    offset = end;
+                    if raw.len() > MAX_PAYLOAD {
+                        bail!(EngineError("rust_input_too_large"))
+                    }
                 }
+                header[format!("{kind}_shapes")] = json!(shapes);
+                header[format!("{kind}_lengths")] = json!(lengths);
             }
-            header["reference_shapes"] = json!(shapes);
-            header["reference_lengths"] = json!(lengths);
             payload = raw;
         }
         self.state.send_modify(|s| {
@@ -588,6 +593,15 @@ fn request_frame(request: &ImagePass, fallback_root: &Path) -> Result<(Value, Ve
         lengths.push(prepared.len());
         payload.extend(prepared);
     }
+    // Maps follow the references unscaled: they are made at the output size.
+    let mut map_lengths = Vec::new();
+    for (_, map) in &request.maps {
+        if payload.len() + map.len() > MAX_PAYLOAD {
+            bail!(EngineError("comfy_input_too_large"));
+        }
+        map_lengths.push(map.len());
+        payload.extend_from_slice(map);
+    }
     let mut loras = Vec::new();
     for lora in &options.loras {
         // Library/native LoRA paths are relative to the dedicated loras directory.
@@ -605,6 +619,14 @@ fn request_frame(request: &ImagePass, fallback_root: &Path) -> Result<(Value, Ve
         "reference_lengths":lengths}),
         payload,
     ))
+    .map(|(mut header, payload)| {
+        if !request.maps.is_empty() {
+            header["map_roles"] = json!(request.maps.iter().map(|(role, _)| role).collect::<Vec<_>>());
+            header["map_lengths"] = json!(map_lengths);
+            header["control"] = json!(request.model_options.moss_control.unwrap_or_default());
+        }
+        (header, payload)
+    })
 }
 
 #[derive(Deserialize)]
@@ -752,6 +774,7 @@ mod tests {
             height: 32,
             seed: 42,
             references: vec![],
+            maps: vec![],
         }
     }
     #[test]

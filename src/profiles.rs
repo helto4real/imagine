@@ -225,6 +225,7 @@ impl Catalog {
             let mut request: JobRequest =
                 serde_json::from_value(value).map_err(|_| invalid("invalid_request"))?;
             decrypt_sheet(&mut request)?;
+            request.add_moss_adapters();
             request.validate().map_err(invalid)?;
             return Ok(request);
         };
@@ -361,6 +362,7 @@ impl Catalog {
         request.negative_prompt = crate::privacy::decrypt(&request.negative_prompt)
             .map_err(|_| invalid("private_prompt_unavailable"))?;
         decrypt_sheet(&mut request)?;
+        request.add_moss_adapters();
         request.validate().map_err(invalid)?;
         request.resolved_profile = Some(ResolvedProfile {
             id: profile.id.clone(),

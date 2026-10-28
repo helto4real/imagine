@@ -97,13 +97,50 @@ pub struct Inputs {
     pub mask: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pose_guide: Option<String>,
+    /// MOSS control: one flat color per region (black is unspecified), at the
+    /// output size.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_map: Option<String>,
+    /// MOSS control: depth with near white, at the output size.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub depth_map: Option<String>,
 }
+impl Inputs {
+    pub fn has_control_maps(&self) -> bool {
+        self.color_map.is_some() || self.depth_map.is_some()
+    }
+}
+/// LoRAs (relative to the loras directory) MOSS adds itself: the edit LoRA for
+/// edits and the color/depth control adapter for control maps.
+pub const MOSS_EDIT_LORA: &str = "moss/Moss-Image-Edit/adapter_model.safetensors";
+pub const MOSS_CONTROL_LORA: &str = "moss/MOSS-Image-color-depth-control/moss-control.safetensors";
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct ModelOptions {
     pub qwen_image_2_1: QwenOptions,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub moss_image: Option<WorkflowOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub moss_control: Option<ControlOptions>,
+}
+/// How the MOSS control maps steer sampling, as `MOSSImageControl` takes it.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(default, deny_unknown_fields)]
+pub struct ControlOptions {
+    /// 0 is no control, 1 the trained strength.
+    pub strength: f32,
+    /// Sampling percents the control spans.
+    pub start: f32,
+    pub end: f32,
+}
+impl Default for ControlOptions {
+    fn default() -> Self {
+        Self {
+            strength: 1.,
+            start: 0.,
+            end: 1.,
+        }
+    }
 }
 impl ModelOptions {
     pub fn generation(&self, model: &str) -> Option<&WorkflowOptions> {
@@ -329,6 +366,26 @@ impl JobRequest {
         {
             return Err("unsupported_moss_configuration");
         }
+        // Control maps steer MOSS text to image; edits and sheets do not combine.
+        if (self.inputs.has_control_maps() || self.model_options.moss_control.is_some())
+            && !(crate::model_spec::is_moss(&self.model)
+                && self.operation == Operation::TextToImage)
+        {
+            return Err("unsupported_control_maps");
+        }
+        if let Some(c) = self.model_options.moss_control {
+            if !self.inputs.has_control_maps() {
+                return Err("unexpected_control_options");
+            }
+            if ![c.strength, c.start, c.end].iter().all(|v| v.is_finite())
+                || !(0.0..=10.0).contains(&c.strength)
+                || !(0.0..=1.0).contains(&c.start)
+                || !(0.0..=1.0).contains(&c.end)
+                || c.start > c.end
+            {
+                return Err("invalid_control_options");
+            }
+        }
         if !crate::model_spec::is_moss(&self.model)
             && matches!(self.sampling.scheduler.as_str(), "normal" | "sgm_uniform")
         {
@@ -412,6 +469,39 @@ impl JobRequest {
             .iter()
             .chain(self.inputs.pose_guide.iter())
             .chain(self.inputs.start_image.iter())
+            .chain(self.inputs.color_map.iter())
+            .chain(self.inputs.depth_map.iter())
+    }
+    /// The LoRAs MOSS adds itself for this request (edit LoRA, control adapter)
+    /// that its workflow does not list yet.
+    pub fn missing_moss_adapters(&self) -> Vec<&'static str> {
+        if !crate::model_spec::is_moss(&self.model) {
+            return Vec::new();
+        }
+        let listed = |path: &str| {
+            self.model_options
+                .moss_image
+                .as_ref()
+                .is_some_and(|w| w.loras.iter().any(|l| l.path == path))
+        };
+        [
+            (self.operation == Operation::ImageEdit, MOSS_EDIT_LORA),
+            (self.inputs.has_control_maps(), MOSS_CONTROL_LORA),
+        ]
+        .into_iter()
+        .filter(|&(needed, path)| needed && !listed(path))
+        .map(|(_, path)| path)
+        .collect()
+    }
+    /// Adds the missing MOSS adapters at full strength.
+    pub fn add_moss_adapters(&mut self) {
+        let missing = self.missing_moss_adapters();
+        if let Some(w) = self.model_options.moss_image.as_mut() {
+            w.loras.extend(missing.into_iter().map(|path| Lora {
+                path: path.into(),
+                strength: 1.,
+            }));
+        }
     }
     pub fn effective(&self) -> Value {
         let mut v = serde_json::to_value(self).expect("serializable request");
@@ -488,7 +578,9 @@ pub fn model(id: &str) -> Option<Value> {
                     "validated_resolutions":[], "steps":{"min":1}, "cfg_scale":{"finite":true},
                     "samplers":spec.architecture.samplers(), "schedulers":spec.architecture.schedulers(),
                     "output_formats":["png"],"max_output_count":1,"loras":true,
-                    "reference_images":{"max_count":0}
+                    "reference_images":{"max_count":4},
+                    "control_maps":{"color":true,"depth":true,"operations":["text_to_image"],
+                        "options":schemars::schema_for!(ControlOptions)}
                 }, "character_sheet":crate::model_adapter::sheet_capabilities(crate::model_adapter::SheetStrategy::MossSinglePass),
                 "request_schema":schemars::schema_for!(JobRequest)
             });

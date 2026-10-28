@@ -1803,8 +1803,9 @@ async fn rust_admission_exposes_its_own_capabilities_and_rejects_unsupported_sam
     .await;
     assert_eq!(
         moss["operations"],
-        json!(["text_to_image", "character_sheet"])
+        json!(["text_to_image", "image_edit", "character_sheet"])
     );
+    assert_eq!(moss["constraints"]["control_maps"]["color"], true);
     h.control.call(Action::Shutdown).await.unwrap();
     h.task.await.unwrap().unwrap();
 }

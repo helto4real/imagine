@@ -22,6 +22,7 @@ fn pass(prompt: &str) -> ImagePass {
         height: 32,
         seed: 42,
         references: vec![],
+        maps: vec![],
     }
 }
 fn fake() -> (tempfile::TempDir, Comfy, watch::Receiver<EngineState>) {

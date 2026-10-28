@@ -488,6 +488,33 @@ impl Library {
             });
             files.push(file);
         }
+        // MOSS adds its edit LoRA and control adapter itself; as library files
+        // they are verified with the rest.
+        if crate::model_spec::is_moss(model) {
+            let edit = value["operation"] == "image_edit";
+            let control = ["color_map", "depth_map"]
+                .iter()
+                .any(|k| !value["inputs"][k].is_null());
+            for (needed, adapter) in [
+                (edit, contract::MOSS_EDIT_LORA),
+                (control, contract::MOSS_CONTROL_LORA),
+            ] {
+                if !needed || loras.iter().any(|l| l.path == adapter) {
+                    continue;
+                }
+                let path = format!("loras/{adapter}");
+                let file = self
+                    .files
+                    .iter()
+                    .find(|f| f.kind == "loras" && f.path == path)
+                    .ok_or(invalid("moss_adapter_missing"))?;
+                loras.push(Lora {
+                    path: adapter.into(),
+                    strength: 1.,
+                });
+                files.push(file);
+            }
+        }
         let workflow = WorkflowOptions {
             diffusion_model: diffusion.path.clone(),
             text_encoder: encoder.path.clone(),

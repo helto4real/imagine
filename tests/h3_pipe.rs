@@ -170,6 +170,7 @@ fn image() -> ImagePass {
         height: 128,
         seed: 42,
         references: vec![],
+        maps: vec![],
     }
 }
 #[tokio::test]

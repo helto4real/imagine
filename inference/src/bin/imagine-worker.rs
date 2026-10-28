@@ -43,6 +43,55 @@ fn write(out: &mut impl Write, event: Value, data: &[u8]) -> io::Result<()> {
     out.write_all(data)?;
     out.flush()
 }
+/// The `{kind}_lengths`/`{kind}_shapes` RGBA8 images from `offset` in the payload,
+/// as `[1, h, w, 4]` in [0, 1]; `reference` lists are required, others optional.
+fn rgba_images(
+    header: &Value,
+    kind: &str,
+    payload: &[u8],
+    offset: &mut usize,
+    max: usize,
+) -> Result<Vec<Tensor>, Box<dyn std::error::Error>> {
+    let (lengths, shapes) = match (
+        header[format!("{kind}_lengths")].as_array(),
+        header[format!("{kind}_shapes")].as_array(),
+    ) {
+        (Some(lengths), Some(shapes)) => (lengths, shapes),
+        (None, None) if kind != "reference" => return Ok(Vec::new()),
+        _ => return Err(format!("Missing {kind} images").into()),
+    };
+    if shapes.len() != lengths.len() {
+        return Err(format!("{kind} shape count").into());
+    }
+    if lengths.len() > max {
+        return Err(format!("Too many {kind} images").into());
+    }
+    let mut images = vec![];
+    for (i, n) in lengths.iter().enumerate() {
+        let n = n.as_u64().ok_or("Invalid image length")? as usize;
+        let end = offset
+            .checked_add(n)
+            .filter(|n| *n <= payload.len())
+            .ok_or("Invalid image boundary")?;
+        let side = |j: usize| {
+            shapes[i][j]
+                .as_i64()
+                .filter(|n| *n > 0 && *n <= 8192)
+                .ok_or("Invalid image shape")
+        };
+        let (h, w) = (side(0)?, side(1)?);
+        if n != h as usize * w as usize * 4 {
+            return Err("Invalid RGBA image size".into());
+        }
+        let values = payload[*offset..end]
+            .iter()
+            .map(|v| *v as f32 / 255.)
+            .collect::<Vec<_>>();
+        images.push(Tensor::f_from_slice(&values)?.f_view([1, h, w, 4])?);
+        *offset = end;
+    }
+    Ok(images)
+}
 fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let native = unsafe { Kitchen::load(&path("IMAGINE_KITCHEN_LIBRARY")?) }?;
     let cache = path("IMAGINE_WORKER_CACHE")?;
@@ -92,46 +141,28 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         let mut load_failure = None;
         let result = (|| -> Result<Vec<u8>, Box<dyn std::error::Error>> {
             let request: Request = serde_json::from_value(value.clone())?;
-            let lengths = value["reference_lengths"]
-                .as_array()
-                .ok_or("Missing references")?;
-            let shapes = value["reference_shapes"]
-                .as_array()
-                .ok_or("Missing reference shapes")?;
-            if shapes.len() != lengths.len() {
-                return Err("Reference shape count".into());
-            }
-            if lengths.len() > 10 {
-                return Err("Too many references".into());
-            }
             let mut offset = 0usize;
-            let mut images = vec![];
-            for (i, n) in lengths.iter().enumerate() {
-                let n = n.as_u64().ok_or("Invalid reference length")? as usize;
-                let end = offset
-                    .checked_add(n)
-                    .filter(|n| *n <= payload.len())
-                    .ok_or("Invalid reference boundary")?;
-                let h = shapes[i][0]
-                    .as_i64()
-                    .filter(|n| *n > 0 && *n <= 8192)
-                    .ok_or("Invalid reference height")?;
-                let w = shapes[i][1]
-                    .as_i64()
-                    .filter(|n| *n > 0 && *n <= 8192)
-                    .ok_or("Invalid reference width")?;
-                if n != h as usize * w as usize * 4 {
-                    return Err("Invalid RGBA reference size".into());
+            let images = rgba_images(&value, "reference", &payload, &mut offset, 10)?;
+            let roles = value["map_roles"].as_array().cloned().unwrap_or_default();
+            let mut maps = server::ControlMaps::default();
+            if !roles.is_empty() {
+                let pixels = rgba_images(&value, "map", &payload, &mut offset, 2)?;
+                if pixels.len() != roles.len() {
+                    return Err("Map role count".into());
                 }
-                let values = payload[offset..end]
-                    .iter()
-                    .map(|v| *v as f32 / 255.)
-                    .collect::<Vec<_>>();
-                images.push(Tensor::f_from_slice(&values)?.f_view([1, h, w, 4])?);
-                offset = end;
+                for (role, pixels) in roles.iter().zip(pixels) {
+                    let slot = match role.as_str() {
+                        Some("color") => &mut maps.color,
+                        Some("depth") => &mut maps.depth,
+                        _ => return Err("Invalid map role".into()),
+                    };
+                    if slot.replace(pixels).is_some() {
+                        return Err("Repeated map role".into());
+                    }
+                }
             }
             if offset != payload.len() {
-                return Err("Trailing reference data".into());
+                return Err("Trailing image data".into());
             }
             let start = Instant::now();
             let mut observer = |event| {
@@ -156,7 +187,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 };
                 write(&mut output, event, &[]).map_err(|e| Error::Native(e.to_string()))
             };
-            let pixels = server::generate(&rt, &aimdo, &request, &images, &mut observer)?
+            let pixels = server::generate(&rt, &aimdo, &request, &images, &maps, &mut observer)?
                 .f_get(0)?
                 .f_to_device(Device::Cpu)?
                 .f_mul_scalar(255.)?

@@ -906,6 +906,7 @@ mod tests {
             height: 896,
             seed: 42,
             references: (0..reference_count).map(|_| vec![0u8].into()).collect(),
+            maps: vec![],
         }
     }
     #[test]
@@ -1103,6 +1104,7 @@ mod tests {
             height: 288,
             seed: 43,
             references,
+            maps: vec![],
         };
         let body = native_body(&pass).unwrap();
         assert_eq!(body["width"], 288);

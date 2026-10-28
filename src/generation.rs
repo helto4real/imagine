@@ -22,6 +22,8 @@ pub struct ImagePass {
     pub height: u32,
     pub seed: u64,
     pub references: Vec<Arc<[u8]>>,
+    /// MOSS control maps by role (`color`, `depth`), encoded images.
+    pub maps: Vec<(&'static str, Arc<[u8]>)>,
 }
 pub struct Artifact {
     pub role: &'static str,
@@ -153,10 +155,20 @@ async fn generate_images(
         height: request.height,
         seed: request.seed.context("resolved seed")?,
         references: Vec::new(),
+        maps: Vec::new(),
     };
     for id in &request.inputs.reference_images {
         pass.references
             .push(store.read_image_asset(id, owner).await?.into());
+    }
+    for (role, id) in [
+        ("color", &request.inputs.color_map),
+        ("depth", &request.inputs.depth_map),
+    ] {
+        if let Some(id) = id {
+            pass.maps
+                .push((role, store.read_image_asset(id, owner).await?.into()));
+        }
     }
     match task {
         Task::Image => Ok(vec![Artifact {

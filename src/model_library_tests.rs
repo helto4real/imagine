@@ -444,7 +444,8 @@ fn moss_defaults_keep_its_encoder_and_vae_but_explicit_cross_family_choices_are_
         .find(|m| m["model"] == contract::MOSS)
         .unwrap();
     assert_eq!(meta["group"], MOSS_GROUP);
-    assert_eq!(meta["constraints"]["reference_images"]["max_count"], 0);
+    assert_eq!(meta["constraints"]["reference_images"]["max_count"], 4);
+    assert_eq!(meta["constraints"]["control_maps"]["depth"], true);
     let (mut value,_)=library.prepare(json!({"model":contract::MOSS,"operation":"text_to_image","prompt":"synthetic","model_selection":{"diffusion":diffusion},"sampling":{"steps":4,"cfg_scale":3.,"sampler":"euler","scheduler":"normal"}})).unwrap();
     value["width"] = json!(256);
     value["height"] = json!(256);
@@ -458,7 +459,70 @@ fn moss_defaults_keep_its_encoder_and_vae_but_explicit_cross_family_choices_are_
     request.inputs.reference_images = vec!["synthetic".into(); 5];
     assert_eq!(request.validate(), Err("unsupported_moss_configuration"));
     request.inputs.reference_images.truncate(1);
+    // Edits add the edit LoRA once; control maps steer text to image only.
+    assert_eq!(request.missing_moss_adapters(), [contract::MOSS_EDIT_LORA]);
+    request.add_moss_adapters();
+    assert!(request.missing_moss_adapters().is_empty());
+    request.inputs.depth_map = Some("depth".into());
+    assert_eq!(request.validate(), Err("unsupported_control_maps"));
+    request.inputs.reference_images.clear();
     request.operation = contract::Operation::TextToImage;
+    request
+        .model_options
+        .moss_image
+        .as_mut()
+        .unwrap()
+        .loras
+        .clear();
+    assert_eq!(
+        request.missing_moss_adapters(),
+        [contract::MOSS_CONTROL_LORA]
+    );
+    request.add_moss_adapters();
+    request.validate().unwrap();
+    assert_eq!(
+        request.asset_ids().collect::<Vec<_>>(),
+        [&"depth".to_string()]
+    );
+    request.model_options.moss_control = Some(contract::ControlOptions {
+        strength: 1.,
+        start: 0.6,
+        end: 0.2,
+    });
+    assert_eq!(request.validate(), Err("invalid_control_options"));
+    request.inputs.depth_map = None;
+    assert_eq!(request.validate(), Err("unexpected_control_options"));
+    request.model_options.moss_control = None;
+    // Library selections resolve the adapters as verified library files.
+    assert_eq!(
+        library
+            .prepare(
+                json!({"model":contract::MOSS,"operation":"text_to_image","prompt":"synthetic",
+                "inputs":{"color_map":"color"},"model_selection":{"diffusion":diffusion},
+                "sampling":{"steps":4,"cfg_scale":3.,"sampler":"euler","scheduler":"normal"}})
+            )
+            .unwrap_err()
+            .code,
+        "moss_adapter_missing"
+    );
+    fixture::write(
+        &root,
+        &format!("loras/{}", contract::MOSS_CONTROL_LORA),
+        json!({"synthetic.lora_A.weight":fixture::tensor(&[1])}),
+    );
+    library.scan().unwrap();
+    let (value, resolved) = library
+        .prepare(
+            json!({"model":contract::MOSS,"operation":"text_to_image","prompt":"synthetic",
+            "inputs":{"color_map":"color"},"model_selection":{"diffusion":diffusion},
+            "sampling":{"steps":4,"cfg_scale":3.,"sampler":"euler","scheduler":"normal"}}),
+        )
+        .unwrap();
+    assert_eq!(
+        value["model_options"]["moss_image"]["loras"],
+        json!([{"path":contract::MOSS_CONTROL_LORA,"strength":1.0}])
+    );
+    resolved.unwrap().verify().unwrap();
     library.settings.components.insert(
         diffusion.clone(),
         Components {

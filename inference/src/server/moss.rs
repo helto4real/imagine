@@ -1,11 +1,13 @@
 use super::*;
 use crate::components as c;
-/// `images` are reference images to edit with (Moss-Image-Edit), RGBA in [0, 1].
+/// `images` are reference images to edit with (Moss-Image-Edit), RGBA in [0, 1];
+/// `maps` drive the color/depth control adapter.
 pub(super) fn generate(
     rt: &Runtime,
     aimdo: &Aimdo,
     r: &Request,
     images: &[Tensor],
+    maps: &ControlMaps,
     observer: &mut Observer<'_>,
 ) -> Result<Tensor, Error> {
     let dev = Device::Cuda(0);
@@ -72,16 +74,17 @@ pub(super) fn generate(
     drop(patcher);
     drop(text);
     rt.native.cuda_soft_empty_cache(0)?;
-    // The edit encoder encodes the references after the prompt; Flux2's latent
-    // format leaves them as encoded.
-    let reference_latents = if images.is_empty() {
-        Vec::new()
+    // The edit encoder encodes the references after the prompt, and
+    // MOSSImageControl its maps; Flux2's latent format leaves them as encoded.
+    let maps = [&maps.color, &maps.depth];
+    let (reference_latents, map_latents) = if images.is_empty() && maps.iter().all(|m| m.is_none())
+    {
+        (Vec::new(), [None, None])
     } else {
         let vae = load_vae(rt, aimdo, r, &pins, observer)?;
-        let mut latents = Vec::with_capacity(images.len());
-        for pixels in images {
+        let mut encode = |pixels: &Tensor| -> Result<Tensor, Error> {
             let pixels = flux2_crop_pixels(&pixels.f_narrow(-1, 0, 3)?)?.f_movedim_int(-1, 1)?;
-            latents.push(flux2_vae(
+            flux2_vae(
                 rt,
                 &vae,
                 q::VaeOperation::Encode,
@@ -89,13 +92,24 @@ pub(super) fn generate(
                 &mut manager,
                 &mut memory,
                 (&r.vae, observer),
-            )?);
-        }
+            )
+        };
+        let latents = images
+            .iter()
+            .map(&mut encode)
+            .collect::<Result<Vec<_>, _>>()?;
+        let [color, depth] = maps.map(|m| m.as_ref().map(&mut encode).transpose());
+        let map_latents = [color?, depth?];
         manager.unload_all(dev, &mut memory)?;
         drop(vae);
         rt.native.cuda_soft_empty_cache(0)?;
-        latents
+        (latents, map_latents)
     };
+    let control_latent = m::moss_control_latent(
+        map_latents[0].as_ref(),
+        map_latents[1].as_ref(),
+        r.control.strength,
+    )?;
     // Each condition carries the references, so the original counts their tokens
     // once per condition, and once in the minimum.
     let reference_shape = [
@@ -188,7 +202,19 @@ pub(super) fn generate(
             }
             value => value.as_tensor()?.size()[1],
         };
-        let control = m::MossControl::new(None, embedder, &shape, dev, (0., 0.), &sampling)?;
+        let control = m::MossControl::new(
+            control_latent.as_ref(),
+            embedder,
+            &shape,
+            dev,
+            (r.control.start, r.control.end),
+            &sampling,
+        )?;
+        if control_latent.is_some() && control.is_none() {
+            return Err(Error::Native(
+                "Control maps need the color/depth control adapter".into(),
+            ));
+        }
         let mut rng = rt.native.generator(Device::Cpu, r.seed)?;
         let noise = rng.randn(&shape, Kind::Float)?.f_to_device(dev)?;
         let input = q::flow_noise_scaling(
