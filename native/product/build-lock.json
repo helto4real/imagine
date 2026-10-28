@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "source_base": "167bf84860e4f456360f838219db019534af8107",
-  "core_revision": "167bf84860e4f456360f838219db019534af8107",
+  "source_base": "d08d3af96e90798ba618c5b5acb1dd538ccd5cc8",
+  "core_revision": "d08d3af96e90798ba618c5b5acb1dd538ccd5cc8",
   "core_files": {
     "inference/src/checkpoint/prepared.rs": "a8b35de43a173de491c01e04ca357aec75d8642bb50ff630e747363770f48569",
     "inference/src/checkpoint/dynamic.rs": "b3fe91a22505bd60e6d5918edefcd31ed3ef2c1a71c2dffa9bd0852fb103c4a9",
@@ -94,7 +94,7 @@
     "environment": {
       "IMAGINE_AIMDO_LIBRARY": "${project}/comfyui/h3-main-20261020/artifacts/8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59/aimdo.so",
       "IMAGINE_KITCHEN_LIBRARY": "${project}/comfyui/h3-main-20261020/artifacts/612fcc110e4bd5232c0c73e7d470b3cb3b3c70cec1f00b52bf0c800c352773df/libimagine_kitchen.so",
-      "IMAGINE_PILLOW_LIBRARY": "${project}/comfyui/h3-main-20261020/artifacts/095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3/libimagine_pillow.so",
+      "IMAGINE_PILLOW_LIBRARY": "${project}/comfyui/h3-main-20261020/artifacts/94d899ab203cdda088adf365bf59bf05b4ee201ad591f5b5b86325673d084fad/libimagine_pillow.so",
       "IMAGINE_TRITON_COMPILER_PROFILE": "${project}/comfyui/h3-main-20261020/artifacts/f5c036937a02cc570fc9fb4e82fd8167a8d1720641cc0f9fa583a51d33e098e3/triton-compiler-profile.json",
       "IMAGINE_TRITON_DRIVER_LIBRARY": "${project}/comfyui/h3-main-20261020/artifacts/bd124a1b2de3c096e3df0e472699c8734b5f456f58f6201454d6aee566121aeb/libimagine_triton_driver.so",
       "LD_LIBRARY_PATH": "${project}/.venv-inference/lib/python3.12/site-packages/torch/lib",
@@ -102,7 +102,6 @@
     },
     "files": {
       "${project}/comfyui/h3-main-20261020/artifacts/8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59/aimdo.so": "8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59",
-      "${project}/comfyui/h3-main-20261020/artifacts/095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3/libimagine_pillow.so": "095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3",
       "${project}/comfyui/h3-main-20261020/artifacts/f5c036937a02cc570fc9fb4e82fd8167a8d1720641cc0f9fa583a51d33e098e3/triton-compiler-profile.json": "f5c036937a02cc570fc9fb4e82fd8167a8d1720641cc0f9fa583a51d33e098e3",
       "${project}/comfyui/h3-main-20261020/artifacts/bd124a1b2de3c096e3df0e472699c8734b5f456f58f6201454d6aee566121aeb/libimagine_triton_driver.so": "bd124a1b2de3c096e3df0e472699c8734b5f456f58f6201454d6aee566121aeb",
       "${project}/.venv-inference/lib/python3.12/site-packages/nvidia/cu13/lib/libcublas.so.13": "25cde432108543626df85d887c730bf2cab96803ca16f9654e4abc8d2b45833e",
@@ -137,7 +136,8 @@
       "/usr/lib/libstdc++.so.6": "f5fc7380f2ae46fa4053a64be04e7b98109f1066a4bbfff3c37042488aa0be0e",
       "/usr/lib/libutil.so.1": "8c2cbf01f52acb42478b9ab10506af9878b7e8d47aefacc8896bb5b37384c222",
       "${project}/.venv-inference/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2": "aa957cdfb91b516eae0d54a28e9ee5db52730d02e0ab45580efc3c19a68327a4",
-      "${project}/comfyui/h3-main-20261020/artifacts/612fcc110e4bd5232c0c73e7d470b3cb3b3c70cec1f00b52bf0c800c352773df/libimagine_kitchen.so": "612fcc110e4bd5232c0c73e7d470b3cb3b3c70cec1f00b52bf0c800c352773df"
+      "${project}/comfyui/h3-main-20261020/artifacts/612fcc110e4bd5232c0c73e7d470b3cb3b3c70cec1f00b52bf0c800c352773df/libimagine_kitchen.so": "612fcc110e4bd5232c0c73e7d470b3cb3b3c70cec1f00b52bf0c800c352773df",
+      "${project}/comfyui/h3-main-20261020/artifacts/94d899ab203cdda088adf365bf59bf05b4ee201ad591f5b5b86325673d084fad/libimagine_pillow.so": "94d899ab203cdda088adf365bf59bf05b4ee201ad591f5b5b86325673d084fad"
     }
   },
   "h3": {
@@ -156,7 +156,7 @@
       "IMAGINE_KITCHEN_LIBRARY": "${project}/comfyui/h3-main-20261020/artifacts/612fcc110e4bd5232c0c73e7d470b3cb3b3c70cec1f00b52bf0c800c352773df/libimagine_kitchen.so",
       "IMAGINE_AIMDO_LIBRARY": "${project}/comfyui/h3-main-20261020/artifacts/8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59/aimdo.so",
       "OMP_NUM_THREADS": "2",
-      "IMAGINE_PILLOW_LIBRARY": "${project}/comfyui/h3-main-20261020/artifacts/095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3/libimagine_pillow.so"
+      "IMAGINE_PILLOW_LIBRARY": "${project}/comfyui/h3-main-20261020/artifacts/94d899ab203cdda088adf365bf59bf05b4ee201ad591f5b5b86325673d084fad/libimagine_pillow.so"
     },
     "files": {
       "${project}/comfyui/h3-main-20261020/artifacts/8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59/aimdo.so": "8764ede0d5b46f9c13ba6eeb5620da87a8cb7baf18779d37127b6699430ffd59",
@@ -191,9 +191,9 @@
       "/usr/lib/librt.so.1": "e06e12b8a78494908d08376838c380fb3817bfd7d54f6a86ef050016f7ade5f8",
       "/usr/lib/libstdc++.so.6": "f5fc7380f2ae46fa4053a64be04e7b98109f1066a4bbfff3c37042488aa0be0e",
       "/usr/lib/libutil.so.1": "8c2cbf01f52acb42478b9ab10506af9878b7e8d47aefacc8896bb5b37384c222",
-      "${project}/comfyui/h3-main-20261020/artifacts/095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3/libimagine_pillow.so": "095de3b9d039ca16b0d9110e2d09f813de88146657ce93b9f395c01affeb04f3",
       "${project}/.venv-inference/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2": "aa957cdfb91b516eae0d54a28e9ee5db52730d02e0ab45580efc3c19a68327a4",
-      "${project}/comfyui/h3-main-20261020/artifacts/612fcc110e4bd5232c0c73e7d470b3cb3b3c70cec1f00b52bf0c800c352773df/libimagine_kitchen.so": "612fcc110e4bd5232c0c73e7d470b3cb3b3c70cec1f00b52bf0c800c352773df"
+      "${project}/comfyui/h3-main-20261020/artifacts/612fcc110e4bd5232c0c73e7d470b3cb3b3c70cec1f00b52bf0c800c352773df/libimagine_kitchen.so": "612fcc110e4bd5232c0c73e7d470b3cb3b3c70cec1f00b52bf0c800c352773df",
+      "${project}/comfyui/h3-main-20261020/artifacts/94d899ab203cdda088adf365bf59bf05b4ee201ad591f5b5b86325673d084fad/libimagine_pillow.so": "94d899ab203cdda088adf365bf59bf05b4ee201ad591f5b5b86325673d084fad"
     },
     "model_root": "/mnt/media/gemensam/AI/ComfyUI/models"
   },
