@@ -320,3 +320,21 @@ Worker RSS again grows across the `qwen-edit` runs when they follow the MOSS and
 10,929 → 12,512). The interleaved rounds, which restart the server before Qwen,
 showed no growth with either build, so this is an effect of the run order; its
 size differs between runs and is not yet explained.
+
+### H3 baseline (Kitchen 0.2.38 bridges, `94d206e`)
+
+Tomas allowed the `normal` video prompt profile for this run. Project "lighthouse
+waves" in its own MCP workspace: one 5-second reference-to-video scene (Default
+ref2v, 16:9 Draft, no dialogue or music), the storyboard written from the profile's
+bundle. Driver and sampler: `comfyui/rust-upgrade-20261027/h3/` (`h3_run.py`,
+`runs.jsonl`). Renders with the take's seed are byte-identical
+(`cff4dc4f…` MP4 each time).
+
+| Run | Wall time | Worker GPU peak | Worker RSS peak |
+| --- | ---: | ---: | ---: |
+| First (cold) | 115.8 s | 13,412 MiB | 24,999 MiB |
+| Same seed | 88.4 s | 13,316 MiB | 24,980 MiB |
+| Same seed | 92.1 s | 13,284 MiB | 24,977 MiB |
+
+The Kitchen 0.2.40 candidate renders the same take seed (`all_same_seeds`) for the
+old-versus-new comparison.
