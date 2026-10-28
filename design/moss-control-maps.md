@@ -96,5 +96,10 @@ Mask2Former regions:
   before loading, models under `annotators/` in the model root), and the two
   are published as `image_NNNN_depth.png` and `image_NNNN_regions.png`. The UI's
   control panel has a Source card with Make maps.
-- Next: a live check of Make maps, then region prompts. Generating maps in the product moves the core lock (the models
+- Live (2026-10-28, after a restart): a `control_maps` job made both maps of
+  the astronaut photo at 1024 × 1024 in 4 s, published as
+  `image_0053_depth.png` / `image_0053_regions.png`; MOSS control with them
+  kept the photo's composition.
+- Next: region prompts (one prompt per region, with the region names the
+  worker already derives). Generating maps in the product moves the core lock (the models
   and Pillow ABI 2 are newer than `core_revision`).
