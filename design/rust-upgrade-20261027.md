@@ -363,3 +363,20 @@ bundle. Driver and sampler: `comfyui/rust-upgrade-20261027/h3/` (`h3_run.py`,
 
 The Kitchen 0.2.40 candidate renders the same take seed (`all_same_seeds`) for the
 old-versus-new comparison.
+
+### H3 old versus new (Kitchen 0.2.38 `94d206e` and 0.2.40 `72d625d`)
+
+The same take seed renders the byte-identical video on both bridges (`cff4dc4f…`),
+with identical worker GPU peaks (13,348 MiB in the interleaved rounds) and RSS
+(about 24.4–25.0 GiB). Wall time varies between 88 and 135 s for one build; the
+workstation had 14 GiB in swap and a full zram device, so model reads come from
+the page cache or the disk run to run. Interleaved rounds (server restarted per
+round, two renders each; `h3/ab.sh`):
+
+| Bridge | Renders (s) | Median |
+| --- | --- | ---: |
+| 0.2.40 | 117.3, 117.7, 115.7, 102.7 | 116.5 |
+| 0.2.38 | 117.7, 103.1, 116.8, 134.8 | 117.2 |
+
+Earlier sequential renders: 0.2.40 113.3, 113.2, 108.7 s; 0.2.38 88.4, 92.1,
+102.7, 102.6, 118.4 s. No difference is visible beyond this variation.
