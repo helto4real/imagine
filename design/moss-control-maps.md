@@ -73,6 +73,12 @@ Mask2Former regions:
   verified library files for library selections. Maps follow the references
   in the worker payload (`map_roles`, `map_lengths`, `map_shapes`, `control`)
   and are VAE-encoded like references. Untested on the GPU yet.
-- Next: the map-generation call (worker frame and HTTP route), then the UI and
-  live checks. Generating maps in the product moves the core lock (the models
+- UI (`4e9861b`, `6ac78c1`, `aa26ae5`): MOSS modes (Text, Edit, Control) in the
+  image desk, depth and region map cards with strength, end and Layout/Exact,
+  output size from the source (its size, its aspect at the long side, or the
+  ratio), and a paint tool: marks on image desk references (sent as a marked
+  copy, original kept) and region-map editing or painting from empty.
+- Next: GPU checks (full inference suite, CUDA captures, live MOSS runs with
+  the adapter's example maps), then the map-generation call (worker frame and
+  HTTP route) and the source-photo card. Generating maps in the product moves the core lock (the models
   and Pillow ABI 2 are newer than `core_revision`).
