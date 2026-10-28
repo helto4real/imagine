@@ -393,10 +393,24 @@ Earlier sequential renders: 0.2.40 113.3, 113.2, 108.7 s; 0.2.38 88.4, 92.1,
 | `qwen-t2i` warm median | 52.7 s | 51.3 s | **72.3 s** |
 | `qwen-edit` warm median | 73.4 s | 71.9 s | **94.0 s** |
 
-Qwen is about 40% (t2i) and 30% (edit) slower with Kitchen 0.2.40, run to run
-within 1 s, so this is not noise; it fails the acceptance limit and blocks moving
-the build lock. The Wan VAE's group norm is not the cause: 0.2.40 now serves its
-channel counts (96, 192, 384) natively, and that kernel is 5–10x faster than the
-eager path 0.2.38 used (`group_norm_silu_pad3d`, bf16, 1×C×1×H×W at the VAE's
-sizes). Next: a per-kernel profile of one Qwen step on both bridges (INT8 linear,
-quantization and attention routes).
+The Qwen difference is not Kitchen 0.2.40. Profiled on 2026-10-28:
+
+- Kernels: `kitchen_qwen_ops` (own example; INT8 ConvRot linears at the DiT's
+  shapes, `rms_rope`, `apply_rope1`, `adaln`, each bridge with its own build,
+  alternated twice) times the large calls the same (0.460 vs 0.459 ms at
+  5600×3072×3072, 1.80 vs 1.79 ms at 5600×12288×3072); small calls carry about
+  10 µs more dispatch, at most about a second per job. Qwen's attention is
+  PyTorch's, and the Wan VAE's group norm is faster natively (above).
+- Phases: a 1 s timeline of GPU utilization and worker CPU over one job on each
+  bridge, three jobs each (`comfyui/rust-upgrade-20261027/profile/timeline.py`):
+  both spend about 26 s loading and encoding (text encoder to 11.8 GB, unloaded,
+  then the DiT), 42–45 s sampling at 100% and 5 s decoding. Both total 73–76 s.
+- Cause: the Qwen worker loads the text encoder and the DiT for every job. Last
+  night the weights were still in the page cache and loading took a few seconds
+  (51 s jobs); this morning the workstation had 14 GiB in swap and a full zram
+  device and loading took about 26 s for either build. The Kitchen 0.2.38 build
+  benched today gives `qwen-t2i` 64.3 s and `qwen-edit` 107.7 s warm medians
+  (`comfyui/bench/recheck-94d206e-20261028T161853Z`).
+
+A clean old-versus-new image bench needs a quiet machine with free memory, run
+interleaved; under today's conditions the two builds are indistinguishable.
