@@ -387,6 +387,8 @@ mod w4a4_cache_tests;
 mod checkpoint_tests;
 #[path = "support/comfy_sdpa.rs"]
 mod comfy_sdpa_tests;
+#[path = "support/depth_anything.rs"]
+mod depth_anything_tests;
 #[path = "support/model_management.rs"]
 mod model_management_tests;
 #[path = "support/moss_conditioning.rs"]

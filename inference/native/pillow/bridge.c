@@ -19,13 +19,26 @@ void ImagingSectionLeave(ImagingSectionCookie *cookie) { (void)cookie;pthread_mu
 __attribute__((visibility("default")))
 const char *imagine_pillow_error(void) { return error_message; }
 __attribute__((visibility("default")))
-int imagine_pillow_abi(void) { return 1; }
+int imagine_pillow_abi(void) { return 2; }
+/* PIL.Image.resize filters by their Resampling value, as Image.resize maps them. */
+static int transform(int filter) {
+    switch(filter){
+    case 1: return IMAGING_TRANSFORM_LANCZOS;
+    case 2: return IMAGING_TRANSFORM_BILINEAR;
+    case 3: return IMAGING_TRANSFORM_BICUBIC;
+    case 4: return IMAGING_TRANSFORM_BOX;
+    case 5: return IMAGING_TRANSFORM_HAMMING;
+    default: return -1;
+    }
+}
 __attribute__((visibility("default")))
-int imagine_pillow_resize_u8(const unsigned char *src,int w,int h,int channels,int ow,int oh,unsigned char *dst) {
+int imagine_pillow_resize_u8_filter(const unsigned char *src,int w,int h,int channels,int ow,int oh,int filter,unsigned char *dst) {
     Imaging image=NULL,premult=NULL,resized=NULL,converted=NULL;
     pthread_mutex_lock(&gate);imagine_pillow_error_clear();
     if (w<=0||h<=0||ow<=0||oh<=0) { ImagingError_ValueError("height and width must be > 0");goto finish; }
     if (channels!=3&&channels!=4) { ImagingError_ValueError("expected RGB or RGBA buffer");goto finish; }
+    /* Nearest goes through ImagingTransform in the original; it is not bound here. */
+    if (transform(filter)<0) { ImagingError_ValueError("unsupported resampling filter");goto finish; }
     image=ImagingNew(channels==4?IMAGING_MODE_RGBA:IMAGING_MODE_RGB,w,h);if(!image)goto finish;
     for(int y=0;y<h;y++)for(int x=0;x<w;x++){
         unsigned char *p=(unsigned char*)image->image[y]+4*x;
@@ -35,11 +48,15 @@ int imagine_pillow_resize_u8(const unsigned char *src,int w,int h,int channels,i
     Imaging input=image;
     if(channels==4){premult=ImagingConvert(image,IMAGING_MODE_RGBa,NULL,3);if(!premult)goto finish;input=premult;}
     float box[4]={0,0,(float)w,(float)h};
-    resized=ImagingResample(input,ow,oh,IMAGING_TRANSFORM_LANCZOS,box);if(!resized)goto finish;
+    resized=ImagingResample(input,ow,oh,transform(filter),box);if(!resized)goto finish;
     Imaging output=resized;
     if(channels==4){converted=ImagingConvert(resized,IMAGING_MODE_RGBA,NULL,3);if(!converted)goto finish;output=converted;}
     for(int y=0;y<oh;y++)for(int x=0;x<ow;x++)for(int c=0;c<channels;c++)dst[((size_t)y*ow+x)*channels+c]=((unsigned char*)output->image[y])[4*x+c];
 finish:
     ImagingDelete(converted);ImagingDelete(resized);ImagingDelete(premult);ImagingDelete(image);
     int result=error_kind;pthread_mutex_unlock(&gate);return result;
+}
+__attribute__((visibility("default")))
+int imagine_pillow_resize_u8(const unsigned char *src,int w,int h,int channels,int ow,int oh,unsigned char *dst) {
+    return imagine_pillow_resize_u8_filter(src,w,h,channels,ow,oh,1,dst);
 }

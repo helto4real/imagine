@@ -7,8 +7,17 @@ use std::{
     ptr::NonNull,
 };
 use tch::{Device, Kind, Tensor};
-type Resize = unsafe extern "C" fn(*const u8, i32, i32, i32, i32, i32, *mut u8) -> i32;
+type Resize = unsafe extern "C" fn(*const u8, i32, i32, i32, i32, i32, i32, *mut u8) -> i32;
 type LastError = unsafe extern "C" fn() -> *const c_char;
+/// PIL `Image.Resampling` values the buffer ABI binds; nearest is not bound.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Resampling {
+    Lanczos = 1,
+    Bilinear = 2,
+    Bicubic = 3,
+    Box = 4,
+    Hamming = 5,
+}
 pub struct Pillow {
     handle: NonNull<c_void>,
     resize: Resize,
@@ -31,7 +40,7 @@ impl Pillow {
             NonNull::new(unsafe { libc::dlopen(path.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) })
                 .ok_or_else(|| Error::Native("Cannot load verified Pillow buffer ABI".into()))?;
         let symbol = |name: &CStr| unsafe { libc::dlsym(handle.as_ptr(), name.as_ptr()) };
-        let resize = symbol(c"imagine_pillow_resize_u8");
+        let resize = symbol(c"imagine_pillow_resize_u8_filter");
         let error = symbol(c"imagine_pillow_error");
         let abi = symbol(c"imagine_pillow_abi");
         if resize.is_null() || error.is_null() || abi.is_null() {
@@ -41,7 +50,7 @@ impl Pillow {
             return Err(Error::Native("Incomplete Pillow buffer ABI".into()));
         }
         let abi: unsafe extern "C" fn() -> i32 = unsafe { std::mem::transmute(abi) };
-        if unsafe { abi() } != 1 {
+        if unsafe { abi() } != 2 {
             unsafe {
                 libc::dlclose(handle.as_ptr());
             }
@@ -53,6 +62,7 @@ impl Pillow {
             error: unsafe { std::mem::transmute::<*mut c_void, LastError>(error) },
         })
     }
+    /// Original `Image.resize` with `Resampling.LANCZOS`.
     pub fn resize_rgb(
         &self,
         bytes: &[u8],
@@ -61,6 +71,28 @@ impl Pillow {
         channels: i32,
         out_width: i32,
         out_height: i32,
+    ) -> Result<Vec<u8>, Error> {
+        self.resize_rgb_filter(
+            bytes,
+            width,
+            height,
+            channels,
+            out_width,
+            out_height,
+            Resampling::Lanczos,
+        )
+    }
+    /// Original `Image.resize` on an RGB/RGBA byte buffer with `filter`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn resize_rgb_filter(
+        &self,
+        bytes: &[u8],
+        width: i32,
+        height: i32,
+        channels: i32,
+        out_width: i32,
+        out_height: i32,
+        filter: Resampling,
     ) -> Result<Vec<u8>, Error> {
         if width <= 0 || height <= 0 || out_width <= 0 || out_height <= 0 {
             return Err(Error::ReferenceException {
@@ -94,6 +126,7 @@ impl Pillow {
                 channels,
                 out_width,
                 out_height,
+                filter as i32,
                 out.as_mut_ptr(),
             )
         };
