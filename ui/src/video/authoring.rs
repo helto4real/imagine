@@ -167,6 +167,21 @@ fn image_label(id: &str, images: &[StoryImage]) -> String {
         .map(|i| i.label.clone())
         .unwrap_or_else(|| "Unavailable source image".into())
 }
+const IMAGE_USES: [ImageUse; 4] = [
+    ImageUse::SettingReference,
+    ImageUse::RequiredMoment,
+    ImageUse::StartFrame,
+    ImageUse::EndFrame,
+];
+/// The words the image-use menu and its closed selector both show.
+fn image_use_label(usage: ImageUse) -> &'static str {
+    match usage {
+        ImageUse::SettingReference => "Setting reference",
+        ImageUse::RequiredMoment => "Required moment",
+        ImageUse::StartFrame => "Directed start frame",
+        ImageUse::EndFrame => "Directed end frame",
+    }
+}
 fn boundary_label(id: &str) -> &'static str {
     if id == "continuous_shot" {
         "Continuous shot"
@@ -1322,15 +1337,11 @@ impl ImagineApp {
                     }
                     if let Some(usage) = state.images.get_mut(&asset.id) {
                         let menu = egui::ComboBox::from_id_salt(("story-image-use", i))
-                            .selected_text(format!("{usage:?}"))
+                            .selected_text(image_use_label(*usage))
                             .show_ui(ui, |ui| {
-                                for (value, label) in [
-                                    (ImageUse::SettingReference, "Setting reference"),
-                                    (ImageUse::RequiredMoment, "Required moment"),
-                                    (ImageUse::StartFrame, "Directed start frame"),
-                                    (ImageUse::EndFrame, "Directed end frame"),
-                                ] {
-                                    let r = ui.selectable_value(usage, value, label);
+                                for value in IMAGE_USES {
+                                    let r =
+                                        ui.selectable_value(usage, value, image_use_label(value));
                                     control(ui, &format!("story-image-{i}-use-{value:?}"), &r);
                                 }
                             });
@@ -1543,5 +1554,27 @@ mod provider_tests {
         state.transport_override = false;
         state.provider_id = "legacy".into();
         assert_eq!(provider_transport(&state), "koboldcpp");
+    }
+}
+
+#[cfg(test)]
+mod image_use_tests {
+    use super::*;
+
+    #[test]
+    fn image_uses_show_their_menu_words_not_enum_names() {
+        let labels: Vec<_> = IMAGE_USES.iter().map(|u| image_use_label(*u)).collect();
+        assert_eq!(
+            labels,
+            [
+                "Setting reference",
+                "Required moment",
+                "Directed start frame",
+                "Directed end frame"
+            ]
+        );
+        for usage in IMAGE_USES {
+            assert_ne!(image_use_label(usage), format!("{usage:?}"));
+        }
     }
 }
