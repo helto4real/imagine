@@ -34,10 +34,11 @@ The server starts at `http://127.0.0.1:8080`. Workers and CUDA start only after 
 scheduled job acquires the GPU reservation. The launchers use the proxy GPU queue
 at `$XDG_RUNTIME_DIR/imagine/gpu.sock`; start
 `./start-proxy.sh` with your backend options before submitting jobs.
-The server starts without a password, YubiKey login or API token. Prompts and job history stay in memory; temporary images are ordinary
-files removed at session end. See [session privacy](docs/PRIVACY.md).
-Ctrl-C clears history and stops the server and its worker. Optional arguments:
-`--bind 127.0.0.1:8081 --data /private/path/imagine-data`.
+The server starts without a password, YubiKey login or API token. Prompts and
+job history stay in memory; uploads stay in memory for the session, and
+generated images are saved on the VeraCrypt volume. See
+[session privacy](docs/PRIVACY.md). Ctrl-C clears history and stops the server
+and its worker. Optional argument: `--bind 127.0.0.1:8081`.
 
 Imagine uses one shared local workspace for API, UI and MCP clients. It does
 not create or read `access.json`; existing credential files are left unused.
@@ -89,13 +90,18 @@ upload and reorder reference images, choose **Spara i → Välj mapp**, then
 **Generera**. It uses the API's standard settings and saves each PNG under a
 unique filename in your chosen folder. The folder choice persists across starts.
 
-Default output: `.imagine/images`; preferences: `.imagine/ui-settings.json`.
+Default output: the project's `outputs/images` on the VeraCrypt volume.
+Preferences: layout and generation settings in `~/.config/imagine/ui.json`,
+model settings in `~/.config/imagine/models.json`, and private choices (output
+folder, prompt catalog, enhancement profiles) in the project library on the
+volume.
 Choose the model folder in **Settings → Models** and select a model beside the
 prompt. The LoRA button opens the saved group-specific list. See
 [Models and LoRAs](docs/MODELS.md) for the ComfyUI-compatible folder structure.
 The app connects through `http://127.0.0.1:8189/imagine` without credentials. `start-server.sh` and `start-proxy.sh`
-use the same `.imagine/gpu.sock` by default. ComfyUI is not required by these
-launchers. MCP images use `/run/media/veracrypt1/mcp-images`, matching Pi.
+use the same `$XDG_RUNTIME_DIR/imagine/gpu.sock` by default. ComfyUI is not
+required by these launchers. MCP agent files live in workspaces under
+`/run/media/veracrypt1/mcp-root` (see [MCP workspaces](docs/MCP-WORKSPACES-DESIGN.md)).
 No direct-API fallback is used.
 See [UI setup and behavior](docs/UI.md) for custom API paths and recovery.
 
