@@ -2,9 +2,10 @@
 use crate::contract::{
     AssetId, ContinuityMethod, ProjectId, Scene, SceneId, SectionId, VideoProject,
 };
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Operation {
     Outline,
@@ -13,8 +14,11 @@ pub enum Operation {
     /// Every Scene field and Section prompt of one Scene, reviewed side by
     /// side, as Director's Enhance mode.
     EnhanceSceneAll,
+    /// A Scene's description, first Section prompt and ambient sound written
+    /// from its First frame, as Director's Animate image.
+    Animate,
 }
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SceneField {
     #[default]
@@ -48,7 +52,7 @@ impl SceneField {
     }
 }
 /// The text one row of a whole-Scene enhancement proposes for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum FieldTarget {
     Scene { field: SceneField },
@@ -56,7 +60,7 @@ pub enum FieldTarget {
 }
 /// One row of a whole-Scene enhancement: the text when it was proposed and
 /// the proposal, editable, applied only when included.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct FieldProposal {
     pub target: FieldTarget,
@@ -100,7 +104,7 @@ impl FieldProposal {
         .collect()
     }
 }
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Destination {
     #[default]
@@ -108,7 +112,7 @@ pub enum Destination {
     Replace,
     Continue,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub schema_version: u32,
@@ -140,8 +144,86 @@ pub struct Request {
     /// in Director.
     #[serde(default)]
     pub add_music: bool,
+    /// A conversation and the cast's current visible state, sent as
+    /// Director's Story bridge context. Without it, `brief` is the story.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<StoryContext>,
+    /// Animate: cast members the instruction names.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mentions: Vec<Mention>,
+    /// Animate: ask for background sound.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub add_ambient_sound: bool,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+/// Text in an Animate instruction that names a selected cast member.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Mention {
+    pub text: String,
+    pub reference_id: String,
+}
+/// What Animate writes for a Scene, editable before Apply.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AnimateProposal {
+    /// The Scene description.
+    pub description: String,
+    /// The first Section's prompt.
+    pub prompt: String,
+    /// The Scene's ambient sound.
+    pub ambient_sound: String,
+}
+/// The story a client holds as a conversation, with what must stay true.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StoryContext {
+    /// Older events, oldest first.
+    #[serde(default)]
+    pub earlier_continuity: Vec<ContextMessage>,
+    /// The moment the Story starts from.
+    pub latest_moment: Vec<ContextMessage>,
+    /// Current visible state of cast members selected in `Request.cast`.
+    #[serde(default)]
+    pub cast_state: Vec<CastState>,
+    /// Facts the model must not contradict.
+    #[serde(default)]
+    pub protected_facts: Vec<String>,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ContextMessage {
+    /// `user` or `assistant`.
+    pub role: String,
+    /// The speaker; the role stands in when empty.
+    #[serde(default)]
+    pub name: String,
+    pub text: String,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct CastState {
+    /// A project `VisualReference.id` selected in `Request.cast`.
+    pub reference_id: String,
+    pub current_appearance: Appearance,
+    /// Wardrobe the model may use when the story states none.
+    #[serde(default)]
+    pub fallback_wardrobe: String,
+}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Appearance {
+    /// `not_stated`, `clothed`, `partially_clothed` or `nude`.
+    pub exposure: String,
+    #[serde(default)]
+    pub garments: Vec<String>,
+    #[serde(default)]
+    pub worn_items: Vec<String>,
+    #[serde(default)]
+    pub temporary_traits: Vec<String>,
+    #[serde(default)]
+    pub visible_body_state: Vec<String>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ImageUse {
     #[default]
@@ -150,7 +232,7 @@ pub enum ImageUse {
     StartFrame,
     EndFrame,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StoryImage {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -160,13 +242,13 @@ pub struct StoryImage {
     pub label: String,
     pub usage: ImageUse,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct InventoryNote {
     pub id: String,
     pub note: String,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StorySection {
     pub id: String,
@@ -184,7 +266,7 @@ pub struct StorySection {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dialogue_intent: Option<crate::creative::DialogueIntent>,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct StoryScene {
     pub id: String,
@@ -199,12 +281,12 @@ pub struct StoryScene {
     #[serde(default)]
     pub image_ids: Vec<String>,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Storyboard {
     pub scenes: Vec<StoryScene>,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Phase {
     Inventory,
@@ -221,7 +303,7 @@ impl Phase {
         matches!(self, Self::Inventory | Self::Running | Self::Expanding)
     }
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Draft {
     pub schema_version: u32,
     pub id: String,
@@ -251,14 +333,20 @@ pub struct Draft {
     /// Model and continuity per outline Scene, chosen by an external agent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub production: Option<Production>,
+    /// With a context's cast state, each character's opening appearance as
+    /// the outline resolved it (Director's `opening_appearance`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening_appearance: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub animate: Option<AnimateProposal>,
 }
 /// Choices the prompt profiles do not write, aligned to the outline's Scenes.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Production {
     pub scenes: Vec<ProductionScene>,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProductionModel {
     Reference,
@@ -272,7 +360,7 @@ impl ProductionModel {
         }
     }
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ProductionScene {
     /// A preset key from the MCP preset catalog; it fixes the model variant.
@@ -288,27 +376,29 @@ pub struct ProductionScene {
     #[serde(default)]
     pub rationale: String,
 }
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ContinuityChoice {
     /// `auto` (none) resolves by the target variant.
     #[serde(default, with = "auto_method")]
+    #[schemars(with = "auto_method::Choice")]
     pub method: Option<ContinuityMethod>,
     #[serde(default)]
     pub include_audio: bool,
 }
 mod auto_method {
     use super::ContinuityMethod;
+    use schemars::JsonSchema;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, JsonSchema)]
     #[serde(untagged)]
-    enum Choice {
+    pub enum Choice {
         Auto(Auto),
         Method(ContinuityMethod),
     }
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, JsonSchema)]
     #[serde(rename_all = "snake_case")]
-    enum Auto {
+    pub enum Auto {
         Auto,
     }
     pub fn serialize<S: Serializer>(
@@ -332,7 +422,7 @@ mod auto_method {
 }
 /// An external agent's complete Story: inventory notes, the outline answer,
 /// one expansion answer per Scene and the production block.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Submission {
     pub schema_version: u32,
@@ -345,7 +435,7 @@ pub struct Submission {
     pub production: Option<Production>,
     pub dry_run: bool,
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Review {
     pub schema_version: u32,
@@ -354,6 +444,8 @@ pub struct Review {
     pub text: Option<String>,
     #[serde(default)]
     pub fields: Option<Vec<FieldProposal>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub animate: Option<AnimateProposal>,
 }
 /// Director ordinary-UI allocator: 250ms minimum when possible; weighted remainder and cap redistribution.
 pub fn durations(weights: &[f64], duration: f64, cap: f64) -> Result<Vec<f64>, &'static str> {

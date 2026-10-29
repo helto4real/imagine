@@ -472,6 +472,9 @@ fn generate_call(state: &State, d: &Snapshot) -> Call {
             },
             add_dialogue: state.operation == Operation::Outline && state.add_dialogue,
             add_music: state.operation == Operation::Outline && state.add_music,
+            context: None,
+            mentions: vec![],
+            add_ambient_sound: false,
         })),
     )
 }

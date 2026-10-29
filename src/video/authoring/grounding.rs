@@ -30,7 +30,9 @@ impl Grounding {
         let mut cast = vec![];
         let mut requested_cast = request.cast.clone();
         let mut selections = request.images.clone();
-        if request.operation != Operation::Outline {
+        // Animate sees its First frame only and the cast it names.
+        let animate = request.operation == Operation::Animate;
+        if request.operation != Operation::Outline && !animate {
             let scene = base
                 .scene(request.scene_id.as_ref().ok_or("scene_not_found")?)
                 .map_err(|_| "scene_not_found")?;
@@ -67,7 +69,7 @@ impl Grounding {
                 continue;
             }
             cast.push(json!({"story_names":[r.name],"reference_tag":format!("@{}",imagine_video_contract::creative::reference_alias(&r.alias)),"description":r.description,"required":true,"default_language":r.voice.as_ref().map(|v|v.language.as_str()).unwrap_or(""),"voice_guidance":r.voice.as_ref().map(|v|v.description.as_str()).unwrap_or("")}));
-            if request.operation != Operation::Outline {
+            if request.operation != Operation::Outline && !animate {
                 for image in r.images.iter().filter(|i| i.enabled) {
                     if !selections.iter().any(|i| i.asset == image.asset) {
                         selections.push(StoryImage {
@@ -82,7 +84,24 @@ impl Grounding {
             }
         }
         let mut opening = false;
-        if request.operation != Operation::Outline {
+        if animate {
+            let scene = base
+                .scene(request.scene_id.as_ref().ok_or("scene_not_found")?)
+                .map_err(|_| "scene_not_found")?;
+            let binding = scene
+                .bindings
+                .iter()
+                .find(|b| b.enabled && b.role == InputRole::FirstFrame)
+                .ok_or("animate_first_frame_missing")?;
+            opening = true;
+            selections.push(StoryImage {
+                pair_with: None,
+                id: binding.asset.0.clone(),
+                asset: binding.asset.clone(),
+                label: "First frame".into(),
+                usage: ImageUse::StartFrame,
+            });
+        } else if request.operation != Operation::Outline {
             let scene = base
                 .scene(request.scene_id.as_ref().ok_or("scene_not_found")?)
                 .map_err(|_| "scene_not_found")?;

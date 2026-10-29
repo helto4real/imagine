@@ -63,6 +63,13 @@ impl Service {
         if external && request.prompt_profile_id.trim().is_empty() {
             return Err(fault("profile_not_found"));
         }
+        let animate = request.operation == Operation::Animate;
+        if animate && external {
+            return Err(fault("animate_external_unsupported"));
+        }
+        if !animate && (!request.mentions.is_empty() || request.add_ambient_sound) {
+            return Err(fault("invalid_authoring_request"));
+        }
         if !(external || profiles::PROVIDERS.contains(&request.provider.as_str()))
             || (external && request.operation != Operation::Outline)
             || request.brief.len() + request.instruction.len() > 65536
@@ -71,10 +78,14 @@ impl Service {
         {
             return Err(fault("invalid_authoring_request"));
         }
-        if request.operation == Operation::Outline && request.brief.trim().is_empty() {
+        if request.operation == Operation::Outline
+            && request.context.is_none()
+            && request.brief.trim().is_empty()
+        {
             return Err(fault("story_brief_required"));
         }
-        if request.add_dialogue && grounding.cast.as_array().is_none_or(|v| v.len() < 2) {
+        if request.add_dialogue && !animate && grounding.cast.as_array().is_none_or(|v| v.len() < 2)
+        {
             return Err(fault("story_dialogue_cast_required"));
         }
         if request.scene_field.is_some() && request.operation != Operation::EnhanceScene {
@@ -162,6 +173,8 @@ impl Service {
                 vec![]
             },
             production: None,
+            opening_appearance: None,
+            animate: None,
         };
         let mut jobs = self.jobs.lock().unwrap();
         if !external && jobs.values().any(|j| j.draft.phase.busy()) {
@@ -394,6 +407,21 @@ impl Service {
             }
             d.fields = fields;
         }
+        if let Some(animate) = review.animate {
+            if d.request.operation != Operation::Animate
+                || d.animate.is_none()
+                || [
+                    &animate.description,
+                    &animate.prompt,
+                    &animate.ambient_sound,
+                ]
+                .iter()
+                .any(|t| t.len() > 65536)
+            {
+                return Err(fault("invalid_animate_review"));
+            }
+            d.animate = Some(animate);
+        }
         if let Some(text) = review.text {
             if text.trim().is_empty()
                 || text.len() > 65536
@@ -597,23 +625,15 @@ impl Service {
             } else {
                 grounding.images.iter().map(|(_, p)| p.clone()).collect()
             };
-            // A Story message's reference markers, or why it cannot be built.
-            let mut markers = Ok(vec![]);
+            // A built Story message, or why it cannot be built.
+            let mut built = Ok(super::director::Built::default());
             let (key, operation, user, protected) = if expand {
                 let message = {
                     let jobs = self.jobs.lock().unwrap();
                     steps::expansion_message(&jobs[&id].draft, &base, index, !images.is_empty())
                 };
-                let user = match message {
-                    Ok(message) => {
-                        markers = Ok(message.references);
-                        message.user
-                    }
-                    Err(code) => {
-                        markers = Err(code);
-                        String::new()
-                    }
-                };
+                let user = message.as_ref().map(|m| m.user.clone()).unwrap_or_default();
+                built = message;
                 (
                     steps::scene_key(draft.request.add_dialogue),
                     "story_scene_expansion",
@@ -621,24 +641,23 @@ impl Service {
                     None,
                 )
             } else if draft.request.operation == Operation::Outline {
-                let user = match steps::outline_message(
-                    &draft,
-                    &base,
-                    steps::Notes::Known(&draft.inventory),
-                ) {
-                    Ok(message) => {
-                        markers = Ok(message.references);
-                        message.user
-                    }
-                    Err(code) => {
-                        markers = Err(code);
-                        String::new()
-                    }
-                };
+                let message =
+                    steps::outline_message(&draft, &base, steps::Notes::Known(&draft.inventory));
+                let user = message.as_ref().map(|m| m.user.clone()).unwrap_or_default();
+                built = message;
                 (
                     steps::outline_key(draft.request.add_dialogue),
                     "story_outline",
                     user,
+                    None,
+                )
+            } else if draft.request.operation == Operation::Animate {
+                let user = steps::animate_message(&draft, &base);
+                built = user.as_ref().map(|_| Default::default()).map_err(|c| *c);
+                (
+                    "animate_image",
+                    "animate_image",
+                    user.unwrap_or_default(),
                     None,
                 )
             } else {
@@ -678,10 +697,10 @@ impl Service {
                 )
             };
             let result=async {
-                markers.clone()?;
+                let contract = built.clone()?.contract;
                 if user.chars().count()>steps::CONTEXT_LIMIT{return Err("story_context_limit");}
                 let parameters=profiles::resolve(&profile.profile.generation,&draft.request.provider,operation)?;
-                let system=system_with_images(&profile,key,&draft.request.images,draft.request.add_dialogue)?;
+                let system=if !expand && draft.request.operation==Operation::Outline {system_for(&profile,key,&contract)?} else {system_with_images(&profile,key,&draft.request.images,draft.request.add_dialogue)?};
                 tokio::select!{biased;_=cancel.cancelled()=>Err("authoring_cancelled"),result=transport.authoring_complete(&provider,&draft.request.provider,&system,&user,&parameters,&images)=>result}
             }.await;
             let mut jobs = self.jobs.lock().unwrap();
@@ -696,9 +715,11 @@ impl Service {
             }
             let result = result.and_then(|text| {
                 if expand {
-                    steps::accept_expansion(&mut j.draft, index, &text, &markers?)?;
+                    steps::accept_expansion(&mut j.draft, index, &text, &built?.references)?;
                 } else if draft.request.operation == Operation::Outline {
-                    steps::accept_outline(&mut j.draft, &text, &markers?)?;
+                    steps::accept_outline(&mut j.draft, &text, &built?)?;
+                } else if draft.request.operation == Operation::Animate {
+                    steps::accept_animate(&mut j.draft, &text)?;
                 } else {
                     if text.len() > 65536 {
                         return Err("story_text_limit");

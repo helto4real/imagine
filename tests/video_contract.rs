@@ -815,6 +815,16 @@ fn rational_comparison_matches_exact_small_integer_oracle() {
 }
 #[test]
 fn checked_in_schemas_and_examples_follow_rust_types() {
+    if std::env::var_os("IMAGINE_UPDATE_CONTRACT_SCHEMAS").is_some() {
+        std::fs::write(
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/design/video-contract/schemas.json"
+            ),
+            serde_json::to_string_pretty(&schemas()).unwrap() + "\n",
+        )
+        .unwrap();
+    }
     let checked: Value =
         serde_json::from_str(include_str!("../design/video-contract/schemas.json")).unwrap();
     assert_eq!(schemas(), checked);

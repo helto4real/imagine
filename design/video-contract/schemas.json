@@ -5331,5 +5331,1536 @@
         ]
       }
     }
+  },
+  "authoring_request": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Request",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      },
+      "expected_project_revision": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "provider_profile_id": {
+        "type": "string"
+      },
+      "provider": {
+        "type": "string"
+      },
+      "prompt_profile_id": {
+        "type": "string"
+      },
+      "operation": {
+        "$ref": "#/$defs/Operation"
+      },
+      "scene_field": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/SceneField"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "scene_id": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "default": null
+      },
+      "section_id": {
+        "type": [
+          "string",
+          "null"
+        ],
+        "default": null
+      },
+      "brief": {
+        "type": "string",
+        "default": ""
+      },
+      "instruction": {
+        "type": "string",
+        "default": ""
+      },
+      "duration_seconds": {
+        "type": "number",
+        "format": "double"
+      },
+      "destination": {
+        "$ref": "#/$defs/Destination",
+        "default": "append"
+      },
+      "cast": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "default": []
+      },
+      "images": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/StoryImage"
+        },
+        "default": []
+      },
+      "add_dialogue": {
+        "type": "boolean",
+        "default": false
+      },
+      "add_music": {
+        "description": "Audience-only music in the Story; off clears what the model writes, as\nin Director.",
+        "type": "boolean",
+        "default": false
+      },
+      "context": {
+        "description": "A conversation and the cast's current visible state, sent as\nDirector's Story bridge context. Without it, `brief` is the story.",
+        "anyOf": [
+          {
+            "$ref": "#/$defs/StoryContext"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "mentions": {
+        "description": "Animate: cast members the instruction names.",
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/Mention"
+        }
+      },
+      "add_ambient_sound": {
+        "description": "Animate: ask for background sound.",
+        "type": "boolean"
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "schema_version",
+      "expected_project_revision",
+      "provider_profile_id",
+      "provider",
+      "prompt_profile_id",
+      "operation",
+      "duration_seconds"
+    ],
+    "$defs": {
+      "Operation": {
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "outline",
+              "enhance_scene",
+              "enhance_section"
+            ]
+          },
+          {
+            "description": "Every Scene field and Section prompt of one Scene, reviewed side by\nside, as Director's Enhance mode.",
+            "type": "string",
+            "const": "enhance_scene_all"
+          },
+          {
+            "description": "A Scene's description, first Section prompt and ambient sound written\nfrom its First frame, as Director's Animate image.",
+            "type": "string",
+            "const": "animate"
+          }
+        ]
+      },
+      "SceneField": {
+        "type": "string",
+        "enum": [
+          "description",
+          "summary",
+          "ambient_sound",
+          "non_diegetic_music"
+        ]
+      },
+      "Destination": {
+        "type": "string",
+        "enum": [
+          "append",
+          "replace",
+          "continue"
+        ]
+      },
+      "StoryImage": {
+        "type": "object",
+        "properties": {
+          "pair_with": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/$defs/ImageUse"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "asset",
+          "label",
+          "usage"
+        ]
+      },
+      "ImageUse": {
+        "type": "string",
+        "enum": [
+          "setting_reference",
+          "required_moment",
+          "start_frame",
+          "end_frame"
+        ]
+      },
+      "StoryContext": {
+        "description": "The story a client holds as a conversation, with what must stay true.",
+        "type": "object",
+        "properties": {
+          "earlier_continuity": {
+            "description": "Older events, oldest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ContextMessage"
+            },
+            "default": []
+          },
+          "latest_moment": {
+            "description": "The moment the Story starts from.",
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ContextMessage"
+            }
+          },
+          "cast_state": {
+            "description": "Current visible state of cast members selected in `Request.cast`.",
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/CastState"
+            },
+            "default": []
+          },
+          "protected_facts": {
+            "description": "Facts the model must not contradict.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "latest_moment"
+        ]
+      },
+      "ContextMessage": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "description": "`user` or `assistant`.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The speaker; the role stands in when empty.",
+            "type": "string",
+            "default": ""
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "text"
+        ]
+      },
+      "CastState": {
+        "type": "object",
+        "properties": {
+          "reference_id": {
+            "description": "A project `VisualReference.id` selected in `Request.cast`.",
+            "type": "string"
+          },
+          "current_appearance": {
+            "$ref": "#/$defs/Appearance"
+          },
+          "fallback_wardrobe": {
+            "description": "Wardrobe the model may use when the story states none.",
+            "type": "string",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reference_id",
+          "current_appearance"
+        ]
+      },
+      "Appearance": {
+        "type": "object",
+        "properties": {
+          "exposure": {
+            "description": "`not_stated`, `clothed`, `partially_clothed` or `nude`.",
+            "type": "string"
+          },
+          "garments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "worn_items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "temporary_traits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "visible_body_state": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "exposure"
+        ]
+      },
+      "Mention": {
+        "description": "Text in an Animate instruction that names a selected cast member.",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "reference_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "reference_id"
+        ]
+      }
+    }
+  },
+  "authoring_review": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Review",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      },
+      "outline": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Storyboard"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "scenes": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StoryScene"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "text": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "fields": {
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "$ref": "#/$defs/FieldProposal"
+        },
+        "default": null
+      },
+      "animate": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/AnimateProposal"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "schema_version"
+    ],
+    "$defs": {
+      "Storyboard": {
+        "type": "object",
+        "properties": {
+          "scenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/StoryScene"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scenes"
+        ]
+      },
+      "StoryScene": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "ambient_sound": {
+            "type": "string"
+          },
+          "non_diegetic_music": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number",
+            "format": "double"
+          },
+          "boundary_from_previous": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/StorySection"
+            }
+          },
+          "image_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "summary",
+          "description",
+          "ambient_sound",
+          "non_diegetic_music",
+          "weight",
+          "boundary_from_previous",
+          "sections"
+        ]
+      },
+      "StorySection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "summary": {
+            "description": "A Section summary an expansion may write, as in Director; never applied.",
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number",
+            "format": "double"
+          },
+          "image_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "first_frame_id": {
+            "type": "string",
+            "default": ""
+          },
+          "last_frame_id": {
+            "type": "string",
+            "default": ""
+          },
+          "dialogue_intent": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DialogueIntent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "prompt",
+          "weight"
+        ]
+      },
+      "DialogueIntent": {
+        "type": "object",
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "max_turns": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "participants",
+          "purpose"
+        ]
+      },
+      "FieldProposal": {
+        "description": "One row of a whole-Scene enhancement: the text when it was proposed and\nthe proposal, editable, applied only when included.",
+        "type": "object",
+        "properties": {
+          "target": {
+            "$ref": "#/$defs/FieldTarget"
+          },
+          "original": {
+            "type": "string"
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "failure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "include": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "target",
+          "original"
+        ]
+      },
+      "FieldTarget": {
+        "description": "The text one row of a whole-Scene enhancement proposes for.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "scene"
+              },
+              "field": {
+                "$ref": "#/$defs/SceneField"
+              }
+            },
+            "required": [
+              "kind",
+              "field"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "section"
+              },
+              "section_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "section_id"
+            ]
+          }
+        ]
+      },
+      "SceneField": {
+        "type": "string",
+        "enum": [
+          "description",
+          "summary",
+          "ambient_sound",
+          "non_diegetic_music"
+        ]
+      },
+      "AnimateProposal": {
+        "description": "What Animate writes for a Scene, editable before Apply.",
+        "type": "object",
+        "properties": {
+          "description": {
+            "description": "The Scene description.",
+            "type": "string"
+          },
+          "prompt": {
+            "description": "The first Section's prompt.",
+            "type": "string"
+          },
+          "ambient_sound": {
+            "description": "The Scene's ambient sound.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "description",
+          "prompt",
+          "ambient_sound"
+        ]
+      }
+    }
+  },
+  "authoring_draft": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Draft",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      },
+      "id": {
+        "type": "string"
+      },
+      "project_id": {
+        "type": "string"
+      },
+      "request": {
+        "$ref": "#/$defs/Request"
+      },
+      "phase": {
+        "$ref": "#/$defs/Phase"
+      },
+      "outline": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Storyboard"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "scenes": {
+        "type": "array",
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StoryScene"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "text": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "failure": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "failed_index": {
+        "type": [
+          "integer",
+          "null"
+        ],
+        "format": "uint",
+        "minimum": 0
+      },
+      "prompt_profile_id": {
+        "type": "string"
+      },
+      "prompt_profile_revision": {
+        "type": "string"
+      },
+      "profile_warning": {
+        "type": "string"
+      },
+      "provider_snapshot": true,
+      "planned_durations": {
+        "type": "array",
+        "items": {
+          "type": "number",
+          "format": "double"
+        },
+        "default": []
+      },
+      "inventory": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/InventoryNote"
+        },
+        "default": []
+      },
+      "selected_cast": {
+        "default": null
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "fields": {
+        "description": "The rows of a whole-Scene enhancement.",
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/FieldProposal"
+        }
+      },
+      "production": {
+        "description": "Model and continuity per outline Scene, chosen by an external agent.",
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Production"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "opening_appearance": {
+        "description": "With a context's cast state, each character's opening appearance as\nthe outline resolved it (Director's `opening_appearance`)."
+      },
+      "animate": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/AnimateProposal"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "required": [
+      "schema_version",
+      "id",
+      "project_id",
+      "request",
+      "phase",
+      "scenes",
+      "prompt_profile_id",
+      "prompt_profile_revision",
+      "profile_warning",
+      "provider_snapshot"
+    ],
+    "$defs": {
+      "Request": {
+        "type": "object",
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          },
+          "expected_project_revision": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          },
+          "provider_profile_id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "prompt_profile_id": {
+            "type": "string"
+          },
+          "operation": {
+            "$ref": "#/$defs/Operation"
+          },
+          "scene_field": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/SceneField"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scene_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "section_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "brief": {
+            "type": "string",
+            "default": ""
+          },
+          "instruction": {
+            "type": "string",
+            "default": ""
+          },
+          "duration_seconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "destination": {
+            "$ref": "#/$defs/Destination",
+            "default": "append"
+          },
+          "cast": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/StoryImage"
+            },
+            "default": []
+          },
+          "add_dialogue": {
+            "type": "boolean",
+            "default": false
+          },
+          "add_music": {
+            "description": "Audience-only music in the Story; off clears what the model writes, as\nin Director.",
+            "type": "boolean",
+            "default": false
+          },
+          "context": {
+            "description": "A conversation and the cast's current visible state, sent as\nDirector's Story bridge context. Without it, `brief` is the story.",
+            "anyOf": [
+              {
+                "$ref": "#/$defs/StoryContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mentions": {
+            "description": "Animate: cast members the instruction names.",
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/Mention"
+            }
+          },
+          "add_ambient_sound": {
+            "description": "Animate: ask for background sound.",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "expected_project_revision",
+          "provider_profile_id",
+          "provider",
+          "prompt_profile_id",
+          "operation",
+          "duration_seconds"
+        ]
+      },
+      "Operation": {
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "outline",
+              "enhance_scene",
+              "enhance_section"
+            ]
+          },
+          {
+            "description": "Every Scene field and Section prompt of one Scene, reviewed side by\nside, as Director's Enhance mode.",
+            "type": "string",
+            "const": "enhance_scene_all"
+          },
+          {
+            "description": "A Scene's description, first Section prompt and ambient sound written\nfrom its First frame, as Director's Animate image.",
+            "type": "string",
+            "const": "animate"
+          }
+        ]
+      },
+      "SceneField": {
+        "type": "string",
+        "enum": [
+          "description",
+          "summary",
+          "ambient_sound",
+          "non_diegetic_music"
+        ]
+      },
+      "Destination": {
+        "type": "string",
+        "enum": [
+          "append",
+          "replace",
+          "continue"
+        ]
+      },
+      "StoryImage": {
+        "type": "object",
+        "properties": {
+          "pair_with": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "asset": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/$defs/ImageUse"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "asset",
+          "label",
+          "usage"
+        ]
+      },
+      "ImageUse": {
+        "type": "string",
+        "enum": [
+          "setting_reference",
+          "required_moment",
+          "start_frame",
+          "end_frame"
+        ]
+      },
+      "StoryContext": {
+        "description": "The story a client holds as a conversation, with what must stay true.",
+        "type": "object",
+        "properties": {
+          "earlier_continuity": {
+            "description": "Older events, oldest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ContextMessage"
+            },
+            "default": []
+          },
+          "latest_moment": {
+            "description": "The moment the Story starts from.",
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ContextMessage"
+            }
+          },
+          "cast_state": {
+            "description": "Current visible state of cast members selected in `Request.cast`.",
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/CastState"
+            },
+            "default": []
+          },
+          "protected_facts": {
+            "description": "Facts the model must not contradict.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "latest_moment"
+        ]
+      },
+      "ContextMessage": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "description": "`user` or `assistant`.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The speaker; the role stands in when empty.",
+            "type": "string",
+            "default": ""
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "text"
+        ]
+      },
+      "CastState": {
+        "type": "object",
+        "properties": {
+          "reference_id": {
+            "description": "A project `VisualReference.id` selected in `Request.cast`.",
+            "type": "string"
+          },
+          "current_appearance": {
+            "$ref": "#/$defs/Appearance"
+          },
+          "fallback_wardrobe": {
+            "description": "Wardrobe the model may use when the story states none.",
+            "type": "string",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "reference_id",
+          "current_appearance"
+        ]
+      },
+      "Appearance": {
+        "type": "object",
+        "properties": {
+          "exposure": {
+            "description": "`not_stated`, `clothed`, `partially_clothed` or `nude`.",
+            "type": "string"
+          },
+          "garments": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "worn_items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "temporary_traits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "visible_body_state": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "exposure"
+        ]
+      },
+      "Mention": {
+        "description": "Text in an Animate instruction that names a selected cast member.",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "reference_id": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "reference_id"
+        ]
+      },
+      "Phase": {
+        "type": "string",
+        "enum": [
+          "inventory",
+          "running",
+          "outline",
+          "expanding",
+          "review",
+          "failed",
+          "cancelled",
+          "applied"
+        ]
+      },
+      "Storyboard": {
+        "type": "object",
+        "properties": {
+          "scenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/StoryScene"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scenes"
+        ]
+      },
+      "StoryScene": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "ambient_sound": {
+            "type": "string"
+          },
+          "non_diegetic_music": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number",
+            "format": "double"
+          },
+          "boundary_from_previous": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/StorySection"
+            }
+          },
+          "image_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "summary",
+          "description",
+          "ambient_sound",
+          "non_diegetic_music",
+          "weight",
+          "boundary_from_previous",
+          "sections"
+        ]
+      },
+      "StorySection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "summary": {
+            "description": "A Section summary an expansion may write, as in Director; never applied.",
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number",
+            "format": "double"
+          },
+          "image_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "first_frame_id": {
+            "type": "string",
+            "default": ""
+          },
+          "last_frame_id": {
+            "type": "string",
+            "default": ""
+          },
+          "dialogue_intent": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DialogueIntent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "prompt",
+          "weight"
+        ]
+      },
+      "DialogueIntent": {
+        "type": "object",
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "max_turns": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "participants",
+          "purpose"
+        ]
+      },
+      "InventoryNote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "note"
+        ]
+      },
+      "FieldProposal": {
+        "description": "One row of a whole-Scene enhancement: the text when it was proposed and\nthe proposal, editable, applied only when included.",
+        "type": "object",
+        "properties": {
+          "target": {
+            "$ref": "#/$defs/FieldTarget"
+          },
+          "original": {
+            "type": "string"
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "failure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "include": {
+            "type": "boolean",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "target",
+          "original"
+        ]
+      },
+      "FieldTarget": {
+        "description": "The text one row of a whole-Scene enhancement proposes for.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "scene"
+              },
+              "field": {
+                "$ref": "#/$defs/SceneField"
+              }
+            },
+            "required": [
+              "kind",
+              "field"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "const": "section"
+              },
+              "section_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "section_id"
+            ]
+          }
+        ]
+      },
+      "Production": {
+        "description": "Choices the prompt profiles do not write, aligned to the outline's Scenes.",
+        "type": "object",
+        "properties": {
+          "scenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ProductionScene"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scenes"
+        ]
+      },
+      "ProductionScene": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "description": "A preset key from the MCP preset catalog; it fixes the model variant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model": {
+            "description": "Without a preset, the variant's default preset.",
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ProductionModel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "continuity": {
+            "description": "Only for a Scene whose boundary is a continuous shot.",
+            "anyOf": [
+              {
+                "$ref": "#/$defs/ContinuityChoice"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "rationale": {
+            "description": "A planning note; never compiled into a prompt.",
+            "type": "string",
+            "default": ""
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProductionModel": {
+        "type": "string",
+        "enum": [
+          "reference",
+          "i2v"
+        ]
+      },
+      "ContinuityChoice": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "description": "`auto` (none) resolves by the target variant.",
+            "$ref": "#/$defs/Choice",
+            "default": "auto"
+          },
+          "include_audio": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "Choice": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Auto"
+          },
+          {
+            "$ref": "#/$defs/ContinuityMethod"
+          }
+        ]
+      },
+      "Auto": {
+        "type": "string",
+        "enum": [
+          "auto"
+        ]
+      },
+      "ContinuityMethod": {
+        "type": "string",
+        "enum": [
+          "last_frame_first_frame",
+          "combo",
+          "influence",
+          "motion_context",
+          "motion_context_exp"
+        ]
+      },
+      "AnimateProposal": {
+        "description": "What Animate writes for a Scene, editable before Apply.",
+        "type": "object",
+        "properties": {
+          "description": {
+            "description": "The Scene description.",
+            "type": "string"
+          },
+          "prompt": {
+            "description": "The first Section's prompt.",
+            "type": "string"
+          },
+          "ambient_sound": {
+            "description": "The Scene's ambient sound.",
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "description",
+          "prompt",
+          "ambient_sound"
+        ]
+      }
+    }
   }
 }

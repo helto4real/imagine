@@ -238,6 +238,556 @@ fn cast_records(draft: &Draft, base: &VideoProject) -> Py {
         .collect::<Vec<_>>();
     director::cast_records(&members)
 }
+/// The longest rendered conversation Director's Story bridge accepts.
+const MAX_STORY_CONTEXT_CHARS: usize = 200000;
+/// A Story context as Director's Story bridge receives it.
+pub struct Bridge {
+    /// The rendered conversation, Director's `story`.
+    pub story: String,
+    /// `grounding_context`, or null without cast state and protected facts.
+    pub grounding: Py,
+    /// `opening_appearance_context`, or null without cast state.
+    pub opening: Py,
+}
+fn context_error(at: impl Into<String>, reason: &str) -> Rejection {
+    located("story_context_invalid", at, reason)
+}
+fn located(code: &'static str, at: impl Into<String>, reason: &str) -> Rejection {
+    let mut rejection = Rejection::new(code, at);
+    rejection.detail = Some(reason.into());
+    rejection
+}
+/// Messages as `[name] text` lines, the role standing in for an empty name.
+fn transcript(messages: &[ContextMessage]) -> String {
+    messages
+        .iter()
+        .map(|m| {
+            let name = m.name.pytrim();
+            format!(
+                "[{}] {}",
+                if name.is_empty() { &m.role } else { name },
+                m.text
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+fn check_messages(messages: &[ContextMessage], at: &str) -> std::result::Result<(), Rejection> {
+    for (i, message) in messages.iter().enumerate() {
+        if !["user", "assistant"].contains(&message.role.as_str()) {
+            return Err(context_error(
+                format!("{at}[{i}].role"),
+                "must be user or assistant",
+            ));
+        }
+        if message.text.pytrim().is_empty() {
+            return Err(context_error(
+                format!("{at}[{i}].text"),
+                "must not be empty",
+            ));
+        }
+    }
+    Ok(())
+}
+/// Director's grounding path as the request's: `$.characters[i]` is
+/// `context.cast_state[i]`, whose reference stands for the ID and tag.
+fn context_path(invalid: &director::Invalid) -> String {
+    let path = invalid.path.replacen('$', "context", 1);
+    let path = path.replacen("context.characters", "context.cast_state", 1);
+    path.replace(".character_id", ".reference_id")
+        .replace(".reference_tag", ".reference_id")
+}
+/// The request's Story context as Director's bridge receives it, validated
+/// by Director's own rules; errors name where in the request.
+pub fn bridge(
+    request: &Request,
+    base: &VideoProject,
+) -> std::result::Result<Option<Bridge>, Rejection> {
+    let Some(context) = &request.context else {
+        return Ok(None);
+    };
+    if !request.brief.is_empty() {
+        return Err(context_error("brief", "must be empty with a context"));
+    }
+    if context.latest_moment.is_empty() {
+        return Err(context_error("context.latest_moment", "must not be empty"));
+    }
+    check_messages(&context.earlier_continuity, "context.earlier_continuity")?;
+    check_messages(&context.latest_moment, "context.latest_moment")?;
+    let latest = format!(
+        "<latest_moment>\n{}\n</latest_moment>",
+        transcript(&context.latest_moment)
+    );
+    let story = if context.earlier_continuity.is_empty() {
+        latest
+    } else {
+        format!(
+            "<earlier_continuity>\n{}\n</earlier_continuity>\n\n{latest}",
+            transcript(&context.earlier_continuity)
+        )
+    };
+    if story.chars().count() > MAX_STORY_CONTEXT_CHARS {
+        return Err(context_error("context", "exceeds the story context limit"));
+    }
+    let mut characters = vec![];
+    let mut roster = vec![];
+    for (i, state) in context.cast_state.iter().enumerate() {
+        let at = format!("context.cast_state[{i}].reference_id");
+        let reference = base
+            .creative
+            .references
+            .iter()
+            .find(|r| r.id == state.reference_id && r.enabled)
+            .filter(|_| request.cast.contains(&state.reference_id))
+            .ok_or_else(|| context_error(&at, "must be an enabled member of cast"))?;
+        let tag = format!(
+            "@{}",
+            imagine_video_contract::creative::reference_alias(&reference.alias)
+        );
+        let appearance = &state.current_appearance;
+        characters.push(Py::obj([
+            ("character_id", Py::str(&state.reference_id)),
+            ("reference_tag", Py::str(&tag)),
+            (
+                "current_appearance",
+                Py::obj([
+                    ("exposure", Py::str(&appearance.exposure)),
+                    ("garments", Py::strs(&appearance.garments)),
+                    ("worn_items", Py::strs(&appearance.worn_items)),
+                    ("temporary_traits", Py::strs(&appearance.temporary_traits)),
+                    (
+                        "visible_body_state",
+                        Py::strs(&appearance.visible_body_state),
+                    ),
+                ]),
+            ),
+        ]));
+        roster.push(Py::obj([
+            ("character_id", Py::str(&state.reference_id)),
+            ("reference_tag", Py::Str(tag)),
+            ("fallback_wardrobe", Py::str(&state.fallback_wardrobe)),
+        ]));
+    }
+    if characters.is_empty() && context.protected_facts.is_empty() {
+        return Ok(Some(Bridge {
+            story,
+            grounding: Py::Null,
+            opening: Py::Null,
+        }));
+    }
+    use sha2::Digest;
+    let digest = Py::Str(format!(
+        "sha256:{:x}",
+        sha2::Sha256::digest(serde_json::to_vec(context).unwrap())
+    ));
+    let grounding = director::normalize_grounding(&Py::obj([
+        ("schema_version", Py::str("1.0")),
+        ("source_digest", digest.clone()),
+        ("characters", Py::List(characters)),
+        ("protected_facts", Py::strs(&context.protected_facts)),
+    ]))
+    .map_err(|e| context_error(context_path(&e), e.reason))?;
+    let opening = if roster.is_empty() {
+        Py::Null
+    } else {
+        director::normalize_opening(
+            &Py::obj([
+                ("schema_version", Py::str("1.0")),
+                ("source_digest", digest),
+                ("characters", Py::List(roster)),
+            ]),
+            &grounding,
+        )
+        .map_err(|e| context_error(context_path(&e), e.reason))?
+    };
+    Ok(Some(Bridge {
+        story,
+        grounding,
+        opening,
+    }))
+}
+fn bridged(request: &Request, base: &VideoProject) -> Result<Option<Bridge>> {
+    bridge(request, base).map_err(|r| r.code)
+}
+/// The longest Animate scene context, as Director's `animate_image` contract.
+const MAX_ANIMATE_MESSAGES: usize = 10;
+fn animate_error(at: impl Into<String>, reason: &str) -> Rejection {
+    located("animate_context_invalid", at, reason)
+}
+/// Animate's target Scene and its First frame.
+fn animate_scene<'a>(
+    request: &Request,
+    base: &'a VideoProject,
+) -> std::result::Result<&'a Scene, Rejection> {
+    let scene = request
+        .scene_id
+        .as_ref()
+        .and_then(|id| base.scene(id).ok())
+        .ok_or_else(|| Rejection::new("scene_not_found", "scene_id"))?;
+    if scene.sections.first().is_none_or(|s| s.start.num != 0) {
+        return Err(located(
+            "animate_scene_invalid",
+            "scene_id",
+            "the first Section must start at 0",
+        ));
+    }
+    let frames = scene
+        .bindings
+        .iter()
+        .filter(|b| {
+            b.role == InputRole::FirstFrame
+                && base
+                    .assets
+                    .get(&b.asset)
+                    .is_some_and(|a| a.kind == MediaKind::Image)
+        })
+        .collect::<Vec<_>>();
+    if frames.is_empty() {
+        return Err(located(
+            "animate_first_frame_missing",
+            "scene_id",
+            "the Scene has no First frame image",
+        ));
+    }
+    if !frames.iter().any(|b| b.enabled) {
+        return Err(located(
+            "animate_first_frame_disabled",
+            "scene_id",
+            "the Scene's First frame is disabled",
+        ));
+    }
+    Ok(scene)
+}
+/// The enabled cast reference `id` of the request.
+fn cast_reference<'a>(
+    request: &Request,
+    base: &'a VideoProject,
+    id: &str,
+) -> Option<&'a imagine_video_contract::creative::VisualReference> {
+    base.creative
+        .references
+        .iter()
+        .find(|r| r.id == id && r.enabled)
+        .filter(|_| request.cast.iter().any(|c| c == id))
+}
+/// Each cast state's appearance as Director's grounding normalizes it.
+fn animate_states(
+    request: &Request,
+    base: &VideoProject,
+) -> std::result::Result<Vec<(String, Py, String)>, Rejection> {
+    let Some(context) = &request.context else {
+        return Ok(vec![]);
+    };
+    let mut characters = vec![];
+    let mut roster = vec![];
+    for (i, state) in context.cast_state.iter().enumerate() {
+        let reference = cast_reference(request, base, &state.reference_id).ok_or_else(|| {
+            animate_error(
+                format!("context.cast_state[{i}].reference_id"),
+                "must be an enabled member of cast",
+            )
+        })?;
+        let tag = format!(
+            "@{}",
+            imagine_video_contract::creative::reference_alias(&reference.alias)
+        );
+        let appearance = &state.current_appearance;
+        characters.push(Py::obj([
+            ("character_id", Py::str(&state.reference_id)),
+            ("reference_tag", Py::str(&tag)),
+            (
+                "current_appearance",
+                Py::obj([
+                    ("exposure", Py::str(&appearance.exposure)),
+                    ("garments", Py::strs(&appearance.garments)),
+                    ("worn_items", Py::strs(&appearance.worn_items)),
+                    ("temporary_traits", Py::strs(&appearance.temporary_traits)),
+                    (
+                        "visible_body_state",
+                        Py::strs(&appearance.visible_body_state),
+                    ),
+                ]),
+            ),
+        ]));
+        roster.push(Py::obj([
+            ("character_id", Py::str(&state.reference_id)),
+            ("reference_tag", Py::Str(tag)),
+            ("fallback_wardrobe", Py::str(&state.fallback_wardrobe)),
+        ]));
+    }
+    let digest = Py::Str(format!("sha256:{}", "0".repeat(64)));
+    let grounding = director::normalize_grounding(&Py::obj([
+        ("schema_version", Py::str("1.0")),
+        ("source_digest", digest.clone()),
+        ("characters", Py::List(characters)),
+        ("protected_facts", Py::List(vec![])),
+    ]))
+    .map_err(|e| animate_error(context_path(&e), e.reason))?;
+    let opening = director::normalize_opening(
+        &Py::obj([
+            ("schema_version", Py::str("1.0")),
+            ("source_digest", digest),
+            ("characters", Py::List(roster)),
+        ]),
+        &grounding,
+    )
+    .map_err(|e| animate_error(context_path(&e), e.reason))?;
+    Ok(grounding
+        .at("characters")
+        .as_list()
+        .unwrap()
+        .iter()
+        .zip(opening.at("characters").as_list().unwrap())
+        .map(|(c, o)| {
+            (
+                c.at("character_id").text(),
+                c.at("current_appearance").clone(),
+                o.at("fallback_wardrobe").text(),
+            )
+        })
+        .collect())
+}
+/// An Animate request's Scene, First frame, context, cast and mentions,
+/// checked before anything starts; errors name where.
+pub fn animate_check(request: &Request, base: &VideoProject) -> std::result::Result<(), Rejection> {
+    if request.provider == EXTERNAL {
+        return Err(located(
+            "animate_external_unsupported",
+            "provider",
+            "Animate runs on the provider path only",
+        ));
+    }
+    animate_scene(request, base)?;
+    if !(1.0..=15.0).contains(&request.duration_seconds) {
+        return Err(animate_error("duration_seconds", "must be from 1 to 15"));
+    }
+    for (field, unused) in [
+        ("brief", !request.brief.is_empty()),
+        ("images", !request.images.is_empty()),
+        ("section_id", request.section_id.is_some()),
+    ] {
+        if unused {
+            return Err(animate_error(field, "is not used by Animate"));
+        }
+    }
+    for (i, id) in request.cast.iter().enumerate() {
+        if cast_reference(request, base, id).is_none() {
+            return Err(animate_error(
+                format!("cast[{i}]"),
+                "must be an enabled reference",
+            ));
+        }
+    }
+    for (i, mention) in request.mentions.iter().enumerate() {
+        if !request.cast.contains(&mention.reference_id) {
+            return Err(animate_error(
+                format!("mentions[{i}].reference_id"),
+                "must be a member of cast",
+            ));
+        }
+    }
+    if let Some(context) = &request.context {
+        if !context.earlier_continuity.is_empty() {
+            return Err(animate_error(
+                "context.earlier_continuity",
+                "is not used by Animate",
+            ));
+        }
+        if !context.protected_facts.is_empty() {
+            return Err(animate_error(
+                "context.protected_facts",
+                "is not used by Animate",
+            ));
+        }
+        if context.latest_moment.len() > MAX_ANIMATE_MESSAGES {
+            return Err(animate_error(
+                "context.latest_moment",
+                "must contain at most 10 messages",
+            ));
+        }
+        for (i, message) in context.latest_moment.iter().enumerate() {
+            if !["user", "assistant"].contains(&message.role.as_str()) {
+                return Err(animate_error(
+                    format!("context.latest_moment[{i}].role"),
+                    "must be user or assistant",
+                ));
+            }
+        }
+    }
+    animate_states(request, base)?;
+    Ok(())
+}
+/// A cast member's appearance as one text: its description, then the
+/// context's current state, one labelled line each.
+fn appearance_text(description: &str, state: Option<&(String, Py, String)>) -> String {
+    let mut lines = vec![];
+    if !description.pytrim().is_empty() {
+        lines.push(description.pytrim().to_owned());
+    }
+    if let Some((_, appearance, fallback)) = state {
+        lines.push(format!("Exposure: {}", appearance.at("exposure").text()));
+        for (field, label) in [
+            ("garments", "Garments"),
+            ("worn_items", "Worn items"),
+            ("temporary_traits", "Temporary traits"),
+            ("visible_body_state", "Visible body state"),
+        ] {
+            let items = appearance
+                .at(field)
+                .as_list()
+                .unwrap_or_default()
+                .iter()
+                .map(Py::text)
+                .collect::<Vec<_>>();
+            if !items.is_empty() {
+                lines.push(format!("{label}: {}", items.join("; ")));
+            }
+        }
+        if !fallback.is_empty() {
+            lines.push(format!("Fallback wardrobe: {fallback}"));
+        }
+    }
+    lines.join("\n")
+}
+fn gcd(a: u32, b: u32) -> u32 {
+    if b == 0 { a.max(1) } else { gcd(b, a % b) }
+}
+/// Director's `animate_image` request for this Draft, without its image.
+pub fn animate_request(draft: &Draft, base: &VideoProject) -> Result<Py> {
+    let request = &draft.request;
+    let states = animate_states(request, base).map_err(|r| r.code)?;
+    let messages = request
+        .context
+        .as_ref()
+        .map(|c| c.latest_moment.as_slice())
+        .unwrap_or_default();
+    let characters = request
+        .cast
+        .iter()
+        .filter_map(|id| cast_reference(request, base, id))
+        .map(|r| {
+            Py::obj([
+                ("id", Py::str(&r.id)),
+                ("name", Py::str(&r.name)),
+                (
+                    "appearance",
+                    Py::Str(appearance_text(
+                        &r.description,
+                        states.iter().find(|s| s.0 == r.id),
+                    )),
+                ),
+            ])
+        })
+        .collect();
+    let (width, height) = (base.delivery.width, base.delivery.height);
+    let divisor = gcd(width, height);
+    Ok(Py::obj([
+        ("schema_version", Py::Int(1)),
+        ("operation", Py::str("animate_image")),
+        (
+            "scene_context",
+            Py::obj([(
+                "messages",
+                Py::List(
+                    messages
+                        .iter()
+                        .map(|m| {
+                            Py::obj([
+                                ("role", Py::str(&m.role)),
+                                ("name", Py::str(&m.name)),
+                                ("text", Py::str(&m.text)),
+                            ])
+                        })
+                        .collect(),
+                ),
+            )]),
+        ),
+        ("active_characters", Py::List(characters)),
+        (
+            "user_instruction",
+            Py::obj([
+                ("text", Py::str(&request.instruction)),
+                (
+                    "mentions",
+                    Py::List(
+                        request
+                            .mentions
+                            .iter()
+                            .map(|m| {
+                                Py::obj([
+                                    ("text", Py::str(&m.text)),
+                                    ("character_id", Py::str(&m.reference_id)),
+                                ])
+                            })
+                            .collect(),
+                    ),
+                ),
+            ]),
+        ),
+        (
+            "audio_request",
+            Py::obj([
+                ("generate_dialogue", Py::Bool(request.add_dialogue)),
+                (
+                    "generate_background_sound",
+                    Py::Bool(request.add_ambient_sound),
+                ),
+            ]),
+        ),
+        (
+            "generation_context",
+            Py::obj([
+                ("duration_seconds", Py::js(request.duration_seconds)),
+                (
+                    "aspect_ratio",
+                    Py::Str(format!("{}:{}", width / divisor, height / divisor)),
+                ),
+                (
+                    "orientation",
+                    Py::str(if width >= height {
+                        "Landscape"
+                    } else {
+                        "Portrait"
+                    }),
+                ),
+            ]),
+        ),
+    ]))
+}
+pub fn animate_message(draft: &Draft, base: &VideoProject) -> Result<String> {
+    Ok(director::build_animate(&animate_request(draft, base)?))
+}
+/// Accepts an Animate answer: exactly `description`, `prompt` and
+/// `ambient_sound`, each a string; nothing is repaired.
+pub fn accept_animate(draft: &mut Draft, text: &str) -> Result<()> {
+    let value = Py::parse(text).ok_or("animate_response_invalid")?;
+    let [description, prompt, ambient_sound] =
+        director::animate_content(&value).map_err(|_| "animate_response_invalid")?;
+    if [&description, &prompt, &ambient_sound]
+        .iter()
+        .any(|t| t.len() > 65536)
+    {
+        return Err("story_text_limit");
+    }
+    draft.animate = Some(AnimateProposal {
+        description,
+        prompt,
+        ambient_sound,
+    });
+    Ok(())
+}
+/// A request's operation-specific inputs, checked before anything starts.
+pub fn check(request: &Request, base: &VideoProject) -> std::result::Result<(), Rejection> {
+    match request.operation {
+        Operation::Animate => animate_check(request, base),
+        Operation::Outline => bridge(request, base).map(|_| ()),
+        _ if request.context.is_some() => Err(context_error(
+            "context",
+            "is used by Outline and Animate only",
+        )),
+        _ => Ok(()),
+    }
+}
 /// The inventory note of each story image, or a slot an agent fills.
 pub enum Notes<'a> {
     Known(&'a [InventoryNote]),
@@ -262,6 +812,7 @@ pub fn inventory_message(selection: &StoryImage, instruction: &str) -> String {
 pub fn outline_request(draft: &Draft, base: &VideoProject, notes: Notes) -> Result<Py> {
     let request = &draft.request;
     let contract = visuals::contract(&request.images, request.add_dialogue)?;
+    let bridge = bridged(request, base)?;
     let note = |id: &str| match &notes {
         Notes::Known(notes) => notes
             .iter()
@@ -270,10 +821,13 @@ pub fn outline_request(draft: &Draft, base: &VideoProject, notes: Notes) -> Resu
             .unwrap_or_default(),
         Notes::Slots => note_slot(id),
     };
-    Ok(Py::obj([
+    let mut out = Py::obj([
         ("operation", Py::str("story_outline")),
         ("user_instruction", Py::str(&request.instruction)),
-        ("story", Py::str(&request.brief)),
+        (
+            "story",
+            Py::str(bridge.as_ref().map_or(&request.brief, |b| &b.story)),
+        ),
         ("cast", cast_records(draft, base)),
         (
             "continuation_context",
@@ -291,7 +845,12 @@ pub fn outline_request(draft: &Draft, base: &VideoProject, notes: Notes) -> Resu
             visuals::inventory_rows(&request.images, &note),
         ),
         ("visual_beats", visuals::beat_records(&contract.beats)),
-    ]))
+    ]);
+    if let Some(bridge) = bridge {
+        out.push("grounding_context", bridge.grounding);
+        out.push("opening_appearance_context", bridge.opening);
+    }
+    Ok(out)
 }
 /// The outline message: Director's `_build_story_outline` of the browser's request.
 pub fn outline_message(
@@ -410,6 +969,9 @@ pub fn scene_request(draft: &Draft, base: &VideoProject, index: usize) -> Result
         ),
         ("next_summary", Py::Str(summary(Some(index + 1)))),
     ]);
+    if let Some(bridge) = bridged(request, base)? {
+        out.push("grounding_context", bridge.grounding);
+    }
     if request.add_dialogue {
         let timings = director::dialogue_timings(
             &outline
@@ -459,14 +1021,34 @@ pub fn accept_inventory(draft: &mut Draft, id: &str, note: String) {
         note,
     });
 }
-/// Accepts an outline answer; `references` restores the message's markers.
-pub fn accept_outline(
-    draft: &mut Draft,
-    text: &str,
-    references: &[(String, String)],
-) -> Result<()> {
+/// Accepts an outline answer to `message`, whose markers it restores; with a
+/// context's cast state the answer resolves each opening appearance.
+pub fn accept_outline(draft: &mut Draft, text: &str, message: &director::Built) -> Result<()> {
     let request = &draft.request;
-    let text = references::restore_all(text, references);
+    let mut text = text.to_owned();
+    let mut opening = None;
+    if let Some(roster) = &message.contract.opening {
+        let mut value = Py::parse(&text).ok_or("authoring_invalid_json")?;
+        let answer = match &mut value {
+            Py::Obj(rows) => rows
+                .iter()
+                .position(|(k, _)| k == "opening_appearance")
+                .map(|i| rows.remove(i).1),
+            _ => None,
+        }
+        .ok_or("story_opening_appearance_invalid")?;
+        director::validate_opening(&answer, roster)
+            .map_err(|_| "story_opening_appearance_invalid")?;
+        opening = Some(
+            serde_json::from_str::<Value>(&references::restore_all(
+                &answer.compact(),
+                &message.references,
+            ))
+            .unwrap(),
+        );
+        text = value.compact();
+    }
+    let text = references::restore_all(&text, &message.references);
     let mut board = outline_with_images(&text, &request.images, request.add_dialogue)?;
     if !request.add_music {
         for scene in &mut board.scenes {
@@ -481,6 +1063,7 @@ pub fn accept_outline(
     )?;
     draft.scenes = vec![None; board.scenes.len()];
     draft.outline = Some(board);
+    draft.opening_appearance = opening;
     Ok(())
 }
 pub fn accept_expansion(
@@ -563,6 +1146,12 @@ pub(crate) fn bundle(
     if request.add_dialogue {
         scene_slots.push("dialogue_timing");
     }
+    let context_grounding = bridged(request, base)?
+        .map(|b| b.grounding)
+        .filter(|g| *g != Py::Null);
+    if context_grounding.is_some() {
+        scene_slots.push("grounding_context");
+    }
     scene_slots.push("scene_json");
     if images {
         scene_slots.push("image_context");
@@ -583,7 +1172,12 @@ pub(crate) fn bundle(
         next_summary: &slot("next_scene_summary"),
         context_cast: &slot("continuity_cast"),
         timing: request.add_dialogue.then_some(timing.as_str()),
+        grounding: context_grounding
+            .is_some()
+            .then(|| slot("grounding_context"))
+            .as_deref(),
     });
+    let outline = outline_message(draft, base, Notes::Slots)?;
     let continued = request.destination == Destination::Continue;
     let (first, first_cast) = if continued {
         let context = director::normalize_continuation(&continuation(base)?)?;
@@ -601,11 +1195,11 @@ pub(crate) fn bundle(
     let cast = identities.iter().map(|i| {
         json!({"image_id":i.image_id,"role":"cast","usage":"identity_reference","label":i.label,"mime":i.image.mime,"base64":i.image.base64})
     });
-    Ok(json!({
+    let mut bundle = json!({
         "profile":{"id":profile.resolved_id,"revision":profile.profile.revision,"prompt_files":profile.profile.prompt_files},
         "limits":limits(),
         "inventory":{"system":system(profile, INVENTORY)?,"messages":request.images.iter().map(|s|json!({"image_id":s.id,"user":inventory_message(s,&request.instruction)})).collect::<Vec<_>>()},
-        "outline":{"system":system_with_images(profile,outline_key(request.add_dialogue),&request.images,request.add_dialogue)?,"user":outline_message(draft,base,Notes::Slots)?.user,"slots":outline_slots,"slot_values":{
+        "outline":{"system":system_for(profile,outline_key(request.add_dialogue),&outline.contract)?,"user":outline.user,"slots":outline_slots,"slot_values":{
             "inventory_note":"each story image's submitted inventory note, escaped as the body of a JSON string"},
             "output_schema":visuals::schema(&request.images,request.add_dialogue)?},
         "expansion":{"system":system_with_images(profile,scene_key(request.add_dialogue),&request.images,request.add_dialogue)?,"user":scene,"slots":scene_slots,"slot_values":{
@@ -621,7 +1215,11 @@ pub(crate) fn bundle(
             "output_schema":scene_schema(request.add_dialogue)},
         "code_owned_fields":CODE_OWNED,
         "images":story.chain(cast).collect::<Vec<_>>(),
-    }))
+    });
+    if let Some(grounding) = context_grounding {
+        bundle["expansion"]["slot_values"]["grounding_context"] = json!(grounding.dumps());
+    }
+    Ok(bundle)
 }
 /// A submission error: a stable code and, when it concerns one part of the
 /// submission, where it was found.
@@ -705,7 +1303,7 @@ pub(crate) fn submit(
     if message.user.chars().count() > CONTEXT_LIMIT {
         return Err(Rejection::new("story_context_limit", "outline"));
     }
-    accept_outline(draft, &submission.outline, &message.references).map_err(|code| {
+    accept_outline(draft, &submission.outline, &message).map_err(|code| {
         let mut rejection = Rejection::new(code, "outline");
         if code == "story_scene_duration_capacity" {
             let minimum = (request.duration_seconds / MAX_SCENE_SECONDS).ceil();

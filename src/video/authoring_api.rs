@@ -116,7 +116,7 @@ async fn start(
     State(app): State<App>,
     Path(id): Path<String>,
     body: Result<Json<AuthorRequest>, JsonRejection>,
-) -> Result<(StatusCode, Json<Value>), Error> {
+) -> Result<(StatusCode, Json<Value>), Located> {
     let Json(request) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
     let external = request.provider == steps::EXTERNAL;
     let provider = if external {
@@ -129,18 +129,15 @@ async fn start(
     let (base, authoring, grounding, identities) = {
         let service = app.video.lock().await;
         let session = service.projects.session(&ProjectId(id.clone()))?;
+        let base = service.projects.read(&ProjectId(id)).map_err(Error::from)?;
+        steps::check(&request, &base)?;
         let grounding = Grounding::capture(session, &request).map_err(media_error)?;
         let identities = if external {
             Grounding::identities(session, &request).map_err(media_error)?
         } else {
             vec![]
         };
-        (
-            service.projects.read(&ProjectId(id)).map_err(Error::from)?,
-            service.authoring.clone(),
-            grounding,
-            identities,
-        )
+        (base, service.authoring.clone(), grounding, identities)
     };
     let draft = authoring.start(base, request, provider, app.enhancement.clone(), grounding)?;
     let mut value = json!(draft);

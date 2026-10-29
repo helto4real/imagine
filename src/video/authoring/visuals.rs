@@ -81,6 +81,7 @@ pub fn contract(images: &[StoryImage], dialogue: bool) -> Result<Contract, &'sta
             .collect(),
         beats: beats(images)?,
         dialogue,
+        opening: None,
     })
 }
 /// The outline answer's JSON Schema.

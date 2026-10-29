@@ -1626,6 +1626,9 @@ mod tests {
                 images: vec![],
                 add_dialogue: false,
                 add_music: false,
+                context: None,
+                mentions: vec![],
+                add_ambient_sound: false,
             },
             phase: Phase::Review,
             outline: None,
@@ -1643,6 +1646,8 @@ mod tests {
             warnings: vec![],
             fields: vec![],
             production: None,
+            opening_appearance: None,
+            animate: None,
         };
         session.store.as_mut().unwrap().fail_commit = true;
         assert_eq!(

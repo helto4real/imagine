@@ -300,6 +300,1329 @@
    "references": []
   },
   {
+   "name": "outline_grounded_context",
+   "kind": "outline",
+   "request": {
+    "operation": "story_outline",
+    "user_instruction": "  Own extra instruction  ",
+    "story": "<earlier_continuity>\n[Own Keeper] The storm is coming.\n[user] Close the door.\n</earlier_continuity>\n\n<latest_moment>\n[Own Visitor] @keeper, the lamp!\n</latest_moment>",
+    "cast": [
+     {
+      "story_names": [
+       "Own Keeper",
+       "keeper"
+      ],
+      "reference_tag": "@keeper",
+      "description": "  Own fictional keeper, grey coat  ",
+      "default_language": "Swedish",
+      "voice_guidance": "calm",
+      "required": true
+     },
+     {
+      "story_names": [
+       "Own Visitor",
+       "visitor"
+      ],
+      "reference_tag": "@visitor",
+      "description": "Own fictional visitor",
+      "default_language": "English",
+      "voice_guidance": "bright",
+      "required": true
+     }
+    ],
+    "continuation_context": null,
+    "duration_seconds": 20,
+    "add_dialogue": true,
+    "include_non_diegetic_music": false,
+    "image_inventory": [
+     {
+      "id": "own_setting",
+      "usage": "story_reference",
+      "label": "Own lighthouse",
+      "user_note": "",
+      "inventory_note": "A white lighthouse on rocks.",
+      "reuse": true
+     },
+     {
+      "id": "own_start",
+      "usage": "story_reference",
+      "label": "Own door closed",
+      "user_note": "",
+      "inventory_note": "A closed door \"red\"\nwith @keeper.",
+      "reuse": false
+     },
+     {
+      "id": "own_end",
+      "usage": "story_reference",
+      "label": "Own door open",
+      "user_note": "",
+      "inventory_note": "",
+      "reuse": false
+     },
+     {
+      "id": "own_moment",
+      "usage": "required_moment",
+      "label": "Own beacon lit",
+      "user_note": "",
+      "inventory_note": "The beacon glows.",
+      "reuse": false
+     }
+    ],
+    "visual_beats": [
+     {
+      "beat_key": "required_moment:own_moment",
+      "type": "required_moment",
+      "order": 1,
+      "image_id": "own_moment",
+      "cue": ""
+     },
+     {
+      "id": "beat_1",
+      "start_image_id": "own_start",
+      "end_image_id": "own_end",
+      "cue": "",
+      "beat_key": "start_end_pair:beat_1",
+      "type": "start_end_pair",
+      "order": 1
+     }
+    ],
+    "grounding_context": {
+     "schema_version": "1.0",
+     "source_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "characters": [
+      {
+       "character_id": "keeper_id",
+       "reference_tag": "@keeper",
+       "current_appearance": {
+        "exposure": "partially_clothed",
+        "garments": [
+         " grey coat ",
+         "",
+         "grey coat",
+         "boots"
+        ],
+        "worn_items": [
+         "lantern"
+        ],
+        "temporary_traits": [
+         "wet hair"
+        ],
+        "visible_body_state": []
+       }
+      },
+      {
+       "character_id": "visitor_id",
+       "reference_tag": "@visitor",
+       "current_appearance": {
+        "exposure": "not_stated",
+        "garments": [],
+        "worn_items": [],
+        "temporary_traits": [],
+        "visible_body_state": [
+         "tired, @keeper notices"
+        ]
+       }
+      }
+     ],
+     "protected_facts": [
+      "  @visitor arrived by boat.  ",
+      "The lamp is broken."
+     ]
+    },
+    "opening_appearance_context": {
+     "schema_version": "1.0",
+     "source_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "characters": [
+      {
+       "character_id": "keeper_id",
+       "reference_tag": "@keeper",
+       "fallback_wardrobe": " Own wool sweater "
+      },
+      {
+       "character_id": "visitor_id",
+       "reference_tag": "@visitor",
+       "fallback_wardrobe": ""
+      }
+     ]
+    }
+   },
+   "user": "Task:\nPlan as many Scenes and Sections as the story needs. Return one JSON object and no markdown.\n\nArray placement rule:\nThe only top-level properties are \"scenes\", \"visual_placements\", and \"opening_appearance\". Put every Scene object inside the single scenes array in playback order. Do not generate internal Scene or Section IDs, raw image IDs, frame bindings, or max_turns.\n\nCharacter references in generated prose:\nThe example below illustrates reference syntax only; use the supplied Story for actual actions and only the characters involved. When naming a selected character in Scene summary, Scene description, or any Section prompt, copy that character's exact selected_cast.reference_tag instead of a story_names value. Correct reference_tag values in opening_appearance do not replace the required markers in Scene and Section prose. Names inside authored quoted dialogue may remain unchanged.\n\nOpening appearance example:\nThe opening_appearance values in the example illustrate structure only. They are not an assessment of the characters. Resolve every character's actual opening appearance from the supplied Story and Additional instruction. Use not_stated only when the evidence leaves exposure unknown. A supplied fallback wardrobe does not establish that its garments are currently worn and must never override established nudity or partial clothing.\n\nMinimal JSON shape:\n{\"scenes\": [{\"title\": \"Short title\", \"summary\": \"[[DIRECTOR_REF_0001]] and [[DIRECTOR_REF_0002]] complete the Story's central interaction.\", \"description\": \"[[DIRECTOR_REF_0001]] performs the planned action involving [[DIRECTOR_REF_0002]], followed by the Story's resulting state.\", \"ambient_sound\": \"Brief diegetic sound direction\", \"non_diegetic_music\": \"Brief score direction, or empty when music is disabled\", \"weight\": 1, \"boundary_from_previous\": \"hard_cut\", \"setting_reference_matches\": {\"own_setting\": true}, \"sections\": [{\"prompt\": \"[[DIRECTOR_REF_0001]] performs one chronological Story action involving [[DIRECTOR_REF_0002]].\", \"weight\": 1, \"dialogue_intent\": {\"participants\": [\"exact protected cast marker 1\", \"exact protected cast marker 2\"], \"purpose\": \"Brief dramatic purpose, or omit dialogue_intent when silence is better\"}}]}, {\"title\": \"Another short title\", \"summary\": \"[[DIRECTOR_REF_0001]] and [[DIRECTOR_REF_0002]] complete the Story's central interaction.\", \"description\": \"[[DIRECTOR_REF_0001]] performs the planned action involving [[DIRECTOR_REF_0002]], followed by the Story's resulting state.\", \"ambient_sound\": \"Brief diegetic sound direction\", \"non_diegetic_music\": \"Brief score direction, or empty when music is disabled\", \"weight\": 1, \"boundary_from_previous\": \"hard_cut\", \"setting_reference_matches\": {\"own_setting\": false}, \"sections\": [{\"prompt\": \"[[DIRECTOR_REF_0001]] performs one chronological Story action involving [[DIRECTOR_REF_0002]].\", \"weight\": 1}]}], \"visual_placements\": [{\"beat_key\": \"required_moment:own_moment\", \"scene_ordinal\": 1, \"section_ordinal\": 1, \"semantic_role\": \"depicted_moment\"}, {\"beat_key\": \"start_end_pair:beat_1\", \"scene_ordinal\": 1, \"section_ordinal\": 1, \"semantic_role\": \"state_transition\"}], \"opening_appearance\": {\"schema_version\": \"1.0\", \"characters\": [{\"character_id\": \"keeper_id\", \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"source\": \"not_stated\", \"exposure\": \"not_stated\", \"garments\": [], \"worn_items\": [], \"temporary_traits\": [], \"visible_body_state\": []}, {\"character_id\": \"visitor_id\", \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"source\": \"not_stated\", \"exposure\": \"not_stated\", \"garments\": [], \"worn_items\": [], \"temporary_traits\": [], \"visible_body_state\": []}]}}\n\nExact JSON Schema:\n{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"scenes\",\"visual_placements\",\"opening_appearance\"],\"properties\":{\"scenes\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"title\",\"summary\",\"description\",\"ambient_sound\",\"non_diegetic_music\",\"weight\",\"boundary_from_previous\",\"setting_reference_matches\",\"sections\"],\"properties\":{\"title\":{\"type\":\"string\"},\"summary\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"ambient_sound\":{\"type\":\"string\"},\"non_diegetic_music\":{\"type\":\"string\"},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0},\"boundary_from_previous\":{\"enum\":[\"hard_cut\",\"continuous_shot\"]},\"setting_reference_matches\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"own_setting\"],\"properties\":{\"own_setting\":{\"type\":\"boolean\"}}},\"sections\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"prompt\",\"weight\"],\"properties\":{\"prompt\":{\"type\":\"string\",\"minLength\":1},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0},\"dialogue_intent\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"participants\",\"purpose\"],\"properties\":{\"participants\":{\"type\":\"array\",\"minItems\":2,\"maxItems\":2,\"items\":{\"type\":\"string\",\"minLength\":1}},\"purpose\":{\"type\":\"string\",\"minLength\":1}}}}}}}}},\"visual_placements\":{\"type\":\"array\",\"minItems\":2,\"maxItems\":2,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"beat_key\",\"scene_ordinal\",\"section_ordinal\",\"semantic_role\"],\"properties\":{\"beat_key\":{\"type\":\"string\",\"enum\":[\"required_moment:own_moment\",\"start_end_pair:beat_1\"]},\"scene_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"section_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"semantic_role\":{\"enum\":[\"depicted_moment\",\"state_transition\"]}}}},\"opening_appearance\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"schema_version\",\"characters\"],\"properties\":{\"schema_version\":{\"const\":\"1.0\"},\"characters\":{\"type\":\"array\",\"minItems\":2,\"maxItems\":2,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"character_id\",\"reference_tag\",\"source\",\"exposure\",\"garments\",\"worn_items\",\"temporary_traits\",\"visible_body_state\"],\"properties\":{\"character_id\":{\"type\":\"string\",\"minLength\":1},\"reference_tag\":{\"type\":\"string\",\"minLength\":1},\"source\":{\"enum\":[\"user_instruction\",\"latest_moment\",\"earlier_continuity\",\"default_wardrobe\",\"not_stated\"]},\"exposure\":{\"enum\":[\"not_stated\",\"clothed\",\"partially_clothed\",\"nude\"]},\"garments\":{\"type\":\"array\",\"maxItems\":12,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"worn_items\":{\"type\":\"array\",\"maxItems\":12,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"temporary_traits\":{\"type\":\"array\",\"maxItems\":20,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"visible_body_state\":{\"type\":\"array\",\"maxItems\":20,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}}}}}}}}}\n\nTotal duration seconds:\n20.0\n\nMaximum Scene duration seconds:\n15\n\nMinimum Scene count:\n2\n\nInclude non-diegetic music:\nNo\n\nImage inventory:\n[{\"id\": \"own_setting\", \"usage\": \"story_reference\", \"label\": \"Own lighthouse\", \"user_note\": \"\", \"inventory_note\": \"A white lighthouse on rocks.\", \"reuse\": true}, {\"id\": \"own_start\", \"usage\": \"story_reference\", \"label\": \"Own door closed\", \"user_note\": \"\", \"inventory_note\": \"A closed door \\\"red\\\"\\nwith @keeper.\", \"reuse\": false}, {\"id\": \"own_end\", \"usage\": \"story_reference\", \"label\": \"Own door open\", \"user_note\": \"\", \"inventory_note\": \"\", \"reuse\": false}, {\"id\": \"own_moment\", \"usage\": \"required_moment\", \"label\": \"Own beacon lit\", \"user_note\": \"\", \"inventory_note\": \"The beacon glows.\", \"reuse\": false}]\n\nRequired image order and visual beats:\n[{\"beat_key\": \"required_moment:own_moment\", \"type\": \"required_moment\", \"order\": 1, \"image_id\": \"own_moment\", \"cue\": \"\"}, {\"id\": \"beat_1\", \"start_image_id\": \"own_start\", \"end_image_id\": \"own_end\", \"cue\": \"\", \"beat_key\": \"start_end_pair:beat_1\", \"type\": \"start_end_pair\", \"order\": 1}]\n\n<selected_cast>\n[{\"story_names\": [\"Own Keeper\", \"keeper\"], \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"description\": \"Own fictional keeper, grey coat\", \"default_language\": \"Swedish\", \"voice_guidance\": \"calm\", \"required\": true}, {\"story_names\": [\"Own Visitor\", \"visitor\"], \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"description\": \"Own fictional visitor\", \"default_language\": \"English\", \"voice_guidance\": \"bright\", \"required\": true}]\n</selected_cast>\n\n<continuation_context>\nnull\n</continuation_context>\n\n<opening_appearance_context>\n{\"schema_version\": \"1.0\", \"source_digest\": \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\", \"characters\": [{\"character_id\": \"keeper_id\", \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"fallback_wardrobe\": \"Own wool sweater\"}, {\"character_id\": \"visitor_id\", \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"fallback_wardrobe\": \"\"}]}\n</opening_appearance_context>\n\n<grounding_context>\n{\"schema_version\": \"1.0\", \"source_digest\": \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\", \"characters\": [{\"character_id\": \"keeper_id\", \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"current_appearance\": {\"exposure\": \"partially_clothed\", \"garments\": [\"grey coat\", \"boots\"], \"worn_items\": [\"lantern\"], \"temporary_traits\": [\"wet hair\"], \"visible_body_state\": []}}, {\"character_id\": \"visitor_id\", \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"current_appearance\": {\"exposure\": \"not_stated\", \"garments\": [], \"worn_items\": [], \"temporary_traits\": [], \"visible_body_state\": [\"tired, [[DIRECTOR_REF_0001]] notices\"]}}], \"protected_facts\": [\"[[DIRECTOR_REF_0002]] arrived by boat.\", \"The lamp is broken.\"]}\n</grounding_context>\n\n<additional_instruction>\nOwn extra instruction\n</additional_instruction>\n\n<story>\n<earlier_continuity>\n[Own Keeper] The storm is coming.\n[user] Close the door.\n</earlier_continuity>\n\n<latest_moment>\n[Own Visitor] [[DIRECTOR_REF_0001]], the lamp!\n</latest_moment>\n</story>",
+   "schema": "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"scenes\",\"visual_placements\",\"opening_appearance\"],\"properties\":{\"scenes\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"title\",\"summary\",\"description\",\"ambient_sound\",\"non_diegetic_music\",\"weight\",\"boundary_from_previous\",\"setting_reference_matches\",\"sections\"],\"properties\":{\"title\":{\"type\":\"string\"},\"summary\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"ambient_sound\":{\"type\":\"string\"},\"non_diegetic_music\":{\"type\":\"string\"},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0},\"boundary_from_previous\":{\"enum\":[\"hard_cut\",\"continuous_shot\"]},\"setting_reference_matches\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"own_setting\"],\"properties\":{\"own_setting\":{\"type\":\"boolean\"}}},\"sections\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"prompt\",\"weight\"],\"properties\":{\"prompt\":{\"type\":\"string\",\"minLength\":1},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0},\"dialogue_intent\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"participants\",\"purpose\"],\"properties\":{\"participants\":{\"type\":\"array\",\"minItems\":2,\"maxItems\":2,\"items\":{\"type\":\"string\",\"minLength\":1}},\"purpose\":{\"type\":\"string\",\"minLength\":1}}}}}}}}},\"visual_placements\":{\"type\":\"array\",\"minItems\":2,\"maxItems\":2,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"beat_key\",\"scene_ordinal\",\"section_ordinal\",\"semantic_role\"],\"properties\":{\"beat_key\":{\"type\":\"string\",\"enum\":[\"required_moment:own_moment\",\"start_end_pair:beat_1\"]},\"scene_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"section_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"semantic_role\":{\"enum\":[\"depicted_moment\",\"state_transition\"]}}}},\"opening_appearance\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"schema_version\",\"characters\"],\"properties\":{\"schema_version\":{\"const\":\"1.0\"},\"characters\":{\"type\":\"array\",\"minItems\":2,\"maxItems\":2,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"character_id\",\"reference_tag\",\"source\",\"exposure\",\"garments\",\"worn_items\",\"temporary_traits\",\"visible_body_state\"],\"properties\":{\"character_id\":{\"type\":\"string\",\"minLength\":1},\"reference_tag\":{\"type\":\"string\",\"minLength\":1},\"source\":{\"enum\":[\"user_instruction\",\"latest_moment\",\"earlier_continuity\",\"default_wardrobe\",\"not_stated\"]},\"exposure\":{\"enum\":[\"not_stated\",\"clothed\",\"partially_clothed\",\"nude\"]},\"garments\":{\"type\":\"array\",\"maxItems\":12,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"worn_items\":{\"type\":\"array\",\"maxItems\":12,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"temporary_traits\":{\"type\":\"array\",\"maxItems\":20,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"visible_body_state\":{\"type\":\"array\",\"maxItems\":20,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}}}}}}}}}",
+   "references": [
+    [
+     "[[DIRECTOR_REF_0001]]",
+     "@keeper"
+    ],
+    [
+     "[[DIRECTOR_REF_0002]]",
+     "@visitor"
+    ]
+   ]
+  },
+  {
+   "name": "outline_opening_answers",
+   "kind": "outline",
+   "request": {
+    "operation": "story_outline",
+    "user_instruction": "  Own extra instruction  ",
+    "story": "<earlier_continuity>\n[Own Keeper] The storm is coming.\n[user] Close the door.\n</earlier_continuity>\n\n<latest_moment>\n[Own Visitor] @keeper, the lamp!\n</latest_moment>",
+    "cast": [
+     {
+      "story_names": [
+       "Own Keeper",
+       "keeper"
+      ],
+      "reference_tag": "@keeper",
+      "description": "  Own fictional keeper, grey coat  ",
+      "default_language": "Swedish",
+      "voice_guidance": "calm",
+      "required": true
+     },
+     {
+      "story_names": [
+       "Own Visitor",
+       "visitor"
+      ],
+      "reference_tag": "@visitor",
+      "description": "Own fictional visitor",
+      "default_language": "English",
+      "voice_guidance": "bright",
+      "required": true
+     }
+    ],
+    "continuation_context": null,
+    "duration_seconds": 10,
+    "add_dialogue": false,
+    "include_non_diegetic_music": false,
+    "image_inventory": [],
+    "visual_beats": [],
+    "grounding_context": {
+     "schema_version": "1.0",
+     "source_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "characters": [
+      {
+       "character_id": "keeper_id",
+       "reference_tag": "@keeper",
+       "current_appearance": {
+        "exposure": "partially_clothed",
+        "garments": [
+         " grey coat ",
+         "",
+         "grey coat",
+         "boots"
+        ],
+        "worn_items": [
+         "lantern"
+        ],
+        "temporary_traits": [
+         "wet hair"
+        ],
+        "visible_body_state": []
+       }
+      },
+      {
+       "character_id": "visitor_id",
+       "reference_tag": "@visitor",
+       "current_appearance": {
+        "exposure": "not_stated",
+        "garments": [],
+        "worn_items": [],
+        "temporary_traits": [],
+        "visible_body_state": [
+         "tired, @keeper notices"
+        ]
+       }
+      }
+     ],
+     "protected_facts": [
+      "  @visitor arrived by boat.  ",
+      "The lamp is broken."
+     ]
+    },
+    "opening_appearance_context": {
+     "schema_version": "1.0",
+     "source_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "characters": [
+      {
+       "character_id": "keeper_id",
+       "reference_tag": "@keeper",
+       "fallback_wardrobe": " Own wool sweater "
+      },
+      {
+       "character_id": "visitor_id",
+       "reference_tag": "@visitor",
+       "fallback_wardrobe": ""
+      }
+     ]
+    },
+    "answers": [
+     {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "default_wardrobe",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "default_wardrobe",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "@visitor",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "dressed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          ""
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": [],
+         "extra": 1
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     }
+    ]
+   },
+   "user": "Task:\nPlan as many Scenes and Sections as the story needs. Return one JSON object and no markdown.\n\nArray placement rule:\nThe only top-level properties are \"scenes\", \"visual_placements\", and \"opening_appearance\". Put every Scene object inside the single scenes array in playback order. Do not generate internal Scene or Section IDs, raw image IDs, frame bindings, or max_turns.\n\nCharacter references in generated prose:\nThe example below illustrates reference syntax only; use the supplied Story for actual actions and only the characters involved. When naming a selected character in Scene summary, Scene description, or any Section prompt, copy that character's exact selected_cast.reference_tag instead of a story_names value. Correct reference_tag values in opening_appearance do not replace the required markers in Scene and Section prose. Names inside authored quoted dialogue may remain unchanged.\n\nOpening appearance example:\nThe opening_appearance values in the example illustrate structure only. They are not an assessment of the characters. Resolve every character's actual opening appearance from the supplied Story and Additional instruction. Use not_stated only when the evidence leaves exposure unknown. A supplied fallback wardrobe does not establish that its garments are currently worn and must never override established nudity or partial clothing.\n\nMinimal JSON shape:\n{\"scenes\": [{\"title\": \"Short title\", \"summary\": \"[[DIRECTOR_REF_0001]] and [[DIRECTOR_REF_0002]] complete the Story's central interaction.\", \"description\": \"[[DIRECTOR_REF_0001]] performs the planned action involving [[DIRECTOR_REF_0002]], followed by the Story's resulting state.\", \"ambient_sound\": \"Brief diegetic sound direction\", \"non_diegetic_music\": \"Brief score direction, or empty when music is disabled\", \"weight\": 1, \"boundary_from_previous\": \"hard_cut\", \"setting_reference_matches\": {}, \"sections\": [{\"prompt\": \"[[DIRECTOR_REF_0001]] performs one chronological Story action involving [[DIRECTOR_REF_0002]].\", \"weight\": 1}]}], \"visual_placements\": [], \"opening_appearance\": {\"schema_version\": \"1.0\", \"characters\": [{\"character_id\": \"keeper_id\", \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"source\": \"not_stated\", \"exposure\": \"not_stated\", \"garments\": [], \"worn_items\": [], \"temporary_traits\": [], \"visible_body_state\": []}, {\"character_id\": \"visitor_id\", \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"source\": \"not_stated\", \"exposure\": \"not_stated\", \"garments\": [], \"worn_items\": [], \"temporary_traits\": [], \"visible_body_state\": []}]}}\n\nExact JSON Schema:\n{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"scenes\",\"visual_placements\",\"opening_appearance\"],\"properties\":{\"scenes\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"title\",\"summary\",\"description\",\"ambient_sound\",\"non_diegetic_music\",\"weight\",\"boundary_from_previous\",\"setting_reference_matches\",\"sections\"],\"properties\":{\"title\":{\"type\":\"string\"},\"summary\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"ambient_sound\":{\"type\":\"string\"},\"non_diegetic_music\":{\"type\":\"string\"},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0},\"boundary_from_previous\":{\"enum\":[\"hard_cut\",\"continuous_shot\"]},\"setting_reference_matches\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[],\"properties\":{}},\"sections\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"prompt\",\"weight\"],\"properties\":{\"prompt\":{\"type\":\"string\",\"minLength\":1},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0}}}}}}},\"visual_placements\":{\"type\":\"array\",\"minItems\":0,\"maxItems\":0,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"beat_key\",\"scene_ordinal\",\"section_ordinal\",\"semantic_role\"],\"properties\":{\"beat_key\":{\"type\":\"string\"},\"scene_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"section_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"semantic_role\":{\"enum\":[\"depicted_moment\",\"state_transition\"]}}}},\"opening_appearance\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"schema_version\",\"characters\"],\"properties\":{\"schema_version\":{\"const\":\"1.0\"},\"characters\":{\"type\":\"array\",\"minItems\":2,\"maxItems\":2,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"character_id\",\"reference_tag\",\"source\",\"exposure\",\"garments\",\"worn_items\",\"temporary_traits\",\"visible_body_state\"],\"properties\":{\"character_id\":{\"type\":\"string\",\"minLength\":1},\"reference_tag\":{\"type\":\"string\",\"minLength\":1},\"source\":{\"enum\":[\"user_instruction\",\"latest_moment\",\"earlier_continuity\",\"default_wardrobe\",\"not_stated\"]},\"exposure\":{\"enum\":[\"not_stated\",\"clothed\",\"partially_clothed\",\"nude\"]},\"garments\":{\"type\":\"array\",\"maxItems\":12,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"worn_items\":{\"type\":\"array\",\"maxItems\":12,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"temporary_traits\":{\"type\":\"array\",\"maxItems\":20,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"visible_body_state\":{\"type\":\"array\",\"maxItems\":20,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}}}}}}}}}\n\nTotal duration seconds:\n10.0\n\nMaximum Scene duration seconds:\n15\n\nMinimum Scene count:\n1\n\nInclude non-diegetic music:\nNo\n\nImage inventory:\n[]\n\nRequired image order and visual beats:\n[]\n\n<selected_cast>\n[{\"story_names\": [\"Own Keeper\", \"keeper\"], \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"description\": \"Own fictional keeper, grey coat\", \"required\": true}, {\"story_names\": [\"Own Visitor\", \"visitor\"], \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"description\": \"Own fictional visitor\", \"required\": true}]\n</selected_cast>\n\n<continuation_context>\nnull\n</continuation_context>\n\n<opening_appearance_context>\n{\"schema_version\": \"1.0\", \"source_digest\": \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\", \"characters\": [{\"character_id\": \"keeper_id\", \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"fallback_wardrobe\": \"Own wool sweater\"}, {\"character_id\": \"visitor_id\", \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"fallback_wardrobe\": \"\"}]}\n</opening_appearance_context>\n\n<grounding_context>\n{\"schema_version\": \"1.0\", \"source_digest\": \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\", \"characters\": [{\"character_id\": \"keeper_id\", \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"current_appearance\": {\"exposure\": \"partially_clothed\", \"garments\": [\"grey coat\", \"boots\"], \"worn_items\": [\"lantern\"], \"temporary_traits\": [\"wet hair\"], \"visible_body_state\": []}}, {\"character_id\": \"visitor_id\", \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"current_appearance\": {\"exposure\": \"not_stated\", \"garments\": [], \"worn_items\": [], \"temporary_traits\": [], \"visible_body_state\": [\"tired, [[DIRECTOR_REF_0001]] notices\"]}}], \"protected_facts\": [\"[[DIRECTOR_REF_0002]] arrived by boat.\", \"The lamp is broken.\"]}\n</grounding_context>\n\n<additional_instruction>\nOwn extra instruction\n</additional_instruction>\n\n<story>\n<earlier_continuity>\n[Own Keeper] The storm is coming.\n[user] Close the door.\n</earlier_continuity>\n\n<latest_moment>\n[Own Visitor] [[DIRECTOR_REF_0001]], the lamp!\n</latest_moment>\n</story>",
+   "schema": "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"scenes\",\"visual_placements\",\"opening_appearance\"],\"properties\":{\"scenes\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"title\",\"summary\",\"description\",\"ambient_sound\",\"non_diegetic_music\",\"weight\",\"boundary_from_previous\",\"setting_reference_matches\",\"sections\"],\"properties\":{\"title\":{\"type\":\"string\"},\"summary\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"ambient_sound\":{\"type\":\"string\"},\"non_diegetic_music\":{\"type\":\"string\"},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0},\"boundary_from_previous\":{\"enum\":[\"hard_cut\",\"continuous_shot\"]},\"setting_reference_matches\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[],\"properties\":{}},\"sections\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"prompt\",\"weight\"],\"properties\":{\"prompt\":{\"type\":\"string\",\"minLength\":1},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0}}}}}}},\"visual_placements\":{\"type\":\"array\",\"minItems\":0,\"maxItems\":0,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"beat_key\",\"scene_ordinal\",\"section_ordinal\",\"semantic_role\"],\"properties\":{\"beat_key\":{\"type\":\"string\"},\"scene_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"section_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"semantic_role\":{\"enum\":[\"depicted_moment\",\"state_transition\"]}}}},\"opening_appearance\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"schema_version\",\"characters\"],\"properties\":{\"schema_version\":{\"const\":\"1.0\"},\"characters\":{\"type\":\"array\",\"minItems\":2,\"maxItems\":2,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"character_id\",\"reference_tag\",\"source\",\"exposure\",\"garments\",\"worn_items\",\"temporary_traits\",\"visible_body_state\"],\"properties\":{\"character_id\":{\"type\":\"string\",\"minLength\":1},\"reference_tag\":{\"type\":\"string\",\"minLength\":1},\"source\":{\"enum\":[\"user_instruction\",\"latest_moment\",\"earlier_continuity\",\"default_wardrobe\",\"not_stated\"]},\"exposure\":{\"enum\":[\"not_stated\",\"clothed\",\"partially_clothed\",\"nude\"]},\"garments\":{\"type\":\"array\",\"maxItems\":12,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"worn_items\":{\"type\":\"array\",\"maxItems\":12,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"temporary_traits\":{\"type\":\"array\",\"maxItems\":20,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}},\"visible_body_state\":{\"type\":\"array\",\"maxItems\":20,\"items\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000}}}}}}}}}",
+   "references": [
+    [
+     "[[DIRECTOR_REF_0001]]",
+     "@keeper"
+    ],
+    [
+     "[[DIRECTOR_REF_0002]]",
+     "@visitor"
+    ]
+   ],
+   "answers": [
+    {
+     "answer": {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     "ok": true
+    },
+    {
+     "answer": {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "default_wardrobe",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     "ok": true
+    },
+    {
+     "answer": {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "default_wardrobe",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     "ok": false,
+     "path": "$.opening_appearance.characters[1].source"
+    },
+    {
+     "answer": {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "@visitor",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     "ok": false,
+     "path": "$.opening_appearance.characters[1].reference_tag"
+    },
+    {
+     "answer": {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     "ok": false,
+     "path": "$.opening_appearance.characters[0].character_id"
+    },
+    {
+     "answer": {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "dressed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     "ok": false,
+     "path": "$.opening_appearance.characters[0].exposure"
+    },
+    {
+     "answer": {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x",
+          "x"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     "ok": false,
+     "path": "$.opening_appearance.characters[0].garments"
+    },
+    {
+     "answer": {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          ""
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     "ok": false,
+     "path": "$.opening_appearance.characters[0].garments[0]"
+    },
+    {
+     "answer": {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "temporary_traits": [],
+         "visible_body_state": []
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     "ok": false,
+     "path": "$.opening_appearance.characters[0].worn_items"
+    },
+    {
+     "answer": {
+      "scenes": [
+       {
+        "title": "T",
+        "summary": "S",
+        "description": "D",
+        "ambient_sound": "",
+        "non_diegetic_music": "",
+        "weight": 1,
+        "boundary_from_previous": "hard_cut",
+        "setting_reference_matches": {},
+        "sections": [
+         {
+          "prompt": "P",
+          "weight": 1
+         }
+        ]
+       }
+      ],
+      "visual_placements": [],
+      "opening_appearance": {
+       "schema_version": "1.0",
+       "characters": [
+        {
+         "character_id": "keeper_id",
+         "reference_tag": "[[DIRECTOR_REF_0001]]",
+         "source": "latest_moment",
+         "exposure": "partially_clothed",
+         "garments": [
+          "grey coat"
+         ],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": [],
+         "extra": 1
+        },
+        {
+         "character_id": "visitor_id",
+         "reference_tag": "[[DIRECTOR_REF_0002]]",
+         "source": "not_stated",
+         "exposure": "not_stated",
+         "garments": [],
+         "worn_items": [],
+         "temporary_traits": [],
+         "visible_body_state": []
+        }
+       ]
+      }
+     },
+     "ok": false,
+     "path": "$.opening_appearance.characters[0]"
+    }
+   ]
+  },
+  {
+   "name": "outline_facts_only",
+   "kind": "outline",
+   "request": {
+    "operation": "story_outline",
+    "user_instruction": "  Own extra instruction  ",
+    "story": "<latest_moment>\n[user] Own night falls.\n</latest_moment>",
+    "cast": [],
+    "continuation_context": null,
+    "duration_seconds": 10,
+    "add_dialogue": false,
+    "include_non_diegetic_music": false,
+    "image_inventory": [],
+    "visual_beats": [],
+    "grounding_context": {
+     "schema_version": "1.0",
+     "source_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "characters": [],
+     "protected_facts": [
+      "Own fact"
+     ]
+    }
+   },
+   "user": "Task:\nPlan as many Scenes and Sections as the story needs. Return one JSON object and no markdown.\n\nArray placement rule:\nThe only top-level properties are \"scenes\" and \"visual_placements\". Put every Scene object inside the single scenes array in playback order. Do not generate internal Scene or Section IDs, raw image IDs, frame bindings, or max_turns.\n\nMinimal JSON shape:\n{\"scenes\": [{\"title\": \"Short title\", \"summary\": \"Story purpose\", \"description\": \"Brief visual and continuity plan\", \"ambient_sound\": \"Brief diegetic sound direction\", \"non_diegetic_music\": \"Brief score direction, or empty when music is disabled\", \"weight\": 1, \"boundary_from_previous\": \"hard_cut\", \"setting_reference_matches\": {}, \"sections\": [{\"prompt\": \"Generic chronological source description\", \"weight\": 1}]}], \"visual_placements\": []}\n\nExact JSON Schema:\n{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"scenes\",\"visual_placements\"],\"properties\":{\"scenes\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"title\",\"summary\",\"description\",\"ambient_sound\",\"non_diegetic_music\",\"weight\",\"boundary_from_previous\",\"setting_reference_matches\",\"sections\"],\"properties\":{\"title\":{\"type\":\"string\"},\"summary\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"ambient_sound\":{\"type\":\"string\"},\"non_diegetic_music\":{\"type\":\"string\"},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0},\"boundary_from_previous\":{\"enum\":[\"hard_cut\",\"continuous_shot\"]},\"setting_reference_matches\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[],\"properties\":{}},\"sections\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"prompt\",\"weight\"],\"properties\":{\"prompt\":{\"type\":\"string\",\"minLength\":1},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0}}}}}}},\"visual_placements\":{\"type\":\"array\",\"minItems\":0,\"maxItems\":0,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"beat_key\",\"scene_ordinal\",\"section_ordinal\",\"semantic_role\"],\"properties\":{\"beat_key\":{\"type\":\"string\"},\"scene_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"section_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"semantic_role\":{\"enum\":[\"depicted_moment\",\"state_transition\"]}}}}}}\n\nTotal duration seconds:\n10.0\n\nMaximum Scene duration seconds:\n15\n\nMinimum Scene count:\n1\n\nInclude non-diegetic music:\nNo\n\nImage inventory:\n[]\n\nRequired image order and visual beats:\n[]\n\n<selected_cast>\n[]\n</selected_cast>\n\n<continuation_context>\nnull\n</continuation_context>\n\n<grounding_context>\n{\"schema_version\": \"1.0\", \"source_digest\": \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\", \"characters\": [], \"protected_facts\": [\"Own fact\"]}\n</grounding_context>\n\n<additional_instruction>\nOwn extra instruction\n</additional_instruction>\n\n<story>\n<latest_moment>\n[user] Own night falls.\n</latest_moment>\n</story>",
+   "schema": "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"scenes\",\"visual_placements\"],\"properties\":{\"scenes\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"title\",\"summary\",\"description\",\"ambient_sound\",\"non_diegetic_music\",\"weight\",\"boundary_from_previous\",\"setting_reference_matches\",\"sections\"],\"properties\":{\"title\":{\"type\":\"string\"},\"summary\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"},\"ambient_sound\":{\"type\":\"string\"},\"non_diegetic_music\":{\"type\":\"string\"},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0},\"boundary_from_previous\":{\"enum\":[\"hard_cut\",\"continuous_shot\"]},\"setting_reference_matches\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[],\"properties\":{}},\"sections\":{\"type\":\"array\",\"minItems\":1,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"prompt\",\"weight\"],\"properties\":{\"prompt\":{\"type\":\"string\",\"minLength\":1},\"weight\":{\"type\":\"number\",\"exclusiveMinimum\":0}}}}}}},\"visual_placements\":{\"type\":\"array\",\"minItems\":0,\"maxItems\":0,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"beat_key\",\"scene_ordinal\",\"section_ordinal\",\"semantic_role\"],\"properties\":{\"beat_key\":{\"type\":\"string\"},\"scene_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"section_ordinal\":{\"type\":\"integer\",\"minimum\":1},\"semantic_role\":{\"enum\":[\"depicted_moment\",\"state_transition\"]}}}}}}",
+   "references": []
+  },
+  {
    "name": "scene_first_no_images",
    "kind": "scene",
    "request": {
@@ -549,6 +1872,132 @@
    "images": 0
   },
   {
+   "name": "scene_grounded",
+   "kind": "scene",
+   "request": {
+    "operation": "story_scene",
+    "user_instruction": "",
+    "add_dialogue": true,
+    "cast": [
+     {
+      "story_names": [
+       "Own Keeper",
+       "keeper"
+      ],
+      "reference_tag": "@keeper",
+      "description": "  Own fictional keeper, grey coat  ",
+      "default_language": "Swedish",
+      "voice_guidance": "calm",
+      "required": true
+     },
+     {
+      "story_names": [
+       "Own Visitor",
+       "visitor"
+      ],
+      "reference_tag": "@visitor",
+      "description": "Own fictional visitor",
+      "default_language": "English",
+      "voice_guidance": "bright",
+      "required": true
+     }
+    ],
+    "scene": {
+     "id": "scene_001",
+     "title": "Own Climb",
+     "summary": "@keeper climbs.",
+     "description": "Own stairwell",
+     "ambient_sound": "Wind",
+     "non_diegetic_music": "",
+     "weight": 1,
+     "image_ids": [
+      "own_setting"
+     ],
+     "boundary_from_previous": "hard_cut",
+     "sections": [
+      {
+       "id": "scene_001_section_001",
+       "summary": "",
+       "prompt": "@keeper climbs the stairs.\n@visitor follows.",
+       "weight": 2.5,
+       "image_ids": [
+        "own_moment"
+       ],
+       "first_frame_id": "own_start",
+       "last_frame_id": "own_end",
+       "dialogue_intent": {
+        "participants": [
+         "@keeper",
+         "@visitor"
+        ],
+        "purpose": "Own greeting",
+        "max_turns": 2
+       }
+      },
+      {
+       "id": "scene_001_section_002",
+       "summary": "",
+       "prompt": "Own lamp turns.",
+       "weight": 1,
+       "image_ids": [],
+       "first_frame_id": "",
+       "last_frame_id": ""
+      }
+     ]
+    },
+    "previous_summary": "",
+    "previous_scene_context": null,
+    "context_cast": [],
+    "next_summary": "",
+    "images": [],
+    "grounding_context": {
+     "schema_version": "1.0",
+     "source_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "characters": [
+      {
+       "character_id": "keeper_id",
+       "reference_tag": "@keeper",
+       "current_appearance": {
+        "exposure": "partially_clothed",
+        "garments": [
+         " grey coat ",
+         "",
+         "grey coat",
+         "boots"
+        ],
+        "worn_items": [
+         "lantern"
+        ],
+        "temporary_traits": [
+         "wet hair"
+        ],
+        "visible_body_state": []
+       }
+      },
+      {
+       "character_id": "visitor_id",
+       "reference_tag": "@visitor",
+       "current_appearance": {
+        "exposure": "not_stated",
+        "garments": [],
+        "worn_items": [],
+        "temporary_traits": [],
+        "visible_body_state": [
+         "tired, @keeper notices"
+        ]
+       }
+      }
+     ],
+     "protected_facts": [
+      "  @visitor arrived by boat.  ",
+      "The lamp is broken."
+     ]
+    }
+   },
+   "user": "Task:\nExpand this one Scene and its Sections. Return one JSON object matching the supplied Scene shape and no markdown.\n\nVisual context rule:\nNo images are supplied. Provide detailed environment, spatial layout, appearance, lighting, and atmosphere.\n\n<previous_scene_summary>\n\n</previous_scene_summary>\n\n<previous_scene_context>\nnull\n</previous_scene_context>\n\n<next_scene_summary>\n\n</next_scene_summary>\n\n<selected_cast>\n[{\"story_names\": [\"Own Keeper\", \"keeper\"], \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"description\": \"Own fictional keeper, grey coat\", \"default_language\": \"Swedish\", \"voice_guidance\": \"calm\", \"required\": true}, {\"story_names\": [\"Own Visitor\", \"visitor\"], \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"description\": \"Own fictional visitor\", \"default_language\": \"English\", \"voice_guidance\": \"bright\", \"required\": true}]\n</selected_cast>\n\n<continuity_cast>\n[]\n</continuity_cast>\n\n<dialogue_timing>\n{}\n</dialogue_timing>\n\n<grounding_context>\n{\"schema_version\": \"1.0\", \"source_digest\": \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\", \"characters\": [{\"character_id\": \"keeper_id\", \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"current_appearance\": {\"exposure\": \"partially_clothed\", \"garments\": [\"grey coat\", \"boots\"], \"worn_items\": [\"lantern\"], \"temporary_traits\": [\"wet hair\"], \"visible_body_state\": []}}, {\"character_id\": \"visitor_id\", \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"current_appearance\": {\"exposure\": \"not_stated\", \"garments\": [], \"worn_items\": [], \"temporary_traits\": [], \"visible_body_state\": [\"tired, [[DIRECTOR_REF_0001]] notices\"]}}], \"protected_facts\": [\"[[DIRECTOR_REF_0002]] arrived by boat.\", \"The lamp is broken.\"]}\n</grounding_context>\n\n<additional_instruction>\n\n</additional_instruction>\n\n<scene_json>\n{\"id\": \"scene_001\", \"title\": \"Own Climb\", \"summary\": \"[[DIRECTOR_REF_0001]] climbs.\", \"description\": \"Own stairwell\", \"ambient_sound\": \"Wind\", \"non_diegetic_music\": \"\", \"weight\": 1, \"image_ids\": [\"own_setting\"], \"boundary_from_previous\": \"hard_cut\", \"sections\": [{\"id\": \"scene_001_section_001\", \"summary\": \"\", \"prompt\": \"[[DIRECTOR_REF_0001]] climbs the stairs.\\n@visitor follows.\", \"weight\": 2.5, \"image_ids\": [\"own_moment\"], \"first_frame_id\": \"own_start\", \"last_frame_id\": \"own_end\", \"dialogue_intent\": {\"participants\": [\"[[DIRECTOR_REF_0001]]\", \"[[DIRECTOR_REF_0002]]\"], \"purpose\": \"Own greeting\", \"max_turns\": 2}}, {\"id\": \"scene_001_section_002\", \"summary\": \"\", \"prompt\": \"Own lamp turns.\", \"weight\": 1, \"image_ids\": [], \"first_frame_id\": \"\", \"last_frame_id\": \"\"}]}\n</scene_json>",
+   "images": 0
+  },
+  {
    "name": "scene_continued",
    "kind": "scene",
    "request": {
@@ -631,6 +2080,157 @@
    },
    "user": "Task:\nExpand this one Scene and its Sections. Return one JSON object matching the supplied Scene shape and no markdown.\n\nVisual context rule:\nNo images are supplied. Provide detailed environment, spatial layout, appearance, lighting, and atmosphere.\n\n<previous_scene_summary>\n\n</previous_scene_summary>\n\n<previous_scene_context>\n{\"title\": \"Final Scene\", \"summary\": \"\", \"description\": \"Own harbour at dusk\", \"ambient_sound\": \"Gulls\", \"non_diegetic_music\": \"\", \"sections\": [{\"prompt\": \"[[DIRECTOR_REF_0001]] waits\"}, {\"prompt\": \"Own keeper turns\"}]}\n</previous_scene_context>\n\n<next_scene_summary>\n\n</next_scene_summary>\n\n<selected_cast>\n[{\"story_names\": [\"Own Keeper\", \"keeper\"], \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"description\": \"Own fictional keeper, grey coat\", \"required\": true}]\n</selected_cast>\n\n<continuity_cast>\n[{\"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"description\": \"Own fictional keeper\", \"required\": false}]\n</continuity_cast>\n\n<additional_instruction>\n\n</additional_instruction>\n\n<scene_json>\n{\"id\": \"scene_001\", \"title\": \"Own Climb\", \"summary\": \"[[DIRECTOR_REF_0001]] climbs.\", \"description\": \"Own stairwell\", \"ambient_sound\": \"Wind\", \"non_diegetic_music\": \"\", \"weight\": 1, \"image_ids\": [\"own_setting\"], \"boundary_from_previous\": \"hard_cut\", \"sections\": [{\"id\": \"scene_001_section_001\", \"summary\": \"\", \"prompt\": \"[[DIRECTOR_REF_0001]] climbs the stairs.\\n@visitor follows.\", \"weight\": 2.5, \"image_ids\": [\"own_moment\"], \"first_frame_id\": \"own_start\", \"last_frame_id\": \"own_end\"}, {\"id\": \"scene_001_section_002\", \"summary\": \"\", \"prompt\": \"Own lamp turns.\", \"weight\": 1, \"image_ids\": [], \"first_frame_id\": \"\", \"last_frame_id\": \"\"}]}\n</scene_json>",
    "images": 0
+  },
+  {
+   "name": "animate_full",
+   "kind": "animate",
+   "request": {
+    "schema_version": 1,
+    "operation": "animate_image",
+    "scene_context": {
+     "messages": [
+      {
+       "role": "assistant",
+       "name": "Own Keeper",
+       "text": "The lamp is out.\nHurry."
+      },
+      {
+       "role": "user",
+       "name": "",
+       "text": "@keeper climbs \"now\" — ö"
+      }
+     ]
+    },
+    "active_characters": [
+     {
+      "id": "keeper_id",
+      "name": "Own Keeper",
+      "appearance": "Own fictional keeper\nExposure: clothed\nGarments: grey coat; boots"
+     },
+     {
+      "id": "visitor_id",
+      "name": "Own Visitor",
+      "appearance": ""
+     }
+    ],
+    "user_instruction": {
+     "text": "Make @keeper climb",
+     "mentions": [
+      {
+       "text": "@keeper",
+       "character_id": "keeper_id"
+      }
+     ]
+    },
+    "audio_request": {
+     "generate_dialogue": true,
+     "generate_background_sound": true
+    },
+    "generation_context": {
+     "duration_seconds": 10,
+     "aspect_ratio": "16:9",
+     "orientation": "Landscape"
+    },
+    "contents": [
+     {
+      "description": "",
+      "prompt": "",
+      "ambient_sound": ""
+     },
+     {
+      "description": "d",
+      "prompt": "p"
+     },
+     {
+      "description": "d",
+      "prompt": "p",
+      "ambient_sound": "s",
+      "extra": ""
+     },
+     {
+      "description": "d",
+      "prompt": 1,
+      "ambient_sound": "s"
+     },
+     [
+      "description"
+     ]
+    ]
+   },
+   "user": "<scene_context>\n<latest_moment>\n[Own Keeper] The lamp is out.\nHurry.\n[] @keeper climbs \"now\" — ö\n</latest_moment>\n</scene_context>\n<active_characters>\n[\n  {\n    \"id\": \"keeper_id\",\n    \"name\": \"Own Keeper\",\n    \"appearance\": \"Own fictional keeper\\nExposure: clothed\\nGarments: grey coat; boots\"\n  },\n  {\n    \"id\": \"visitor_id\",\n    \"name\": \"Own Visitor\",\n    \"appearance\": \"\"\n  }\n]\n</active_characters>\n<user_instruction>\n{\n  \"text\": \"Make @keeper climb\",\n  \"mentions\": [\n    {\n      \"text\": \"@keeper\",\n      \"character_id\": \"keeper_id\"\n    }\n  ]\n}\n</user_instruction>\n<audio_request>\n{\n  \"generate_dialogue\": true,\n  \"generate_background_sound\": true\n}\n</audio_request>\n<generation_context>\n{\n  \"duration_seconds\": 10,\n  \"aspect_ratio\": \"16:9\",\n  \"orientation\": \"Landscape\"\n}\n</generation_context>",
+   "images": 1,
+   "contents": [
+    {
+     "content": {
+      "description": "",
+      "prompt": "",
+      "ambient_sound": ""
+     },
+     "ok": true
+    },
+    {
+     "content": {
+      "description": "d",
+      "prompt": "p"
+     },
+     "ok": false,
+     "path": "$"
+    },
+    {
+     "content": {
+      "description": "d",
+      "prompt": "p",
+      "ambient_sound": "s",
+      "extra": ""
+     },
+     "ok": false,
+     "path": "$"
+    },
+    {
+     "content": {
+      "description": "d",
+      "prompt": 1,
+      "ambient_sound": "s"
+     },
+     "ok": false,
+     "path": "$.prompt"
+    },
+    {
+     "content": [
+      "description"
+     ],
+     "ok": false,
+     "path": "$"
+    }
+   ]
+  },
+  {
+   "name": "animate_empty",
+   "kind": "animate",
+   "request": {
+    "schema_version": 1,
+    "operation": "animate_image",
+    "scene_context": {
+     "messages": []
+    },
+    "active_characters": [],
+    "user_instruction": {
+     "text": "",
+     "mentions": []
+    },
+    "audio_request": {
+     "generate_dialogue": false,
+     "generate_background_sound": false
+    },
+    "generation_context": {
+     "duration_seconds": 7.5,
+     "aspect_ratio": "9:16",
+     "orientation": "Portrait"
+    }
+   },
+   "user": "<scene_context>\n<latest_moment>\n\n</latest_moment>\n</scene_context>\n<active_characters>\n[]\n</active_characters>\n<user_instruction>\n{\n  \"text\": \"\",\n  \"mentions\": []\n}\n</user_instruction>\n<audio_request>\n{\n  \"generate_dialogue\": false,\n  \"generate_background_sound\": false\n}\n</audio_request>\n<generation_context>\n{\n  \"duration_seconds\": 7.5,\n  \"aspect_ratio\": \"9:16\",\n  \"orientation\": \"Portrait\"\n}\n</generation_context>",
+   "images": 1,
+   "contents": []
   },
   {
    "name": "inventory_label",

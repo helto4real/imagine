@@ -372,6 +372,32 @@ pub fn apply(
                 return Err("authoring_empty_draft");
             }
         }
+        Operation::Animate => {
+            let scene = base
+                .scene(request.scene_id.as_ref().ok_or("scene_not_found")?)
+                .map_err(|_| "scene_not_found")?;
+            let proposal = draft.animate.clone().ok_or("authoring_empty_draft")?;
+            let mut section = scene
+                .sections
+                .first()
+                .cloned()
+                .ok_or("animate_scene_invalid")?;
+            section.prompt = proposal.prompt;
+            commands.push(Edit::SetSceneDescription {
+                scene_id: scene.id.clone(),
+                description: proposal.description,
+            });
+            commands.push(Edit::UpdateSection {
+                scene_id: scene.id.clone(),
+                section,
+            });
+            creative
+                .scene_prompts
+                .entry(scene.id.clone())
+                .or_default()
+                .ambient_sound = proposal.ambient_sound;
+            commands.push(Edit::SetCreative { creative });
+        }
         Operation::EnhanceSection => {
             let scene = base
                 .scene(request.scene_id.as_ref().ok_or("scene_not_found")?)
@@ -645,11 +671,11 @@ pub fn apply(
 pub fn system(snapshot: &profiles::Snapshot, key: &str) -> Result<String> {
     system_with_images(snapshot, key, &[], false)
 }
-pub fn system_with_images(
+/// A system prompt whose outline schema follows `contract`.
+pub fn system_for(
     snapshot: &profiles::Snapshot,
     key: &str,
-    images: &[StoryImage],
-    dialogue: bool,
+    contract: &super::director::Contract,
 ) -> Result<String> {
     let text = snapshot
         .prompts
@@ -657,8 +683,16 @@ pub fn system_with_images(
         .ok_or("prompt_profile_unavailable")?;
     Ok(text.replace(
         "{{STORY_OUTLINE_JSON_SCHEMA}}",
-        &super::director::schema_text(&super::visuals::contract(images, dialogue)?),
+        &super::director::schema_text(contract),
     ))
+}
+pub fn system_with_images(
+    snapshot: &profiles::Snapshot,
+    key: &str,
+    images: &[StoryImage],
+    dialogue: bool,
+) -> Result<String> {
+    system_for(snapshot, key, &super::visuals::contract(images, dialogue)?)
 }
 #[cfg(test)]
 mod tests {

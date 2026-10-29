@@ -72,17 +72,61 @@ def patch(studio):
 PROFILE = {'profile': {}, 'resolved_id': 'own'}
 
 
+def bridge_context(request):
+    """The Story bridge's normalized contexts with Director's default Scene policy."""
+    from shared.prompt_studio_story_service import (
+        StoryRequestContext, normalize_grounding_context, normalize_opening_appearance_context)
+    grounding = normalize_grounding_context(request.get('grounding_context'))
+    opening = normalize_opening_appearance_context(request.get('opening_appearance_context'),
+                                                   grounding_context=grounding)
+    return StoryRequestContext(scope='story_bridge', grounding_context=grounding,
+                               opening_appearance_context=opening)
+
+
+def answers(built, cases):
+    from shared.contracts.story_outline import StoryOutlineContractError, validate_story_outline_contract
+    results = []
+    for answer in cases:
+        try:
+            validate_story_outline_contract(answer, built['contract'])
+            results.append({'answer': answer, 'ok': True})
+        except StoryOutlineContractError as error:
+            results.append({'answer': answer, 'ok': False, 'path': error.path})
+    return results
+
+
 def run(studio, kind, request):
     cancelled = studio.PromptStudioCancellationCoordinator(threading.Event())
     status = lambda *a: None
     instruction = str(request.get('user_instruction') or '').strip()
     if kind == 'outline':
-        built = studio._build_story_outline(request, instruction, PROFILE, studio.StoryRequestContext())
-        return {'user': built['user_prompt'], 'schema': built['system_prompt'],
-                'references': [list(r) for r in built['references']]}
+        built = studio._build_story_outline(request, instruction, PROFILE, bridge_context(request))
+        result = {'user': built['user_prompt'], 'schema': built['system_prompt'],
+                  'references': [list(r) for r in built['references']]}
+        if request.get('answers'):
+            result['answers'] = answers(built, request['answers'])
+        return result
+    if kind == 'animate':
+        from shared.contracts.animate_image import AnimateImageFormatError, validate_content
+        snapshot = {'provider': 'ollama', 'settings': {'model': 'own'}, 'system_prompt': 'SYSTEM:animate_image',
+                    'profile': {'profile': {'id': 'own', 'revision': 'own'}}}
+        try:
+            studio._run_animate_image({**request, 'image': {'mime_type': 'image/png', 'base64': ''},
+                                       'include_private_error_details': False}, snapshot, None, None, 'director')
+        except Captured as captured:
+            contents = []
+            for content in request.get('contents', []):
+                try:
+                    validate_content(content)
+                    contents.append({'content': content, 'ok': True})
+                except AnimateImageFormatError as error:
+                    contents.append({'content': content, 'ok': False, 'path': error.path})
+            return {'user': captured.user, 'images': captured.images, 'contents': contents}
+        raise RuntimeError('animate made no provider call')
     try:
         if kind == 'scene':
-            studio._run_story_scene(request, 'ollama', {}, instruction, status, cancelled, PROFILE)
+            studio._run_story_scene(request, 'ollama', {}, instruction, status, cancelled, PROFILE,
+                                    story_context=bridge_context(request))
         else:
             studio._run_image_inventory({'items': [request['item']]}, 'ollama', {}, instruction,
                                         status, cancelled, PROFILE)
@@ -156,6 +200,51 @@ def scene_request(**fields):
     return request
 
 
+DIGEST = 'sha256:' + '0123456789abcdef' * 4
+GROUNDING = {
+    'schema_version': '1.0', 'source_digest': DIGEST,
+    'characters': [
+        {'character_id': 'keeper_id', 'reference_tag': '@keeper', 'current_appearance': {
+            'exposure': 'partially_clothed', 'garments': [' grey coat ', '', 'grey coat', 'boots'],
+            'worn_items': ['lantern'], 'temporary_traits': ['wet hair'], 'visible_body_state': []}},
+        {'character_id': 'visitor_id', 'reference_tag': '@visitor', 'current_appearance': {
+            'exposure': 'not_stated', 'garments': [], 'worn_items': [], 'temporary_traits': [],
+            'visible_body_state': ['tired, @keeper notices']}},
+    ],
+    'protected_facts': ['  @visitor arrived by boat.  ', 'The lamp is broken.'],
+}
+OPENING = {
+    'schema_version': '1.0', 'source_digest': DIGEST,
+    'characters': [
+        {'character_id': 'keeper_id', 'reference_tag': '@keeper', 'fallback_wardrobe': ' Own wool sweater '},
+        {'character_id': 'visitor_id', 'reference_tag': '@visitor', 'fallback_wardrobe': ''},
+    ],
+}
+TRANSCRIPT = ('<earlier_continuity>\n[Own Keeper] The storm is coming.\n[user] Close the door.\n'
+              '</earlier_continuity>\n\n<latest_moment>\n[Own Visitor] @keeper, the lamp!\n</latest_moment>')
+
+
+def opening_answer(changes=None):
+    rows = [
+        {'character_id': 'keeper_id', 'reference_tag': '[[DIRECTOR_REF_0001]]', 'source': 'latest_moment',
+         'exposure': 'partially_clothed', 'garments': ['grey coat'], 'worn_items': [], 'temporary_traits': [],
+         'visible_body_state': []},
+        {'character_id': 'visitor_id', 'reference_tag': '[[DIRECTOR_REF_0002]]', 'source': 'not_stated',
+         'exposure': 'not_stated', 'garments': [], 'worn_items': [], 'temporary_traits': [],
+         'visible_body_state': []},
+    ]
+    for (index, key), value in (changes or {}).items():
+        if value is None:
+            del rows[index][key]
+        else:
+            rows[index][key] = value
+    scene = {'title': 'T', 'summary': 'S', 'description': 'D', 'ambient_sound': '', 'non_diegetic_music': '',
+             'weight': 1, 'boundary_from_previous': 'hard_cut', 'setting_reference_matches': {},
+             'sections': [{'prompt': 'P', 'weight': 1}]}
+    return {'scenes': [scene], 'visual_placements': [],
+            'opening_appearance': {'schema_version': '1.0', 'characters': rows}}
+
+
 IMAGE = {'id': 'own_moment', 'label': 'Own beacon lit', 'note': '', 'usage': 'required_moment'}
 
 CASES = [
@@ -173,6 +262,23 @@ CASES = [
                'required': False}, {'story_names': [], 'reference_tag': 'nope'},
               {'story_names': [], 'reference_tag': '@long_alias'}])),
     ('outline_day', 'outline', outline(duration_seconds=100000)),
+    ('outline_grounded_context', 'outline', outline(
+        story=TRANSCRIPT, cast=[KEEPER, VISITOR], grounding_context=GROUNDING, opening_appearance_context=OPENING,
+        duration_seconds=20, add_dialogue=True, image_inventory=INVENTORY, visual_beats=BEATS)),
+    ('outline_opening_answers', 'outline', outline(
+        story=TRANSCRIPT, cast=[KEEPER, VISITOR], grounding_context=GROUNDING, opening_appearance_context=OPENING,
+        answers=[opening_answer(), opening_answer({(0, 'source'): 'default_wardrobe'}),
+                 opening_answer({(1, 'source'): 'default_wardrobe'}),
+                 opening_answer({(1, 'reference_tag'): '@visitor'}),
+                 opening_answer({(0, 'character_id'): 'visitor_id'}),
+                 opening_answer({(0, 'exposure'): 'dressed'}),
+                 opening_answer({(0, 'garments'): ['x'] * 13}),
+                 opening_answer({(0, 'garments'): ['']}),
+                 opening_answer({(0, 'worn_items'): None}),
+                 opening_answer({(0, 'extra'): 1})])),
+    ('outline_facts_only', 'outline', outline(
+        story='<latest_moment>\n[user] Own night falls.\n</latest_moment>',
+        grounding_context={**GROUNDING, 'characters': [], 'protected_facts': ['Own fact']})),
     ('scene_first_no_images', 'scene', scene_request(next_summary='Own next.')),
     ('scene_dialogue_images', 'scene', scene_request(
         user_instruction='  Keep @keeper calm  ', add_dialogue=True, cast=[KEEPER, VISITOR], scene=scene(True),
@@ -186,9 +292,31 @@ CASES = [
         images=[IMAGE])),
     ('scene_dialogue_without_timing', 'scene', scene_request(
         add_dialogue=True, cast=[KEEPER, VISITOR], scene=scene(True, 2.5, 1))),
+    ('scene_grounded', 'scene', scene_request(
+        cast=[KEEPER, VISITOR], grounding_context=GROUNDING, add_dialogue=True, scene=scene(True))),
     ('scene_continued', 'scene', scene_request(
         cast=[KEEPER], previous_scene_context=CONTINUATION['previous_scene'],
         context_cast=CONTINUATION['context_cast'])),
+    ('animate_full', 'animate', {
+        'schema_version': 1, 'operation': 'animate_image',
+        'scene_context': {'messages': [{'role': 'assistant', 'name': 'Own Keeper', 'text': 'The lamp is out.\nHurry.'},
+                                       {'role': 'user', 'name': '', 'text': '@keeper climbs "now" — ö'}]},
+        'active_characters': [{'id': 'keeper_id', 'name': 'Own Keeper',
+                               'appearance': 'Own fictional keeper\nExposure: clothed\nGarments: grey coat; boots'},
+                              {'id': 'visitor_id', 'name': 'Own Visitor', 'appearance': ''}],
+        'user_instruction': {'text': 'Make @keeper climb', 'mentions': [{'text': '@keeper', 'character_id': 'keeper_id'}]},
+        'audio_request': {'generate_dialogue': True, 'generate_background_sound': True},
+        'generation_context': {'duration_seconds': 10, 'aspect_ratio': '16:9', 'orientation': 'Landscape'},
+        'contents': [{'description': '', 'prompt': '', 'ambient_sound': ''},
+                     {'description': 'd', 'prompt': 'p'},
+                     {'description': 'd', 'prompt': 'p', 'ambient_sound': 's', 'extra': ''},
+                     {'description': 'd', 'prompt': 1, 'ambient_sound': 's'},
+                     ['description']]}),
+    ('animate_empty', 'animate', {
+        'schema_version': 1, 'operation': 'animate_image', 'scene_context': {'messages': []},
+        'active_characters': [], 'user_instruction': {'text': '', 'mentions': []},
+        'audio_request': {'generate_dialogue': False, 'generate_background_sound': False},
+        'generation_context': {'duration_seconds': 7.5, 'aspect_ratio': '9:16', 'orientation': 'Portrait'}}),
     ('inventory_label', 'inventory', {'user_instruction': ' Own look ', 'item': IMAGE}),
     ('inventory_empty', 'inventory', {'user_instruction': '',
                                       'item': {'id': '', 'label': '', 'note': '', 'usage': ''}}),

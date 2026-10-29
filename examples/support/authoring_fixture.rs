@@ -13,6 +13,7 @@ pub struct Fixture {
     pub fail_inventory_once: AtomicBool,
     pub drop_reference_once: AtomicBool,
     pub introduce_reference_once: AtomicBool,
+    pub fail_animate_once: AtomicBool,
 }
 pub async fn spawn() -> (String, tokio::task::JoinHandle<()>, Arc<Fixture>) {
     let state = Arc::new(Fixture::default());
@@ -61,7 +62,14 @@ async fn reply(State(state): State<Arc<Fixture>>, Json(body): Json<Value>) -> Js
             .and_then(|s| serde_json::from_str::<Value>(s).ok())
             .unwrap_or(Value::Null)
     };
-    let text = if user.contains("\n\nStable image ID:\n") {
+    let text = if user.starts_with("<scene_context>\n") {
+        if state.fail_animate_once.swap(false, Ordering::SeqCst) {
+            json!({"description":"Own incomplete answer"}).to_string()
+        } else {
+            json!({"description":"Own animated harbour","prompt":"","ambient_sound":"Own gulls"})
+                .to_string()
+        }
+    } else if user.contains("\n\nStable image ID:\n") {
         if state.fail_inventory_once.swap(false, Ordering::SeqCst) {
             String::new()
         } else {
@@ -106,6 +114,10 @@ async fn reply(State(state): State<Arc<Fixture>>, Json(body): Json<Value>) -> Js
             }
         }
         board["visual_placements"]=json!(row("Required image order and visual beats").as_array().into_iter().flatten().map(|b|json!({"beat_key":b["beat_key"],"scene_ordinal":1,"section_ordinal":1,"semantic_role":if b["type"]=="required_moment"{"depicted_moment"}else{"state_transition"}})).collect::<Vec<_>>());
+        let opening = tag("opening_appearance_context");
+        if let Some(characters) = opening["characters"].as_array() {
+            board["opening_appearance"] = json!({"schema_version":"1.0","characters":characters.iter().map(|c|json!({"character_id":c["character_id"],"reference_tag":c["reference_tag"],"source":"latest_moment","exposure":"clothed","garments":["Own fixture coat"],"worn_items":[],"temporary_traits":[],"visible_body_state":[]})).collect::<Vec<_>>()});
+        }
         let cast = tag("selected_cast");
         let system = body["messages"][0]["content"]
             .as_str()

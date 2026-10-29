@@ -439,6 +439,496 @@ pub struct Contract {
     pub setting_ids: Vec<String>,
     pub beats: Vec<Beat>,
     pub dialogue: bool,
+    /// The roster whose opening appearance the outline must resolve.
+    pub opening: Option<Vec<OpeningCharacter>>,
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct OpeningCharacter {
+    pub character_id: String,
+    pub reference_tag: String,
+    pub fallback_wardrobe: String,
+}
+pub const OPENING_SOURCES: [&str; 5] = [
+    "user_instruction",
+    "latest_moment",
+    "earlier_continuity",
+    "default_wardrobe",
+    "not_stated",
+];
+pub const EXPOSURES: [&str; 4] = ["not_stated", "clothed", "partially_clothed", "nude"];
+/// Appearance lists and their item limits.
+pub const APPEARANCE_LISTS: [(&str, usize); 4] = [
+    ("garments", 12),
+    ("worn_items", 12),
+    ("temporary_traits", 20),
+    ("visible_body_state", 20),
+];
+pub const APPEARANCE_FACT_CHARS: usize = 4000;
+const APPEARANCE_CHARACTER_CHARS: usize = 16000;
+const FALLBACK_WARDROBE_CHARS: usize = 2000;
+const CHARACTER_ID_CHARS: usize = 300;
+pub const MAX_PROTECTED_FACTS: usize = 128;
+const PROTECTED_FACT_CHARS: usize = 16000;
+const GROUNDING_BYTES: usize = 2097152;
+/// `_opening_appearance_schema`.
+fn opening_schema(count: usize) -> Py {
+    let fact = || {
+        Py::obj([
+            ("type", Py::str("string")),
+            ("minLength", Py::Int(1)),
+            ("maxLength", Py::Int(APPEARANCE_FACT_CHARS as i64)),
+        ])
+    };
+    let mut properties = Py::obj([
+        (
+            "character_id",
+            Py::obj([("type", Py::str("string")), ("minLength", Py::Int(1))]),
+        ),
+        (
+            "reference_tag",
+            Py::obj([("type", Py::str("string")), ("minLength", Py::Int(1))]),
+        ),
+        ("source", Py::obj([("enum", Py::strs(OPENING_SOURCES))])),
+        ("exposure", Py::obj([("enum", Py::strs(EXPOSURES))])),
+    ]);
+    for (field, maximum) in APPEARANCE_LISTS {
+        properties.push(
+            field,
+            Py::obj([
+                ("type", Py::str("array")),
+                ("maxItems", Py::Int(maximum as i64)),
+                ("items", fact()),
+            ]),
+        );
+    }
+    Py::obj([
+        ("type", Py::str("object")),
+        ("additionalProperties", Py::Bool(false)),
+        ("required", required(&["schema_version", "characters"])),
+        (
+            "properties",
+            Py::obj([
+                ("schema_version", Py::obj([("const", Py::str("1.0"))])),
+                (
+                    "characters",
+                    Py::obj([
+                        ("type", Py::str("array")),
+                        ("minItems", Py::Int(count as i64)),
+                        ("maxItems", Py::Int(count as i64)),
+                        (
+                            "items",
+                            Py::obj([
+                                ("type", Py::str("object")),
+                                ("additionalProperties", Py::Bool(false)),
+                                (
+                                    "required",
+                                    required(&[
+                                        "character_id",
+                                        "reference_tag",
+                                        "source",
+                                        "exposure",
+                                        "garments",
+                                        "worn_items",
+                                        "temporary_traits",
+                                        "visible_body_state",
+                                    ]),
+                                ),
+                                ("properties", properties),
+                            ]),
+                        ),
+                    ]),
+                ),
+            ]),
+        ),
+    ])
+}
+/// Where Director found a context or answer invalid, and why.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Invalid {
+    pub path: String,
+    pub reason: &'static str,
+}
+fn invalid<T>(path: impl Into<String>, reason: &'static str) -> Result<T, Invalid> {
+    Err(Invalid {
+        path: path.into(),
+        reason,
+    })
+}
+/// Director's `_REFERENCE_TAG_RE` for grounding rosters.
+fn roster_tag(tag: &str) -> bool {
+    reference_tag(tag) && tag.chars().count() <= 129
+}
+fn digest(value: &Py) -> bool {
+    value.as_str().is_some_and(|d| {
+        d.strip_prefix("sha256:").is_some_and(|hex| {
+            hex.len() == 64
+                && hex
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        })
+    })
+}
+fn sorted_keys(value: &Py) -> Py {
+    match value {
+        Py::Obj(rows) => {
+            let mut rows = rows
+                .iter()
+                .map(|(k, v)| (k.clone(), sorted_keys(v)))
+                .collect::<Vec<_>>();
+            rows.sort_by(|a, b| a.0.cmp(&b.0));
+            Py::Obj(rows)
+        }
+        Py::List(items) => Py::List(items.iter().map(sorted_keys).collect()),
+        other => other.clone(),
+    }
+}
+/// `_bounded_string_list`.
+fn bounded_list(value: &Py, path: &str, maximum: usize) -> Result<Vec<String>, Invalid> {
+    let Some(items) = value.as_list() else {
+        return invalid(path, "must be a bounded array");
+    };
+    let mut out: Vec<String> = vec![];
+    for (i, item) in items.iter().enumerate() {
+        let Some(text) = item.as_str() else {
+            return invalid(format!("{path}[{i}]"), "must be a string");
+        };
+        let text = text.pytrim();
+        if text.is_empty() {
+            continue;
+        }
+        if text.chars().count() > APPEARANCE_FACT_CHARS {
+            return invalid(format!("{path}[{i}]"), "is too long");
+        }
+        if !out.iter().any(|t| t == text) {
+            out.push(text.into());
+        }
+    }
+    if out.len() > maximum {
+        return invalid(path, "must be a bounded array");
+    }
+    Ok(out)
+}
+/// `_normalize_appearance`.
+fn appearance(value: &Py, path: &str) -> Result<Py, Invalid> {
+    let keys = [
+        "exposure",
+        "garments",
+        "worn_items",
+        "temporary_traits",
+        "visible_body_state",
+    ];
+    if value.keys().is_none() {
+        return invalid(path, "must be an object");
+    }
+    if !exact_keys(value, &keys) {
+        return invalid(path, "must use the exact appearance shape");
+    }
+    let exposure = value.at("exposure").text();
+    if !EXPOSURES.contains(&exposure.as_str()) {
+        return invalid(format!("{path}.exposure"), "uses an unsupported value");
+    }
+    let mut out = Py::obj([("exposure", Py::Str(exposure))]);
+    let mut total = 0;
+    for (field, maximum) in APPEARANCE_LISTS {
+        let items = bounded_list(value.at(field), &format!("{path}.{field}"), maximum)?;
+        total += items.iter().map(|i| i.chars().count()).sum::<usize>();
+        out.push(field, Py::strs(&items));
+    }
+    if total > APPEARANCE_CHARACTER_CHARS {
+        return invalid(path, "exceeds the published per-character appearance limit");
+    }
+    Ok(out)
+}
+/// `normalize_grounding_context`; paths are relative to the context (`$`).
+pub fn normalize_grounding(value: &Py) -> Result<Py, Invalid> {
+    if *value == Py::Null {
+        return Ok(Py::Null);
+    }
+    if value.keys().is_none() {
+        return invalid("$", "must be an object");
+    }
+    if sorted_keys(value).compact().len() > GROUNDING_BYTES {
+        return invalid("$", "exceeds the published UTF-8 payload limit");
+    }
+    let allowed = [
+        "schema_version",
+        "source_digest",
+        "characters",
+        "protected_facts",
+    ];
+    if value.keys().unwrap().iter().any(|k| !allowed.contains(k)) {
+        return invalid("$", "contains unsupported fields");
+    }
+    if value.at("schema_version").text() != "1.0" {
+        return invalid("$.schema_version", "must be 1.0");
+    }
+    if !digest(value.at("source_digest")) {
+        return invalid("$.source_digest", "must be a canonical SHA-256 digest");
+    }
+    let rows = match value.at("characters").as_list() {
+        Some(rows) if rows.len() <= MAX_CAST => rows,
+        _ => return invalid("$.characters", "must be a bounded array"),
+    };
+    let mut ids = std::collections::BTreeSet::new();
+    let mut aliases = std::collections::BTreeSet::new();
+    let mut characters = vec![];
+    for (i, row) in rows.iter().enumerate() {
+        let path = format!("$.characters[{i}]");
+        if row.keys().is_none() {
+            return invalid(path, "must be an object");
+        }
+        if !exact_keys(
+            row,
+            &["character_id", "reference_tag", "current_appearance"],
+        ) {
+            return invalid(path, "must use the exact character shape");
+        }
+        let id = row.at("character_id").text();
+        let tag = row.at("reference_tag").text();
+        if !(1..=CHARACTER_ID_CHARS).contains(&id.chars().count()) {
+            return invalid(format!("{path}.character_id"), "is invalid");
+        }
+        if !roster_tag(&tag) {
+            return invalid(format!("{path}.reference_tag"), "is invalid");
+        }
+        if !ids.insert(id.clone()) {
+            return invalid(format!("{path}.character_id"), "must be unique");
+        }
+        if !aliases.insert(tag.to_lowercase()) {
+            return invalid(format!("{path}.reference_tag"), "must be unique");
+        }
+        characters.push(Py::obj([
+            ("character_id", Py::Str(id)),
+            ("reference_tag", Py::Str(tag)),
+            (
+                "current_appearance",
+                appearance(
+                    row.at("current_appearance"),
+                    &format!("{path}.current_appearance"),
+                )?,
+            ),
+        ]));
+    }
+    let facts = match value.get("protected_facts") {
+        None => &[][..],
+        Some(Py::List(facts)) if facts.len() <= MAX_PROTECTED_FACTS => facts,
+        Some(_) => return invalid("$.protected_facts", "must be a bounded array"),
+    };
+    let mut protected_facts = vec![];
+    for (i, fact) in facts.iter().enumerate() {
+        let text = fact.text().pytrim().to_owned();
+        if text.is_empty() || text.chars().count() > PROTECTED_FACT_CHARS {
+            return invalid(format!("$.protected_facts[{i}]"), "is empty or too long");
+        }
+        protected_facts.push(text);
+    }
+    Ok(Py::obj([
+        ("schema_version", Py::str("1.0")),
+        ("source_digest", value.at("source_digest").clone()),
+        ("characters", Py::List(characters)),
+        ("protected_facts", Py::strs(&protected_facts)),
+    ]))
+}
+/// `normalize_opening_appearance_context` against the normalized grounding.
+pub fn normalize_opening(value: &Py, grounding: &Py) -> Result<Py, Invalid> {
+    if *value == Py::Null {
+        return Ok(Py::Null);
+    }
+    if value.keys().is_none() {
+        return invalid("$", "must be an object");
+    }
+    if !exact_keys(value, &["schema_version", "source_digest", "characters"]) {
+        return invalid("$", "must use the exact context shape");
+    }
+    if value.at("schema_version").text() != "1.0" {
+        return invalid("$.schema_version", "must be 1.0");
+    }
+    if !digest(value.at("source_digest")) {
+        return invalid("$.source_digest", "must be a canonical SHA-256 digest");
+    }
+    let grounded = *grounding != Py::Null;
+    if grounded && value.at("source_digest") != grounding.at("source_digest") {
+        return invalid(
+            "$.source_digest",
+            "must match the structured grounding source digest",
+        );
+    }
+    let rows = match value.at("characters").as_list() {
+        Some(rows) if rows.len() <= MAX_CAST => rows,
+        _ => return invalid("$.characters", "must be a bounded array"),
+    };
+    let roster = grounding.at("characters").as_list().unwrap_or_default();
+    if grounded && rows.len() != roster.len() {
+        return invalid("$.characters", "must match the structured grounding roster");
+    }
+    let mut ids = std::collections::BTreeSet::new();
+    let mut aliases = std::collections::BTreeSet::new();
+    let mut characters = vec![];
+    for (i, row) in rows.iter().enumerate() {
+        let path = format!("$.characters[{i}]");
+        if row.keys().is_none() {
+            return invalid(path, "must be an object");
+        }
+        if !exact_keys(row, &["character_id", "reference_tag", "fallback_wardrobe"]) {
+            return invalid(path, "must use the exact character shape");
+        }
+        let id = row.at("character_id").text();
+        let tag = row.at("reference_tag").text();
+        if !(1..=CHARACTER_ID_CHARS).contains(&id.chars().count()) {
+            return invalid(format!("{path}.character_id"), "is invalid");
+        }
+        if !roster_tag(&tag) {
+            return invalid(format!("{path}.reference_tag"), "is invalid");
+        }
+        let Some(wardrobe) = row.at("fallback_wardrobe").as_str() else {
+            return invalid(format!("{path}.fallback_wardrobe"), "must be a string");
+        };
+        let wardrobe = wardrobe.pytrim();
+        if wardrobe.chars().count() > FALLBACK_WARDROBE_CHARS {
+            return invalid(
+                format!("{path}.fallback_wardrobe"),
+                "exceeds the published default wardrobe limit",
+            );
+        }
+        if !ids.insert(id.clone()) {
+            return invalid(format!("{path}.character_id"), "must be unique");
+        }
+        if !aliases.insert(tag.to_lowercase()) {
+            return invalid(format!("{path}.reference_tag"), "must be unique");
+        }
+        if grounded && roster[i].at("character_id").text() != id {
+            return invalid(
+                format!("{path}.character_id"),
+                "must match the structured grounding roster and order",
+            );
+        }
+        if grounded && roster[i].at("reference_tag").text() != tag {
+            return invalid(
+                format!("{path}.reference_tag"),
+                "must match the structured grounding roster and order",
+            );
+        }
+        characters.push(Py::obj([
+            ("character_id", Py::Str(id)),
+            ("reference_tag", Py::Str(tag)),
+            ("fallback_wardrobe", Py::str(wardrobe)),
+        ]));
+    }
+    Ok(Py::obj([
+        ("schema_version", Py::str("1.0")),
+        ("source_digest", value.at("source_digest").clone()),
+        ("characters", Py::List(characters)),
+    ]))
+}
+/// The outline answer's `opening_appearance` against its schema and roster
+/// (`validate_story_outline_contract`), before references are restored.
+pub fn validate_opening(value: &Py, roster: &[OpeningCharacter]) -> Result<(), Invalid> {
+    let path = "$.opening_appearance";
+    if value.keys().is_none() {
+        return invalid(path, "must be object");
+    }
+    let keys = value.keys().unwrap();
+    for key in ["schema_version", "characters"] {
+        if !keys.contains(&key) {
+            return invalid(format!("{path}.{key}"), "is required");
+        }
+    }
+    if keys
+        .iter()
+        .any(|k| !["schema_version", "characters"].contains(k))
+    {
+        return invalid(path, "has properties that are not allowed");
+    }
+    if *value.at("schema_version") != Py::str("1.0") {
+        return invalid(format!("{path}.schema_version"), "must equal 1.0");
+    }
+    let Some(rows) = value.at("characters").as_list() else {
+        return invalid(format!("{path}.characters"), "must be array");
+    };
+    if rows.len() != roster.len() {
+        return invalid(format!("{path}.characters"), "must contain every character");
+    }
+    let fields = [
+        "character_id",
+        "reference_tag",
+        "source",
+        "exposure",
+        "garments",
+        "worn_items",
+        "temporary_traits",
+        "visible_body_state",
+    ];
+    for (i, (row, expected)) in rows.iter().zip(roster).enumerate() {
+        let path = format!("{path}.characters[{i}]");
+        let Some(keys) = row.keys() else {
+            return invalid(path, "must be object");
+        };
+        if let Some(key) = fields.iter().find(|k| !keys.contains(k)) {
+            return invalid(format!("{path}.{key}"), "is required");
+        }
+        if keys.iter().any(|k| !fields.contains(k)) {
+            return invalid(path, "has properties that are not allowed");
+        }
+        for key in ["character_id", "reference_tag"] {
+            if row.at(key).as_str().is_none_or(str::is_empty) {
+                return invalid(format!("{path}.{key}"), "must be a non-empty string");
+            }
+        }
+        if !row
+            .at("source")
+            .as_str()
+            .is_some_and(|s| OPENING_SOURCES.contains(&s))
+        {
+            return invalid(format!("{path}.source"), "must use an allowed value");
+        }
+        if !row
+            .at("exposure")
+            .as_str()
+            .is_some_and(|s| EXPOSURES.contains(&s))
+        {
+            return invalid(format!("{path}.exposure"), "must use an allowed value");
+        }
+        for (field, maximum) in APPEARANCE_LISTS {
+            let Some(items) = row.at(field).as_list() else {
+                return invalid(format!("{path}.{field}"), "must be array");
+            };
+            if items.len() > maximum {
+                return invalid(format!("{path}.{field}"), "has too many items");
+            }
+            for (j, item) in items.iter().enumerate() {
+                if !item
+                    .as_str()
+                    .is_some_and(|s| (1..=APPEARANCE_FACT_CHARS).contains(&s.chars().count()))
+                {
+                    return invalid(
+                        format!("{path}.{field}[{j}]"),
+                        "must be a string of allowed length",
+                    );
+                }
+            }
+        }
+        if row.at("character_id").text() != expected.character_id {
+            return invalid(
+                format!("{path}.character_id"),
+                "must preserve the supplied character ID and order",
+            );
+        }
+        if row.at("reference_tag").text() != expected.reference_tag {
+            return invalid(
+                format!("{path}.reference_tag"),
+                "must preserve the supplied reference tag and order",
+            );
+        }
+        if row.at("source").as_str() == Some("default_wardrobe")
+            && expected.fallback_wardrobe.is_empty()
+        {
+            return invalid(
+                format!("{path}.source"),
+                "cannot use default_wardrobe without a supplied fallback",
+            );
+        }
+    }
+    Ok(())
 }
 fn string() -> Py {
     Py::obj([("type", Py::str("string"))])
@@ -604,7 +1094,7 @@ pub fn outline_schema(contract: &Contract) -> Py {
         ),
     ]);
     let beats = contract.beats.len() as i64;
-    Py::obj([
+    let mut schema = Py::obj([
         ("type", Py::str("object")),
         ("additionalProperties", Py::Bool(false)),
         ("required", required(&["scenes", "visual_placements"])),
@@ -630,7 +1120,17 @@ pub fn outline_schema(contract: &Contract) -> Py {
                 ),
             ]),
         ),
-    ])
+    ]);
+    if let Some(roster) = &contract.opening {
+        if let Some(Py::List(keys)) = schema.get_mut("required") {
+            keys.push(Py::str("opening_appearance"));
+        }
+        schema
+            .get_mut("properties")
+            .unwrap()
+            .push("opening_appearance", opening_schema(roster.len()));
+    }
+    schema
 }
 /// `story_outline_json_schema_text(contract)`, also the system prompt's
 /// `{{STORY_OUTLINE_JSON_SCHEMA}}`.
@@ -688,6 +1188,8 @@ pub struct Outline<'a> {
     pub music: bool,
     pub inventory: &'a Py,
     pub beats: &'a Py,
+    pub grounding: &'a Py,
+    pub opening: &'a Py,
 }
 /// `_story_outline_user_prompt` without a one-Scene policy.
 pub fn outline_user(input: &Outline) -> String {
@@ -799,7 +1301,7 @@ pub fn outline_user(input: &Outline) -> String {
             ]),
         );
     }
-    let shape = Py::obj([
+    let mut shape = Py::obj([
         ("scenes", Py::List(scenes)),
         (
             "visual_placements",
@@ -819,7 +1321,40 @@ pub fn outline_user(input: &Outline) -> String {
             ),
         ),
     ]);
+    if let Some(roster) = &contract.opening {
+        shape.push(
+            "opening_appearance",
+            Py::obj([
+                ("schema_version", Py::str("1.0")),
+                (
+                    "characters",
+                    Py::List(
+                        roster
+                            .iter()
+                            .map(|c| {
+                                Py::obj([
+                                    ("character_id", Py::str(&c.character_id)),
+                                    ("reference_tag", Py::str(&c.reference_tag)),
+                                    ("source", Py::str("not_stated")),
+                                    ("exposure", Py::str("not_stated")),
+                                    ("garments", Py::List(vec![])),
+                                    ("worn_items", Py::List(vec![])),
+                                    ("temporary_traits", Py::List(vec![])),
+                                    ("visible_body_state", Py::List(vec![])),
+                                ])
+                            })
+                            .collect(),
+                    ),
+                ),
+            ]),
+        );
+    }
     let minimum = ((duration / MAX_SCENE_SECONDS as f64).ceil() as i64).max(1);
+    let top = if contract.opening.is_some() {
+        "The only top-level properties are \"scenes\", \"visual_placements\", and \"opening_appearance\". "
+    } else {
+        "The only top-level properties are \"scenes\" and \"visual_placements\". "
+    };
     let mut rows = vec![
         Row::Labelled(
             "Task",
@@ -827,13 +1362,19 @@ pub fn outline_user(input: &Outline) -> String {
         ),
         Row::Labelled(
             "Array placement rule",
-            "The only top-level properties are \"scenes\" and \"visual_placements\". Put every Scene object inside the single scenes array in playback order. Do not generate internal Scene or Section IDs, raw image IDs, frame bindings, or max_turns.".into(),
+            format!("{top}Put every Scene object inside the single scenes array in playback order. Do not generate internal Scene or Section IDs, raw image IDs, frame bindings, or max_turns."),
         ),
     ];
     if !tags.is_empty() {
         rows.push(Row::Labelled(
             "Character references in generated prose",
             "The example below illustrates reference syntax only; use the supplied Story for actual actions and only the characters involved. When naming a selected character in Scene summary, Scene description, or any Section prompt, copy that character's exact selected_cast.reference_tag instead of a story_names value. Correct reference_tag values in opening_appearance do not replace the required markers in Scene and Section prose. Names inside authored quoted dialogue may remain unchanged.".into(),
+        ));
+    }
+    if contract.opening.is_some() {
+        rows.push(Row::Labelled(
+            "Opening appearance example",
+            "The opening_appearance values in the example illustrate structure only. They are not an assessment of the characters. Resolve every character's actual opening appearance from the supplied Story and Additional instruction. Use not_stated only when the evidence leaves exposure unknown. A supplied fallback wardrobe does not establish that its garments are currently worn and must never override established nudity or partial clothing.".into(),
         ));
     }
     rows.extend([
@@ -861,6 +1402,17 @@ pub fn outline_user(input: &Outline) -> String {
         Row::Labelled("Required image order and visual beats", input.beats.dumps()),
         Row::Block("selected_cast", input.cast.dumps()),
         Row::Block("continuation_context", input.continuation.dumps()),
+    ]);
+    if *input.opening != Py::Null {
+        rows.push(Row::Block(
+            "opening_appearance_context",
+            input.opening.dumps(),
+        ));
+    }
+    if *input.grounding != Py::Null {
+        rows.push(Row::Block("grounding_context", input.grounding.dumps()));
+    }
+    rows.extend([
         Row::Block("additional_instruction", input.instruction.into()),
         Row::Block("story", input.story.into()),
     ]);
@@ -880,6 +1432,7 @@ pub struct Expansion<'a> {
     pub context_cast: &'a str,
     /// With dialogue, the Scene's `dialogue_timing`.
     pub timing: Option<&'a str>,
+    pub grounding: Option<&'a str>,
 }
 pub const SCENE_IMAGES: &str = "Actual assigned images are supplied. Treat them as visual truth; focus on action, camera, timing, interaction, and change instead of detailed environment description.";
 pub const SCENE_NO_IMAGES: &str = "No images are supplied. Provide detailed environment, spatial layout, appearance, lighting, and atmosphere.";
@@ -899,6 +1452,9 @@ pub fn scene_user(input: &Expansion) -> String {
     ];
     if let Some(timing) = input.timing {
         rows.push(Row::Block("dialogue_timing", timing.into()));
+    }
+    if let Some(grounding) = input.grounding {
+        rows.push(Row::Block("grounding_context", grounding.into()));
     }
     rows.extend([
         Row::Block("additional_instruction", input.instruction.into()),
@@ -1308,6 +1864,7 @@ pub fn contract(inventory: &Py, beats: &Py, dialogue: bool) -> Result<Contract, 
         setting_ids,
         beats: out,
         dialogue,
+        opening: None,
     })
 }
 /// Director's reference markers in every string of `value`, as
@@ -1332,6 +1889,7 @@ pub fn protected(payload: &Py) -> (Vec<(String, String)>, Py) {
     (markers.clone(), protect(payload, &markers))
 }
 /// A built provider message and the markers its answer is restored with.
+#[derive(Debug, Clone, Default)]
 pub struct Built {
     pub user: String,
     pub references: Vec<(String, String)>,
@@ -1340,15 +1898,25 @@ pub struct Built {
 fn dialogue(request: &Py) -> bool {
     *request.at("add_dialogue") == Py::Bool(true)
 }
-/// `_build_story_outline` without a one-Scene policy; `instruction` is the
-/// stripped `user_instruction`.
+/// The grounding and opening appearance contexts a request carries, as
+/// `prepare_story_request` normalizes them for the Story bridge.
+fn contexts(request: &Py) -> Result<(Py, Py), &'static str> {
+    let grounding = normalize_grounding(request.at("grounding_context"))
+        .map_err(|_| "story_context_invalid")?;
+    let opening = normalize_opening(request.at("opening_appearance_context"), &grounding)
+        .map_err(|_| "story_context_invalid")?;
+    Ok((grounding, opening))
+}
+/// `_build_story_outline` without a one-Scene policy; a request may carry a
+/// Story bridge's `grounding_context` and `opening_appearance_context`.
 pub fn build_outline(request: &Py) -> Result<Built, &'static str> {
     let story = request.at("story").text().pytrim().to_owned();
     if story.is_empty() {
         return Err("story_brief_required");
     }
+    let (grounding, opening) = contexts(request)?;
     let dialogue = dialogue(request);
-    let contract = contract(
+    let mut contract = contract(
         request.at("image_inventory"),
         request.at("visual_beats"),
         dialogue,
@@ -1358,12 +1926,31 @@ pub fn build_outline(request: &Py) -> Result<Built, &'static str> {
     if dialogue && cast.len() < 2 {
         return Err("story_dialogue_cast_required");
     }
-    let (references, payload) = protected(&Py::obj([
+    let mut payload = Py::obj([
         ("story", Py::Str(story)),
         ("cast", cast_for_prompt(&cast, dialogue)),
         ("continuation_context", continuation),
-        ("grounding_context", Py::Null),
-    ]));
+        ("grounding_context", grounding),
+    ]);
+    if opening != Py::Null {
+        payload.push("opening_appearance_context", opening);
+    }
+    let (references, payload) = protected(&payload);
+    if let Some(opening) = payload.get("opening_appearance_context") {
+        contract.opening = Some(
+            opening
+                .at("characters")
+                .as_list()
+                .unwrap()
+                .iter()
+                .map(|c| OpeningCharacter {
+                    character_id: c.at("character_id").text(),
+                    reference_tag: c.at("reference_tag").text(),
+                    fallback_wardrobe: c.at("fallback_wardrobe").text(),
+                })
+                .collect(),
+        );
+    }
     let duration = match request.at("duration_seconds") {
         Py::Bool(_) => 5.,
         value => value.number().unwrap_or(5.),
@@ -1381,6 +1968,8 @@ pub fn build_outline(request: &Py) -> Result<Built, &'static str> {
         ),
         inventory: request.at("image_inventory"),
         beats: request.at("visual_beats"),
+        grounding: payload.at("grounding_context"),
+        opening: payload.at("opening_appearance_context"),
     });
     Ok(Built {
         user,
@@ -1391,6 +1980,7 @@ pub fn build_outline(request: &Py) -> Result<Built, &'static str> {
 /// `_run_story_scene`'s user message for a request without visual bindings;
 /// `images` when its images load.
 pub fn build_scene(request: &Py, images: bool) -> Result<Built, &'static str> {
+    let (grounding, _) = contexts(request)?;
     let dialogue = dialogue(request);
     let cast = normalize_cast(request.at("cast"));
     let previous = normalize_previous(request.at("previous_scene_context"), false)?;
@@ -1411,8 +2001,12 @@ pub fn build_scene(request: &Py, images: bool) -> Result<Built, &'static str> {
         ("cast", cast_for_prompt(&cast, dialogue)),
         ("previous_scene_context", previous),
         ("context_cast", context_cast),
-        ("grounding_context", Py::Null),
+        ("grounding_context", grounding),
     ]));
+    let grounding = match payload.at("grounding_context") {
+        Py::Null => None,
+        grounding => Some(grounding.dumps()),
+    };
     let timing = dialogue.then(|| match request.at("dialogue_timing") {
         timing @ Py::Obj(_) => timing.dumps(),
         _ => "{}".into(),
@@ -1431,12 +2025,49 @@ pub fn build_scene(request: &Py, images: bool) -> Result<Built, &'static str> {
         next_summary: &request.at("next_summary").text(),
         context_cast: &payload.at("context_cast").dumps(),
         timing: timing.as_deref(),
+        grounding: grounding.as_deref(),
     });
     Ok(Built {
         user,
         references,
         contract: Contract::default(),
     })
+}
+/// `_run_animate_image`'s user message for a validated `animate_image` request.
+pub fn build_animate(request: &Py) -> String {
+    let lines = request
+        .at("scene_context")
+        .at("messages")
+        .as_list()
+        .unwrap_or_default()
+        .iter()
+        .map(|m| format!("[{}] {}", m.at("name").text(), m.at("text").text()))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let mut blocks = vec![format!(
+        "<scene_context>\n<latest_moment>\n{lines}\n</latest_moment>\n</scene_context>"
+    )];
+    for key in [
+        "active_characters",
+        "user_instruction",
+        "audio_request",
+        "generation_context",
+    ] {
+        blocks.push(format!("<{key}>\n{}\n</{key}>", request.at(key).indented()));
+    }
+    blocks.join("\n")
+}
+/// `contracts.animate_image.validate_content`: exactly three strings.
+pub fn animate_content(value: &Py) -> Result<[String; 3], Invalid> {
+    let fields = ["description", "prompt", "ambient_sound"];
+    if !exact_keys(value, &fields) {
+        return invalid("$", "must contain exactly the expected fields");
+    }
+    let text = |key: &str| match value.at(key) {
+        Py::Str(s) => Ok(s.clone()),
+        _ => invalid(format!("$.{key}"), "must be a string"),
+    };
+    Ok([text(fields[0])?, text(fields[1])?, text(fields[2])?])
 }
 /// `_inventory_user_prompt` for a browser visual descriptor.
 pub fn build_inventory(item: &Py, instruction: &str) -> String {
@@ -1607,7 +2238,7 @@ mod tests {
         ))
         .unwrap();
         let cases = fixture.at("cases").as_list().unwrap();
-        assert_eq!(cases.len(), 11);
+        assert_eq!(cases.len(), 17);
         for case in cases {
             let name = case.at("name").text();
             let request = case.at("request");
@@ -1630,7 +2261,28 @@ mod tests {
                         })
                         .collect::<Vec<_>>();
                     assert_eq!(built.references, references, "{name}");
+                    for answer in case.at("answers").as_list().unwrap_or_default() {
+                        let result = validate_opening(
+                            answer.at("answer").at("opening_appearance"),
+                            built.contract.opening.as_ref().unwrap(),
+                        );
+                        match answer.at("path") {
+                            Py::Null => assert_eq!(result, Ok(()), "{name}"),
+                            path => assert_eq!(result.unwrap_err().path, path.text(), "{name}"),
+                        }
+                    }
                     built.user
+                }
+                "animate" => {
+                    assert_eq!(*case.at("images"), Py::Int(1), "{name}");
+                    for content in case.at("contents").as_list().unwrap() {
+                        let result = animate_content(content.at("content"));
+                        match content.at("path") {
+                            Py::Null => assert!(result.is_ok(), "{name}"),
+                            path => assert_eq!(result.unwrap_err().path, path.text(), "{name}"),
+                        }
+                    }
+                    build_animate(request)
                 }
                 "scene" => {
                     let images = !request.at("images").as_list().unwrap().is_empty();

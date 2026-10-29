@@ -155,7 +155,7 @@ per-Scene cast filter.
 - A Section may carry Director's optional `summary`; it is never applied.
 
 Evidence: `tools/director-story-messages-oracle.py` runs Director's Python
-builders, with only the provider call captured, on eleven synthetic browser
+builders, with only the provider call captured, on seventeen synthetic browser
 requests (`tests/fixtures/director-story-messages.json`);
 `tools/director-story-browser-oracle.mjs` runs the browser helpers on
 continuation, timing, beat, cast and previous-Scene inputs
@@ -163,6 +163,91 @@ continuation, timing, beat, cast and previous-Scene inputs
 byte without Python or Node. The adaptive and one-Scene policies, visual-binding
 sidecars and Director's response text normalization (Markdown and backtick
 removal) are not ported; Imagine keeps its own answer validation.
+
+## Story context
+
+`Request.context` (optional) carries a client's conversation and the cast's
+current visible state. Without it every request, message and response is
+unchanged. `GET /v1/video/authoring/{id}` echoes it in `request`.
+
+```json
+"context": {
+  "earlier_continuity": [{"role": "user|assistant", "name": "", "text": ""}],
+  "latest_moment": [{"role": "assistant", "name": "Ann", "text": "..."}],
+  "cast_state": [{"reference_id": "<VisualReference.id in cast>",
+    "current_appearance": {"exposure": "not_stated|clothed|partially_clothed|nude",
+      "garments": [], "worn_items": [], "temporary_traits": [], "visible_body_state": []},
+    "fallback_wardrobe": ""}],
+  "protected_facts": []
+}
+```
+
+- Outline: `brief` must be empty. The story Director receives is the
+  conversation, one `[name] text` line per message (the role when the name is
+  blank), as `<earlier_continuity>…</earlier_continuity>` (left out when empty),
+  a blank line and `<latest_moment>…</latest_moment>`. `latest_moment` must not
+  be empty; the rendered story is at most 200,000 characters.
+- Cast state and protected facts become Director's Story bridge
+  `grounding_context` (`character_id` = `reference_id`, `reference_tag` = the
+  reference's normalized tag, `source_digest` = SHA-256 of the context's JSON).
+  Cast state also becomes `opening_appearance_context`. Both are normalized and
+  limited by Director's own rules: 64 characters, list items trimmed, empty and
+  repeated items dropped, at most 12 garments, 12 worn items, 20 temporary
+  traits and 20 body-state items of 4,000 characters each and 16,000 per
+  character, a 2,000-character fallback wardrobe, 128 protected facts of at most
+  16,000 characters, all counted in code points.
+- Outline and every expansion carry `<grounding_context>`; the outline also
+  carries `<opening_appearance_context>`, the "Opening appearance example" rule
+  and `opening_appearance` in the shape and schema. The answer must resolve each
+  character's opening appearance; it is validated as Director validates it and
+  exposed, references restored, as `Draft.opening_appearance`. Expand and Retry
+  rebuild their messages from the captured context.
+- Errors: `story_context_invalid` with `at` (`brief`, `context.latest_moment`,
+  `context.cast_state[i].reference_id`, `context.cast_state[i].current_appearance.garments`,
+  `context.protected_facts[i]`, …) and Director's reason as `detail`; an outline
+  answer without a valid opening appearance fails `story_opening_appearance_invalid`.
+  Enhance operations do not take a context.
+
+Imagine keeps Director's default Scene policy (minimum Scene count from the
+duration) with this context; Director's bridge itself requires its one-Scene
+or adaptive policy, which Imagine does not offer. Four oracle cases cover the
+grounded outline, its answers, facts-only grounding and the grounded
+expansion; ten opening-appearance answer validations match Director's.
+
+## Animate
+
+`operation: "animate"` writes one Scene's description, first Section prompt
+and ambient sound from its First frame, with Director's `animate_image` prompt
+and operation settings and one model call.
+
+- The Scene (`scene_id`) must have a first Section starting at 0 and an enabled
+  First frame image, which the model sees. `duration_seconds` is 1 to 15.
+- `context.latest_moment` (at most 10 messages, may be empty) becomes
+  `scene_context.messages`; `earlier_continuity` and `protected_facts` must be
+  empty. `cast` becomes `active_characters` (`id`, `name`, `appearance`).
+  `appearance` is the reference's description, then, with a cast state,
+  `Exposure: …`, `Garments: a; b`, `Worn items: …`, `Temporary traits: …`,
+  `Visible body state: …` and `Fallback wardrobe: …` lines, each list only
+  when not empty.
+- `instruction` and `mentions` (`[{text, reference_id}]`, each in `cast`)
+  become `user_instruction`; `add_dialogue` and `add_ambient_sound` become
+  `audio_request`; the project canvas gives `aspect_ratio` (reduced `W:H`) and
+  `orientation` (`Landscape` when width ≥ height).
+- The answer must be exactly `{description, prompt, ambient_sound}`, strings,
+  empty allowed; anything else fails `animate_response_invalid` and nothing is
+  repaired. `Draft.animate` holds it, `Review.animate` edits it, and Apply writes
+  the description, the first Section's prompt and
+  `creative.scene_prompts[scene].ambient_sound` in one revision. Cancel, Retry
+  and revision conflicts behave as for other Drafts.
+- Errors: `animate_external_unsupported` (`provider`), `scene_not_found`,
+  `animate_scene_invalid`, `animate_first_frame_missing` and
+  `animate_first_frame_disabled` (`scene_id`), `animate_context_invalid` with
+  `at` and `detail`.
+
+The message is Director's `_run_animate_image` construction; two oracle cases
+and five content validations match. Imagine sends the First frame as its
+usual normalized vision JPEG and parses the answer as strict JSON, where
+Director passes the client's PNG and tolerates a Markdown wrapper.
 
 ## Timing and source
 
@@ -184,7 +269,7 @@ Native UI QA is recorded separately. These make no live LLM quality claim.
 
 P07 remains incomplete: broader dialogue lexical diagnostics, full Reference manifest/runtime projection,
 full library reference metadata/editing semantics,
-binding editing/acceptance for every visual role, Animate authoring, richer
+binding editing/acceptance for every visual role, richer
 field selection, catalog editor, IntelliSense/Phrase Composer, provider context
 budgeting/ETA and live acceptance remain. H3 I2V applies its scene-start First
 Frame. Reference picture roles use reference conditioning; this does not implement

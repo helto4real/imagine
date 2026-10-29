@@ -1,4 +1,8 @@
 //! Synthetic HTTP/media/persistence cases, with all file fixtures on the owned encrypted volume.
+#[path = "support/video_authoring_animate.rs"]
+mod authoring_animate;
+#[path = "support/video_authoring_context.rs"]
+mod authoring_context;
 #[path = "support/video_authoring_external.rs"]
 mod authoring_external;
 #[path = "support/video_authoring_messages.rs"]
