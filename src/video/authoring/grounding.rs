@@ -32,7 +32,9 @@ impl Grounding {
         let mut selections = request.images.clone();
         // Animate sees its First frame only and the cast it names.
         let animate = request.operation == Operation::Animate;
-        if request.operation != Operation::Outline && !animate {
+        // A Story request names its own images; an enhancement adds its Scene's.
+        let story = matches!(request.operation, Operation::Outline | Operation::Inventory);
+        if !story && !animate {
             let scene = base
                 .scene(request.scene_id.as_ref().ok_or("scene_not_found")?)
                 .map_err(|_| "scene_not_found")?;
@@ -69,7 +71,7 @@ impl Grounding {
                 continue;
             }
             cast.push(json!({"story_names":[r.name],"reference_tag":format!("@{}",imagine_video_contract::creative::reference_alias(&r.alias)),"description":r.description,"required":true,"default_language":r.voice.as_ref().map(|v|v.language.as_str()).unwrap_or(""),"voice_guidance":r.voice.as_ref().map(|v|v.description.as_str()).unwrap_or("")}));
-            if request.operation != Operation::Outline && !animate {
+            if !story && !animate {
                 for image in r.images.iter().filter(|i| i.enabled) {
                     if !selections.iter().any(|i| i.asset == image.asset) {
                         selections.push(StoryImage {
@@ -101,7 +103,7 @@ impl Grounding {
                 label: "First frame".into(),
                 usage: ImageUse::StartFrame,
             });
-        } else if request.operation != Operation::Outline {
+        } else if !story {
             let scene = base
                 .scene(request.scene_id.as_ref().ok_or("scene_not_found")?)
                 .map_err(|_| "scene_not_found")?;

@@ -1179,7 +1179,7 @@ pub fn limits() -> Value {
             )
         })
         .collect::<serde_json::Map<_, _>>();
-    json!({"max_scene_seconds":MAX_SCENE_SECONDS,"max_scenes":MAX_SCENES,"max_sections_per_scene":MAX_SECTIONS_PER_SCENE,"supported_boundaries":BOUNDARIES,"continuity":continuity})
+    json!({"max_scene_seconds":MAX_SCENE_SECONDS,"max_scenes":MAX_SCENES,"max_sections_per_scene":MAX_SECTIONS_PER_SCENE,"supported_boundaries":BOUNDARIES,"continuity":continuity,"char_limit":CONTEXT_LIMIT})
 }
 /// The `StoryScene` shape an expansion returns; code-owned fields are optional.
 pub fn scene_schema(dialogue: bool) -> Value {

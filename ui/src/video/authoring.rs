@@ -11,6 +11,8 @@ pub(in crate::app) enum Reply {
     Providers,
     Draft,
     Applied,
+    /// An outline request's measured budget; a fitting one starts the outline.
+    Measure,
 }
 pub(super) struct State {
     pub(super) open: bool,
@@ -60,6 +62,10 @@ pub(super) struct State {
     pub(super) confirm_replace: bool,
     /// Edit outline was pressed while Scenes are expanded.
     pub(super) confirm_edit_outline: bool,
+    /// The outline a running inventory or measurement leads to, for its project.
+    pub(super) pending: Option<(ProjectId, Request)>,
+    /// The last outline budget measured.
+    pub(super) measurement: Option<Measurement>,
 }
 fn provider_transport(state: &State) -> String {
     if state.transport_override {
@@ -118,6 +124,8 @@ impl Default for State {
             received_rows: vec![],
             confirm_replace: false,
             confirm_edit_outline: false,
+            pending: None,
+            measurement: None,
         }
     }
 }
@@ -228,6 +236,8 @@ fn source_image_label(project: &VideoProject, id: &AssetId) -> String {
 #[derive(Default)]
 pub(super) struct Actions {
     pub call: Option<Call>,
+    /// An outline to start through its inventory and budget.
+    pub story: Option<(ProjectId, Request)>,
     pub new_proposal: bool,
     pub close: bool,
     pub pick_images: bool,
@@ -322,6 +332,11 @@ pub(super) fn authoring_draft_actions(
     });
     if let Some((project, request)) = again {
         actions.new_proposal = true;
+        // An outline is measured again; its known inventory notes are reused.
+        if request.operation == Operation::Outline {
+            actions.story = Some((ProjectId(project), request));
+            return;
+        }
         actions.call = Some((
             Reply::Draft,
             true,
@@ -422,7 +437,11 @@ pub(super) fn authoring_generate(
     if r.clicked()
         && let Some(d) = document
     {
-        actions.call = Some(generate_call(state, d));
+        if state.operation == Operation::Outline {
+            actions.story = Some((d.project.id.clone(), generate_request(state, d)));
+        } else {
+            actions.call = Some(generate_call(state, d));
+        }
     }
 }
 /// A new proposal for the state's operation and target against `d`.
@@ -431,52 +450,105 @@ fn generate_call(state: &State, d: &Snapshot) -> Call {
         Reply::Draft,
         true,
         format!("/v1/video/projects/{}/authoring", d.project.id.0),
-        Some(json!(Request {
-            schema_version: 1,
-            expected_project_revision: d.project.project_revision,
-            provider_profile_id: state.provider_id.clone(),
-            provider: provider_transport(state),
-            prompt_profile_id: state.profile.clone(),
-            operation: state.operation,
-            scene_field: state.scene_field,
-            scene_id: state.target_scene.clone(),
-            section_id: state.target_section.clone(),
-            brief: state.brief.clone(),
-            instruction: state.instruction.clone(),
-            duration_seconds: state.duration,
-            destination: state.destination,
-            cast: if state.operation == Operation::Outline {
-                state.cast.iter().cloned().collect()
-            } else {
-                vec![]
-            },
-            images: if state.operation == Operation::Outline {
-                state
-                    .images
-                    .iter()
-                    .enumerate()
-                    .map(|(i, (asset, usage))| StoryImage {
-                        pair_with: state
-                            .pairs
-                            .get(asset)
-                            .filter(|id| !id.0.is_empty())
-                            .map(|id| id.0.clone()),
-                        id: asset.0.clone(),
-                        asset: asset.clone(),
-                        label: format!("Source image {}", i + 1),
-                        usage: *usage,
-                    })
-                    .collect()
-            } else {
-                vec![]
-            },
-            add_dialogue: state.operation == Operation::Outline && state.add_dialogue,
-            add_music: state.operation == Operation::Outline && state.add_music,
-            context: None,
-            mentions: vec![],
-            add_ambient_sound: false,
-        })),
+        Some(json!(generate_request(state, d))),
     )
+}
+/// The next call for an outline `request`: its story images' inventory, else
+/// its budget measurement, which starts the outline when it fits.
+pub(super) fn story_call(project: &ProjectId, request: &Request) -> Call {
+    if request.inventory.is_empty() && !request.images.is_empty() {
+        let mut inventory = request.clone();
+        inventory.operation = Operation::Inventory;
+        return (
+            Reply::Draft,
+            true,
+            format!("/v1/video/projects/{}/authoring", project.0),
+            Some(json!(inventory)),
+        );
+    }
+    (
+        Reply::Measure,
+        true,
+        format!("/v1/video/projects/{}/authoring/measure", project.0),
+        Some(json!(request)),
+    )
+}
+/// A conservative estimate of a measurement's input tokens: a third of its
+/// bytes, 12 per message and 32, with a 15% margin.
+pub(super) fn input_tokens(m: &Measurement) -> u64 {
+    let base = m.text_bytes.div_ceil(3) as u64 + 12 * m.message_count as u64 + 32;
+    (base as f64 * 1.15).ceil() as u64
+}
+/// The input tokens the model's context leaves for the outline's messages.
+pub(super) fn available_tokens(m: &Measurement) -> u64 {
+    m.context_tokens
+        .saturating_sub(m.max_output_tokens)
+        .saturating_sub(m.context_reserve_tokens)
+}
+/// Why a measured outline cannot start, if it cannot.
+pub(super) fn budget_problem(m: &Measurement) -> Option<String> {
+    if m.chars > m.char_limit {
+        return Some(format!(
+            "The outline message has {} characters; at most {} are allowed. Shorten the brief or use fewer story images.",
+            m.chars, m.char_limit
+        ));
+    }
+    let (needed, available) = (input_tokens(m), available_tokens(m));
+    (needed > available).then(|| {
+        format!(
+            "The outline needs about {needed} input tokens; the model leaves {available}. Shorten the brief, use fewer story images or lower the Story output budget."
+        )
+    })
+}
+/// The request of a new proposal for the state's operation and target.
+fn generate_request(state: &State, d: &Snapshot) -> Request {
+    Request {
+        schema_version: 1,
+        expected_project_revision: d.project.project_revision,
+        provider_profile_id: state.provider_id.clone(),
+        provider: provider_transport(state),
+        prompt_profile_id: state.profile.clone(),
+        operation: state.operation,
+        scene_field: state.scene_field,
+        scene_id: state.target_scene.clone(),
+        section_id: state.target_section.clone(),
+        brief: state.brief.clone(),
+        instruction: state.instruction.clone(),
+        duration_seconds: state.duration,
+        destination: state.destination,
+        cast: if state.operation == Operation::Outline {
+            state.cast.iter().cloned().collect()
+        } else {
+            vec![]
+        },
+        images: if state.operation == Operation::Outline {
+            state
+                .images
+                .iter()
+                .enumerate()
+                .map(|(i, (asset, usage))| StoryImage {
+                    pair_with: state
+                        .pairs
+                        .get(asset)
+                        .filter(|id| !id.0.is_empty())
+                        .map(|id| id.0.clone()),
+                    id: asset.0.clone(),
+                    asset: asset.clone(),
+                    label: format!("Source image {}", i + 1),
+                    usage: *usage,
+                })
+                .collect()
+        } else {
+            vec![]
+        },
+        add_dialogue: state.operation == Operation::Outline && state.add_dialogue,
+        add_music: state.operation == Operation::Outline && state.add_music,
+        context: None,
+        mentions: vec![],
+        add_ambient_sound: false,
+        inventory: vec![],
+        budget_fingerprint: None,
+    }
 }
 /// The editable source of one outline scene and its Sections.
 pub(super) fn authoring_scene_editor(ui: &mut egui::Ui, draft: &mut Draft, index: usize) {
@@ -828,6 +900,9 @@ impl ImagineApp {
         let value = match result {
             Ok(v) => v,
             Err(e) => {
+                if matches!(kind, Reply::Measure) {
+                    self.timeline.authoring.pending = None;
+                }
                 self.timeline.authoring.failure = Some(
                     if e.code == "authoring_revision_conflict" {
                         "The project changed. This draft is retained; Apply is blocked. Start a new proposal against the current project.".into()
@@ -880,11 +955,49 @@ impl ImagineApp {
                         &mut state.received_rows,
                         draft,
                     );
+                    // A finished inventory leads to its outline's measurement.
+                    let next = (draft.request.operation == Operation::Inventory
+                        && draft.phase == Phase::Review)
+                        .then(|| state.pending.take())
+                        .flatten()
+                        .map(|(project, mut request)| {
+                            request.inventory = draft.inventory.clone();
+                            let call = story_call(&project, &request);
+                            state.pending = Some((project, request));
+                            call
+                        });
                     state.draft = Some(draft);
                     state.poll_at = Some(std::time::Instant::now());
+                    if let Some((kind, post, path, body)) = next {
+                        self.authoring_call(ctx, kind, post, path, body);
+                    }
                 } else {
                     self.timeline.authoring.failure =
                         Some("Could not read the proposal. Reconnect to this draft.".into());
+                }
+            }
+            Reply::Measure => {
+                let state = &mut self.timeline.authoring;
+                let Ok(measurement) = serde_json::from_value::<Measurement>(value) else {
+                    state.pending = None;
+                    state.failure = Some("Could not read the outline budget.".into());
+                    return;
+                };
+                let pending = state.pending.take();
+                state.measurement = Some(measurement.clone());
+                if let Some(problem) = budget_problem(&measurement) {
+                    state.failure = Some(problem);
+                    return;
+                }
+                if let Some((project, mut request)) = pending {
+                    request.budget_fingerprint = Some(measurement.fingerprint);
+                    self.authoring_call(
+                        ctx,
+                        Reply::Draft,
+                        true,
+                        format!("/v1/video/projects/{}/authoring", project.0),
+                        Some(json!(request)),
+                    );
                 }
             }
             Reply::Applied => {
@@ -948,7 +1061,11 @@ impl ImagineApp {
     }
     /// Whether a story outline is open; it is shown as the Story view.
     pub(super) fn timeline_story_open(&self) -> bool {
-        self.timeline.authoring.open && self.authoring_operation() == Operation::Outline
+        self.timeline.authoring.open
+            && matches!(
+                self.authoring_operation(),
+                Operation::Outline | Operation::Inventory
+            )
     }
     /// Polls a running draft and takes the state for one frame of drawing.
     pub(super) fn authoring_begin(&mut self, ctx: &egui::Context) -> (State, Option<Snapshot>) {
@@ -1423,13 +1540,20 @@ impl ImagineApp {
         {
             state.draft = Some(state.history[i].clone());
         }
-        if actions.new_proposal
-            && let Some(draft) = state.draft.take()
-        {
-            state.history.push(draft);
+        if actions.new_proposal {
+            state.pending = None;
+            if let Some(draft) = state.draft.take() {
+                state.history.push(draft);
+            }
         }
         state.open = state.open && !actions.close;
         let mut call = actions.call;
+        if let Some((project, request)) = actions.story {
+            let mut request = request;
+            request.budget_fingerprint = None;
+            call = Some(story_call(&project, &request));
+            state.pending = Some((project, request));
+        }
         if state.provider_settings {
             let mut settings_open = true;
             egui::Window::new("Story provider settings")

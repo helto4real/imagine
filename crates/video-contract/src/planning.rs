@@ -536,6 +536,7 @@ pub fn schemas() -> serde_json::Value {
         "authoring_request": schemars::schema_for!(super::authoring::Request),
         "authoring_review": schemars::schema_for!(super::authoring::Review),
         "authoring_draft": schemars::schema_for!(super::authoring::Draft),
+        "authoring_measurement": schemars::schema_for!(super::authoring::Measurement),
     })
 }
 

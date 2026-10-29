@@ -1,5 +1,9 @@
 //! Synthetic loopback-only LLM for opt-in tests; never wired into product services.
-use axum::{Json, Router, extract::State, routing::post};
+use axum::{
+    Json, Router,
+    extract::State,
+    routing::{get, post},
+};
 use serde_json::{Value, json};
 use std::sync::{
     Arc, Mutex,
@@ -16,6 +20,8 @@ pub struct Fixture {
     pub fail_animate_once: AtomicBool,
     /// Answers wrapped in Markdown code fences, as local models often write them.
     pub fence_answers: AtomicBool,
+    /// The model's reported context window; zero reports none.
+    pub context_tokens: AtomicU64,
 }
 pub async fn spawn() -> (String, tokio::task::JoinHandle<()>, Arc<Fixture>) {
     let state = Arc::new(Fixture::default());
@@ -24,11 +30,21 @@ pub async fn spawn() -> (String, tokio::task::JoinHandle<()>, Arc<Fixture>) {
     let app = Router::new()
         .route("/v1/chat/completions", post(reply))
         .route("/v1/api/generate", post(reply))
+        .route("/v1/models", get(models))
         .with_state(state.clone());
     let worker = tokio::spawn(async move {
         axum::serve(listener, app).await.unwrap();
     });
     (url, worker, state)
+}
+/// The model list, with `meta.n_ctx` when a context window is set.
+async fn models(State(state): State<Arc<Fixture>>) -> Json<Value> {
+    let context = state.context_tokens.load(Ordering::SeqCst);
+    let mut model = json!({"id":"own-story-fixture","object":"model"});
+    if context > 0 {
+        model["meta"] = json!({"n_ctx":context});
+    }
+    Json(json!({"object":"list","data":[{"id":"own-other-model","meta":{"n_ctx":1}},model]}))
 }
 async fn reply(State(state): State<Arc<Fixture>>, Json(body): Json<Value>) -> Json<Value> {
     state.requests.lock().unwrap().push(body.clone());

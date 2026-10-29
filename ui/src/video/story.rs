@@ -60,6 +60,20 @@ impl ImagineApp {
                     "{:.0} s · {}",
                     draft.request.duration_seconds, draft.prompt_profile_id
                 ));
+                // The measured budget this outline was started with.
+                if let Some(m) = state
+                    .measurement
+                    .as_ref()
+                    .filter(|m| draft.request.budget_fingerprint.as_ref() == Some(&m.fingerprint))
+                {
+                    ui.weak(format!(
+                        "Context: about {} of {} input tokens · {} of {} characters",
+                        input_tokens(m),
+                        available_tokens(m),
+                        m.chars,
+                        m.char_limit
+                    ));
+                }
             } else {
                 self.authoring_sources(ui, &mut state, &mut actions);
                 ImagineApp::authoring_story_inputs(ui, &mut state, &document, &mut actions);
@@ -297,6 +311,93 @@ mod tests {
             "provider_snapshot":{},"planned_durations":[8.0,8.0]
         }))
         .unwrap()
+    }
+    #[test]
+    fn an_outline_runs_its_inventory_then_starts_only_within_its_measured_budget() {
+        use imagine_video_contract::authoring::*;
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let project = super::super::media_picker::tests::project();
+        app.timeline.session = Some("own-session".into());
+        let mut request = draft(&project).request;
+        request.images = vec![StoryImage {
+            pair_with: None,
+            id: "own_image".into(),
+            asset: AssetId("own_asset".into()),
+            label: "Source image 1".into(),
+            usage: ImageUse::SettingReference,
+        }];
+        // Story images are analysed first; known notes go to the measurement.
+        let (_, _, path, body) = story_call(&project.id, &request);
+        assert!(path.ends_with("/authoring"), "{path}");
+        assert_eq!(body.as_ref().unwrap()["operation"], "inventory");
+        let notes = vec![InventoryNote {
+            id: "own_image".into(),
+            note: "Own lighthouse note".into(),
+        }];
+        let mut known = request.clone();
+        known.inventory = notes.clone();
+        let (_, _, path, body) = story_call(&project.id, &known);
+        assert!(path.ends_with("/authoring/measure"), "{path}");
+        assert_eq!(
+            body.as_ref().unwrap()["inventory"][0]["note"],
+            "Own lighthouse note"
+        );
+        // A finished inventory Draft measures its outline with its notes.
+        app.timeline.authoring.pending = Some((project.id.clone(), request.clone()));
+        app.timeline.authoring.open = true;
+        let mut inventory = serde_json::to_value(draft(&project)).unwrap();
+        inventory["request"]["operation"] = json!("inventory");
+        inventory["outline"] = Value::Null;
+        inventory["scenes"] = json!([]);
+        inventory["inventory"] = json!(notes);
+        app.timeline_authoring_reply(&ctx, "own-session".into(), Reply::Draft, Ok(inventory));
+        let state = &app.timeline.authoring;
+        assert!(state.busy, "the measurement was sent");
+        assert_eq!(state.pending.as_ref().unwrap().1.inventory, notes);
+        assert!(
+            app.timeline_story_open(),
+            "the Story view stays open during an inventory"
+        );
+        // A measurement that does not fit stops with the numbers; one that fits starts.
+        let measured = |context_tokens: u64| Measurement {
+            schema_version: 1,
+            operation: Operation::Outline,
+            chars: 9000,
+            char_limit: 100000,
+            text_bytes: 9000,
+            message_count: 2,
+            context_tokens,
+            max_output_tokens: 1000,
+            context_reserve_tokens: 8,
+            fingerprint: "sha256:own".into(),
+        };
+        app.timeline.authoring.busy = false;
+        app.timeline_authoring_reply(
+            &ctx,
+            "own-session".into(),
+            Reply::Measure,
+            Ok(json!(measured(4000))),
+        );
+        let state = &app.timeline.authoring;
+        let failure = state.failure.clone().unwrap();
+        assert!(
+            failure.contains("about 3515 input tokens") && failure.contains("leaves 2992"),
+            "{failure}"
+        );
+        assert!(state.pending.is_none() && !state.busy);
+        app.timeline.authoring.pending = Some((project.id.clone(), known));
+        app.timeline_authoring_reply(
+            &ctx,
+            "own-session".into(),
+            Reply::Measure,
+            Ok(json!(measured(8192))),
+        );
+        let state = &app.timeline.authoring;
+        assert!(state.failure.is_none() && state.pending.is_none());
+        assert!(state.busy, "the outline start was sent");
+        assert_eq!(state.measurement.as_ref().unwrap().context_tokens, 8192);
     }
     #[test]
     fn story_view_shows_brief_outline_and_selected_scene_and_follows_privacy() {

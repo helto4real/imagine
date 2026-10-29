@@ -17,6 +17,9 @@ pub enum Operation {
     /// A Scene's description, first Section prompt and ambient sound written
     /// from its First frame, as Director's Animate image.
     Animate,
+    /// Only the story images' inventory notes, as Director's
+    /// `story_image_inventory`; an outline can then reuse them. Nothing to apply.
+    Inventory,
 }
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -154,6 +157,37 @@ pub struct Request {
     /// Animate: ask for background sound.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub add_ambient_sound: bool,
+    /// Outline: one known inventory note per story image, as an inventory
+    /// Draft wrote them; the outline then analyses no image itself.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub inventory: Vec<InventoryNote>,
+    /// Outline: the `fingerprint` of a measurement of this request; the
+    /// start fails `authoring_budget_changed` when the measured basis changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_fingerprint: Option<String>,
+}
+/// What an outline request would send to the provider, measured without
+/// starting it, as Director's outline budget.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Measurement {
+    pub schema_version: u32,
+    /// Always `outline`.
+    pub operation: Operation,
+    /// Characters of the user message, the part `char_limit` bounds.
+    pub chars: usize,
+    /// The largest user message a Story step sends (`story_context_limit`).
+    pub char_limit: usize,
+    /// UTF-8 bytes of the system and user messages together.
+    pub text_bytes: usize,
+    pub message_count: usize,
+    /// The selected model's context window, as its provider reports it.
+    pub context_tokens: u64,
+    /// The outline's maximum output tokens.
+    pub max_output_tokens: u64,
+    pub context_reserve_tokens: u64,
+    /// `sha256:` of the measured messages, provider, settings, profile and budget.
+    pub fingerprint: String,
 }
 /// Text in an Animate instruction that names a selected cast member.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]

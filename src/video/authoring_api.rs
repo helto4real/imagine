@@ -7,10 +7,10 @@ impl From<Fault> for Error {
         )
     }
 }
-use super::super::authoring::{engine, grounding::Grounding, steps};
+use super::super::authoring::{budget, drafts, engine, grounding::Grounding, steps};
 use crate::scheduler::Fault;
 use imagine_video_contract::authoring::{
-    Draft, Production, Request as AuthorRequest, Review, Submission,
+    Draft, Measurement, Operation, Production, Request as AuthorRequest, Review, Submission,
 };
 /// Agent guidance beside the prompt profiles; never sent to the local provider.
 const AGENT_GUIDANCE: &str = "video/agent-guidance.txt";
@@ -70,6 +70,7 @@ pub(super) fn routes() -> Router<App> {
         .route("/v1/video/authoring/profiles", get(profiles))
         .route("/v1/video/authoring/profiles/{id}", get(profile))
         .route("/v1/video/projects/{id}/authoring", post(start).get(list))
+        .route("/v1/video/projects/{id}/authoring/measure", post(measure))
         .route("/v1/video/authoring/{id}", get(read))
         .route("/v1/video/authoring/{id}/bundle", get(bundle))
         .route("/v1/video/authoring/{id}/review", post(review))
@@ -118,6 +119,13 @@ async fn start(
     body: Result<Json<AuthorRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<Value>), Located> {
     let Json(request) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
+    if let Some(expected) = &request.budget_fingerprint {
+        let mut unmeasured = request.clone();
+        unmeasured.budget_fingerprint = None;
+        if &measured(&app, &id, unmeasured).await?.fingerprint != expected {
+            return Err(Fault::new(409, "authoring_budget_changed").into());
+        }
+    }
     let external = request.provider == steps::EXTERNAL;
     let provider = if external {
         crate::enhancement::ProviderSnapshot {
@@ -146,6 +154,60 @@ async fn start(
         value["bundle"]["limits"] = limits(&app).await;
     }
     Ok((StatusCode::ACCEPTED, Json(value)))
+}
+/// What an outline start of this request would send, measured; nothing starts.
+async fn measure(
+    State(app): State<App>,
+    Path(id): Path<String>,
+    body: Result<Json<AuthorRequest>, JsonRejection>,
+) -> Result<Json<Value>, Located> {
+    let Json(request) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
+    if request.budget_fingerprint.is_some() {
+        return Err(Fault::new(422, "invalid_authoring_request").into());
+    }
+    Ok(Json(json!(measured(&app, &id, request).await?)))
+}
+/// The measurement of a provider outline whose story images all have known
+/// inventory notes, built exactly as its start builds the messages.
+async fn measured(app: &App, id: &str, request: AuthorRequest) -> Result<Measurement, Located> {
+    if request.operation != Operation::Outline || request.provider == steps::EXTERNAL {
+        return Err(Fault::new(422, "invalid_authoring_request").into());
+    }
+    if request.inventory.len() != request.images.len() {
+        return Err(steps::Rejection::new("authoring_inventory_mismatch", "inventory").into());
+    }
+    let provider = app.enhancement.snapshot(&request.provider_profile_id)?;
+    let (draft, profile, base) = {
+        let service = app.video.lock().await;
+        let project = ProjectId(id.into());
+        let session = service.projects.session(&project)?;
+        let base = service.projects.read(&project).map_err(Error::from)?;
+        steps::check(&request, &base)?;
+        // The measurement needs the cast, not the images' pixels.
+        let mut cast = request.clone();
+        cast.images.clear();
+        cast.inventory.clear();
+        let grounding = Grounding::capture(session, &cast).map_err(media_error)?;
+        let (draft, profile) = drafts::prepare(&base, request, &provider, &grounding)?;
+        (draft, profile, base)
+    };
+    let basis = budget::basis(&draft, &base, &profile).map_err(|c| Fault::new(422, c))?;
+    let window = app
+        .enhancement
+        .context_window(&provider, &draft.request.provider)
+        .await
+        .map_err(|c| {
+            Fault::new(
+                if c == "authoring_context_window_unknown" {
+                    422
+                } else {
+                    502
+                },
+                c,
+            )
+        })?;
+    Ok(budget::measure(&basis, &draft, &provider, &profile, window)
+        .map_err(|c| Fault::new(422, c))?)
 }
 /// The project's Drafts in this session, so an agent can recover one after a timeout.
 async fn list(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Error> {

@@ -5443,6 +5443,20 @@
       "add_ambient_sound": {
         "description": "Animate: ask for background sound.",
         "type": "boolean"
+      },
+      "inventory": {
+        "description": "Outline: one known inventory note per story image, as an inventory\nDraft wrote them; the outline then analyses no image itself.",
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/InventoryNote"
+        }
+      },
+      "budget_fingerprint": {
+        "description": "Outline: the `fingerprint` of a measurement of this request; the\nstart fails `authoring_budget_changed` when the measured basis changed.",
+        "type": [
+          "string",
+          "null"
+        ]
       }
     },
     "additionalProperties": false,
@@ -5475,6 +5489,11 @@
             "description": "A Scene's description, first Section prompt and ambient sound written\nfrom its First frame, as Director's Animate image.",
             "type": "string",
             "const": "animate"
+          },
+          {
+            "description": "Only the story images' inventory notes, as Director's\n`story_image_inventory`; an outline can then reuse them. Nothing to apply.",
+            "type": "string",
+            "const": "inventory"
           }
         ]
       },
@@ -5675,6 +5694,22 @@
         "required": [
           "text",
           "reference_id"
+        ]
+      },
+      "InventoryNote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "note"
         ]
       }
     }
@@ -6255,6 +6290,20 @@
           "add_ambient_sound": {
             "description": "Animate: ask for background sound.",
             "type": "boolean"
+          },
+          "inventory": {
+            "description": "Outline: one known inventory note per story image, as an inventory\nDraft wrote them; the outline then analyses no image itself.",
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/InventoryNote"
+            }
+          },
+          "budget_fingerprint": {
+            "description": "Outline: the `fingerprint` of a measurement of this request; the\nstart fails `authoring_budget_changed` when the measured basis changed.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "additionalProperties": false,
@@ -6287,6 +6336,11 @@
             "description": "A Scene's description, first Section prompt and ambient sound written\nfrom its First frame, as Director's Animate image.",
             "type": "string",
             "const": "animate"
+          },
+          {
+            "description": "Only the story images' inventory notes, as Director's\n`story_image_inventory`; an outline can then reuse them. Nothing to apply.",
+            "type": "string",
+            "const": "inventory"
           }
         ]
       },
@@ -6489,6 +6543,22 @@
           "reference_id"
         ]
       },
+      "InventoryNote": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "note"
+        ]
+      },
       "Phase": {
         "type": "string",
         "enum": [
@@ -6645,22 +6715,6 @@
         "required": [
           "participants",
           "purpose"
-        ]
-      },
-      "InventoryNote": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "note": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "id",
-          "note"
         ]
       },
       "FieldProposal": {
@@ -6862,6 +6916,109 @@
           "description",
           "prompt",
           "ambient_sound"
+        ]
+      }
+    }
+  },
+  "authoring_measurement": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "Measurement",
+    "description": "What an outline request would send to the provider, measured without\nstarting it, as Director's outline budget.",
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "format": "uint32",
+        "minimum": 0
+      },
+      "operation": {
+        "description": "Always `outline`.",
+        "$ref": "#/$defs/Operation"
+      },
+      "chars": {
+        "description": "Characters of the user message, the part `char_limit` bounds.",
+        "type": "integer",
+        "format": "uint",
+        "minimum": 0
+      },
+      "char_limit": {
+        "description": "The largest user message a Story step sends (`story_context_limit`).",
+        "type": "integer",
+        "format": "uint",
+        "minimum": 0
+      },
+      "text_bytes": {
+        "description": "UTF-8 bytes of the system and user messages together.",
+        "type": "integer",
+        "format": "uint",
+        "minimum": 0
+      },
+      "message_count": {
+        "type": "integer",
+        "format": "uint",
+        "minimum": 0
+      },
+      "context_tokens": {
+        "description": "The selected model's context window, as its provider reports it.",
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "max_output_tokens": {
+        "description": "The outline's maximum output tokens.",
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "context_reserve_tokens": {
+        "type": "integer",
+        "format": "uint64",
+        "minimum": 0
+      },
+      "fingerprint": {
+        "description": "`sha256:` of the measured messages, provider, settings, profile and budget.",
+        "type": "string"
+      }
+    },
+    "additionalProperties": false,
+    "required": [
+      "schema_version",
+      "operation",
+      "chars",
+      "char_limit",
+      "text_bytes",
+      "message_count",
+      "context_tokens",
+      "max_output_tokens",
+      "context_reserve_tokens",
+      "fingerprint"
+    ],
+    "$defs": {
+      "Operation": {
+        "oneOf": [
+          {
+            "type": "string",
+            "enum": [
+              "outline",
+              "enhance_scene",
+              "enhance_section"
+            ]
+          },
+          {
+            "description": "Every Scene field and Section prompt of one Scene, reviewed side by\nside, as Director's Enhance mode.",
+            "type": "string",
+            "const": "enhance_scene_all"
+          },
+          {
+            "description": "A Scene's description, first Section prompt and ambient sound written\nfrom its First frame, as Director's Animate image.",
+            "type": "string",
+            "const": "animate"
+          },
+          {
+            "description": "Only the story images' inventory notes, as Director's\n`story_image_inventory`; an outline can then reuse them. Nothing to apply.",
+            "type": "string",
+            "const": "inventory"
+          }
         ]
       }
     }

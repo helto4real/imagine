@@ -1629,6 +1629,8 @@ mod tests {
                 context: None,
                 mentions: vec![],
                 add_ambient_sound: false,
+                inventory: vec![],
+                budget_fingerprint: None,
             },
             phase: Phase::Review,
             outline: None,

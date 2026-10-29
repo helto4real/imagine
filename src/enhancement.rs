@@ -126,6 +126,35 @@ impl Service {
             completion_text(&value)
         }
     }
+    /// The selected model's context window as the provider's `/models`
+    /// reports it (`meta.n_ctx`), as Director's outline budget reads it.
+    pub(crate) async fn context_window(
+        &self,
+        snapshot: &ProviderSnapshot,
+        provider: &str,
+    ) -> std::result::Result<u64, &'static str> {
+        const UNKNOWN: &str = "authoring_context_window_unknown";
+        if provider != "koboldcpp" {
+            return Err(UNKNOWN);
+        }
+        let p = &snapshot.profile;
+        let value = self
+            .receive(
+                self.http
+                    .get(format!("{}/models", p.base_url.trim_end_matches('/')))
+                    .timeout(Duration::from_secs(20)),
+            )
+            .await?;
+        let rows = value["data"].as_array().ok_or(UNKNOWN)?;
+        let mut matches = rows.iter().filter(|row| row["id"] == p.model.as_str());
+        match (matches.next(), matches.next()) {
+            (Some(row), None) => row["meta"]["n_ctx"]
+                .as_u64()
+                .filter(|n| *n > 0)
+                .ok_or(UNKNOWN),
+            _ => Err(UNKNOWN),
+        }
+    }
     /// Explicit fixture/developer path; normal startup uses open_private.
     pub fn open(path: PathBuf) -> Result<Arc<Self>> {
         let saved: Saved = match std::fs::read(&path) {

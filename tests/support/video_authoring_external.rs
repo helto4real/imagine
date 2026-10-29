@@ -1024,7 +1024,7 @@ async fn capabilities_report_the_authoring_limits_and_continuity_table() {
     assert_eq!(
         capabilities["authoring"],
         json!({"max_scene_seconds":15.0,"max_scenes":128,"max_sections_per_scene":12,
-            "supported_boundaries":["hard_cut","continuous_shot"],
+            "supported_boundaries":["hard_cut","continuous_shot"],"char_limit":100000,
             "continuity":{
                 "reference":{"methods":["combo","influence","motion_context","motion_context_exp"],"auto":"motion_context_exp"},
                 "i2v":{"methods":["last_frame_first_frame"],"auto":"last_frame_first_frame"}},

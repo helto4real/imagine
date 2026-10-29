@@ -299,6 +299,8 @@ pub fn apply(
     let mut commands = vec![];
     let mut creative = base.creative.clone();
     match request.operation {
+        // Inventory notes are reused by an outline; they change no project.
+        Operation::Inventory => return Err("authoring_not_applicable"),
         Operation::EnhanceScene => {
             let scene_id = request.scene_id.clone().ok_or("scene_not_found")?;
             base.scene(&scene_id).map_err(|_| "scene_not_found")?;

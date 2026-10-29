@@ -44,6 +44,168 @@ fn settled(draft: &Draft) -> Phase {
 fn fault(code: &'static str) -> Fault {
     Fault::new(422, code)
 }
+/// The Draft a start of `request` creates, validated as the start validates
+/// it, with its prompt profile; nothing is stored or sent.
+pub(crate) fn prepare(
+    base: &VideoProject,
+    request: Request,
+    provider: &ProviderSnapshot,
+    grounding: &super::grounding::Grounding,
+) -> Result<(Draft, profiles::Snapshot), Fault> {
+    if request.schema_version != 1 || request.expected_project_revision != base.project_revision {
+        return Err(Fault::new(409, "authoring_revision_conflict"));
+    }
+    // An external agent writes the whole Story itself; no provider task.
+    let external = request.provider == steps::EXTERNAL;
+    // An external Draft names its profile explicitly; never the default.
+    if external && request.prompt_profile_id.trim().is_empty() {
+        return Err(fault("profile_not_found"));
+    }
+    let animate = request.operation == Operation::Animate;
+    if animate && external {
+        return Err(fault("animate_external_unsupported"));
+    }
+    if !animate && (!request.mentions.is_empty() || request.add_ambient_sound) {
+        return Err(fault("invalid_authoring_request"));
+    }
+    // Known notes and a measured budget belong to a provider outline.
+    if (!request.inventory.is_empty() || request.budget_fingerprint.is_some())
+        && (external || request.operation != Operation::Outline)
+    {
+        return Err(fault("invalid_authoring_request"));
+    }
+    if request.operation == Operation::Inventory && request.images.is_empty() {
+        return Err(fault("invalid_authoring_request"));
+    }
+    let inventory = known_inventory(&request).map_err(fault)?;
+    if !(external || profiles::PROVIDERS.contains(&request.provider.as_str()))
+        || (external && request.operation != Operation::Outline)
+        || request.brief.len() + request.instruction.len() > 65536
+        || !request.duration_seconds.is_finite()
+        || !(0.25..=3600.).contains(&request.duration_seconds)
+    {
+        return Err(fault("invalid_authoring_request"));
+    }
+    if request.operation == Operation::Outline
+        && request.context.is_none()
+        && request.brief.trim().is_empty()
+    {
+        return Err(fault("story_brief_required"));
+    }
+    if request.add_dialogue && !animate && grounding.cast.as_array().is_none_or(|v| v.len() < 2) {
+        return Err(fault("story_dialogue_cast_required"));
+    }
+    if request.scene_field.is_some() && request.operation != Operation::EnhanceScene {
+        return Err(fault("invalid_enhancement_target"));
+    }
+    if !matches!(request.operation, Operation::Outline | Operation::Inventory) {
+        let scene = base
+            .scene(request.scene_id.as_ref().ok_or(fault("scene_not_found"))?)
+            .map_err(|_| fault("scene_not_found"))?;
+        if request.operation == Operation::EnhanceSection
+            && !scene
+                .sections
+                .iter()
+                .any(|s| Some(&s.id) == request.section_id.as_ref())
+        {
+            return Err(fault("section_not_found"));
+        }
+    }
+    if request.destination == Destination::Continue {
+        steps::continuation(base)
+            .and_then(|c| super::director::normalize_continuation(&c))
+            .map_err(fault)?;
+    }
+    let catalog = profiles::Catalog::load(&crate::config_files::path("video/prompt-profiles"))
+        .map_err(fault)?;
+    let profile = catalog
+        .snapshot(&request.prompt_profile_id)
+        .map_err(fault)?;
+    if external && profile.fallback {
+        return Err(fault("profile_not_found"));
+    }
+    let id = format!("authoring_{}", uuid::Uuid::new_v4().simple());
+    let request_rows = request.operation == Operation::EnhanceSceneAll;
+    let scene_rows = request.scene_id.clone();
+    super::visuals::beats(&request.images).map_err(fault)?;
+    let generation_parameters = profiles::OPERATIONS
+        .into_iter()
+        .map(|operation| {
+            (
+                operation,
+                profiles::resolve(
+                    &profile.profile.generation,
+                    if external {
+                        "koboldcpp"
+                    } else {
+                        &request.provider
+                    },
+                    operation,
+                )
+                .unwrap(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let draft = Draft {
+        schema_version: 1,
+        id: id.clone(),
+        project_id: base.id.clone(),
+        request,
+        phase: if external {
+            Phase::Outline
+        } else {
+            Phase::Running
+        },
+        outline: None,
+        scenes: vec![],
+        text: None,
+        failure: None,
+        failed_index: None,
+        prompt_profile_id: profile.resolved_id.clone(),
+        prompt_profile_revision: profile.profile.revision.clone(),
+        profile_warning: profile.warning.clone(),
+        // An external Draft's generation parameters are informational only.
+        provider_snapshot: if external {
+            json!({"profile_id":steps::EXTERNAL,"generation":generation_parameters})
+        } else {
+            json!({"profile_id":provider.profile.id,"name":provider.profile.name,"base_url":provider.profile.base_url,"model":provider.profile.model,"generation":generation_parameters})
+        },
+        planned_durations: vec![],
+        inventory,
+        selected_cast: grounding.cast.clone(),
+        warnings: vec![],
+        fields: if request_rows {
+            FieldProposal::rows(base, base.scene(scene_rows.as_ref().unwrap()).unwrap())
+        } else {
+            vec![]
+        },
+        production: None,
+        opening_appearance: None,
+        animate: None,
+    };
+    Ok((draft, profile))
+}
+/// A request's known inventory notes in story image order: exactly one per
+/// story image, or none.
+fn known_inventory(request: &Request) -> std::result::Result<Vec<InventoryNote>, &'static str> {
+    if request.inventory.is_empty() {
+        return Ok(vec![]);
+    }
+    if request.inventory.len() != request.images.len() {
+        return Err("authoring_inventory_mismatch");
+    }
+    request
+        .images
+        .iter()
+        .map(|image| {
+            let mut notes = request.inventory.iter().filter(|n| n.id == image.id);
+            match (notes.next(), notes.next()) {
+                (Some(note), None) => Ok(note.clone()),
+                _ => Err("authoring_inventory_mismatch"),
+            }
+        })
+        .collect()
+}
 impl Service {
     pub(crate) fn start(
         self: &Arc<Self>,
@@ -53,129 +215,9 @@ impl Service {
         transport: Arc<ProviderService>,
         grounding: super::grounding::Grounding,
     ) -> Result<Draft, Fault> {
-        if request.schema_version != 1 || request.expected_project_revision != base.project_revision
-        {
-            return Err(Fault::new(409, "authoring_revision_conflict"));
-        }
-        // An external agent writes the whole Story itself; no provider task.
         let external = request.provider == steps::EXTERNAL;
-        // An external Draft names its profile explicitly; never the default.
-        if external && request.prompt_profile_id.trim().is_empty() {
-            return Err(fault("profile_not_found"));
-        }
-        let animate = request.operation == Operation::Animate;
-        if animate && external {
-            return Err(fault("animate_external_unsupported"));
-        }
-        if !animate && (!request.mentions.is_empty() || request.add_ambient_sound) {
-            return Err(fault("invalid_authoring_request"));
-        }
-        if !(external || profiles::PROVIDERS.contains(&request.provider.as_str()))
-            || (external && request.operation != Operation::Outline)
-            || request.brief.len() + request.instruction.len() > 65536
-            || !request.duration_seconds.is_finite()
-            || !(0.25..=3600.).contains(&request.duration_seconds)
-        {
-            return Err(fault("invalid_authoring_request"));
-        }
-        if request.operation == Operation::Outline
-            && request.context.is_none()
-            && request.brief.trim().is_empty()
-        {
-            return Err(fault("story_brief_required"));
-        }
-        if request.add_dialogue && !animate && grounding.cast.as_array().is_none_or(|v| v.len() < 2)
-        {
-            return Err(fault("story_dialogue_cast_required"));
-        }
-        if request.scene_field.is_some() && request.operation != Operation::EnhanceScene {
-            return Err(fault("invalid_enhancement_target"));
-        }
-        if request.operation != Operation::Outline {
-            let scene = base
-                .scene(request.scene_id.as_ref().ok_or(fault("scene_not_found"))?)
-                .map_err(|_| fault("scene_not_found"))?;
-            if request.operation == Operation::EnhanceSection
-                && !scene
-                    .sections
-                    .iter()
-                    .any(|s| Some(&s.id) == request.section_id.as_ref())
-            {
-                return Err(fault("section_not_found"));
-            }
-        }
-        if request.destination == Destination::Continue {
-            steps::continuation(&base)
-                .and_then(|c| super::director::normalize_continuation(&c))
-                .map_err(fault)?;
-        }
-        let catalog = profiles::Catalog::load(&crate::config_files::path("video/prompt-profiles"))
-            .map_err(fault)?;
-        let profile = catalog
-            .snapshot(&request.prompt_profile_id)
-            .map_err(fault)?;
-        if external && profile.fallback {
-            return Err(fault("profile_not_found"));
-        }
-        let id = format!("authoring_{}", uuid::Uuid::new_v4().simple());
-        let request_rows = request.operation == Operation::EnhanceSceneAll;
-        let scene_rows = request.scene_id.clone();
-        super::visuals::beats(&request.images).map_err(fault)?;
-        let generation_parameters = profiles::OPERATIONS
-            .into_iter()
-            .map(|operation| {
-                (
-                    operation,
-                    profiles::resolve(
-                        &profile.profile.generation,
-                        if external {
-                            "koboldcpp"
-                        } else {
-                            &request.provider
-                        },
-                        operation,
-                    )
-                    .unwrap(),
-                )
-            })
-            .collect::<BTreeMap<_, _>>();
-        let draft = Draft {
-            schema_version: 1,
-            id: id.clone(),
-            project_id: base.id.clone(),
-            request,
-            phase: if external {
-                Phase::Outline
-            } else {
-                Phase::Running
-            },
-            outline: None,
-            scenes: vec![],
-            text: None,
-            failure: None,
-            failed_index: None,
-            prompt_profile_id: profile.resolved_id.clone(),
-            prompt_profile_revision: profile.profile.revision.clone(),
-            profile_warning: profile.warning.clone(),
-            // An external Draft's generation parameters are informational only.
-            provider_snapshot: if external {
-                json!({"profile_id":steps::EXTERNAL,"generation":generation_parameters})
-            } else {
-                json!({"profile_id":provider.profile.id,"name":provider.profile.name,"base_url":provider.profile.base_url,"model":provider.profile.model,"generation":generation_parameters})
-            },
-            planned_durations: vec![],
-            inventory: vec![],
-            selected_cast: grounding.cast.clone(),
-            warnings: vec![],
-            fields: if request_rows {
-                FieldProposal::rows(&base, base.scene(scene_rows.as_ref().unwrap()).unwrap())
-            } else {
-                vec![]
-            },
-            production: None,
-            opening_appearance: None,
-            animate: None,
-        };
+        let (draft, profile) = prepare(&base, request, &provider, &grounding)?;
+        let id = draft.id.clone();
         let mut jobs = self.jobs.lock().unwrap();
         if !external && jobs.values().any(|j| j.draft.phase.busy()) {
             return Err(Fault::new(409, "authoring_busy"));
@@ -185,7 +227,7 @@ impl Service {
             Job {
                 created: std::time::Instant::now(),
                 clock: std::time::Instant::now(),
-                clock_completed: 0,
+                clock_completed: draft.inventory.len(),
                 clock_elapsed: None,
                 draft: draft.clone(),
                 base,
@@ -362,6 +404,9 @@ impl Service {
             return Err(Fault::new(409, "authoring_not_editable"));
         }
         let mut d = j.draft.clone();
+        if d.request.operation == Operation::Inventory {
+            return Err(Fault::new(409, "authoring_not_editable"));
+        }
         if let Some(outline) = review.outline {
             validate(&outline).map_err(fault)?;
             d.planned_durations = durations(
@@ -551,7 +596,8 @@ impl Service {
                 j.grounding.clone(),
             )
         };
-        if !expand && draft.request.operation == Operation::Outline {
+        let inventory = draft.request.operation == Operation::Inventory;
+        if !expand && (inventory || draft.request.operation == Operation::Outline) {
             for (selection, image) in &grounding.images {
                 if draft.inventory.iter().any(|n| n.id == selection.id) {
                     continue;
@@ -595,6 +641,12 @@ impl Service {
             let mut jobs = self.jobs.lock().unwrap();
             let j = jobs.get_mut(&id).unwrap();
             if j.generation != generation {
+                return;
+            }
+            // An inventory Draft ends with its notes.
+            if inventory {
+                j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
+                j.draft.phase = Phase::Review;
                 return;
             }
             j.draft.phase = Phase::Running;

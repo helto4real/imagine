@@ -34,6 +34,8 @@ All routes use the existing Imagine session guard. Types live in
 
 - `GET /v1/video/authoring/profiles`: reload source-owned catalog.
 - `POST /v1/video/projects/{id}/authoring`: capture schema 1 Request and revision.
+- `POST /v1/video/projects/{id}/authoring/measure`: an outline Request's budget;
+  nothing starts (see "Inventory and outline budget").
 - `GET /v1/video/authoring/{id}`: session state/progress.
 - `POST .../review`: validate edited Outline, expanded Scenes or enhancement.
 - `POST .../expand`: schema 1 and `start_index`; preceding successful Scenes stay
@@ -293,6 +295,58 @@ and five content validations match. Imagine sends the First frame as PNG at
 its normalized size (longest side at most 1280), where Director passes the
 client's PNG unchanged; the answer goes through Director's `parse_json_object`.
 
+## Inventory and outline budget
+
+Director measures an outline after its separate image inventory. Imagine offers
+the same split; without the new fields an outline still runs its own inventory
+and every request, message and response is unchanged.
+
+- `operation: "inventory"` runs only the story images' inventory, as the outline
+  would, and ends in `review` with `Draft.inventory`. It needs at least one
+  story image and is provider-only. Review fails `authoring_not_editable`;
+  Apply fails `authoring_not_applicable`. Cancel and Retry behave as for an
+  outline's inventory.
+- `Request.inventory` (outline, provider only) gives one known note per story
+  image, as an inventory Draft wrote them. The outline then analyses no image
+  and its message carries those notes. A missing, repeated or unknown note fails
+  `authoring_inventory_mismatch`.
+- `POST /v1/video/projects/{id}/authoring/measure` takes an outline Request
+  whose story images all have known notes (else `authoring_inventory_mismatch`
+  at `inventory`) and builds the outline's system and user messages exactly as
+  its start would, without sending them:
+
+  ```json
+  {"schema_version":1,"operation":"outline","chars":81234,"char_limit":100000,
+   "text_bytes":90312,"message_count":2,"context_tokens":32768,
+   "max_output_tokens":8000,"context_reserve_tokens":8,"fingerprint":"sha256:…"}
+  ```
+
+  `chars` counts the user message, which `char_limit` (`story_context_limit`)
+  bounds; `text_bytes` both messages. `max_output_tokens` is the outline's
+  resolved `max_tokens`; the reserve is Director's 8 tokens. `context_tokens` is
+  read as Director reads it: the provider profile's `{base_url}/models`, the
+  entry whose `id` is the profile's model, its `meta.n_ctx`. A provider other
+  than `koboldcpp`, no such single entry or no positive `n_ctx` fails
+  `authoring_context_window_unknown`; an unreachable provider keeps its
+  enhancement error. The fingerprint covers both messages, the transport, the
+  provider profile's address and model, the resolved settings, the prompt
+  profile and its revision, and the budget. Measuring the same request again
+  gives the same result. A Request with `budget_fingerprint`, an external
+  provider or another operation fails `invalid_authoring_request`.
+- An outline start with `budget_fingerprint` measures again first and fails
+  `authoring_budget_changed` (409) when the result differs; nothing starts.
+- The authoring limits add `char_limit`.
+
+The client decides whether a measurement fits. The native Story view's
+Generate outline runs the inventory Draft (when story images are selected),
+measures with its notes and starts the outline with the fingerprint only when
+`chars` is within `char_limit` and an estimated input (a third of
+`text_bytes`, 12 tokens per message and 32, plus 15%) fits within
+`context_tokens - max_output_tokens - context_reserve_tokens`; otherwise it
+shows both numbers. It shows the measured budget beside the started outline.
+Generate again measures again and reuses the known notes. Tests use synthetic
+loopback providers only.
+
 ## Timing and source
 
 Ordinary Director timing uses the 250 ms minimum when possible, weighted
@@ -314,8 +368,9 @@ Native UI QA is recorded separately. These make no live LLM quality claim.
 P07 remains incomplete: broader dialogue lexical diagnostics, full Reference manifest/runtime projection,
 full library reference metadata/editing semantics,
 binding editing/acceptance for every visual role, richer
-field selection, catalog editor, IntelliSense/Phrase Composer, provider context
-budgeting/ETA and live acceptance remain. H3 I2V applies its scene-start First
+field selection, catalog editor, IntelliSense/Phrase Composer, provider ETA
+and live acceptance remain; the outline's context budget is measured as in
+Director, and expansions, like Director's, are bounded only by `char_limit`. H3 I2V applies its scene-start First
 Frame. Reference picture roles use reference conditioning; this does not implement
 frame-specific keyframe constraints for arbitrary Section times. Cast identity/voice
 inputs now reach the actual worker; this does not establish semantic identity/timbre

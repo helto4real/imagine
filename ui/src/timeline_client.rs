@@ -273,6 +273,9 @@ fn timeline_error_message(code: &str) -> String {
         "authoring_visual_context_unavailable"=>"Image-grounded enhancement is not connected yet. Edit this scene manually.",
         "authoring_video_context_unavailable"=>"Video-grounded enhancement is not connected to this provider path yet. The source binding is retained.",
         "authoring_busy"=>"Another proposal is generating. Wait or cancel that proposal.",
+        "authoring_context_window_unknown"=>"The selected model does not report its context size, so the outline cannot be measured. Check the Story provider connection.",
+        "authoring_budget_changed"=>"The outline settings changed after they were measured. Generate the outline again.",
+        "story_context_limit"=>"The Story message is longer than the provider path allows. Shorten the brief or use fewer story images.",
         "story_scene_duration_capacity"=>"Add more scenes or reduce Story duration. Each Story scene can be at most 15 seconds.",
         "authoring_not_editable"=>"Wait for generation to finish or cancel it before editing this proposal.",
         "session_changed" | "session_required" => {

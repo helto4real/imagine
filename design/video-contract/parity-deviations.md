@@ -51,7 +51,11 @@ Eighteen pure projection cases match actual Director code. All five profiles /
 * Native library selection, browsing, Save/Replace and independent copies are
   implemented and tested in own instances. Full reference metadata preservation,
   all image-role editing and broader fault/cancel acceptance remain open.
-* Provider abort acknowledgement, budgeting, live vision/model behavior and
+* The outline budget follows Director's measurement (messages, `max_tokens`,
+  `meta.n_ctx`, reserve 8, fingerprint check) after a separate inventory; its
+  fingerprint's JSON is Imagine's own, not Director's, and only `koboldcpp`
+  reports a window, as in Director. The native UI's fit estimate is its own.
+* Provider abort acknowledgement, live vision/model behavior and
   broader image formats remain unverified. No model/encoder name allowlists or
   advertised-vision preflight block was added.
 
