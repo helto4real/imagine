@@ -88,12 +88,29 @@ report after every phase and exits without interpreter teardown. Decode times
 are therefore missing; the source scene took 33 s through sampling in ComfyUI's
 code against 85 s for the whole Imagine job.
 
+## Image diffusion models: Kitchen INT8
+
+The image worker had the same defect: Qwen and MOSS diffusion models used
+PyTorch SDPA (`server::attention`). Their diffusion executions now use
+`dit_attention`, Kitchen INT8 as the checkpoints prefer; text encoders and VAEs
+keep PyTorch SDPA, as in ComfyUI. The files are product files, so the core lock
+is unchanged. One synthetic prompt and seed through the proxy, each run loading
+its models after a server start:
+
+| Profile | PyTorch SDPA | Kitchen INT8 |
+| --- | --- | --- |
+| Qwen 1600×896, 40 steps `er_sde`/`beta` | 72.2 s | 52.1 s |
+| MOSS 1024×1024, 50 steps `euler`/`normal` | 48.1 s | 36.1 s |
+
+The outputs differ in bytes, as INT8 attention is expected to; the Kitchen
+images were inspected and are intact. A side-by-side quality comparison needs
+both modes in one server session and belongs to the planned test matrix.
+
 ## Status and next steps
 
 The Combo/Influence path is coupled end to end in code and synthetic tests, and
 both ran on GPU with the tested budget, but without it they run out of memory at
-this size on a 16 GB card. Next, in order: Kitchen INT8 for the image worker
-(core lock update), an attention mode runtime setting (Auto default, Kitchen
+this size on a 16 GB card. Next, in order: an attention mode runtime setting (Auto default, Kitchen
 INT8, PyTorch SDPA) for video and images, dynamic VRAM as a runtime setting (on
 by default, as in ComfyUI) for the H3 DiT and the image models, and a repeatable
 performance comparison against this Python reference.

@@ -112,6 +112,14 @@ pub(super) fn attention() -> Attention {
         model_device: Device::Cuda(0),
     }
 }
+/// The diffusion models' attention: Comfy Kitchen INT8, as their
+/// checkpoints' ComfyAttention preference names it. Encoders keep `attention`.
+pub(super) fn dit_attention() -> Attention {
+    Attention {
+        method: AttentionMethod::KitchenInt8,
+        ..attention()
+    }
+}
 pub(super) fn load(
     rt: &Runtime,
     aimdo: &Aimdo,

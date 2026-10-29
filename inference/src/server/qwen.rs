@@ -227,7 +227,7 @@ pub(super) fn generate(
                     rt,
                     params,
                     dit.config.num_layers,
-                    attention(),
+                    dit_attention(),
                 )?,
                 compute_dtype: Kind::BFloat16,
                 generator: rt.native.generator(dev, r.seed)?,

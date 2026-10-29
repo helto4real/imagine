@@ -231,7 +231,7 @@ pub(super) fn generate(
                 .iter()
                 .map(|l| l.f_to_device_(dev, Kind::BFloat16, false, false))
                 .collect::<Result<Vec<_>, _>>()?;
-            let mut exec = m::MossStaticExecution::bind(rt, &params, attention())?;
+            let mut exec = m::MossStaticExecution::bind(rt, &params, dit_attention())?;
             Some(unsafe { dit.preprocess_refs(rt, &refs, &mut exec)? })
         };
         let condition = |context| q::FullAreaCondition {
@@ -255,7 +255,7 @@ pub(super) fn generate(
                 compute_dtype: Kind::BFloat16,
                 flash_attention_memory: true,
                 multiplier: 1.,
-                execution: m::MossStaticExecution::bind(rt, &params, attention())?,
+                execution: m::MossStaticExecution::bind(rt, &params, dit_attention())?,
                 generator: rt.native.generator(dev, r.seed)?,
                 observer: Some(Box::new(|step| {
                     observer(Event::Step(step.i + 1))?;
