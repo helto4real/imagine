@@ -549,6 +549,43 @@ async fn progress_is_scoped_to_active_job_in_polling_and_events() {
 }
 
 #[tokio::test]
+async fn retrying_a_job_without_a_destination_returns_the_same_job() {
+    let h = setup().await;
+    // The raw route, without the helper's destination proof.
+    let submit = |body: Value| {
+        let router = h.router.clone();
+        async move {
+            let response = router
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/v1/jobs")
+                        .header("content-type", "application/json")
+                        .header("Idempotency-Key", "own-retry")
+                        .body(Body::from(body.to_string()))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            let status = response.status().as_u16();
+            let value: Value =
+                serde_json::from_slice(&to_bytes(response.into_body(), 65536).await.unwrap())
+                    .unwrap();
+            (status, value)
+        }
+    };
+    assert!(request()["client_metadata"]["video_destination"].is_null());
+    let (status, first) = submit(request()).await;
+    assert_eq!(status, 202, "{first}");
+    let (status, repeat) = submit(request()).await;
+    assert_eq!((status, &repeat["id"]), (202, &first["id"]), "{repeat}");
+    let mut changed = request();
+    changed["prompt"] = json!("own changed prompt");
+    assert_eq!(submit(changed).await.0, 409);
+    stop(h).await;
+}
+
+#[tokio::test]
 async fn queue_idempotency_unload_resume_and_cancel() {
     let h = setup().await;
     assert_eq!(req(&h.router, "GET", "/v1/models", None, None).await.0, 200);

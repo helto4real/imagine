@@ -445,6 +445,8 @@ impl Scheduler {
                 key,
             } => {
                 request.validate().map_err(|e| Fault::new(422, e))?;
+                // The caller's request identifies a retry; the destination the
+                // server may add below does not.
                 let fingerprint =
                     hash(&serde_json::to_vec(&request).expect("serializable request"));
                 if let Some(key) = &key {
@@ -479,7 +481,7 @@ impl Scheduler {
                     None
                 };
                 sqlx::query("INSERT INTO jobs (id,owner,status,request,request_hash,idempotency_key,created) VALUES (?,?,'queued',?,?,?,?)")
-                    .bind(&p.id).bind(owner).bind(p.effective).bind(p.fingerprint).bind(key).bind(now()).execute(&self.store.db).await?;
+                    .bind(&p.id).bind(owner).bind(p.effective).bind(&fingerprint).bind(key).bind(now()).execute(&self.store.db).await?;
                 if let Some(ticket) = ticket {
                     self.tickets.insert(p.id.clone(), ticket);
                 }
