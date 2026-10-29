@@ -20,28 +20,34 @@ fn text_layer(name: &str) -> Option<usize> {
 fn text_module_order(
     modules: Vec<crate::models::qwen_image21::OffloadModule>,
 ) -> Vec<crate::models::qwen_image21::OffloadModule> {
+    module_order(modules, text_layer)
+}
+/// ModelPatcherDynamic's load order: a model's dynamic units in their own
+/// order, then `_load_list(for_dynamic=True)` sorted.
+fn module_order(
+    modules: Vec<crate::models::qwen_image21::OffloadModule>,
+    unit: impl Fn(&str) -> Option<usize>,
+) -> Vec<crate::models::qwen_image21::OffloadModule> {
     let mut indexed = modules.into_iter().enumerate().collect::<Vec<_>>();
-    indexed.sort_by(
-        |(ai, a), (bi, b)| match (text_layer(&a.name), text_layer(&b.name)) {
-            // SD1ClipModel forwards Llama's layer units. root.modules() retains
-            // constructor registration order inside each unit, not size order.
-            (Some(a), Some(b)) => (a, ai).cmp(&(b, bi)),
-            (Some(_), None) => std::cmp::Ordering::Less,
-            (None, Some(_)) => std::cmp::Ordering::Greater,
-            (None, None) => (
-                a.offload_bytes >= 64 * 1024,
-                std::cmp::Reverse(a.offload_bytes),
-                a.module_bytes,
-                &a.name,
-            )
-                .cmp(&(
-                    b.offload_bytes >= 64 * 1024,
-                    std::cmp::Reverse(b.offload_bytes),
-                    b.module_bytes,
-                    &b.name,
-                )),
-        },
-    );
+    indexed.sort_by(|(ai, a), (bi, b)| match (unit(&a.name), unit(&b.name)) {
+        // SD1ClipModel forwards Llama's layer units. root.modules() retains
+        // constructor registration order inside each unit, not size order.
+        (Some(a), Some(b)) => (a, ai).cmp(&(b, bi)),
+        (Some(_), None) => std::cmp::Ordering::Less,
+        (None, Some(_)) => std::cmp::Ordering::Greater,
+        (None, None) => (
+            a.offload_bytes >= 64 * 1024,
+            std::cmp::Reverse(a.offload_bytes),
+            a.module_bytes,
+            &a.name,
+        )
+            .cmp(&(
+                b.offload_bytes >= 64 * 1024,
+                std::cmp::Reverse(b.offload_bytes),
+                b.module_bytes,
+                &b.name,
+            )),
+    });
     indexed.into_iter().map(|(_, m)| m).collect()
 }
 
@@ -192,16 +198,54 @@ impl Module {
 pub fn prepare_text(
     rt: &Runtime,
     library: &Path,
-    mut parameters: PreparedParameters,
+    parameters: PreparedParameters,
     inventory: crate::models::qwen_image21::ComponentInventory,
 ) -> Result<PreparedParameters, Error> {
-    let vbar = unsafe { Vbar::load(library, 0, inventory.model_size * 10)? };
+    let modules = text_module_order(inventory.modules);
+    prepare_ordered(
+        rt,
+        library,
+        parameters,
+        inventory.model_size,
+        inventory.buffers,
+        modules,
+    )
+}
+/// A diffusion model with dynamic VRAM: weights stay on the host and enter a
+/// VBAR range when a layer runs, as ModelPatcherDynamic. A model without
+/// dynamic units, such as the H3, Qwen Image and MOSS diffusion models, loads
+/// in the sorted `_load_list` order. Bound low-VRAM patches apply at use.
+pub fn prepare_model(
+    rt: &Runtime,
+    library: &Path,
+    parameters: PreparedParameters,
+    inventory: crate::models::qwen_image21::ComponentInventory,
+) -> Result<PreparedParameters, Error> {
+    let modules = module_order(inventory.modules, |_| None);
+    prepare_ordered(
+        rt,
+        library,
+        parameters,
+        inventory.model_size,
+        inventory.buffers,
+        modules,
+    )
+}
+fn prepare_ordered(
+    rt: &Runtime,
+    library: &Path,
+    mut parameters: PreparedParameters,
+    model_size: u64,
+    buffers: Vec<crate::components::ComponentBuffer>,
+    modules: Vec<crate::models::qwen_image21::OffloadModule>,
+) -> Result<PreparedParameters, Error> {
+    let vbar = unsafe { Vbar::load(library, 0, model_size * 10)? };
     vbar.prioritize();
     let owner = Arc::new(Owner {
         vbar,
         native: rt.native.clone(),
     });
-    for module in text_module_order(inventory.modules) {
+    for module in modules {
         if module.cast_weights && module.module_bytes > 16 * 1024 {
             let original = ["weight", "bias"]
                 .iter()
@@ -235,7 +279,7 @@ pub fn prepare_text(
             }
         }
     }
-    for buffer in inventory.buffers {
+    for buffer in buffers {
         if let Some(value) = buffer.initial_value {
             let kind = if buffer.default_dtype {
                 rt.native.default_dtype()?
@@ -282,6 +326,30 @@ mod tests {
             Value::tensor(Tensor::zeros([600], (Kind::Float, Device::Cpu))),
         ];
         assert_eq!(packed_size(&values).unwrap(), 4096);
+    }
+    #[test]
+    fn a_model_without_units_loads_small_modules_first_then_by_size() {
+        let module = |name: &str, size| crate::models::qwen_image21::OffloadModule {
+            name: name.into(),
+            module_bytes: size,
+            offload_bytes: size,
+            cast_weights: true,
+            parameters: vec![],
+        };
+        let modules = vec![
+            module("blocks.0.ff", 300_000),
+            module("norm", 10),
+            module("blocks.1.ff", 300_000),
+            module("embed", 900_000),
+            module("adaln", 1_000),
+        ];
+        assert_eq!(
+            module_order(modules, |_| None)
+                .iter()
+                .map(|m| m.name.as_str())
+                .collect::<Vec<_>>(),
+            ["adaln", "norm", "embed", "blocks.0.ff", "blocks.1.ff"]
+        );
     }
     #[test]
     fn language_units_precede_dynamic_size_sorted_remainder() {
