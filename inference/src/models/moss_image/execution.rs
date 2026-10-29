@@ -222,7 +222,10 @@ impl FullAreaExecution for Forward<'_, '_> {
         match device {
             Device::Cuda(i) => {
                 let [free, _, active, reserved] = self.rt.native.cuda_memory(i)?;
-                Ok((free + reserved - active) as f64)
+                // As ModelPatcher.get_free_memory: what dynamic VRAM could
+                // release counts as free, so CFG batching wins over residency.
+                let dynamic = crate::checkpoint::dynamic_vbar::reclaimable(i);
+                Ok((free + reserved - active + dynamic) as f64)
             }
             Device::Cpu => Ok(host_available_memory()? as f64),
             _ => Err(Error::BindingGap {

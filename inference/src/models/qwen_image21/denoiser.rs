@@ -59,7 +59,10 @@ impl<C: CacheServices> FullAreaExecution for Forward<'_, '_, C> {
             Device::Cpu => Ok(host_available_memory()? as f64),
             Device::Cuda(index) => {
                 let [free, _, active, reserved] = self.runtime.native.cuda_memory(index)?;
-                Ok((free + reserved - active) as f64)
+                // As ModelPatcher.get_free_memory: what dynamic VRAM could
+                // release counts as free, so CFG batching wins over residency.
+                let dynamic = crate::checkpoint::dynamic_vbar::reclaimable(index);
+                Ok((free + reserved - active + dynamic) as f64)
             }
             _ => Err(Error::BindingGap {
                 backend: "qwen_cfg".into(),

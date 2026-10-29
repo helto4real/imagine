@@ -102,6 +102,7 @@ struct Delta {
     a: Linear,
     out: Linear,
     conv: Tensor,
+    dynamic_conv: Option<std::sync::Arc<crate::checkpoint::dynamic::Module>>,
     decay: Tensor,
     bias: Tensor,
     norm: Tensor,
@@ -117,6 +118,7 @@ impl Delta {
             a: l("in_proj_a")?,
             out: l("out_proj")?,
             conv: w("conv1d.weight")?,
+            dynamic_conv: p.dynamic_modules.get(&format!("{path}.conv1d")).cloned(),
             decay: w("A_log")?,
             bias: w("dt_bias")?,
             norm: w("norm.weight")?,
@@ -137,7 +139,17 @@ impl Delta {
         let b = unsafe { project(&self.b, rt, x, e)? };
         let a = unsafe { project(&self.a, rt, x, e)? };
         e.check_interrupt()?;
-        let conv = self.conv.f_to_device_(x.device(), x.kind(), false, false)?;
+        // A dynamic conv1d runs from its VBAR range, as Comfy's cast_bias_weight.
+        let lease = self
+            .dynamic_conv
+            .as_ref()
+            .map(|m| m.acquire(rt))
+            .transpose()?;
+        let conv = match &lease {
+            Some(lease) => lease.values[0].as_tensor()?,
+            None => self.conv.shallow_clone(),
+        };
+        let conv = conv.f_to_device_(x.device(), x.kind(), false, false)?;
         let mixed = mixed
             .f_conv1d(
                 &conv,
@@ -279,6 +291,7 @@ struct Block {
 pub struct Qwen35TextEncoder {
     pub config: Qwen35Config,
     pub embedding: Value,
+    dynamic_embedding: Option<std::sync::Arc<crate::checkpoint::dynamic::Module>>,
     blocks: Vec<Block>,
     norm: Tensor,
 }
@@ -418,6 +431,7 @@ impl Qwen35TextEncoder {
         }
         Ok(Self {
             embedding: parameter(p, "model.embed_tokens.weight")?,
+            dynamic_embedding: p.dynamic_modules.get("model.embed_tokens").cloned(),
             norm: parameter(p, "model.norm.weight")?.as_tensor()?,
             blocks,
             config: c,
@@ -432,7 +446,13 @@ impl Qwen35TextEncoder {
         e: &mut E,
     ) -> Result<Tensor, Error> {
         e.check_interrupt()?;
-        unsafe { embedding_rows(rt, &self.embedding, ids, Some(Kind::Float)) }
+        let lease = self
+            .dynamic_embedding
+            .as_ref()
+            .map(|m| m.acquire(rt))
+            .transpose()?;
+        let weight = lease.as_ref().map_or(&self.embedding, |v| &v.values[0]);
+        unsafe { embedding_rows(rt, weight, ids, Some(Kind::Float)) }
     }
     /// Language prefill only; caller binds full-attention preferences at each
     /// indexed execution block. Source add(out=x) mutates the embedding buffer.

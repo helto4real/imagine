@@ -56,7 +56,13 @@ impl StaticCacheServices {
 }
 impl CacheServices for StaticCacheServices {
     fn patcher_free_memory(&mut self, device: Device) -> Result<f64, Error> {
-        self.free_memory(device)
+        // As ModelPatcher.get_free_memory: what dynamic VRAM could release
+        // counts as free for the patcher's own decisions.
+        let dynamic = match device {
+            Device::Cuda(index) => crate::checkpoint::dynamic_vbar::reclaimable(index),
+            _ => 0,
+        };
+        Ok(self.free_memory(device)? + dynamic as f64)
     }
     fn free_memory(&mut self, device: Device) -> Result<f64, Error> {
         if device == Device::Cpu {

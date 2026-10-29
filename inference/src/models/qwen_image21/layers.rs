@@ -294,10 +294,18 @@ impl Linear {
             && q.layout == "TensorWiseINT8Layout"
             && q.params.fields.get("transposed") != Some(&ScalarField::Bool(true))
         {
+            // A dynamic module runs from its VBAR range, as in forward and
+            // Comfy's cast_bias_weight, not from its host weights.
+            let lease = self.dynamic.as_ref().map(|m| m.acquire(rt)).transpose()?;
+            let weight = lease.as_ref().map_or(&self.weight, |v| &v.values[0]);
+            let module_bias = lease
+                .as_ref()
+                .and_then(|v| v.values.get(1))
+                .or(self.bias.as_ref());
             let w = unsafe {
                 rt.op(
                     "aten::to.dtype_layout",
-                    std::slice::from_ref(&self.weight),
+                    std::slice::from_ref(weight),
                     &vec![
                         ("dtype".into(), Value::DType(x.kind())),
                         ("device".into(), Value::Device(x.device())),
@@ -305,7 +313,7 @@ impl Linear {
                 )?
             }
             .as_quantized()?;
-            let bias = match &self.bias {
+            let bias = match module_bias {
                 Some(b) => Value::tensor(b.as_tensor()?.f_to_device_(
                     x.device(),
                     x.kind(),

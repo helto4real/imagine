@@ -19,6 +19,7 @@ type FaultFn = unsafe extern "C" fn(*mut c_void, *mut c_void, u64, u64, *mut u32
 type RangeFn = unsafe extern "C" fn(*mut c_void, *mut c_void, u64, u64);
 type Prioritize = unsafe extern "C" fn(*mut c_void, *mut c_void, u64);
 type LoadedSize = unsafe extern "C" fn(*mut c_void, *mut c_void) -> usize;
+type Analyze = unsafe extern "C" fn(*mut c_void, bool) -> u64;
 
 struct Api {
     handle: NonNull<c_void>,
@@ -30,6 +31,7 @@ struct Api {
     prioritize: Prioritize,
     deprioritize: Free,
     loaded_size: LoadedSize,
+    analyze: Analyze,
 }
 
 impl Drop for Api {
@@ -106,6 +108,7 @@ unsafe fn initialize(path: &Path) -> Result<Arc<Runtime>, Error> {
             prioritize: symbol(handle, c"vbar_prioritize")?,
             deprioritize: symbol(handle, c"vbar_deprioritize")?,
             loaded_size: symbol(handle, c"vbar_loaded_size")?,
+            analyze: symbol(handle, c"vbars_analyze")?,
         })
     })();
     let api = match bindings {
@@ -178,6 +181,19 @@ unsafe fn initialize(path: &Path) -> Result<Arc<Runtime>, Error> {
     });
     *shared = Some(Arc::clone(&runtime));
     Ok(runtime)
+}
+
+/// Bytes AIMDO could release from the VBARs on CUDA `device`, as
+/// `comfy_aimdo.model_vbar.vbars_analyze`; zero before AIMDO is initialized.
+pub(crate) fn reclaimable(device: usize) -> u64 {
+    let Some(runtime) = lock(&RUNTIME).clone() else {
+        return 0;
+    };
+    let Some(context) = runtime.devices.get(device) else {
+        return 0;
+    };
+    let _calls = lock(&runtime.calls);
+    unsafe { (runtime.api.analyze)(context.as_ptr(), false) }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
