@@ -1320,6 +1320,51 @@ mod tests {
         }
     }
 
+    #[test]
+    fn closing_with_unsaved_work_asks_first_and_then_closes() {
+        let root = tempfile::tempdir().unwrap();
+        let ctx = egui::Context::default();
+        let mut app = ImagineApp::synthetic_preview(&ctx, root.path().into());
+        let project = super::super::media_picker::tests::project();
+        // One frame with the window's close button pressed; the closes it sends.
+        let close = |app: &mut ImagineApp| {
+            let mut input = egui::RawInput::default();
+            input.viewports.insert(
+                egui::ViewportId::ROOT,
+                egui::ViewportInfo {
+                    events: vec![egui::ViewportEvent::Close],
+                    ..Default::default()
+                },
+            );
+            let mut output = ctx.run_ui(input, |ui| app.timeline_guard_close(ui.ctx()));
+            output.textures_delta.clear();
+            output
+                .viewport_output
+                .get(&egui::ViewportId::ROOT)
+                .map(|v| v.commands.clone())
+                .unwrap_or_default()
+        };
+        for (state, held) in [("saved", false), ("not_saved", true)] {
+            app.timeline.replace_pending = None;
+            app.timeline.document = Some(Snapshot::with(
+                project.clone(),
+                json!({"persistence":{"state":state}}),
+            ));
+            let commands = close(&mut app);
+            assert_eq!(
+                commands.contains(&egui::ViewportCommand::CancelClose),
+                held,
+                "{state}"
+            );
+            assert_eq!(app.timeline.replace_pending == Some(Replace::Close), held);
+        }
+        // Once the user discards the work the close is no longer held.
+        app.timeline.replace_pending = None;
+        app.timeline.close_confirmed = true;
+        assert!(!close(&mut app).contains(&egui::ViewportCommand::CancelClose));
+        assert!(app.timeline.replace_pending.is_none());
+    }
+
     /// Synthetic timeline frames; written only when IMAGINE_UI_PREVIEW_DIR is set.
     #[test]
     fn headless_timeline_with_project() {

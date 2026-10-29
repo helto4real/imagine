@@ -1252,6 +1252,7 @@ impl eframe::App for ImagineApp {
     }
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.receive(ctx);
+        self.timeline_guard_close(ctx);
         self.timeline_final_tick(ctx);
         #[cfg(feature = "ui-preview")]
         self.qa_tick(ctx);

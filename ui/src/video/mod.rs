@@ -106,6 +106,8 @@ impl Snapshot {
 pub(super) struct Timeline {
     /// A project-replacing action held until the user discards unsaved work.
     replace_pending: Option<Replace>,
+    /// The user chose to close Imagine and discard unsaved work.
+    close_confirmed: bool,
     captures: captures::State,
     reference_cache: reference_cache::State,
     preflight: preflight::State,
@@ -403,6 +405,8 @@ pub(super) enum Replace {
     New,
     Open,
     Animate,
+    /// Closing the main window.
+    Close,
 }
 #[derive(Clone)]
 pub(super) enum PostAction {
@@ -1266,6 +1270,16 @@ impl ImagineApp {
         !self.timeline.draft_edits().is_empty()
             || has_content && d.save_state() != Some(&snapshot::SaveState::Saved)
     }
+    /// Holds a main-window close while the open project has unsaved work; the
+    /// close goes through once the user discards it.
+    pub(super) fn timeline_guard_close(&mut self, ctx: &egui::Context) {
+        if ctx.input(|i| i.viewport().close_requested())
+            && !self.timeline.close_confirmed
+            && self.timeline_hold_replace(Replace::Close)
+        {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+        }
+    }
     /// Holds `replace` for confirmation when it would discard unsaved work.
     pub(super) fn timeline_hold_replace(&mut self, replace: Replace) -> bool {
         if !self.timeline_unsaved() {
@@ -1299,6 +1313,9 @@ impl ImagineApp {
                         Replace::Animate => {
                             "Animate into a new project? Unsaved changes in this project are lost."
                         }
+                        Replace::Close => {
+                            "Close Imagine? Unsaved changes in this project are lost."
+                        }
                     },
                     (crate::icons::Icon::Trash, "Discard changes"),
                     "Keep project",
@@ -1325,6 +1342,10 @@ impl ImagineApp {
                     Replace::New => self.timeline_new(ctx),
                     Replace::Open => self.timeline_open_project(ctx),
                     Replace::Animate => self.animate_now(ctx),
+                    Replace::Close => {
+                        self.timeline.close_confirmed = true;
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    }
                 }
             }
         }
