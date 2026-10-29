@@ -175,17 +175,26 @@ async fn upload(
     let (mut file, name, limit) = workspaces
         .upload(&workspace, &query.name, &head)
         .map_err(failure)?;
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<axum::body::Bytes>(8);
+    // `None` ends a complete upload. The sender disappearing without it (a failed
+    // body, a dropped request) leaves the file uncommitted, and dropping it
+    // removes the temporary file.
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Option<axum::body::Bytes>>(8);
     let writer = tokio::task::spawn_blocking(move || {
         let mut written = 0u64;
-        while let Some(chunk) = rx.blocking_recv() {
-            written += chunk.len() as u64;
-            if written > limit {
-                return Err("upload_too_large");
+        loop {
+            match rx.blocking_recv() {
+                Some(Some(chunk)) => {
+                    written += chunk.len() as u64;
+                    if written > limit {
+                        return Err("upload_too_large");
+                    }
+                    file.file()
+                        .write_all(&chunk)
+                        .map_err(|_| "private_storage_write_failed")?;
+                }
+                Some(None) => break,
+                None => return Err("upload_interrupted"),
             }
-            file.file()
-                .write_all(&chunk)
-                .map_err(|_| "private_storage_write_failed")?;
         }
         if written == 0 {
             return Err("upload_empty");
@@ -194,11 +203,11 @@ async fn upload(
         Ok(written)
     });
     let mut interrupted = false;
-    if tx.send(head.into()).await.is_ok() {
+    if tx.send(Some(head.into())).await.is_ok() {
         while let Some(chunk) = stream.next().await {
             match chunk {
                 Ok(chunk) => {
-                    if tx.send(chunk).await.is_err() {
+                    if tx.send(Some(chunk)).await.is_err() {
                         break;
                     }
                 }
@@ -210,11 +219,12 @@ async fn upload(
         }
     }
     if interrupted {
-        // Dropping the receiver side ends the writer without committing.
         drop(tx);
         let _ = writer.await;
         return Err(Error::new(StatusCode::BAD_REQUEST, "upload_interrupted"));
     }
+    // A writer that already stopped (too large, write failure) reports why.
+    let _ = tx.send(None).await;
     drop(tx);
     writer
         .await

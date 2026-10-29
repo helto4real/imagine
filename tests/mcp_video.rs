@@ -486,6 +486,27 @@ async fn agent_produces_a_video_in_its_workspace_and_resumes_with_the_key() {
         .await;
     assert_eq!(listed["files"].as_array().unwrap().len(), 2, "{listed}");
     assert!(workspace.folder.join("uploads/own-keeper.png").is_file());
+    // A body that breaks off after a valid header publishes nothing.
+    {
+        use tokio::io::AsyncWriteExt;
+        let mut socket = tokio::net::TcpStream::connect(address).await.unwrap();
+        let head = format!(
+            "PUT /v1/workspaces/{}/files?name=own-broken.png HTTP/1.1\r\nHost: 127.0.0.1\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n",
+            workspace.meta.id, 64
+        );
+        socket.write_all(head.as_bytes()).await.unwrap();
+        socket.write_all(&keeper[..64]).await.unwrap();
+        socket.write_all(b"\r\n").await.unwrap();
+        socket.flush().await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let mut uploads: Vec<_> = files(&workspace.folder.join("uploads"))
+        .into_iter()
+        .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+        .collect();
+    uploads.sort();
+    assert_eq!(uploads, ["own-harbour.png", "own-keeper.png"]);
 
     // A project in the workspace, saved there at once.
     let mut create = json!(imagine_server::video_defaults::new_project());
