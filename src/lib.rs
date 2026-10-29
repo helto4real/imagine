@@ -5,6 +5,8 @@ pub mod component_error;
 pub mod config;
 #[path = "../shared/config_files.rs"]
 pub mod config_files;
+#[path = "../shared/local_ingress.rs"]
+pub mod local_ingress;
 /// Configuration files the server reads at startup; see `config/README.md`.
 pub const CONFIG_FILES: &[&str] = &[
     "image/character-sheet/portrait.txt",

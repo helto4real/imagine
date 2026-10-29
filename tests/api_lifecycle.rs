@@ -238,6 +238,51 @@ async fn comfy_selection_is_visible_without_starting_inference() {
 }
 
 #[tokio::test]
+async fn foreign_hosts_and_origins_cannot_reach_the_local_api() {
+    let h = setup().await;
+    let call = |host: Option<&'static str>, origin: Option<&'static str>| {
+        let router = h.router.clone();
+        async move {
+            let mut request = Request::builder().uri("/v1/session");
+            if let Some(host) = host {
+                request = request.header("Host", host);
+            }
+            if let Some(origin) = origin {
+                request = request.header("Origin", origin);
+            }
+            let response = router
+                .oneshot(request.body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            let status = response.status().as_u16();
+            let body: Value =
+                serde_json::from_slice(&to_bytes(response.into_body(), 8192).await.unwrap())
+                    .unwrap();
+            (status, body["error"]["code"].clone())
+        }
+    };
+    // A rebinding page names its own domain; local clients name loopback or nothing.
+    assert_eq!(call(None, None).await.0, 200);
+    assert_eq!(call(Some("127.0.0.1:8080"), None).await.0, 200);
+    assert_eq!(
+        call(Some("127.0.0.1:8080"), Some("http://localhost:8000"))
+            .await
+            .0,
+        200
+    );
+    assert_eq!(
+        call(Some("rebound.example:8080"), None).await,
+        (421, json!("invalid_host"))
+    );
+    assert_eq!(
+        call(Some("127.0.0.1:8080"), Some("http://rebound.example")).await,
+        (403, json!("invalid_origin"))
+    );
+    h.control.call(Action::Shutdown).await.unwrap();
+    h.task.await.unwrap().unwrap();
+}
+
+#[tokio::test]
 async fn enhancement_routes_share_session_guard_and_never_start_image_inference() {
     let h = setup().await;
     let response = h

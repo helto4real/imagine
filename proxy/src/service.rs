@@ -869,6 +869,24 @@ async fn imagine_handler(s: &Service, mut req: Request<Body>) -> Response<Body> 
         return http::json(404, json!({"error":{"code":"not_found"}}));
     };
     let path = format!("/{path}");
+    // The incoming headers, before forwarding rewrites them; see local_ingress.
+    let ingress = {
+        let header = |name| {
+            req.headers()
+                .get(name)
+                .map(|v: &axum::http::HeaderValue| v.to_str().unwrap_or(""))
+        };
+        crate::local_ingress::check(
+            header(axum::http::header::HOST),
+            header(axum::http::header::ORIGIN),
+        )
+    };
+    if let Err(code) = ingress {
+        return http::json(
+            if code == "invalid_host" { 421 } else { 403 },
+            json!({"error":{"code":code}}),
+        );
+    }
     if s.config.coordinator_socket.is_none() {
         return http::json(
             503,
@@ -1182,6 +1200,50 @@ mod imagine_bridge_tests {
         server.abort();
     }
 
+    #[tokio::test]
+    async fn bridge_rejects_foreign_hosts_and_origins_before_forwarding() {
+        let dir = tempfile::tempdir().unwrap();
+        let unused = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let origin = format!("http://{}", unused.local_addr().unwrap());
+        drop(unused);
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let running = Service::start(Config {
+            chat_port: 0,
+            image_port: 0,
+            imagine_url: origin,
+            coordinator_socket: Some(dir.path().join("gpu.sock").to_string_lossy().into_owned()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let url = format!("http://127.0.0.1:{}/imagine/v1/models", running.image_port);
+        for (host, page, status, code) in [
+            (Some("rebound.example"), None, 421, "invalid_host"),
+            (None, Some("http://rebound.example"), 403, "invalid_origin"),
+            // Loopback reaches the (here absent) upstream.
+            (
+                None,
+                Some("http://localhost:8000"),
+                502,
+                "imagine_upstream_unavailable",
+            ),
+        ] {
+            let mut request = client.get(&url);
+            if let Some(host) = host {
+                request = request.header("Host", host);
+            }
+            if let Some(page) = page {
+                request = request.header("Origin", page);
+            }
+            let response = request.send().await.unwrap();
+            assert_eq!(response.status().as_u16(), status, "{host:?} {page:?}");
+            assert_eq!(
+                response.json::<Value>().await.unwrap()["error"]["code"],
+                code
+            );
+        }
+        running.close().await;
+    }
     #[tokio::test]
     async fn bridge_fails_closed_without_coordination_or_upstream() {
         let dir = tempfile::tempdir().unwrap();

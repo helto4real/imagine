@@ -30,6 +30,8 @@ pub mod mcp_protocol;
 
 #[path = "../../shared/config_files.rs"]
 pub mod config_files;
+#[path = "../../shared/local_ingress.rs"]
+pub mod local_ingress;
 
 pub mod connection_limit;
 

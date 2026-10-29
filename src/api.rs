@@ -82,7 +82,19 @@ pub fn router(app: App) -> Router {
         .layer(middleware::from_fn_with_state(app.clone(), session_guard))
 }
 async fn session_guard(State(app): State<App>, request: Request, next: Next) -> Response {
-    let mut response = if request.uri().path().starts_with("/v1/video/")
+    // A header that is not text counts as a foreign one.
+    let ingress = {
+        let header = |name| {
+            request
+                .headers()
+                .get(name)
+                .map(|v: &header::HeaderValue| v.to_str().unwrap_or(""))
+        };
+        crate::local_ingress::check(header(header::HOST), header(header::ORIGIN))
+    };
+    let mut response = if let Err(code) = ingress {
+        Fault::new(if code == "invalid_host" { 421 } else { 403 }, code).into_response()
+    } else if request.uri().path().starts_with("/v1/video/")
         && request.headers().get("X-Imagine-Session").is_none()
     {
         Fault::new(401, "session_required").into_response()
