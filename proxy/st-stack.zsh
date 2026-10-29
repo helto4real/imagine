@@ -633,12 +633,30 @@ signal_port_owners() {
     done
 }
 
+# An st-proxy of this user, perhaps started from another checkout: the only port
+# owner startup may stop. Anything else keeps its port and startup fails.
+port_owner_is_stack_proxy() {
+    local pid=$1
+    local command_lower
+
+    [[ -O "/proc/${pid}" ]] || return 1
+    read_process_info "${pid}" || return 1
+    command_lower=${PROCESS_COMMAND:l}
+    [[ "${command_lower}" == */st-proxy\ * || "${command_lower}" == */st-proxy ]]
+}
+
 free_proxy_port() {
     local port=$1
-    local deadline
+    local deadline pid
 
     find_port_owner_pids "${port}" || return 0
-    log "proxy port ${port} is owned by PID(s) ${(j:, :)PORT_OWNER_PIDS}; stopping them"
+    for pid in "${PORT_OWNER_PIDS[@]}"; do
+        if ! port_owner_is_stack_proxy "${pid}"; then
+            log "proxy port ${port} is in use by PID ${pid}, which is not an st-proxy of this user; stop it or choose another port"
+            return 1
+        fi
+    done
+    log "proxy port ${port} is owned by st-proxy PID(s) ${(j:, :)PORT_OWNER_PIDS}; stopping them"
     signal_port_owners TERM
 
     deadline=$(( SECONDS + STOP_TIMEOUT ))
@@ -1297,4 +1315,5 @@ main() {
     monitor_stack
 }
 
-main "$@"
+# Tests read the functions without starting the stack.
+[[ -n "${ST_STACK_FUNCTIONS_ONLY:-}" ]] || main "$@"
