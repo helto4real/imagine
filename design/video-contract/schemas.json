@@ -5740,6 +5740,9 @@
             "type": "null"
           }
         ]
+      },
+      "opening_appearance": {
+        "description": "Replaces the Draft's opening appearance; later expansions use it.\nThe same shape as `Draft.opening_appearance`."
       }
     },
     "additionalProperties": false,
@@ -6117,7 +6120,7 @@
         ]
       },
       "opening_appearance": {
-        "description": "With a context's cast state, each character's opening appearance as\nthe outline resolved it (Director's `opening_appearance`)."
+        "description": "With a context's cast state, each character's opening appearance as\nthe outline resolved it or a review replaced it (Director's\n`opening_appearance`: `schema_version` and `characters` of\n`character_id`, `reference_tag`, `source`, `exposure`, `garments`,\n`worn_items`, `temporary_traits` and `visible_body_state`). Expansions\nstart from it."
       },
       "animate": {
         "anyOf": [

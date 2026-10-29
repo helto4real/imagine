@@ -199,7 +199,7 @@ async fn an_outline_without_the_opening_appearance_is_rejected() {
         1
     );
     assert!(
-        bundle["expansion"]["slot_values"]["grounding_context"]
+        bundle["expansion"]["slot_values"]["grounding_context"]["captured"]
             .as_str()
             .unwrap()
             .contains("\"protected_facts\": [\"The lamp is broken.\"]")

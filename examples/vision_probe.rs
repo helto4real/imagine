@@ -12,8 +12,9 @@ fn main() {
     let out = std::path::Path::new(&args[1]);
     match imagine_server::video::authoring::vision::normalize(&input) {
         Ok(result) => {
+            let jpeg = imagine_server::video::authoring::vision::director_jpeg(&result).unwrap();
             std::fs::write(out.join("rust-rgb.raw"), result.rgb).unwrap();
-            std::fs::write(out.join("rust.jpg"), result.jpeg).unwrap();
+            std::fs::write(out.join("rust.jpg"), jpeg).unwrap();
             println!(
                 "{}",
                 serde_json::json!({"width":result.width,"height":result.height})

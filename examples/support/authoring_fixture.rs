@@ -14,6 +14,8 @@ pub struct Fixture {
     pub drop_reference_once: AtomicBool,
     pub introduce_reference_once: AtomicBool,
     pub fail_animate_once: AtomicBool,
+    /// Answers wrapped in Markdown code fences, as local models often write them.
+    pub fence_answers: AtomicBool,
 }
 pub async fn spawn() -> (String, tokio::task::JoinHandle<()>, Arc<Fixture>) {
     let state = Arc::new(Fixture::default());
@@ -144,6 +146,16 @@ async fn reply(State(state): State<Arc<Fixture>>, Json(body): Json<Value>) -> Js
         }
     } else {
         "The lighthouse keeper walks across wet rocks and waves toward the camera.".into()
+    };
+    let text = if state.fence_answers.load(Ordering::SeqCst) {
+        let language = if text.starts_with('{') {
+            "json"
+        } else {
+            "text"
+        };
+        format!("\n```{language}\n{text}\n```\n")
+    } else {
+        text
     };
     if body["messages"].is_array() {
         Json(json!({"choices":[{"finish_reason":"stop","message":{"content":text}}]}))

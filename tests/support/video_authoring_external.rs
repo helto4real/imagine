@@ -280,35 +280,35 @@ async fn external_bundle_matches_the_provider_path_and_submission_parses_identic
                 "story",
                 "setting_reference",
                 "Own lighthouse",
-                "image/jpeg"
+                "image/png"
             ),
             (
                 "own_start",
                 "story",
                 "start_frame",
                 "Own door closed",
-                "image/jpeg"
+                "image/png"
             ),
             (
                 "own_end",
                 "story",
                 "end_frame",
                 "Own door open",
-                "image/jpeg"
+                "image/png"
             ),
             (
                 "own_moment",
                 "story",
                 "required_moment",
                 "Own beacon lit",
-                "image/jpeg"
+                "image/png"
             ),
             (
                 "own_keeper_face",
                 "cast",
                 "identity_reference",
                 "keeper (@keeper)",
-                "image/jpeg"
+                "image/png"
             ),
         ]
     );
@@ -327,7 +327,7 @@ async fn external_bundle_matches_the_provider_path_and_submission_parses_identic
                 .unwrap(),
             imagine_server::video::authoring::vision::normalize(&png)
                 .unwrap()
-                .jpeg
+                .png
         );
     }
     assert!(!bundle.to_string().contains(&assets[4]));

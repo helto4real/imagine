@@ -14,6 +14,8 @@ pub enum Py {
     Bool(bool),
     Int(i64),
     Float(f64),
+    /// An integer beyond i64, kept as its digits as Python keeps it.
+    BigInt(String),
     Str(String),
     List(Vec<Py>),
     Obj(Vec<(String, Py)>),
@@ -152,6 +154,7 @@ impl Py {
             Self::Null => out.push_str("null"),
             Self::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
             Self::Int(n) => write!(out, "{n}").unwrap(),
+            Self::BigInt(digits) => out.push_str(digits),
             Self::Float(f) => out.push_str(&py_float(*f)),
             Self::Str(s) => escape(out, s),
             Self::List(items) if items.is_empty() => out.push_str("[]"),
@@ -223,7 +226,12 @@ impl Parser<'_> {
                     if !self.eat(":") {
                         return None;
                     }
-                    rows.push((key, self.value()?));
+                    // As a Python dict: a repeated key keeps its place, the last value wins.
+                    let value = self.value()?;
+                    match rows.iter_mut().find(|(k, _)| *k == key) {
+                        Some(row) => row.1 = value,
+                        None => rows.push((key, value)),
+                    }
                     self.space();
                     if self.eat("}") {
                         return Some(Py::Obj(rows));
@@ -255,20 +263,61 @@ impl Parser<'_> {
             b't' => self.eat("true").then_some(Py::Bool(true)),
             b'f' => self.eat("false").then_some(Py::Bool(false)),
             b'n' => self.eat("null").then_some(Py::Null),
+            b'N' => self.eat("NaN").then_some(Py::Float(f64::NAN)),
+            b'I' => self.eat("Infinity").then_some(Py::Float(f64::INFINITY)),
+            _ if self.eat("-Infinity") => Some(Py::Float(f64::NEG_INFINITY)),
             _ => {
+                // Python's `-?(?:0|[1-9]\d*)(\.\d+)?([eE][-+]?\d+)?`.
                 let start = self.pos;
-                while self
+                let digits = |p: &mut Self| {
+                    let from = p.pos;
+                    while p.text.get(p.pos).is_some_and(u8::is_ascii_digit) {
+                        p.pos += 1;
+                    }
+                    p.pos > from
+                };
+                self.eat("-");
+                let leading = self
                     .text
                     .get(self.pos)
-                    .is_some_and(|b| b"+-0123456789.eE".contains(b))
+                    .is_some_and(|b| (b'1'..=b'9').contains(b));
+                if !(self.eat("0") || leading && digits(self)) {
+                    return None;
+                }
+                let mut float = false;
+                let mark = self.pos;
+                if self.eat(".") {
+                    if digits(self) {
+                        float = true;
+                    } else {
+                        self.pos = mark;
+                    }
+                }
+                let mark = self.pos;
+                if self
+                    .text
+                    .get(self.pos)
+                    .is_some_and(|b| *b == b'e' || *b == b'E')
                 {
                     self.pos += 1;
+                    if !self.eat("-") {
+                        self.eat("+");
+                    }
+                    if digits(self) {
+                        float = true;
+                    } else {
+                        self.pos = mark;
+                    }
                 }
                 let number = std::str::from_utf8(&self.text[start..self.pos]).ok()?;
-                if number.contains(['.', 'e', 'E']) {
+                if float {
                     number.parse().ok().map(Py::Float)
                 } else {
-                    number.parse().ok().map(Py::Int)
+                    Some(
+                        number
+                            .parse()
+                            .map_or_else(|_| Py::BigInt(number.into()), Py::Int),
+                    )
                 }
             }
         }
@@ -353,6 +402,77 @@ pub fn py_float(f: f64) -> String {
             exponent.abs()
         )
     }
+}
+/// Python's `re.IGNORECASE` match of the fence language names, where `ſ`
+/// matches `s` and the Kelvin sign `k`.
+fn fence_language(rest: &str) -> usize {
+    for word in ["text", "json", "markdown"] {
+        let mut chars = rest.char_indices();
+        let mut matched = true;
+        for expected in word.chars() {
+            match chars.next() {
+                Some((_, c))
+                    if c.to_ascii_lowercase() == expected
+                        || (expected == 's' && c == 'ſ')
+                        || (expected == 'k' && c == '\u{212a}') => {}
+                _ => {
+                    matched = false;
+                    break;
+                }
+            }
+        }
+        if matched {
+            return chars.next().map_or(rest.len(), |(i, _)| i);
+        }
+    }
+    0
+}
+/// `_strip_outer_markdown`: a whole-text code fence, then a whole-text
+/// inline code span, each unwrapped and stripped.
+pub fn strip_outer_markdown(value: &str) -> String {
+    let mut text = value.pytrim().to_owned();
+    if text.len() >= 6 && text.starts_with("```") && text.ends_with("```") {
+        let mut rest = &text[3..text.len() - 3];
+        rest = &rest[fence_language(rest)..];
+        rest = rest.trim_start_matches([' ', '\t']);
+        rest = rest
+            .strip_prefix("\r\n")
+            .or_else(|| rest.strip_prefix('\n'))
+            .unwrap_or(rest);
+        rest = rest
+            .strip_suffix("\r\n")
+            .or_else(|| rest.strip_suffix('\n'))
+            .unwrap_or(rest);
+        text = rest.pytrim().to_owned();
+    }
+    if text.len() >= 2
+        && text.starts_with('`')
+        && text.ends_with('`')
+        && !text[1..text.len() - 1].contains('`')
+    {
+        text = text[1..text.len() - 1].pytrim().to_owned();
+    }
+    text
+}
+/// `clean_text_response`: the unwrapped text without any backtick; `None`
+/// when nothing remains.
+pub fn clean_text_response(value: &str) -> Option<String> {
+    let text = strip_outer_markdown(value)
+        .replace('`', "")
+        .pytrim()
+        .to_owned();
+    (!text.is_empty()).then_some(text)
+}
+/// `parse_json_object`: the unwrapped text as JSON, else its span from the
+/// first `{` to the last `}`; the root must be an object.
+pub fn parse_json_object(value: &str) -> Option<Py> {
+    let text = strip_outer_markdown(value);
+    let parsed = Py::parse(&text).or_else(|| {
+        let start = text.find('{')?;
+        let end = text.rfind('}')?;
+        (end > start).then(|| Py::parse(&text[start..=end]))?
+    })?;
+    matches!(parsed, Py::Obj(_)).then_some(parsed)
 }
 /// JavaScript's `String.prototype.trim`.
 pub fn js_trim(text: &str) -> &str {
@@ -2238,7 +2358,31 @@ mod tests {
         ))
         .unwrap();
         let cases = fixture.at("cases").as_list().unwrap();
-        assert_eq!(cases.len(), 17);
+        assert_eq!(cases.len(), 18);
+        let answers = fixture.at("answers").as_list().unwrap();
+        assert_eq!(answers.len(), 25);
+        for answer in answers {
+            let raw = answer.at("raw").text();
+            assert_eq!(
+                strip_outer_markdown(&raw),
+                answer.at("stripped").text(),
+                "{raw:?}"
+            );
+            let object = match answer.at("object") {
+                Py::Null => None,
+                object => Some(object.text()),
+            };
+            assert_eq!(
+                parse_json_object(&raw).map(|v| v.dumps()),
+                object,
+                "{raw:?}"
+            );
+            let text = match answer.at("text") {
+                Py::Null => None,
+                text => Some(text.text()),
+            };
+            assert_eq!(clean_text_response(&raw), text, "{raw:?}");
+        }
         for case in cases {
             let name = case.at("name").text();
             let request = case.at("request");

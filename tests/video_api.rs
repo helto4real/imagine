@@ -3,6 +3,8 @@
 mod authoring_animate;
 #[path = "support/video_authoring_context.rs"]
 mod authoring_context;
+#[path = "support/video_authoring_corrections.rs"]
+mod authoring_corrections;
 #[path = "support/video_authoring_external.rs"]
 mod authoring_external;
 #[path = "support/video_authoring_messages.rs"]

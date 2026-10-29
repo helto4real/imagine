@@ -17,10 +17,22 @@ Eighteen pure projection cases match actual Director code. All five profiles /
   RGB and JPEG bytes against actual Director functions, including EXIF1–8,
   palette/alpha, 8/16-bit gray/color and CMYK. Existing cjpeg/djpeg memory pipes
   avoid a new Cargo/Python dependency. Broader/corrupt input coverage remains.
+* **Deliberate deviation (I11, Tomas 2026-10-29):** the language model receives
+  those pixels as lossless PNG, never Director's JPEG; Story image bytes
+  therefore differ from Director's, and the Animate First frame is the
+  normalized image (at most 1280 px) rather than the client's own PNG. The
+  JPEG step is kept only for the vision source oracle.
+* Story answers follow Director's response text normalization
+  (`parse_json_object`, `clean_text_response`) on the provider path; Director's
+  per-field cleanup after decoding and its wrapped Scene shape are not ported,
+  and external submissions are read strictly.
+* Story context keeps Imagine's duration-based Scene policy (Tomas
+  2026-10-29); Director's adaptive and one-Scene bridge policies are not ported.
 * Enhance marker protection/restoration and its user-prompt builder are ported.
   Missing markers retain source and fail the proposal; introduced references
-  warn without blocking manual review. Full Story dynamic prompt/protection
-  construction and complete provider semantics remain open.
+  warn without blocking manual review. Story prompts and protection follow
+  Director's builders (`authoring.md`, "Director Story messages"); complete
+  provider semantics remain open.
   Cast lookup/fingerprinting now share timeline token selection;64 actual
   Director cases pass. The distinct protection rules and native Reference/I2V
   compilers match421 actual-function cases, plus32 I2V text projections.

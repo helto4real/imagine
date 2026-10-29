@@ -1,4 +1,5 @@
-//! Director vision normalization. Existing libjpeg tools run only on in-memory pipes.
+//! Director vision normalization: Director's pixels, sent to the language model
+//! as lossless PNG. Existing libjpeg tools run only on in-memory pipes.
 use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader};
 use std::{
     io::{Cursor, Read, Write},
@@ -9,7 +10,8 @@ pub struct Normalized {
     pub width: u32,
     pub height: u32,
     pub rgb: Vec<u8>,
-    pub jpeg: Vec<u8>,
+    /// The pixels as the language model receives them.
+    pub png: Vec<u8>,
 }
 fn codec(program: &str, args: &[&str], input: &[u8]) -> Result<Vec<u8>, &'static str> {
     let mut child = Command::new(program)
@@ -166,9 +168,33 @@ pub fn normalize(bytes: &[u8]) -> Result<Normalized, &'static str> {
     }
     let (width, height) = rgb.dimensions();
     let rgb = rgb.into_raw();
+    let png = png(width, height, &rgb)?;
+    Ok(Normalized {
+        width,
+        height,
+        rgb,
+        png,
+    })
+}
+/// Lossless PNG with fixed settings, so the same pixels give the same bytes.
+fn png(width: u32, height: u32, rgb: &[u8]) -> Result<Vec<u8>, &'static str> {
+    use image::{
+        ExtendedColorType, ImageEncoder,
+        codecs::png::{CompressionType, FilterType, PngEncoder},
+    };
+    let mut out = vec![];
+    PngEncoder::new_with_quality(&mut out, CompressionType::Default, FilterType::Adaptive)
+        .write_image(rgb, width, height, ExtendedColorType::Rgb8)
+        .map_err(|_| "vision_codec_failed")?;
+    Ok(out)
+}
+/// Director's own JPEG of the normalized pixels, for the vision source
+/// oracle only; nothing sends it to a language model.
+pub fn director_jpeg(normalized: &Normalized) -> Result<Vec<u8>, &'static str> {
+    let (width, height) = (normalized.width, normalized.height);
     let mut packed = format!("P6\n{width} {height}\n255\n").into_bytes();
-    packed.extend_from_slice(&rgb);
-    let jpeg = codec(
+    packed.extend_from_slice(&normalized.rgb);
+    codec(
         "cjpeg",
         &[
             "-quality",
@@ -180,11 +206,5 @@ pub fn normalize(bytes: &[u8]) -> Result<Normalized, &'static str> {
             "int",
         ],
         &packed,
-    )?;
-    Ok(Normalized {
-        width,
-        height,
-        rgb,
-        jpeg,
-    })
+    )
 }

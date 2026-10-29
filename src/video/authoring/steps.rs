@@ -788,6 +788,79 @@ pub fn check(request: &Request, base: &VideoProject) -> std::result::Result<(), 
         _ => Ok(()),
     }
 }
+/// The grounding an expansion starts from: each character's current
+/// appearance replaced by its opening appearance, as Director's Story bridge
+/// client applies it; fallback wardrobe, facts and digest stay as captured.
+pub fn effective_grounding(grounding: &Py, opening: Option<&Value>) -> Result<Py> {
+    let Some(opening) = opening.and_then(|o| Py::parse(&o.to_string())) else {
+        return Ok(grounding.clone());
+    };
+    let mut grounding = grounding.clone();
+    if let Some(Py::List(characters)) = grounding.get_mut("characters") {
+        for character in characters {
+            let id = character.at("character_id").text();
+            let Some(resolved) = opening
+                .at("characters")
+                .as_list()
+                .unwrap_or_default()
+                .iter()
+                .find(|c| c.at("character_id").text() == id)
+            else {
+                continue;
+            };
+            *character.get_mut("current_appearance").unwrap() = Py::obj([
+                ("exposure", resolved.at("exposure").clone()),
+                ("garments", resolved.at("garments").clone()),
+                ("worn_items", resolved.at("worn_items").clone()),
+                ("temporary_traits", resolved.at("temporary_traits").clone()),
+                (
+                    "visible_body_state",
+                    resolved.at("visible_body_state").clone(),
+                ),
+            ]);
+        }
+    }
+    director::normalize_grounding(&grounding).map_err(|_| "story_opening_appearance_invalid")
+}
+/// A reviewed opening appearance, validated as the outline's answer is:
+/// every cast character once, in order, within Director's limits.
+pub fn review_opening(draft: &Draft, value: &Value) -> std::result::Result<(), Rejection> {
+    let invalid = |at: &str, reason: &str| located("story_opening_appearance_invalid", at, reason);
+    let current = draft
+        .opening_appearance
+        .as_ref()
+        .and_then(|o| Py::parse(&o.to_string()))
+        .ok_or_else(|| invalid("opening_appearance", "the Draft has no opening appearance"))?;
+    let states = draft
+        .request
+        .context
+        .as_ref()
+        .map(|c| c.cast_state.as_slice())
+        .unwrap_or_default();
+    let roster = current
+        .at("characters")
+        .as_list()
+        .unwrap_or_default()
+        .iter()
+        .map(|c| director::OpeningCharacter {
+            character_id: c.at("character_id").text(),
+            reference_tag: c.at("reference_tag").text(),
+            fallback_wardrobe: states
+                .iter()
+                .find(|s| s.reference_id == c.at("character_id").text())
+                .map(|s| s.fallback_wardrobe.pytrim().to_owned())
+                .unwrap_or_default(),
+        })
+        .collect::<Vec<_>>();
+    let value = Py::parse(&value.to_string()).unwrap_or(Py::Null);
+    director::validate_opening(&value, &roster).map_err(|e| {
+        invalid(
+            &e.path
+                .replacen("$.opening_appearance", "opening_appearance", 1),
+            e.reason,
+        )
+    })
+}
 /// The inventory note of each story image, or a slot an agent fills.
 pub enum Notes<'a> {
     Known(&'a [InventoryNote]),
@@ -970,7 +1043,10 @@ pub fn scene_request(draft: &Draft, base: &VideoProject, index: usize) -> Result
         ("next_summary", Py::Str(summary(Some(index + 1)))),
     ]);
     if let Some(bridge) = bridged(request, base)? {
-        out.push("grounding_context", bridge.grounding);
+        out.push(
+            "grounding_context",
+            effective_grounding(&bridge.grounding, draft.opening_appearance.as_ref())?,
+        );
     }
     if request.add_dialogue {
         let timings = director::dialogue_timings(
@@ -1217,7 +1293,9 @@ pub(crate) fn bundle(
         "images":story.chain(cast).collect::<Vec<_>>(),
     });
     if let Some(grounding) = context_grounding {
-        bundle["expansion"]["slot_values"]["grounding_context"] = json!(grounding.dumps());
+        bundle["expansion"]["slot_values"]["grounding_context"] = json!({
+            "captured": grounding.dumps(),
+            "expansions": "the captured grounding with each character's current_appearance replaced by your outline's opening_appearance (exposure, garments, worn_items, temporary_traits, visible_body_state), list items trimmed and repeats dropped, as JSON"});
     }
     Ok(bundle)
 }
@@ -1369,6 +1447,50 @@ fn owned(text: &str, source: &StoryScene) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// The grounding Director's Story bridge client sends after the outline:
+    /// each current appearance replaced by the resolved opening appearance.
+    #[test]
+    fn opened_grounding_matches_the_director_source_oracle() {
+        let fixture = Py::parse(include_str!(
+            "../../../tests/fixtures/director-story-messages.json"
+        ))
+        .unwrap();
+        let case = |name: &str| {
+            fixture
+                .at("cases")
+                .as_list()
+                .unwrap()
+                .iter()
+                .find(|c| c.at("name").text() == name)
+                .unwrap()
+                .clone()
+        };
+        let captured = director::normalize_grounding(
+            case("scene_grounded").at("request").at("grounding_context"),
+        )
+        .unwrap();
+        let opened = case("scene_opened");
+        let request = opened.at("request");
+        let restored = request
+            .at("opening_answer")
+            .at("opening_appearance")
+            .compact()
+            .replace("[[DIRECTOR_REF_0001]]", "@keeper")
+            .replace("[[DIRECTOR_REF_0002]]", "@visitor");
+        let effective =
+            effective_grounding(&captured, Some(&serde_json::from_str(&restored).unwrap()))
+                .unwrap();
+        assert_eq!(
+            effective,
+            director::normalize_grounding(request.at("grounding_context")).unwrap()
+        );
+        let mut sent = request.clone();
+        *sent.get_mut("grounding_context").unwrap() = effective;
+        assert_eq!(
+            director::build_scene(&sent, false).unwrap().user,
+            opened.at("user").text()
+        );
+    }
     /// Director's browser helpers on the same inputs
     /// (`tools/director-story-browser-oracle.mjs`).
     #[test]

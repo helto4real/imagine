@@ -407,6 +407,12 @@ impl Service {
             }
             d.fields = fields;
         }
+        if let Some(opening) = review.opening_appearance {
+            if d.opening_appearance.is_none() {
+                return Err(fault("story_opening_appearance_invalid"));
+            }
+            d.opening_appearance = Some(opening);
+        }
         if let Some(animate) = review.animate {
             if d.request.operation != Operation::Animate
                 || d.animate.is_none()
@@ -569,6 +575,10 @@ impl Service {
                 if j.generation != generation {
                     return;
                 }
+                // Director's `clean_text_response`.
+                let result = result.and_then(|note| {
+                    super::director::clean_text_response(&note).ok_or("enhancement_empty_response")
+                });
                 match result {
                     Ok(note) => {
                         steps::accept_inventory(&mut j.draft, &selection.id, note.clone());
@@ -714,13 +724,24 @@ impl Service {
                 return;
             }
             let result = result.and_then(|text| {
+                // Director's `parse_json_object` before any JSON answer is read.
+                let answer = |code| {
+                    super::director::parse_json_object(&text)
+                        .map(|value| value.compact())
+                        .ok_or(code)
+                };
                 if expand {
+                    let text = answer("authoring_invalid_json")?;
                     steps::accept_expansion(&mut j.draft, index, &text, &built?.references)?;
                 } else if draft.request.operation == Operation::Outline {
+                    let text = answer("authoring_invalid_json")?;
                     steps::accept_outline(&mut j.draft, &text, &built?)?;
                 } else if draft.request.operation == Operation::Animate {
-                    steps::accept_animate(&mut j.draft, &text)?;
+                    steps::accept_animate(&mut j.draft, &answer("animate_response_invalid")?)?;
                 } else {
+                    // Director's `clean_text_response`, before markers are restored.
+                    let text = super::director::clean_text_response(&text)
+                        .ok_or("enhancement_empty_response")?;
                     if text.len() > 65536 {
                         return Err("story_text_limit");
                     }

@@ -1998,6 +1998,181 @@
    "images": 0
   },
   {
+   "name": "scene_opened",
+   "kind": "scene",
+   "request": {
+    "operation": "story_scene",
+    "user_instruction": "",
+    "add_dialogue": true,
+    "cast": [
+     {
+      "story_names": [
+       "Own Keeper",
+       "keeper"
+      ],
+      "reference_tag": "@keeper",
+      "description": "  Own fictional keeper, grey coat  ",
+      "default_language": "Swedish",
+      "voice_guidance": "calm",
+      "required": true
+     },
+     {
+      "story_names": [
+       "Own Visitor",
+       "visitor"
+      ],
+      "reference_tag": "@visitor",
+      "description": "Own fictional visitor",
+      "default_language": "English",
+      "voice_guidance": "bright",
+      "required": true
+     }
+    ],
+    "scene": {
+     "id": "scene_001",
+     "title": "Own Climb",
+     "summary": "@keeper climbs.",
+     "description": "Own stairwell",
+     "ambient_sound": "Wind",
+     "non_diegetic_music": "",
+     "weight": 1,
+     "image_ids": [
+      "own_setting"
+     ],
+     "boundary_from_previous": "hard_cut",
+     "sections": [
+      {
+       "id": "scene_001_section_001",
+       "summary": "",
+       "prompt": "@keeper climbs the stairs.\n@visitor follows.",
+       "weight": 2.5,
+       "image_ids": [
+        "own_moment"
+       ],
+       "first_frame_id": "own_start",
+       "last_frame_id": "own_end",
+       "dialogue_intent": {
+        "participants": [
+         "@keeper",
+         "@visitor"
+        ],
+        "purpose": "Own greeting",
+        "max_turns": 2
+       }
+      },
+      {
+       "id": "scene_001_section_002",
+       "summary": "",
+       "prompt": "Own lamp turns.",
+       "weight": 1,
+       "image_ids": [],
+       "first_frame_id": "",
+       "last_frame_id": ""
+      }
+     ]
+    },
+    "previous_summary": "",
+    "previous_scene_context": null,
+    "context_cast": [],
+    "next_summary": "",
+    "images": [],
+    "grounding_context": {
+     "schema_version": "1.0",
+     "source_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+     "characters": [
+      {
+       "character_id": "keeper_id",
+       "reference_tag": "@keeper",
+       "current_appearance": {
+        "exposure": "partially_clothed",
+        "garments": [
+         "  wet @visitor coat ",
+         "",
+         "boots",
+         "boots"
+        ],
+        "worn_items": [],
+        "temporary_traits": [],
+        "visible_body_state": []
+       }
+      },
+      {
+       "character_id": "visitor_id",
+       "reference_tag": "@visitor",
+       "current_appearance": {
+        "exposure": "nude",
+        "garments": [],
+        "worn_items": [],
+        "temporary_traits": [],
+        "visible_body_state": [
+         "shivering"
+        ]
+       }
+      }
+     ],
+     "protected_facts": [
+      "  @visitor arrived by boat.  ",
+      "The lamp is broken."
+     ]
+    },
+    "opening_answer": {
+     "scenes": [
+      {
+       "title": "T",
+       "summary": "S",
+       "description": "D",
+       "ambient_sound": "",
+       "non_diegetic_music": "",
+       "weight": 1,
+       "boundary_from_previous": "hard_cut",
+       "setting_reference_matches": {},
+       "sections": [
+        {
+         "prompt": "P",
+         "weight": 1
+        }
+       ]
+      }
+     ],
+     "visual_placements": [],
+     "opening_appearance": {
+      "schema_version": "1.0",
+      "characters": [
+       {
+        "character_id": "keeper_id",
+        "reference_tag": "[[DIRECTOR_REF_0001]]",
+        "source": "latest_moment",
+        "exposure": "partially_clothed",
+        "garments": [
+         "  wet [[DIRECTOR_REF_0002]] coat ",
+         "",
+         "boots",
+         "boots"
+        ],
+        "worn_items": [],
+        "temporary_traits": [],
+        "visible_body_state": []
+       },
+       {
+        "character_id": "visitor_id",
+        "reference_tag": "[[DIRECTOR_REF_0002]]",
+        "source": "not_stated",
+        "exposure": "nude",
+        "garments": [],
+        "worn_items": [],
+        "temporary_traits": [],
+        "visible_body_state": [
+         "shivering"
+        ]
+       }
+      ]
+     }
+    }
+   },
+   "user": "Task:\nExpand this one Scene and its Sections. Return one JSON object matching the supplied Scene shape and no markdown.\n\nVisual context rule:\nNo images are supplied. Provide detailed environment, spatial layout, appearance, lighting, and atmosphere.\n\n<previous_scene_summary>\n\n</previous_scene_summary>\n\n<previous_scene_context>\nnull\n</previous_scene_context>\n\n<next_scene_summary>\n\n</next_scene_summary>\n\n<selected_cast>\n[{\"story_names\": [\"Own Keeper\", \"keeper\"], \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"description\": \"Own fictional keeper, grey coat\", \"default_language\": \"Swedish\", \"voice_guidance\": \"calm\", \"required\": true}, {\"story_names\": [\"Own Visitor\", \"visitor\"], \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"description\": \"Own fictional visitor\", \"default_language\": \"English\", \"voice_guidance\": \"bright\", \"required\": true}]\n</selected_cast>\n\n<continuity_cast>\n[]\n</continuity_cast>\n\n<dialogue_timing>\n{}\n</dialogue_timing>\n\n<grounding_context>\n{\"schema_version\": \"1.0\", \"source_digest\": \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\", \"characters\": [{\"character_id\": \"keeper_id\", \"reference_tag\": \"[[DIRECTOR_REF_0001]]\", \"current_appearance\": {\"exposure\": \"partially_clothed\", \"garments\": [\"wet [[DIRECTOR_REF_0002]] coat\", \"boots\"], \"worn_items\": [], \"temporary_traits\": [], \"visible_body_state\": []}}, {\"character_id\": \"visitor_id\", \"reference_tag\": \"[[DIRECTOR_REF_0002]]\", \"current_appearance\": {\"exposure\": \"nude\", \"garments\": [], \"worn_items\": [], \"temporary_traits\": [], \"visible_body_state\": [\"shivering\"]}}], \"protected_facts\": [\"[[DIRECTOR_REF_0002]] arrived by boat.\", \"The lamp is broken.\"]}\n</grounding_context>\n\n<additional_instruction>\n\n</additional_instruction>\n\n<scene_json>\n{\"id\": \"scene_001\", \"title\": \"Own Climb\", \"summary\": \"[[DIRECTOR_REF_0001]] climbs.\", \"description\": \"Own stairwell\", \"ambient_sound\": \"Wind\", \"non_diegetic_music\": \"\", \"weight\": 1, \"image_ids\": [\"own_setting\"], \"boundary_from_previous\": \"hard_cut\", \"sections\": [{\"id\": \"scene_001_section_001\", \"summary\": \"\", \"prompt\": \"[[DIRECTOR_REF_0001]] climbs the stairs.\\n@visitor follows.\", \"weight\": 2.5, \"image_ids\": [\"own_moment\"], \"first_frame_id\": \"own_start\", \"last_frame_id\": \"own_end\", \"dialogue_intent\": {\"participants\": [\"[[DIRECTOR_REF_0001]]\", \"[[DIRECTOR_REF_0002]]\"], \"purpose\": \"Own greeting\", \"max_turns\": 2}}, {\"id\": \"scene_001_section_002\", \"summary\": \"\", \"prompt\": \"Own lamp turns.\", \"weight\": 1, \"image_ids\": [], \"first_frame_id\": \"\", \"last_frame_id\": \"\"}]}\n</scene_json>",
+   "images": 0
+  },
+  {
    "name": "scene_continued",
    "kind": "scene",
    "request": {
@@ -2261,6 +2436,158 @@
    },
    "user": "Task:\nWrite one short factual planning note for this image. Return only the note.\n\nStable image ID:\nimage\n\nUser label or cue:\nNone\n\nUsage:\nstory_reference\n\nAdditional user instruction:\nNone",
    "images": 1
+  }
+ ],
+ "answers": [
+  {
+   "raw": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "stripped": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "object": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "text": "{\"description\": \"Own harbour\", \"prompt\": \"Own keeper waits\", \"ambient_sound\": \"\"}"
+  },
+  {
+   "raw": "```json\n{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}\n```",
+   "stripped": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "object": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "text": "{\"description\": \"Own harbour\", \"prompt\": \"Own keeper waits\", \"ambient_sound\": \"\"}"
+  },
+  {
+   "raw": "```JSON\r\n{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}\r\n```",
+   "stripped": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "object": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "text": "{\"description\": \"Own harbour\", \"prompt\": \"Own keeper waits\", \"ambient_sound\": \"\"}"
+  },
+  {
+   "raw": "```\n{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}\n```",
+   "stripped": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "object": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "text": "{\"description\": \"Own harbour\", \"prompt\": \"Own keeper waits\", \"ambient_sound\": \"\"}"
+  },
+  {
+   "raw": "\n\n  ```json  \n\n{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}\n\n```  \n\n",
+   "stripped": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "object": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "text": "{\"description\": \"Own harbour\", \"prompt\": \"Own keeper waits\", \"ambient_sound\": \"\"}"
+  },
+  {
+   "raw": "`{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}`",
+   "stripped": "`{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}`",
+   "object": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "text": "{\"description\": \"Own harbour\", \"prompt\": \"Own keeper waits\", \"ambient_sound\": \"\"}"
+  },
+  {
+   "raw": "Here is the JSON: {\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"} Done.",
+   "stripped": "Here is the JSON: {\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"} Done.",
+   "object": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "text": "Here is the JSON: {\"description\": \"Own harbour\", \"prompt\": \"Own keeper waits\", \"ambient_sound\": \"\"} Done."
+  },
+  {
+   "raw": "```python\n{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}\n```",
+   "stripped": "python\n{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "object": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "text": "python\n{\"description\": \"Own harbour\", \"prompt\": \"Own keeper waits\", \"ambient_sound\": \"\"}"
+  },
+  {
+   "raw": "```jſon\n{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}\n```",
+   "stripped": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "object": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "text": "{\"description\": \"Own harbour\", \"prompt\": \"Own keeper waits\", \"ambient_sound\": \"\"}"
+  },
+  {
+   "raw": "```marKdown\n{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}\n```",
+   "stripped": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "object": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "text": "{\"description\": \"Own harbour\", \"prompt\": \"Own keeper waits\", \"ambient_sound\": \"\"}"
+  },
+  {
+   "raw": "```json{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}```",
+   "stripped": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "object": "{\"description\": \"Own harbour\", \"prompt\": \"Own `keeper` waits\", \"ambient_sound\": \"\"}",
+   "text": "{\"description\": \"Own harbour\", \"prompt\": \"Own keeper waits\", \"ambient_sound\": \"\"}"
+  },
+  {
+   "raw": "{\"a\": 1, \"b\": [1.5, 1e2, -0, 12345678901234567890123], \"a\": 2}",
+   "stripped": "{\"a\": 1, \"b\": [1.5, 1e2, -0, 12345678901234567890123], \"a\": 2}",
+   "object": "{\"a\": 2, \"b\": [1.5, 100.0, 0, 12345678901234567890123]}",
+   "text": "{\"a\": 1, \"b\": [1.5, 1e2, -0, 12345678901234567890123], \"a\": 2}"
+  },
+  {
+   "raw": "{\"w\": NaN, \"x\": Infinity, \"y\": -Infinity}",
+   "stripped": "{\"w\": NaN, \"x\": Infinity, \"y\": -Infinity}",
+   "object": "{\"w\": NaN, \"x\": Infinity, \"y\": -Infinity}",
+   "text": "{\"w\": NaN, \"x\": Infinity, \"y\": -Infinity}"
+  },
+  {
+   "raw": "",
+   "stripped": "",
+   "object": null,
+   "text": null
+  },
+  {
+   "raw": "   ",
+   "stripped": "",
+   "object": null,
+   "text": null
+  },
+  {
+   "raw": "[1, 2]",
+   "stripped": "[1, 2]",
+   "object": null,
+   "text": "[1, 2]"
+  },
+  {
+   "raw": "```json\n[1]\n```",
+   "stripped": "[1]",
+   "object": null,
+   "text": "[1]"
+  },
+  {
+   "raw": "{broken",
+   "stripped": "{broken",
+   "object": null,
+   "text": "{broken"
+  },
+  {
+   "raw": "} {",
+   "stripped": "} {",
+   "object": null,
+   "text": "} {"
+  },
+  {
+   "raw": "{\"a\": 01}",
+   "stripped": "{\"a\": 01}",
+   "object": null,
+   "text": "{\"a\": 01}"
+  },
+  {
+   "raw": "{\"a\": 1.e5}",
+   "stripped": "{\"a\": 1.e5}",
+   "object": null,
+   "text": "{\"a\": 1.e5}"
+  },
+  {
+   "raw": "``````",
+   "stripped": "",
+   "object": null,
+   "text": null
+  },
+  {
+   "raw": "`text with `inner` ticks`",
+   "stripped": "`text with `inner` ticks`",
+   "object": null,
+   "text": "text with inner ticks"
+  },
+  {
+   "raw": "```text\nA lighthouse `here`\n```",
+   "stripped": "A lighthouse `here`",
+   "object": null,
+   "text": "A lighthouse here"
+  },
+  {
+   "raw": "``` ```",
+   "stripped": "",
+   "object": null,
+   "text": null
   }
  ]
 }

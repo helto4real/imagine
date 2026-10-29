@@ -334,7 +334,11 @@ pub struct Draft {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub production: Option<Production>,
     /// With a context's cast state, each character's opening appearance as
-    /// the outline resolved it (Director's `opening_appearance`).
+    /// the outline resolved it or a review replaced it (Director's
+    /// `opening_appearance`: `schema_version` and `characters` of
+    /// `character_id`, `reference_tag`, `source`, `exposure`, `garments`,
+    /// `worn_items`, `temporary_traits` and `visible_body_state`). Expansions
+    /// start from it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub opening_appearance: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -446,6 +450,10 @@ pub struct Review {
     pub fields: Option<Vec<FieldProposal>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub animate: Option<AnimateProposal>,
+    /// Replaces the Draft's opening appearance; later expansions use it.
+    /// The same shape as `Draft.opening_appearance`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening_appearance: Option<serde_json::Value>,
 }
 /// Director ordinary-UI allocator: 250ms minimum when possible; weighted remainder and cap redistribution.
 pub fn durations(weights: &[f64], duration: f64, cap: f64) -> Result<Vec<f64>, &'static str> {

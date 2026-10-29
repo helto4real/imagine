@@ -264,7 +264,7 @@ fn normalized(session: &ProjectSession, asset: &AssetId) -> Result<ProviderImage
         .map_err(|_| "media_io_failed")?;
     let normalized = super::vision::normalize(&bytes)?;
     Ok(ProviderImage {
-        mime: "image/jpeg".into(),
-        base64: STANDARD.encode(normalized.jpeg),
+        mime: "image/png".into(),
+        base64: STANDARD.encode(normalized.png),
     })
 }

@@ -20,6 +20,11 @@ image enlargement), Pillow-compatible Lanczos and optimized JPEG quality 90.
 Twenty-eight procedural PNG/JPEG/WebP cases match both raw RGB and JPEG bytes.
 The existing `cjpeg`/`djpeg` tools run through memory pipes; no Python runtime or
 new Cargo dependency is used. Missing codecs report an operation error.
+Since the corrections after `7d1de17` (I11) the language model receives these
+pixels as lossless PNG (`image/png`, fixed encoder settings, so the same input
+gives the same bytes), never JPEG; Director's JPEG step remains only for the
+vision source oracle (`vision::director_jpeg`). This applies to inventory,
+outline, expansion, Enhance, Animate and the external bundle.
 This component result is not complete Director/provider/runtime parity.
 
 ## API
@@ -160,9 +165,32 @@ requests (`tests/fixtures/director-story-messages.json`);
 `tools/director-story-browser-oracle.mjs` runs the browser helpers on
 continuation, timing, beat, cast and previous-Scene inputs
 (`tests/fixtures/director-story-browser.json`). Rust compares both byte for
-byte without Python or Node. The adaptive and one-Scene policies, visual-binding
-sidecars and Director's response text normalization (Markdown and backtick
-removal) are not ported; Imagine keeps its own answer validation.
+byte without Python or Node. The adaptive and one-Scene policies and
+visual-binding sidecars are not ported.
+
+### Answer text normalization
+
+On the provider path the raw answer text goes through Director's own
+normalization before it is read, as Director applies it:
+
+- Outline, Scene expansion and Animate: `parse_json_object`. The text is
+  stripped; a text that is entirely one code fence (` ``` `, ` ```json `,
+  ` ```text ` or ` ```markdown `, any case) is unwrapped and stripped, then a
+  text that is entirely one backtick span without inner backticks. It is then
+  decoded with Python's `json.loads` rules (NaN and Infinity, repeated keys keep
+  the first place and the last value), else the span from its first `{` to its
+  last `}` is decoded; the root must be an object. Markers are restored after
+  decoding, as in Director. Otherwise `authoring_invalid_json` (Animate
+  `animate_response_invalid`).
+- Inventory notes and Enhance text: `clean_text_response`, the same unwrapping
+  and then every backtick removed and the text stripped, before markers are
+  restored. An empty result fails `enhancement_empty_response`.
+
+Nothing else is changed: Director's per-field cleanup after decoding
+(`normalize_story_scene`) and its `{"scene": …}` wrapper are not ported.
+External submissions have no Director counterpart and are read as before.
+Twenty-five answer cases match Director's unwrapped text, decoded object and
+cleaned text.
 
 ## Story context
 
@@ -200,8 +228,24 @@ unchanged. `GET /v1/video/authoring/{id}` echoes it in `request`.
   carries `<opening_appearance_context>`, the "Opening appearance example" rule
   and `opening_appearance` in the shape and schema. The answer must resolve each
   character's opening appearance; it is validated as Director validates it and
-  exposed, references restored, as `Draft.opening_appearance`. Expand and Retry
-  rebuild their messages from the captured context.
+  exposed, references restored, as `Draft.opening_appearance`.
+- Expand and Retry rebuild their messages from the captured context, with each
+  character's `current_appearance` replaced by its opening appearance
+  (`exposure`, `garments`, `worn_items`, `temporary_traits`,
+  `visible_body_state`) and normalized again; fallback wardrobe, protected facts
+  and `source_digest` stay as captured, as Director's Story bridge client sends
+  them. An oracle case matches Director's `story_scene` message for that
+  grounding.
+- `Review.opening_appearance` replaces it, in the same shape:
+  `{"schema_version":"1.0","characters":[{"character_id","reference_tag","source","exposure","garments","worn_items","temporary_traits","visible_body_state"}]}`
+  with every cast character once, in order, with its reference tag (as shown
+  in the Draft) and Director's limits. Later Expand and Retry use it; Scenes
+  already expanded stay until expanded again (`start_index` or `only`). An
+  invalid value, or a Draft without an opening appearance, fails
+  `story_opening_appearance_invalid` with `at` (for example
+  `opening_appearance.characters[0].garments`) and `detail`.
+- The external bundle's `slot_values.grounding_context` gives the `captured`
+  grounding and the rule for `expansions`.
 - Errors: `story_context_invalid` with `at` (`brief`, `context.latest_moment`,
   `context.cast_state[i].reference_id`, `context.cast_state[i].current_appearance.garments`,
   `context.protected_facts[i]`, …) and Director's reason as `detail`; an outline
@@ -245,9 +289,9 @@ and operation settings and one model call.
   `at` and `detail`.
 
 The message is Director's `_run_animate_image` construction; two oracle cases
-and five content validations match. Imagine sends the First frame as its
-usual normalized vision JPEG and parses the answer as strict JSON, where
-Director passes the client's PNG and tolerates a Markdown wrapper.
+and five content validations match. Imagine sends the First frame as PNG at
+its normalized size (longest side at most 1280), where Director passes the
+client's PNG unchanged; the answer goes through Director's `parse_json_object`.
 
 ## Timing and source
 

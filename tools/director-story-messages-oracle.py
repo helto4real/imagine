@@ -245,6 +245,25 @@ def opening_answer(changes=None):
             'opening_appearance': {'schema_version': '1.0', 'characters': rows}}
 
 
+def opened(grounding, answer):
+    """The grounding with each current appearance replaced by its resolved opening appearance."""
+    from shared.prompt_studio import restore_references_in_value
+    restored = restore_references_in_value(
+        answer['opening_appearance'], [('[[DIRECTOR_REF_0001]]', '@keeper'), ('[[DIRECTOR_REF_0002]]', '@visitor')])
+    resolved = {row['character_id']: row for row in restored['characters']}
+    result = json.loads(json.dumps(grounding))
+    for character in result['characters']:
+        row = resolved[character['character_id']]
+        character['current_appearance'] = {
+            key: row[key]
+            for key in ('exposure', 'garments', 'worn_items', 'temporary_traits', 'visible_body_state')}
+    return result
+
+
+OPENED_ANSWER = opening_answer({(0, 'garments'): ['  wet [[DIRECTOR_REF_0002]] coat ', '', 'boots', 'boots'],
+                                (1, 'exposure'): 'nude', (1, 'visible_body_state'): ['shivering']})
+
+
 IMAGE = {'id': 'own_moment', 'label': 'Own beacon lit', 'note': '', 'usage': 'required_moment'}
 
 CASES = [
@@ -294,6 +313,9 @@ CASES = [
         add_dialogue=True, cast=[KEEPER, VISITOR], scene=scene(True, 2.5, 1))),
     ('scene_grounded', 'scene', scene_request(
         cast=[KEEPER, VISITOR], grounding_context=GROUNDING, add_dialogue=True, scene=scene(True))),
+    ('scene_opened', 'scene', scene_request(
+        cast=[KEEPER, VISITOR], grounding_context=None, add_dialogue=True,
+        scene=scene(True), opening_answer=OPENED_ANSWER)),
     ('scene_continued', 'scene', scene_request(
         cast=[KEEPER], previous_scene_context=CONTINUATION['previous_scene'],
         context_cast=CONTINUATION['context_cast'])),
@@ -323,14 +345,64 @@ CASES = [
 ]
 
 
+OBJECT = '{"description": "Own harbour", "prompt": "Own `keeper` waits", "ambient_sound": ""}'
+ANSWERS = [
+    OBJECT,
+    '```json\n' + OBJECT + '\n```',
+    '```JSON\r\n' + OBJECT + '\r\n```',
+    '```\n' + OBJECT + '\n```',
+    '\n\n  ```json  \n\n' + OBJECT + '\n\n```  \n\n',
+    '`' + OBJECT + '`',
+    'Here is the JSON: ' + OBJECT + ' Done.',
+    '```python\n' + OBJECT + '\n```',
+    '```j\u017fon\n' + OBJECT + '\n```',
+    '```mar\u212adown\n' + OBJECT + '\n```',
+    '```json' + OBJECT + '```',
+    '{"a": 1, "b": [1.5, 1e2, -0, 12345678901234567890123], "a": 2}',
+    '{"w": NaN, "x": Infinity, "y": -Infinity}',
+    '',
+    '   ',
+    '[1, 2]',
+    '```json\n[1]\n```',
+    '{broken',
+    '} {',
+    '{"a": 01}',
+    '{"a": 1.e5}',
+    '``````',
+    '`text with `inner` ticks`',
+    '```text\nA lighthouse `here`\n```',
+    '``` ```',
+]
+
+
+def answer_cases(studio):
+    rows = []
+    for raw in ANSWERS:
+        row = {'raw': raw, 'stripped': studio._strip_outer_markdown(raw)}
+        try:
+            row['object'] = json.dumps(studio.parse_json_object(raw), ensure_ascii=False)
+        except studio.PromptStudioError:
+            row['object'] = None
+        try:
+            row['text'] = studio.clean_text_response(raw)
+        except studio.PromptStudioError:
+            row['text'] = None
+        rows.append(row)
+    return rows
+
+
 def main():
     studio = load()
     patch(studio)
+    for name, _, request in CASES:
+        if name == 'scene_opened':
+            request['grounding_context'] = opened(GROUNDING, OPENED_ANSWER)
     commit = subprocess.check_output(['git', '-C', str(DIRECTOR), 'rev-parse', 'HEAD'], text=True).strip()
     cases = [{'name': name, 'kind': kind, 'request': request, **run(studio, kind, request)}
              for name, kind, request in CASES]
     FIXTURE.write_text(json.dumps({'source': f'comfyui-helto-director {commit} shared/prompt_studio.py',
-                                   'cases': cases}, ensure_ascii=False, indent=1) + '\n')
+                                   'cases': cases, 'answers': answer_cases(studio)},
+                                  ensure_ascii=False, indent=1) + '\n')
 
 
 if __name__ == '__main__':

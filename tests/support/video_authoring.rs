@@ -386,14 +386,14 @@ async fn cast_inventory_dialogue_retry_apply_and_reopen_keep_owned_bindings_and_
         let requests = state.requests.lock().unwrap();
         let inventory = &requests[0]["messages"][1]["content"];
         let url = inventory[1]["image_url"]["url"].as_str().unwrap();
-        assert!(url.starts_with("data:image/jpeg;base64,"));
+        assert!(url.starts_with("data:image/png;base64,"));
         assert_eq!(
             base64::engine::general_purpose::STANDARD
                 .decode(url.split_once(',').unwrap().1)
                 .unwrap(),
             imagine_server::video::authoring::vision::normalize(&png())
                 .unwrap()
-                .jpeg
+                .png
         );
     }
     assert_eq!(

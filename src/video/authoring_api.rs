@@ -193,9 +193,12 @@ async fn review(
     State(app): State<App>,
     Path(id): Path<String>,
     body: Result<Json<Review>, JsonRejection>,
-) -> Result<Json<Value>, Fault> {
+) -> Result<Json<Value>, Located> {
     let Json(review) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
     let service = app.video.lock().await;
+    if let Some(opening) = &review.opening_appearance {
+        steps::review_opening(&service.authoring.read(&id)?, opening)?;
+    }
     Ok(Json(json!(service.authoring.review(&id, review)?)))
 }
 #[derive(Deserialize)]

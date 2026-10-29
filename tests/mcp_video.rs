@@ -596,14 +596,14 @@ async fn agent_produces_a_video_in_its_workspace_and_resumes_with_the_key() {
     for (i, (image, original)) in images.iter().zip([&harbour, &keeper]).enumerate() {
         assert_eq!(image["index"], i);
         assert_eq!(blocks[i]["type"], "image");
-        assert_eq!(blocks[i]["mimeType"], "image/jpeg");
+        assert_eq!(blocks[i]["mimeType"], "image/png");
         assert_eq!(
             base64::engine::general_purpose::STANDARD
                 .decode(blocks[i]["data"].as_str().unwrap())
                 .unwrap(),
             imagine_server::video::authoring::vision::normalize(original)
                 .unwrap()
-                .jpeg
+                .png
         );
     }
     assert_eq!(
