@@ -776,6 +776,7 @@ mod tests {
                 preferences: app.prefs.clone(),
                 references: vec![],
                 maps: [None, None],
+                region_colors: vec![],
             },
         )]);
         assert_eq!(app.sampling_preview_current_job().as_deref(), Some("job-a"));

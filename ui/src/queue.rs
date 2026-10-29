@@ -7,6 +7,8 @@ pub(super) struct Snapshot {
     pub preferences: Preferences,
     pub references: Vec<ReferenceView>,
     pub maps: [Option<ReferenceView>; 2],
+    /// The region map's colors, which its region prompts are listed by.
+    pub region_colors: Vec<([u8; 3], f32)>,
 }
 
 pub(super) struct Job {
@@ -44,7 +46,8 @@ pub(super) struct Queue {
     /// Drafts from a closed Multiple prompts window, restored on reopen.
     pub parked_drafts: Option<Vec<String>>,
     /// The inputs Reuse settings replaced, until the next generation.
-    pub reuse_undo: Option<Snapshot>,
+    /// What Reuse settings replaced, and the model group entry it wrote.
+    pub reuse_undo: Option<(Snapshot, String)>,
     pub draft_error: Option<String>,
 }
 impl Default for Queue {
@@ -211,6 +214,7 @@ impl ImagineApp {
                         preferences: self.prefs.clone(),
                         references: self.image.references.clone(),
                         maps: [self.image.color_map.clone(), self.image.depth_map.clone()],
+                        region_colors: self.image.region_colors.clone(),
                     },
                 ))
             })
@@ -583,15 +587,18 @@ impl ImagineApp {
             return;
         };
         // Keep what is replaced so Reuse settings can be undone.
-        self.queue.reuse_undo = Some(Snapshot {
+        let replaced = Snapshot {
             prompt: std::mem::take(&mut self.image.prompt),
             preferences: self.prefs.clone(),
             references: std::mem::take(&mut self.image.references),
             maps: [self.image.color_map.take(), self.image.depth_map.take()],
-        });
+            region_colors: std::mem::take(&mut self.image.region_colors),
+        };
+        self.queue.reuse_undo = Some((replaced, snapshot.preferences.model_group.clone()));
         self.image.prompt = snapshot.prompt;
         self.image.references = snapshot.references;
         [self.image.color_map, self.image.depth_map] = snapshot.maps;
+        self.image.region_colors = snapshot.region_colors;
         self.prefs.generation = snapshot.preferences.generation;
         self.prefs.model_group = snapshot.preferences.model_group;
         let group_settings = snapshot
@@ -611,16 +618,22 @@ impl ImagineApp {
     }
     /// Restores the prompt, references and settings Reuse settings replaced.
     pub(super) fn undo_reuse_settings(&mut self) {
-        let Some(previous) = self.queue.reuse_undo.take() else {
+        let Some((previous, reused)) = self.queue.reuse_undo.take() else {
             return;
         };
         self.image.prompt = previous.prompt;
         self.image.references = previous.references;
-        // Only what Reuse settings changed; later preference changes stay.
-        let before = previous.preferences;
+        [self.image.color_map, self.image.depth_map] = previous.maps;
+        self.image.region_colors = previous.region_colors;
+        // Only what Reuse settings changed; later preference changes, including
+        // other model groups, stay.
+        let mut before = previous.preferences;
         self.prefs.generation = before.generation;
         self.prefs.model_group = before.model_group;
-        self.prefs.model_groups = before.model_groups;
+        match before.model_groups.remove(&reused) {
+            Some(settings) => self.prefs.model_groups.insert(reused, settings),
+            None => self.prefs.model_groups.remove(&reused),
+        };
         if self.models.catalog.is_some() {
             self.metadata = self.selected_model().cloned();
         }

@@ -744,11 +744,36 @@ fn reuse_settings_can_be_undone_until_the_next_generation() {
     );
     desk.app.queue.jobs.clear();
     desk.app.image.prompt = "Own current prompt".into();
+    // A region map of the current desk, which the reused job did not have.
+    let texture = desk.ctx.load_texture(
+        "own-region-map",
+        egui::ColorImage::from_rgba_unmultiplied([1, 1], &[230, 25, 75, 255]),
+        Default::default(),
+    );
+    desk.app.image.color_map = Some(ReferenceView {
+        number: 0,
+        id: "own-region-map".into(),
+        name: "own-region-map.png".into(),
+        texture,
+        size: [1, 1],
+        marks: None,
+    });
+    desk.app.image.region_colors = vec![([230, 25, 75], 1.)];
     let gallery = desk.app.queue.gallery[0].id.clone();
     desk.app.reuse_queue_settings(&gallery);
     assert_eq!(desk.app.image.prompt, "Own earlier prompt");
+    assert!(desk.app.image.color_map.is_none() && desk.app.image.region_colors.is_empty());
     desk.app.prefs.privacy_mode = !desk.app.prefs.privacy_mode;
     let privacy = desk.app.prefs.privacy_mode;
+    // Another model group changed after the reuse keeps its change.
+    let other = crate::settings::ModelGroupSettings {
+        variant: "own-later-variant".into(),
+        ..Default::default()
+    };
+    desk.app
+        .prefs
+        .model_groups
+        .insert("own-other-group".into(), other.clone());
     desk.frame(vec![]);
     desk.click("Undo Reuse settings");
     assert_eq!(desk.app.image.prompt, "Own current prompt");
@@ -756,5 +781,11 @@ fn reuse_settings_can_be_undone_until_the_next_generation() {
         desk.app.prefs.privacy_mode, privacy,
         "unrelated changes stay"
     );
+    assert_eq!(desk.app.prefs.model_groups["own-other-group"], other);
+    assert_eq!(
+        desk.app.image.color_map.as_ref().map(|m| m.id.as_str()),
+        Some("own-region-map")
+    );
+    assert_eq!(desk.app.image.region_colors, [([230, 25, 75], 1.)]);
     assert!(desk.app.queue.reuse_undo.is_none());
 }
