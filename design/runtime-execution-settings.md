@@ -72,15 +72,37 @@ H3 scene with `auto` succeeded (80.1 s). Each job's `output` or Take
 Dynamic VRAM, through the proxy on the same GPU: an H3 scene and the Qwen and
 MOSS images were byte-identical with dynamic VRAM on and off. Combo and
 Influence at 640×352 with a 56-frame boundary tail succeeded with it on (120 s
-each) and ran out of memory with it off, as before. With the model fitting in
-VRAM, dynamic VRAM was 4–6 s slower per image (Qwen 70.1 s against 64.1 s, MOSS
-52.1 s against 48.1 s). Imagine's port has the VBAR residency but, as far as
-the source shows, not ComfyUI's pinned host staging buffers; that and RAM use
-are still to be measured.
+each) and ran out of memory with it off, as before.
+
+Cold and warm starts on 2026-10-29, same GPU, `auto` attention, one synthetic
+prompt and seed: cold is the first job after a server restart, warm the same
+job straight after it. Times come from the engine's phase changes; free GPU
+memory is the lowest `nvidia-smi` reading during the job and RSS the worker's
+peak resident memory.
+
+| Model | Dynamic VRAM | Start | Total | Load and text encoding | Placing the DiT | Sampling | Free GPU | Worker RSS |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Qwen | on | cold | 71.8 s | 13.4 s | — | 56.1 s | 4195 MiB | 9798 MiB |
+| Qwen | on | warm | 57.1 s | 5.1 s | — | 50.1 s | 4184 MiB | 11176 MiB |
+| Qwen | off | cold | 64.9 s | 13.2 s | 6.9 s | 42.4 s | 4086 MiB | 10008 MiB |
+| Qwen | off | warm | 48.2 s | 5.4 s | 1.0 s | 40.4 s | 4074 MiB | 11243 MiB |
+| MOSS | on | cold | 54.6 s | 14.4 s | — | 39.1 s | 3664 MiB | 10418 MiB |
+| MOSS | on | warm | 40.1 s | 5.7 s | — | 34.1 s | 3628 MiB | 11362 MiB |
+| MOSS | off | cold | 48.6 s | 13.9 s | 5.1 s | 27.8 s | 3664 MiB | 10404 MiB |
+| MOSS | off | warm | 32.7 s | 5.4 s | 0.8 s | 26.2 s | 3628 MiB | 11372 MiB |
+
+Each model gave the same image in all four runs. Dynamic VRAM cost 6.0–8.9 s
+per image (11–23 %), in sampling rather than loading, and the cost did not
+shrink when warm, while free GPU memory and worker RSS stayed within about
+200 MiB of the static runs. These jobs fit statically, so dynamic VRAM bought
+them nothing. The VBAR is released at the end of each job, so a warm job
+brings its weights in again. Imagine's port also lacks, as far as the source
+shows, ComfyUI's pinned host staging buffers; how much each contributes is
+unmeasured.
 
 ## Not yet included
 
 An automatic dynamic VRAM choice (static when the diffusion model and its
 activations, references included, fit with margin), and a test matrix of both
-choices for Qwen, MOSS and H3 at Draft quality, with cold and warm starts,
-comparing time, memory and output.
+choices for H3 and of both attention modes for Qwen, MOSS and H3 at Draft
+quality, comparing time, memory and output.
