@@ -100,9 +100,39 @@ brings its weights in again. Imagine's port also lacks, as far as the source
 shows, ComfyUI's pinned host staging buffers; how much each contributes is
 unmeasured.
 
+ComfyUI's own code for the same profiles, prompt and seed
+(`tools/image-python-reference.py`, checkout `426f5eea`, `--use-ck-attention`,
+under the coordinator's reservation without network): one process loads the
+profile's three files and runs the graph twice, cold and then warm with the
+models kept, as a repeated ComfyUI prompt. Its encoding phase includes loading
+the text encoder; the static diffusion model is placed inside sampling.
+
+| Model | Dynamic VRAM | Start | Encoding | Sampling | Decode | Free GPU | Process RSS |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Qwen | on | cold | 2.9 s | 37.4 s | 0.9 s | 262 MiB | 2547 MiB |
+| Qwen | on | warm | 0.8 s | 35.4 s | 0.7 s | 593 MiB | 2553 MiB |
+| Qwen | off | cold | 3.7 s | 39.4 s | 1.1 s | 1122 MiB | 8897 MiB |
+| Qwen | off | warm | 3.4 s | 37.6 s | 0.8 s | 1070 MiB | 11254 MiB |
+| MOSS | on | cold | 3.2 s | 25.3 s | 0.5 s | 272 MiB | 2927 MiB |
+| MOSS | on | warm | 0.5 s | 23.3 s | 0.2 s | 265 MiB | 2935 MiB |
+| MOSS | off | cold | 3.9 s | 26.0 s | 0.4 s | 2806 MiB | 7788 MiB |
+| MOSS | off | warm | 2.5 s | 25.7 s | 0.2 s | 1708 MiB | 8781 MiB |
+
+In ComfyUI dynamic VRAM is not a cost: it samples as fast as static placement
+or slightly faster (0.7–2.4 s), uses the device down to a few hundred MiB and
+keeps the process at 2547–2935 MiB resident against 7788–14730 MiB static
+(the last at its peak). Each
+model's decoded pixels were identical with it on and off. Imagine's dynamic
+sampling took 42–55 % longer than ComfyUI's (Qwen 56.1/50.1 s against
+37.4/35.4 s, MOSS 39.1/34.1 s against 25.3/23.3 s) with about four times the
+resident memory, while Imagine's static placement and sampling were within
+1–10 s of ComfyUI's static sampling. The gap is in Imagine's dynamic port, so
+an automatic choice would hide it; the port should be brought to ComfyUI's
+behavior instead. The reference sets comfy-aimdo's log level to warning, as
+`main.py` sets one; with it, decoding completed in every run.
+
 ## Not yet included
 
-An automatic dynamic VRAM choice (static when the diffusion model and its
-activations, references included, fit with margin), and a test matrix of both
+Dynamic VRAM at ComfyUI's speed and resident memory, and a test matrix of both
 choices for H3 and of both attention modes for Qwen, MOSS and H3 at Draft
 quality, comparing time, memory and output.
