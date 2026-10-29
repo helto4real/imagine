@@ -43,6 +43,11 @@ pub trait Backend: Send {
     fn h3_model_root(&self) -> Option<std::path::PathBuf> {
         None
     }
+    /// The operator's execution choices for a job starting now; a job reads
+    /// them once, sends them to its worker and records them with its output.
+    fn execution(&self) -> crate::execution_settings::Settings {
+        Default::default()
+    }
     fn generate<'a>(&'a mut self, request: &'a ImagePass) -> EngineFuture<'a, Vec<u8>>;
     fn generate_video<'a>(
         &'a mut self,
@@ -68,6 +73,9 @@ pub trait Backend: Send {
 pub struct EngineState {
     #[serde(skip)]
     pub sampling_preview: std::sync::Arc<crate::sampling_preview::Hub>,
+    /// The operator's execution choices, applied to each job as it starts.
+    #[serde(skip)]
+    pub execution: std::sync::Arc<crate::execution_settings::Store>,
     #[serde(default)]
     pub backend: String,
     #[serde(default)]
@@ -916,6 +924,7 @@ mod tests {
             seed: 42,
             references: (0..reference_count).map(|_| vec![0u8].into()).collect(),
             maps: vec![],
+            execution: Default::default(),
         }
     }
     #[test]
@@ -1114,6 +1123,7 @@ mod tests {
             seed: 43,
             references,
             maps: vec![],
+            execution: Default::default(),
         };
         let body = native_body(&pass).unwrap();
         assert_eq!(body["width"], 288);

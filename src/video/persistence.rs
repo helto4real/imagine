@@ -287,6 +287,9 @@ pub struct TakeProvenance {
     /// The Scene's prompt text when the Take was made, so selecting it can restore it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authored: Option<AuthoredPrompt>,
+    /// The operator's execution choices the Take was made with.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution: Option<crate::execution_settings::Settings>,
 }
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1432,6 +1435,7 @@ mod tests {
                     source_take: None,
                     continuity: None,
                     authored: None,
+                    execution: None,
                 }),
             });
             document.resources.push(Resource {

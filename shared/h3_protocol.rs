@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 // descriptor field; negotiate a matching worker before sending physical tails.
 // v16 reports actual adaptive-solver callback progress, including total corrections.
 // v17 adds bounded failure diagnostics (stage, kind, integers) to Error events.
-pub const VERSION: u32 = 17;
+pub const VERSION: u32 = 18;
 #[path = "h3_reference_cache.rs"]
 pub mod cache;
 #[path = "h3_continuation.rs"]
@@ -128,6 +128,33 @@ pub struct Request {
     pub continuation_bytes: Vec<u8>,
     #[serde(default, skip_serializing_if = "references::Input::is_empty")]
     pub references: references::Input,
+    /// The operator's execution choices when the job ran.
+    #[serde(default)]
+    pub execution: execution::Settings,
+}
+/// The operator's execution choices, which a server applies to every job it
+/// starts from then on; image and video workers receive them per request.
+pub mod execution {
+    use serde::{Deserialize, Serialize};
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(rename_all = "snake_case")]
+    pub enum Attention {
+        /// Comfy Kitchen INT8 where the GPU supports it, else PyTorch SDPA, as
+        /// ComfyUI with `--use-ck-attention`.
+        #[default]
+        Auto,
+        /// Comfy Kitchen INT8; an unsupported GPU fails the job by name.
+        KitchenInt8,
+        /// PyTorch SDPA, as ComfyUI without `--use-ck-attention`.
+        PytorchSdpa,
+    }
+    /// A checkpoint's own ComfyAttention preference applies in every mode, as
+    /// in ComfyUI.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[serde(deny_unknown_fields)]
+    pub struct Settings {
+        pub attention: Attention,
+    }
 }
 impl Request {
     pub fn total_steps(&self) -> u32 {
@@ -200,6 +227,8 @@ pub enum ErrorCode {
     LatentUpscaleFailed,
     LoraLoadFailed,
     UpscaleContextUnavailable,
+    /// The requested attention method is not available on this GPU.
+    AttentionUnavailable,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]

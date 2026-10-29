@@ -33,6 +33,7 @@ pub struct App {
     pub uploads: Arc<Semaphore>,
 }
 const LOCAL_OWNER: &str = "local";
+mod execution;
 mod sampling_preview;
 
 impl IntoResponse for Fault {
@@ -47,6 +48,7 @@ impl IntoResponse for Fault {
 pub fn router(app: App) -> Router {
     Router::new()
         .merge(sampling_preview::routes())
+        .merge(execution::routes())
         .merge(crate::video::api::routes())
         .route("/v1/session", get(session))
         .route("/v1/video-destination", get(video_destination))

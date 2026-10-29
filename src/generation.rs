@@ -24,6 +24,8 @@ pub struct ImagePass {
     pub references: Vec<Arc<[u8]>>,
     /// MOSS control maps by role (`color`, `depth`), encoded images.
     pub maps: Vec<(&'static str, Arc<[u8]>)>,
+    /// The operator's execution choices for this job.
+    pub execution: crate::execution_settings::Settings,
 }
 pub struct Artifact {
     pub role: &'static str,
@@ -38,6 +40,7 @@ pub enum Generated {
     Images {
         artifacts: Vec<Artifact>,
         pending: Vec<crate::video::output::Pending>,
+        execution: crate::execution_settings::Settings,
     },
     Video {
         bytes: Vec<u8>,
@@ -50,6 +53,7 @@ impl From<Vec<Artifact>> for Generated {
         Self::Images {
             artifacts: v,
             pending: Vec::new(),
+            execution: Default::default(),
         }
     }
 }
@@ -109,6 +113,7 @@ pub async fn generate(
             input.image = Some(descriptor);
             input.image_rgb = rgb;
         }
+        input.execution = engine.execution();
         let av = engine.generate_video(&input).await?;
         anyhow::ensure!(
             av.shape == input.shape,
@@ -123,8 +128,13 @@ pub async fn generate(
         })
     } else {
         let pending = store.reserve_images(request, owner).await?;
-        let artifacts = generate_images(engine, request, owner, store).await?;
-        Ok(Generated::Images { artifacts, pending })
+        let execution = engine.execution();
+        let artifacts = generate_images(engine, request, owner, store, execution).await?;
+        Ok(Generated::Images {
+            artifacts,
+            pending,
+            execution,
+        })
     }
 }
 pub(crate) async fn encode_video(av: crate::short_av::Av) -> Result<Vec<u8>> {
@@ -145,6 +155,7 @@ async fn generate_images(
     request: &JobRequest,
     owner: &str,
     store: &Store,
+    execution: crate::execution_settings::Settings,
 ) -> Result<Vec<Artifact>> {
     let task = Task::resolve(request)?;
     let mut pass = ImagePass {
@@ -159,6 +170,7 @@ async fn generate_images(
         seed: request.seed.context("resolved seed")?,
         references: Vec::new(),
         maps: Vec::new(),
+        execution,
     };
     for id in &request.inputs.reference_images {
         pass.references

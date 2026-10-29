@@ -33,6 +33,12 @@ pub fn prepare(
             }
             provenance.boundary = Some(receipt.clone());
         }
+        if let super::artifacts::Produced::Execution(settings) = artifact {
+            take.provenance
+                .as_mut()
+                .ok_or_else(|| StorageError::new("take_provenance_missing"))?
+                .execution = Some(*settings);
+        }
     }
     // A concurrent scene edit retains the result, but never declares it current.
     if planning::input_revision(&document.project, &take.scene_id)?
@@ -64,7 +70,11 @@ pub fn prepare(
     inputs.insert(resource.key(), file);
     document.resources.push(resource);
     for artifact in artifacts {
-        if matches!(artifact, super::artifacts::Produced::BoundaryApplied(_)) {
+        if matches!(
+            artifact,
+            super::artifacts::Produced::BoundaryApplied(_)
+                | super::artifacts::Produced::Execution(_)
+        ) {
             continue;
         }
         let (resource, file) = artifact.prepare(&take, staging)?;

@@ -598,8 +598,13 @@ impl Store {
                 )
                 .await
             }
-            crate::generation::Generated::Images { artifacts, pending } => {
-                self.publish_images(job, owner, artifacts, pending).await
+            crate::generation::Generated::Images {
+                artifacts,
+                pending,
+                execution,
+            } => {
+                self.publish_images(job, owner, artifacts, pending, execution)
+                    .await
             }
         }
     }
@@ -666,6 +671,7 @@ impl Store {
         owner: &str,
         artifacts: Vec<crate::generation::Artifact>,
         mut pending: Vec<crate::video::output::Pending>,
+        execution: crate::execution_settings::Settings,
     ) -> Result<()> {
         if artifacts.is_empty() || pending.len() != artifacts.len() {
             bail!("image_output_not_reserved");
@@ -715,7 +721,7 @@ impl Store {
             assets.push(json!({"id":id,"role":role,"mime_type":info.mime,"width":info.width,"height":info.height,"bytes":info.bytes.len(),"sha256":digest,"saved_path":saved.path,"persistent":true}));
             published.push((id, saved));
         }
-        let output = json!({"assets":assets,"format":"png","persistent":true,"saved_path":assets[0]["saved_path"]});
+        let output = json!({"assets":assets,"format":"png","persistent":true,"saved_path":assets[0]["saved_path"],"execution":execution});
         let updated = sqlx::query("UPDATE jobs SET status='succeeded',output=?,finished=? WHERE id=? AND owner=? AND status='running'").bind(output.to_string()).bind(now()).bind(job).bind(owner).execute(&mut *tx).await?;
         if updated.rows_affected() != 1 {
             bail!("output job is no longer running");

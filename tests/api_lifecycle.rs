@@ -645,6 +645,8 @@ async fn queue_idempotency_unload_resume_and_cancel() {
     let first = wait_status(&h.store, id, "local", "succeeded").await;
     assert!(first["effective"]["seed"].is_u64());
     assert_eq!(first["output"]["assets"][0]["width"], 2);
+    // The operator's execution choices the images were made with.
+    assert_eq!(first["output"]["execution"], json!({"attention":"auto"}));
     let asset = first["output"]["assets"][0]["id"].as_str().unwrap();
     assert!(h.store.read_asset(asset, "local").await.is_ok());
     let opid = op["id"].as_str().unwrap();
@@ -1678,7 +1680,8 @@ async fn output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid
                     pending: vec![
                         destination.reserve_image(&proof, 1024, None).unwrap(),
                         destination.reserve_image(&proof, 1024, None).unwrap()
-                    ]
+                    ],
+                    execution: Default::default(),
                 }
             )
             .await
@@ -1707,7 +1710,8 @@ async fn output_publication_rolls_back_files_and_rows_if_a_later_role_is_invalid
                         role: "image",
                         bytes: png()
                     }],
-                    pending: vec![destination.reserve_image(&proof, 1024, None).unwrap()]
+                    pending: vec![destination.reserve_image(&proof, 1024, None).unwrap()],
+                    execution: Default::default(),
                 }
             )
             .await

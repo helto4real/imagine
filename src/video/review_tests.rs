@@ -184,6 +184,7 @@ fn add_take(document: &mut ProjectDocument, scene: u64, id: &str) {
             source_take,
             continuity: None,
             authored: None,
+            execution: None,
         }),
     });
     document.resources.push(Resource {

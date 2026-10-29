@@ -421,6 +421,7 @@ fn seed(
             source_take: None,
             continuity: None,
             authored: None,
+            execution: None,
         }),
     });
     if let Some(motion) = motion {

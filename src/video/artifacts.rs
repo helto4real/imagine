@@ -4,7 +4,12 @@ use crate::{h3_protocol as h3, short_av::Av};
 use std::{fs::File, io::Cursor};
 pub enum Produced {
     BoundaryApplied(serde_json::Value),
-    H3Endpoint { shape: h3::Shape, png: Vec<u8> },
+    /// The operator's execution choices the Take was made with.
+    Execution(crate::execution_settings::Settings),
+    H3Endpoint {
+        shape: h3::Shape,
+        png: Vec<u8>,
+    },
     H3Motion(h3::continuation::Artifact),
 }
 impl Produced {
@@ -34,6 +39,7 @@ impl Produced {
         let provenance = take.generated()?;
         match self {
             Self::BoundaryApplied(_) => Err(StorageError::new("boundary_receipt_is_not_media")),
+            Self::Execution(_) => Err(StorageError::new("execution_record_is_not_media")),
             Self::H3Motion(artifact) => {
                 if !artifact.valid() {
                     return Err(StorageError::new("invalid_continuation"));

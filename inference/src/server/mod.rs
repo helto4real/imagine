@@ -11,7 +11,7 @@ mod moss;
 mod preview_callback;
 mod qwen;
 mod sampling_values;
-pub use crate::h3_product::protocol::preview;
+pub use crate::h3_product::protocol::{execution, preview};
 use crate::{
     attention::{Attention, AttentionMethod},
     checkpoint::{Aimdo, PreparedParameters, Safetensors},
@@ -62,6 +62,9 @@ pub struct Request {
     pub sampling_preview: Option<preview::Settings>,
     #[serde(default)]
     pub control: Control,
+    /// The operator's execution choices when the job started.
+    #[serde(default)]
+    pub execution: execution::Settings,
 }
 /// The MOSS color/depth control adapter's settings, as `MOSSImageControl` takes
 /// them: the maps' strength and the sampling percents it spans.
@@ -103,22 +106,39 @@ pub enum Event {
     PreviewWarning,
 }
 pub type Observer<'a> = dyn FnMut(Event) -> Result<(), Error> + 'a;
-pub(super) fn attention() -> Attention {
-    Attention {
-        method: AttentionMethod::Pytorch,
+/// The attention method for every component of a request: Comfy Kitchen INT8
+/// unless PyTorch SDPA was chosen, as ComfyUI with `--use-ck-attention`. Auto
+/// uses PyTorch SDPA where Kitchen INT8 is unavailable; an explicit Kitchen
+/// INT8 is `None` there, which the worker reports as `attention_unavailable`.
+/// A checkpoint's own ComfyAttention preference still applies per block.
+pub fn attention_method(
+    rt: &Runtime,
+    choice: execution::Settings,
+) -> Result<Option<AttentionMethod>, Error> {
+    use execution::Attention::*;
+    if choice.attention == PytorchSdpa {
+        return Ok(Some(AttentionMethod::Pytorch));
+    }
+    Ok(
+        match (
+            choice.attention,
+            rt.int8_attention_available(Some(Device::Cuda(0)))?,
+        ) {
+            (_, true) => Some(AttentionMethod::KitchenInt8),
+            (Auto, false) => Some(AttentionMethod::Pytorch),
+            _ => None,
+        },
+    )
+}
+pub(super) fn attention(rt: &Runtime, choice: execution::Settings) -> Result<Attention, Error> {
+    Ok(Attention {
+        method: attention_method(rt, choice)?
+            .ok_or_else(|| Error::Native("Comfy Kitchen INT8 attention is unavailable".into()))?,
         priority_wrapper: true,
         attention_precision: None,
         low_precision_attention: false,
         model_device: Device::Cuda(0),
-    }
-}
-/// The diffusion models' attention: Comfy Kitchen INT8, as their
-/// checkpoints' ComfyAttention preference names it. Encoders keep `attention`.
-pub(super) fn dit_attention() -> Attention {
-    Attention {
-        method: AttentionMethod::KitchenInt8,
-        ..attention()
-    }
+    })
 }
 pub(super) fn load(
     rt: &Runtime,
@@ -290,6 +310,7 @@ pub(super) fn full_condition(
     })
 }
 /// Same managed VAE path for reference encoding and final decoding.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn qwen_vae<'a>(
     rt: &'a Runtime,
     model: &std::rc::Rc<q::StaticModel<'a, q::ComponentBuffers>>,
@@ -298,6 +319,7 @@ pub(super) fn qwen_vae<'a>(
     manager: &mut Manager<'a>,
     memory: &mut q::StaticMemoryServices,
     diagnostic: (&std::path::Path, &mut Observer<'_>),
+    attention: Attention,
 ) -> Result<Tensor, Error> {
     let patcher = model.patcher();
     manager
@@ -311,7 +333,7 @@ pub(super) fn qwen_vae<'a>(
         )
         .map_err(|error| load_failure("vae", diagnostic.0, diagnostic.1, error))?;
     let schema = q::constructor_schema()?;
-    let mut exec = q::ResidentExecution::bind(rt, &PreparedParameters::default(), 0, attention())?;
+    let mut exec = q::ResidentExecution::bind(rt, &PreparedParameters::default(), 0, attention)?;
     let mut service = q::ManagedImageVae {
         runtime: rt,
         model: model.clone(),

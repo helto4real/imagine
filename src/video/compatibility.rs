@@ -328,6 +328,7 @@ mod tests {
                 source_take: None,
                 continuity: None,
                 authored: None,
+                execution: None,
             }),
         });
         assert_eq!(

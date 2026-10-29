@@ -189,6 +189,10 @@ async fn run() -> Result<()> {
     let mut store = Store::open_private(private.clone(), workspace).await?;
     store.workspaces = workspaces;
     let (engine_tx, engine_rx) = watch::channel(EngineState {
+        execution: Arc::new(imagine_server::execution_settings::Store::open_private(
+            private.clone(),
+            "library/runtime-execution.json".into(),
+        )?),
         backend: backend.name().into(),
         phase: "unloaded".into(),
         pid: None,

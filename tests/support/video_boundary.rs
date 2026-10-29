@@ -77,6 +77,10 @@ async fn transition_combo_influence_freeze_actual_take_tail_and_publish_applied_
         let receipt =
             &document["takes"].as_array().unwrap().last().unwrap()["provenance"]["boundary"];
         assert_eq!(receipt["applied"], true);
+        assert_eq!(
+            document["takes"].as_array().unwrap().last().unwrap()["provenance"]["execution"],
+            json!({"attention":"auto"})
+        );
         assert_eq!(receipt["dependency"]["source_shot_id"], "s1");
         assert_eq!(receipt["dependency"]["boundary_id"]["left"], boundary_left);
         assert_eq!(receipt["dependency"]["target_shot_id"], id);

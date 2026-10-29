@@ -1155,6 +1155,7 @@ pub fn error_message(code: &str) -> String {
         "rust_startup_timeout"=>"Rust inference startup timed out.",
         "rust_protocol_error"=>"Rust worker communication failed. Rebuild the Rust runtime and restart Imagine.",
         "rust_generation_failed"=>"Rust inference failed. Check available RAM/VRAM and the selected model files.",
+        "attention_unavailable"|"h3_attention_unavailable"=>"This GPU cannot run Comfy Kitchen INT8 attention. Choose Auto or PyTorch SDPA under Settings, Execution.",
         "rust_invalid_output"=>"Rust inference returned invalid image data.",
         "rust_input_too_large"=>"Reference images exceed the Rust transfer limit. Use fewer or smaller references.",
         "requires_rust_backend"=>"Start Imagine with --backend rust to use MOSS.",

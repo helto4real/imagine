@@ -406,6 +406,8 @@ pub fn freeze(
         } else {
             Default::default()
         },
+        // The engine sets the operator's current choices when the job runs.
+        execution: Default::default(),
         protocol: h3::VERSION,
         kind: h3::RequestKind::GenerateVideo,
         id: uuid::Uuid::new_v4().to_string(),
@@ -441,6 +443,7 @@ pub fn freeze(
                             .map(|id|TakeId(id.into()))).flatten()),
                     continuity: source,
                     authored: Some(AuthoredPrompt::of(project, scene)),
+                    execution: None,
                 }),
             },
             references,
@@ -525,13 +528,17 @@ pub async fn generate(
         });
         input.image_rgb = frame.rgb;
     }
+    input.execution = engine.execution();
     let mut av = engine.generate_video(&input).await?;
     anyhow::ensure!(
         av.shape == input.shape,
         crate::engine::EngineError("h3_invalid_output")
     );
     engine.stage(Some("encoding_video"));
-    let mut take_artifacts = vec![super::artifacts::Produced::endpoint(&av)?];
+    let mut take_artifacts = vec![
+        super::artifacts::Produced::endpoint(&av)?,
+        super::artifacts::Produced::Execution(input.execution),
+    ];
     if let Some(receipt) = input.references.boundary_receipt() {
         take_artifacts.push(super::artifacts::Produced::BoundaryApplied(receipt));
     }

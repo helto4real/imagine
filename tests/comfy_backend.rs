@@ -23,6 +23,7 @@ fn pass(prompt: &str) -> ImagePass {
         seed: 42,
         references: vec![],
         maps: vec![],
+        execution: Default::default(),
     }
 }
 fn fake() -> (tempfile::TempDir, Comfy, watch::Receiver<EngineState>) {

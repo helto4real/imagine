@@ -58,7 +58,7 @@ fn numeric_probe(result_path: &std::path::Path, stage: &Cell<&'static str>) {
     }
     .unwrap();
     let model_root = PathBuf::from(std::env::var_os("IMAGINE_CP40_MODEL_ROOT").unwrap());
-    let models = Models::new(model_root, false, Default::default()).unwrap();
+    let models = Models::new(model_root, false, Default::default(), Default::default()).unwrap();
     let shape = p::Shape {
         width: 416,
         height: 224,

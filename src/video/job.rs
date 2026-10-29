@@ -65,6 +65,8 @@ pub fn request(job: &JobRequest) -> Result<h3::Request, &'static str> {
         continuation: None,
         continuation_bytes: vec![],
         references: Default::default(),
+        // The engine sets the operator's current choices when the job runs.
+        execution: Default::default(),
         protocol: h3::VERSION,
         kind: h3::RequestKind::GenerateVideo,
         id: "x".repeat(128),

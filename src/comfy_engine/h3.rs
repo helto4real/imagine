@@ -203,6 +203,7 @@ impl PipeBackend {
                         wire::ErrorCode::GenerationFailed => "h3_generation_failed",
                         wire::ErrorCode::LatentUpscaleFailed => "h3_latent_upscale_failed",
                         wire::ErrorCode::LoraLoadFailed => "h3_lora_load_failed",
+                        wire::ErrorCode::AttentionUnavailable => "h3_attention_unavailable",
                         wire::ErrorCode::UpscaleContextUnavailable => {
                             "h3_upscale_context_unavailable"
                         }

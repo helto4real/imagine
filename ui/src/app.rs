@@ -45,6 +45,10 @@ enum Message {
         nonce: u64,
         reply: sampling_preview::Reply,
     },
+    Execution {
+        session: String,
+        result: Result<execution_settings::Settings, String>,
+    },
     Timeline(timeline::Event),
     Video(video_ui::Event),
     Queue(queue::Event),
@@ -213,6 +217,7 @@ pub struct ImagineApp {
     video: video_ui::VideoDesk,
     timeline: timeline::Timeline,
     sampling_preview: sampling_preview::State,
+    execution: execution_settings::State,
     image: GenerationDesk,
     edit: editing::EditSession,
     sheet: GenerationDesk,
@@ -277,6 +282,7 @@ impl ImagineApp {
             video: Default::default(),
             timeline: Default::default(),
             sampling_preview: Default::default(),
+            execution: Default::default(),
             image: GenerationDesk::default(),
             edit: editing::EditSession::default(),
             sheet: GenerationDesk {
@@ -531,6 +537,7 @@ impl ImagineApp {
                 Message::SamplingPreview { nonce, reply } => {
                     self.sampling_preview_reply(ctx, nonce, reply)
                 }
+                Message::Execution { session, result } => self.execution_reply(session, result),
                 Message::Video(event) => self.video_message(ctx, event),
                 Message::Timeline(event) => self.timeline_message(ctx, event),
                 Message::Queue(event) => self.queue_message(ctx, event),
@@ -1060,6 +1067,8 @@ mod workspace;
 mod commands;
 use commands::Command;
 
+#[path = "execution_settings.rs"]
+mod execution_settings;
 #[path = "video/sampling_preview.rs"]
 mod sampling_preview;
 

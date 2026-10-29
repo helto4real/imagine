@@ -174,8 +174,14 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .ok_or("Missing request identity")?
             .to_owned();
         let mut load_failure = None;
+        let mut attention_unavailable = false;
         let result = (|| -> Result<Vec<u8>, Box<dyn std::error::Error>> {
             let request: Request = serde_json::from_value(value.clone())?;
+            // An explicit Kitchen INT8 choice fails by name, before any loading.
+            if server::attention_method(&rt, request.execution)?.is_none() {
+                attention_unavailable = true;
+                return Err("Comfy Kitchen INT8 attention is unavailable".into());
+            }
             let mut offset = 0usize;
             let images = rgba_images(&value, "reference", &payload, &mut offset, 10)?;
             let roles = value["map_roles"].as_array().cloned().unwrap_or_default();
@@ -241,6 +247,9 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             Ok(pixels) => write(&mut output, json!({"type":"result","id":id}), &pixels)?,
             Err(_) => {
                 let event = match load_failure {
+                    _ if attention_unavailable => {
+                        json!({"type":"error","id":id,"code":"attention_unavailable"})
+                    }
                     Some(diagnostic) => {
                         json!({"type":"error","id":id,"code":"model_component_load_failed","diagnostic":diagnostic})
                     }

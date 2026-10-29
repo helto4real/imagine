@@ -54,7 +54,7 @@ pub(super) fn generate(
         let params = text.owner.borrow().execution_parameters();
         let encoder = m::Qwen35TextEncoder::from_parameters(Default::default(), &params)
             .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?;
-        let mut exec = m::MossStaticExecution::bind(rt, &params, attention())?;
+        let mut exec = m::MossStaticExecution::bind(rt, &params, attention(rt, r.execution)?)?;
         contexts.push(
             unsafe {
                 encoder.encode_prompt(
@@ -92,6 +92,7 @@ pub(super) fn generate(
                 &mut manager,
                 &mut memory,
                 (&r.vae, observer),
+                attention(rt, r.execution)?,
             )
         };
         let latents = images
@@ -231,7 +232,7 @@ pub(super) fn generate(
                 .iter()
                 .map(|l| l.f_to_device_(dev, Kind::BFloat16, false, false))
                 .collect::<Result<Vec<_>, _>>()?;
-            let mut exec = m::MossStaticExecution::bind(rt, &params, dit_attention())?;
+            let mut exec = m::MossStaticExecution::bind(rt, &params, attention(rt, r.execution)?)?;
             Some(unsafe { dit.preprocess_refs(rt, &refs, &mut exec)? })
         };
         let condition = |context| q::FullAreaCondition {
@@ -255,7 +256,7 @@ pub(super) fn generate(
                 compute_dtype: Kind::BFloat16,
                 flash_attention_memory: true,
                 multiplier: 1.,
-                execution: m::MossStaticExecution::bind(rt, &params, dit_attention())?,
+                execution: m::MossStaticExecution::bind(rt, &params, attention(rt, r.execution)?)?,
                 generator: rt.native.generator(dev, r.seed)?,
                 observer: Some(Box::new(|step| {
                     observer(Event::Step(step.i + 1))?;
@@ -287,6 +288,7 @@ pub(super) fn generate(
         &mut manager,
         &mut memory,
         (&r.vae, observer),
+        attention(rt, r.execution)?,
     )?;
     manager.unload_all(dev, &mut memory)?;
     Ok(out)
@@ -308,6 +310,7 @@ fn load_vae<'a>(
     })
 }
 /// One Flux2 VAE encode or decode under the original memory policy.
+#[allow(clippy::too_many_arguments)]
 fn flux2_vae<'a>(
     rt: &'a Runtime,
     model: &std::rc::Rc<c::StaticModel<'a, c::ComponentBuffers>>,
@@ -316,6 +319,7 @@ fn flux2_vae<'a>(
     manager: &mut Manager<'a>,
     memory: &mut c::StaticMemoryServices,
     diagnostic: (&std::path::Path, &mut Observer<'_>),
+    attention: Attention,
 ) -> Result<Tensor, Error> {
     let patcher = model.patcher();
     manager
@@ -328,7 +332,7 @@ fn flux2_vae<'a>(
             memory,
         )
         .map_err(|error| load_failure("vae", diagnostic.0, diagnostic.1, error))?;
-    let mut exec = m::MossStaticExecution::bind(rt, &PreparedParameters::default(), attention())?;
+    let mut exec = m::MossStaticExecution::bind(rt, &PreparedParameters::default(), attention)?;
     let mut services = m::ManagedFlux2Vae {
         runtime: rt,
         model: model.clone(),

@@ -22,6 +22,7 @@ pub mod engine;
 pub mod enhancement;
 #[path = "../shared/enhancement.rs"]
 pub mod enhancement_types;
+pub mod execution_settings;
 pub(crate) mod image_sampling_preview;
 #[path = "../shared/private_storage.rs"]
 pub mod private_storage;

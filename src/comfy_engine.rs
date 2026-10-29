@@ -135,6 +135,7 @@ impl PipeBackend {
                 "comfy_startup_timeout" => "rust_startup_timeout",
                 "comfy_protocol_error" => "rust_protocol_error",
                 "comfy_invalid_output" => "rust_invalid_output",
+                "attention_unavailable" => "attention_unavailable",
                 _ => "rust_generation_failed",
             }
         } else {
@@ -254,6 +255,7 @@ impl PipeBackend {
         if self.rust_runtime.is_some() {
             crate::engine::validate_selection("rust", &request.model, &request.sampling)?;
             header["model"] = json!(request.model);
+            header["execution"] = json!(request.execution);
             let mut raw = Vec::new();
             let mut offset = 0;
             for kind in ["reference", "map"] {
@@ -502,6 +504,9 @@ impl PipeBackend {
     }
 }
 impl Backend for PipeBackend {
+    fn execution(&self) -> crate::execution_settings::Settings {
+        self.state.borrow().execution.get()
+    }
     fn h3_model_root(&self) -> Option<std::path::PathBuf> {
         self.rust_runtime
             .as_ref()
@@ -618,6 +623,7 @@ impl Backend for PipeBackend {
 fn worker_error(code: &str) -> &'static str {
     match code {
         "comfy_kitchen_unavailable" => "comfy_kitchen_unavailable",
+        "attention_unavailable" => "attention_unavailable",
         "comfy_protocol_error" | "rust_protocol_error" => "comfy_protocol_error",
         "comfy_startup_failed" | "rust_startup_failed" => "comfy_startup_failed",
         _ => "comfy_generation_failed",
@@ -853,6 +859,7 @@ mod tests {
             seed: 42,
             references: vec![],
             maps: vec![],
+            execution: Default::default(),
         }
     }
     #[test]

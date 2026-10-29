@@ -32,6 +32,7 @@ fn request() -> Request {
         continuation: None,
         continuation_bytes: vec![],
         references: Default::default(),
+        execution: Default::default(),
         sampling: None,
         protocol: VERSION,
         kind: RequestKind::GenerateVideo,

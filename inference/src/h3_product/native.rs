@@ -57,6 +57,26 @@ fn remember_memory(native: &Kitchen) {
             .collect();
     }
 }
+/// The operator's attention choice for this GPU: Comfy Kitchen INT8 unless
+/// PyTorch SDPA was chosen; Auto uses PyTorch SDPA where Kitchen INT8 is
+/// unavailable, an explicit Kitchen INT8 fails by name.
+fn attention_method(
+    rt: &Runtime,
+    choice: p::execution::Attention,
+) -> Result<AttentionMethod, ErrorCode> {
+    use p::execution::Attention::*;
+    if choice == PytorchSdpa {
+        return Ok(AttentionMethod::Pytorch);
+    }
+    let kitchen = rt
+        .int8_attention_available(Some(Device::Cuda(0)))
+        .map_err(|error| classify(&error, ErrorCode::ComponentLoadFailed))?;
+    match (choice, kitchen) {
+        (_, true) => Ok(AttentionMethod::KitchenInt8),
+        (Auto, false) => Ok(AttentionMethod::Pytorch),
+        _ => Err(ErrorCode::AttentionUnavailable),
+    }
+}
 fn classify(error: &Error, fallback: ErrorCode) -> ErrorCode {
     let root = error.root();
     // The message only selects a kind and shape integers; its text is never sent.
@@ -93,12 +113,19 @@ struct Models {
     profile: Value,
     i2v: bool,
     options: p::options::Options,
+    attention: p::execution::Attention,
 }
 impl Models {
-    fn new(root: PathBuf, i2v: bool, options: p::options::Options) -> Result<Self, ErrorCode> {
+    fn new(
+        root: PathBuf,
+        i2v: bool,
+        options: p::options::Options,
+        attention: p::execution::Attention,
+    ) -> Result<Self, ErrorCode> {
         Ok(Self {
             root,
             i2v,
+            attention,
             options,
             profile: serde_json::from_str(PROFILE).map_err(|_| ErrorCode::DeploymentMismatch)?,
         })
@@ -323,9 +350,7 @@ fn component<T>(
         let mut exec = Exec {
             native: rt.native.clone(),
             attention: Attention {
-                // Comfy Kitchen INT8 attention is the default, as the
-                // checkpoints' ComfyAttention preference names it.
-                method: AttentionMethod::KitchenInt8,
+                method: attention_method(rt, models.attention)?,
                 priority_wrapper: true,
                 attention_precision: None,
                 low_precision_attention: true,
@@ -425,9 +450,7 @@ fn component<T>(
         let mut exec = Exec {
             native: rt.native.clone(),
             attention: Attention {
-                // Comfy Kitchen INT8 attention is the default, as the
-                // checkpoints' ComfyAttention preference names it.
-                method: AttentionMethod::KitchenInt8,
+                method: attention_method(rt, models.attention)?,
                 priority_wrapper: true,
                 attention_precision: None,
                 low_precision_attention: true,
@@ -522,6 +545,7 @@ impl Generator for Native {
             self.config.model_root.clone(),
             request.profile == p::Profile::ImageToAvV1,
             request.options.clone(),
+            request.execution.attention,
         )?;
         models.verify_all()?;
         // Everything above is admitted-request bounded CPU header validation. The first
@@ -570,6 +594,7 @@ impl Generator for Native {
                     self.config.model_root.clone(),
                     second.profile == p::Profile::ImageToAvV1,
                     options,
+                    request.execution.attention,
                 )
             })
             .transpose()?;

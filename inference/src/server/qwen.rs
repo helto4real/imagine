@@ -45,6 +45,7 @@ pub(super) fn generate(
                 &mut manager,
                 &mut memory,
                 (&r.vae, observer),
+                attention(rt, r.execution)?,
             )
         };
         // Server preparation already applies the shared shrink/crop geometry.
@@ -98,7 +99,7 @@ pub(super) fn generate(
                     .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?,
             )
         };
-        let mut exec = q::ResidentExecution::bind(rt, &params, 0, attention())?;
+        let mut exec = q::ResidentExecution::bind(rt, &params, 0, attention(rt, r.execution)?)?;
         unsafe {
             encoder.encode_prompt_with_images(
                 rt,
@@ -227,7 +228,7 @@ pub(super) fn generate(
                     rt,
                     params,
                     dit.config.num_layers,
-                    dit_attention(),
+                    attention(rt, r.execution)?,
                 )?,
                 compute_dtype: Kind::BFloat16,
                 generator: rt.native.generator(dev, r.seed)?,
@@ -273,6 +274,7 @@ pub(super) fn generate(
         &mut manager,
         &mut memory,
         (&r.vae, observer),
+        attention(rt, r.execution)?,
     )?;
     manager.unload_all(dev, &mut memory)?;
     Ok(pixels)

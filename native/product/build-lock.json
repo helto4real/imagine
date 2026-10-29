@@ -143,7 +143,7 @@
   },
   "h3": {
     "identity": {
-      "protocol": 17,
+      "protocol": 18,
       "profile": "h3-av-noref-v2",
       "core_revision": "40ff91114a6d71782aa1a79a76df6940546570bb",
       "model_lock_sha256": "4ee404910332151d529509d3ca6cbfa7c829d0df34109fc0e93166f3dccdcc18"

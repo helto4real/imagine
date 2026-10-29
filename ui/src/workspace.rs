@@ -2112,6 +2112,8 @@ impl ImagineApp {
                     ui.add_space(22.);
                     self.enhancement_settings(ui);
                     ui.add_space(16.);
+                    self.execution_settings(ui);
+                    ui.add_space(18.);
                     ui.label(helto::section("Storage"));
                     ui.add_space(12.);
                     ui.label("Save to");

@@ -18,6 +18,7 @@ fn input(prompt: &str) -> h3::Request {
         capture_continuation: false,
         continuation: None,
         continuation_bytes: vec![],
+        execution: Default::default(),
         sampling: None,
         protocol: h3::VERSION,
         kind: h3::RequestKind::GenerateVideo,
@@ -171,6 +172,7 @@ fn image() -> ImagePass {
         seed: 42,
         references: vec![],
         maps: vec![],
+        execution: Default::default(),
     }
 }
 #[tokio::test]

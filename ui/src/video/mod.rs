@@ -1704,6 +1704,10 @@ impl ImagineApp {
     }
 }
 impl Timeline {
+    /// The server session this Timeline is connected to.
+    pub(in crate::app) fn server_session(&self) -> Option<String> {
+        self.session.clone()
+    }
     pub(in crate::app) fn sampling_preview_session(&self) -> Option<(u64, String)> {
         Some((self.epoch, self.session.clone()?))
     }
