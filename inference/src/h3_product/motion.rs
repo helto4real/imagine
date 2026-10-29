@@ -258,12 +258,17 @@ impl Window {
             .unwrap_or(self.weights.len());
         let a = n - self.video_rows + fade as i64;
         let b = n - self.video_rows + blocked as i64;
+        // A query slice is a strided view; SDPA receives it dense so that a
+        // fused kernel, not the materializing math kernel, can take it.
+        let rows = |start: i64, length: i64| -> Result<Tensor, Error> {
+            Ok(q.f_narrow(2, start, length)?.f_contiguous()?)
+        };
         let mut out = vec![];
         if a > 0 {
-            out.push(backend(&q.f_narrow(2, 0, a)?, k, v)?);
+            out.push(backend(&rows(0, a)?, k, v)?);
         }
         if b > a {
-            let queries = q.f_narrow(2, a, b - a)?;
+            let queries = rows(a, b - a)?;
             let full = backend(&queries, k, v)?;
             let restricted = backend(&queries, &restricted_k, &restricted_v)?;
             let weights = Tensor::f_from_slice(&self.weights[fade..blocked])?
@@ -272,11 +277,7 @@ impl Window {
             out.push(restricted.f_lerp_tensor(&full, &weights)?);
         }
         if b < n {
-            out.push(backend(
-                &q.f_narrow(2, b, n - b)?,
-                &restricted_k,
-                &restricted_v,
-            )?);
+            out.push(backend(&rows(b, n - b)?, &restricted_k, &restricted_v)?);
         }
         Ok(Tensor::f_cat(&out, 1)?)
     }

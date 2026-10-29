@@ -33,23 +33,43 @@ const PROFILE: &str = include_str!("../../profiles/h3-short-av.json");
 fn native_error() -> Error {
     Error::Native("H3 product boundary failed".into())
 }
-fn classify(error: &Error, fallback: ErrorCode) -> ErrorCode {
-    let root = error.root();
-    // The message only selects a kind and shape integers; its text is never sent.
-    let (kind, sizes) = p::classify_message(&root.to_string());
-    let (exception, accelerator_code) = match root {
-        Error::ReferenceException { class, .. } => (Some(*class), None),
-        Error::AcceleratorException { code, .. } => (None, Some(*code)),
-        _ => (None, None),
-    };
-    let oom = matches!(
-        root,
+/// CUDA memory when sampling ran out of it, in MiB: free and total device
+/// memory, active and reserved, then allocated and reserved current and peak.
+static OOM_MEMORY: std::sync::Mutex<Vec<i64>> = std::sync::Mutex::new(Vec::new());
+fn out_of_memory(error: &Error) -> bool {
+    matches!(
+        error.root(),
         Error::AcceleratorException { code: 2, .. }
             | Error::ReferenceException {
                 class: "OutOfMemoryError",
                 ..
             }
-    );
+    )
+}
+fn remember_memory(native: &Kitchen) {
+    if let (Ok(memory), Ok(allocator)) = (native.cuda_memory(0), native.cuda_allocator_stats(0))
+        && let Ok(mut sizes) = OOM_MEMORY.lock()
+    {
+        *sizes = memory
+            .iter()
+            .chain(&allocator)
+            .map(|bytes| (bytes / 1_048_576) as i64)
+            .collect();
+    }
+}
+fn classify(error: &Error, fallback: ErrorCode) -> ErrorCode {
+    let root = error.root();
+    // The message only selects a kind and shape integers; its text is never sent.
+    let (kind, mut sizes) = p::classify_message(&root.to_string());
+    let (exception, accelerator_code) = match root {
+        Error::ReferenceException { class, .. } => (Some(*class), None),
+        Error::AcceleratorException { code, .. } => (None, Some(*code)),
+        _ => (None, None),
+    };
+    let oom = out_of_memory(error);
+    if oom && sizes.is_empty() {
+        sizes = OOM_MEMORY.lock().map(|m| m.clone()).unwrap_or_default();
+    }
     let kind = match root {
         _ if oom => p::FailureKind::OutOfMemory,
         Error::AcceleratorException { .. } if kind == p::FailureKind::Internal => {
@@ -303,7 +323,9 @@ fn component<T>(
         let mut exec = Exec {
             native: rt.native.clone(),
             attention: Attention {
-                method: AttentionMethod::Pytorch,
+                // Comfy Kitchen INT8 attention is the default, as the
+                // checkpoints' ComfyAttention preference names it.
+                method: AttentionMethod::KitchenInt8,
                 priority_wrapper: true,
                 attention_precision: None,
                 low_precision_attention: true,
@@ -403,7 +425,9 @@ fn component<T>(
         let mut exec = Exec {
             native: rt.native.clone(),
             attention: Attention {
-                method: AttentionMethod::Pytorch,
+                // Comfy Kitchen INT8 attention is the default, as the
+                // checkpoints' ComfyAttention preference names it.
+                method: AttentionMethod::KitchenInt8,
                 priority_wrapper: true,
                 attention_precision: None,
                 low_precision_attention: true,
@@ -1190,7 +1214,12 @@ impl Generator for Native {
                             input,
                             exec,
                         )
-                    }?;
+                    }
+                    .inspect_err(|error| {
+                        if out_of_memory(error) {
+                            remember_memory(&rt.native);
+                        }
+                    })?;
                     sampler_progress = exec.sampler_progress;
                     if let Some(preview) = &exec.preview {
                         preview_sequence = preview.sequence();

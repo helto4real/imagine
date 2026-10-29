@@ -928,6 +928,8 @@ Kontrollerna är byggproveniens och samtidighetsskydd för startval, inga nya
 modell- eller binärhashspärrar i produkten. `tools/publish-video-product.py`
 kan återställa den bevarade rollback-versionen utan att röra användarprocesser.
 
+Uppdatering 2026-10-29: Combo/Influence är runtimekopplat genom H3-arbetaren och har körts på GPU; minnesfynd, budgettestet som inte valdes och Python-referensen finns i [design/h3-boundary-memory-20261029.md](design/h3-boundary-memory-20261029.md).
+
 Combo/Influence är fortsatt ej runtimekopplat; endast12 byteexakta CPU-
 attentionfall är verifierade. Tränad upscaling/D10, full Story/catalog/provider-
 acceptans, återstående P08, Exp och exekverings-/minnesparitet är öppna. Review
