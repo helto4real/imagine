@@ -646,7 +646,10 @@ async fn queue_idempotency_unload_resume_and_cancel() {
     assert!(first["effective"]["seed"].is_u64());
     assert_eq!(first["output"]["assets"][0]["width"], 2);
     // The operator's execution choices the images were made with.
-    assert_eq!(first["output"]["execution"], json!({"attention":"auto"}));
+    assert_eq!(
+        first["output"]["execution"],
+        json!({"attention":"auto","dynamic_vram":true})
+    );
     let asset = first["output"]["assets"][0]["id"].as_str().unwrap();
     assert!(h.store.read_asset(asset, "local").await.is_ok());
     let opid = op["id"].as_str().unwrap();

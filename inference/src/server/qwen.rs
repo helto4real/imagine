@@ -129,59 +129,11 @@ pub(super) fn generate(
     drop(text);
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("loading_model"))?;
-    let model = observe_load("dit", &r.diffusion_model, observer, || {
-        let params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
-        let patches = q::component_patch_owner("dit", &params, &loras)?;
-        patch_report.merge(&patches.report);
-        Ok(c::StaticModel::new(
-            q::StaticOffload::new(params, rt.native.clone())?
-                .with_shared_pins(pins.clone())
-                .with_patches(patches)?,
-            rt,
-            Some(tch::Kind::BFloat16),
-        ))
-    })?;
-    let patcher = model.patcher();
-    manager
-        .load(
-            std::slice::from_ref(&patcher),
-            0.,
-            None,
-            false,
-            false,
-            &mut memory,
-        )
-        .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
     let shape = [1, 64, r.height / 16, r.width / 16];
-    let refs = references
-        .as_ref()
-        .map(|r| {
-            r.reference_latents
-                .iter()
-                .map(Tensor::size)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let groups = if refs.is_empty() {
-        vec![]
-    } else {
-        vec![refs.clone(), refs]
-    };
-    let (required, minimum) = q::qwen_sampling_memory_with_references(&shape, &groups);
-    manager
-        .load(
-            std::slice::from_ref(&patcher),
-            required,
-            Some(minimum),
-            false,
-            false,
-            &mut memory,
-        )
-        .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
-    let latent = {
-        let owner = model.owner.borrow();
-        let params = &owner.parameters;
-        let sampling = &owner.sampling;
+    let sample = |params: &PreparedParameters,
+                  sampling: &q::FluxSampling,
+                  observer: &mut Observer<'_>|
+     -> Result<Tensor, Error> {
         let mut dit = q::DiT::from_parameters(Default::default(), params)?;
         let mut cache = q::PrefixCache::new(
             rt,
@@ -246,16 +198,97 @@ pub(super) fn generate(
             _ => unreachable!(),
         };
         q::PrefixKv::free(denoiser.cache_mut())?;
-        q::LatentNormalization::new(rt)?
+        Ok(q::LatentNormalization::new(rt)?
             .process_out(
                 &q::flow_inverse_noise_scaling(&sigmas.f_get(sigmas.size()[0] - 1)?, &out)?
                     .f_to_kind(Kind::Float)?,
             )?
-            .f_to_device(Device::Cpu)?
+            .f_to_device(Device::Cpu)?)
     };
-    manager.unload_all(dev, &mut memory)?;
-    drop(patcher);
-    drop(model);
+    let latent = if r.execution.dynamic_vram {
+        // Dynamic VRAM: layers enter a VBAR range when they run, as ComfyUI.
+        let (params, mut sampling) = observe_load("dit", &r.diffusion_model, observer, || {
+            let mut params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
+            let patches = q::component_patch_owner("dit", &params, &loras)?;
+            patch_report.merge(&patches.report);
+            let modules = q::bf16_dit_modules()?;
+            bind_dynamic_patches(&patches, &mut params, &modules)?;
+            let inventory = c::ComponentInventory {
+                model_size: modules.iter().map(|m| m.module_bytes).sum(),
+                modules,
+                force_cast_weights: false,
+                manual_cast_dtype: "bfloat16".into(),
+                buffers: vec![],
+            };
+            let params =
+                crate::checkpoint::dynamic::prepare_model(rt, aimdo.path(), params, inventory)?;
+            Ok((params, q::FluxSampling::qwen21()?))
+        })?;
+        sampling.to_device(dev)?;
+        let latent = sample(&params, &sampling, observer);
+        // Complete queued uses before destroying the VBAR and its ATen views.
+        let synchronized = rt.native.synchronize_device(0);
+        drop(params);
+        synchronized?;
+        latent?
+    } else {
+        let model = observe_load("dit", &r.diffusion_model, observer, || {
+            let params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
+            let patches = q::component_patch_owner("dit", &params, &loras)?;
+            patch_report.merge(&patches.report);
+            Ok(c::StaticModel::new(
+                q::StaticOffload::new(params, rt.native.clone())?
+                    .with_shared_pins(pins.clone())
+                    .with_patches(patches)?,
+                rt,
+                Some(tch::Kind::BFloat16),
+            ))
+        })?;
+        let patcher = model.patcher();
+        manager
+            .load(
+                std::slice::from_ref(&patcher),
+                0.,
+                None,
+                false,
+                false,
+                &mut memory,
+            )
+            .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
+        let refs = references
+            .as_ref()
+            .map(|r| {
+                r.reference_latents
+                    .iter()
+                    .map(Tensor::size)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let groups = if refs.is_empty() {
+            vec![]
+        } else {
+            vec![refs.clone(), refs]
+        };
+        let (required, minimum) = q::qwen_sampling_memory_with_references(&shape, &groups);
+        manager
+            .load(
+                std::slice::from_ref(&patcher),
+                required,
+                Some(minimum),
+                false,
+                false,
+                &mut memory,
+            )
+            .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
+        let latent = {
+            let owner = model.owner.borrow();
+            sample(&owner.parameters, &owner.sampling, observer)?
+        };
+        manager.unload_all(dev, &mut memory)?;
+        drop(patcher);
+        drop(model);
+        latent
+    };
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("saving_output"))?;
     let vae = observe_load("vae", &r.vae, observer, || {

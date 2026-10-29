@@ -21,9 +21,10 @@ impl Attention {
         }
     }
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub(super) struct Settings {
     pub attention: Attention,
+    pub dynamic_vram: bool,
 }
 #[derive(Default)]
 pub(super) struct State {
@@ -72,6 +73,14 @@ impl ImagineApp {
             Attention::PytorchSdpa => {
                 "A checkpoint's own attention preference still applies, as in ComfyUI."
             }
+        });
+        ui.add_enabled_ui(!self.execution.pending, |ui| {
+            ui.checkbox(&mut settings.dynamic_vram, "Dynamic VRAM");
+        });
+        ui.weak(if settings.dynamic_vram {
+            "Diffusion models bring each layer into VRAM when it runs and release it under memory pressure, as ComfyUI."
+        } else {
+            "Diffusion models are placed in VRAM once, before sampling."
         });
         ui.weak("Applies to jobs started after the change.");
         if let Some(error) = &self.execution.error {
@@ -127,13 +136,17 @@ mod tests {
     fn choices_use_the_server_names() {
         assert_eq!(
             serde_json::to_value(Settings {
-                attention: Attention::PytorchSdpa
+                attention: Attention::PytorchSdpa,
+                dynamic_vram: false,
             })
             .unwrap(),
-            serde_json::json!({"attention":"pytorch_sdpa"})
+            serde_json::json!({"attention":"pytorch_sdpa","dynamic_vram":false})
         );
-        let read: Settings =
-            serde_json::from_value(serde_json::json!({"attention":"kitchen_int8"})).unwrap();
+        let read: Settings = serde_json::from_value(
+            serde_json::json!({"attention":"kitchen_int8","dynamic_vram":true}),
+        )
+        .unwrap();
         assert_eq!(read.attention, Attention::KitchenInt8);
+        assert!(read.dynamic_vram);
     }
 }

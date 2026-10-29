@@ -127,51 +127,72 @@ pub(super) fn generate(
         m::moss_memory_required(&reference_shape, Kind::BFloat16, true)
     };
     observer(Event::Phase("loading_model"))?;
-    let model = observe_load("dit", &r.diffusion_model, observer, || {
-        let params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
-        let patches = if loras.is_empty() {
-            None
-        } else {
-            Some(m::component_patch_owner(&params, &loras)?)
-        };
-        let component = m::static_moss_component(rt, "dit", params)?.with_shared_pins(pins.clone());
-        let component = if let Some(patches) = patches {
-            component.with_patches(patches)?
-        } else {
-            component
-        };
-        Ok(c::StaticModel::new(
-            component,
-            rt,
-            Some(tch::Kind::BFloat16),
-        ))
-    })?;
-    let patcher = model.patcher();
     let shape = [1, 128, r.height / 16, r.width / 16];
-    manager
-        .load(
-            std::slice::from_ref(&patcher),
-            0.,
-            None,
-            false,
-            false,
-            &mut memory,
-        )
-        .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
-    let mut doubled = shape;
-    doubled[0] *= 2;
-    manager
-        .load(
-            std::slice::from_ref(&patcher),
-            m::moss_memory_required(&doubled, Kind::BFloat16, true) + 2. * reference_memory,
-            Some(m::moss_memory_required(&shape, Kind::BFloat16, true) + reference_memory),
-            false,
-            false,
-            &mut memory,
-        )
-        .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
-    let latent = {
+    let (model, patcher, params) = if r.execution.dynamic_vram {
+        // Dynamic VRAM: layers enter a VBAR range when they run, as ComfyUI.
+        let params = observe_load("dit", &r.diffusion_model, observer, || {
+            let mut params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
+            params.values.insert(
+                "model_sampling.sigmas".into(),
+                crate::execution_value::Value::tensor(m::MossSampling::moss()?.sigmas),
+            );
+            let fused = params.contains_key("layers.0.proj.qkv.weight");
+            let inventory = m::moss_component_inventory_for_layout("dit", fused)?;
+            if !loras.is_empty() {
+                let patches = m::component_patch_owner(&params, &loras)?;
+                bind_dynamic_patches(&patches, &mut params, &inventory.modules)?;
+            }
+            crate::checkpoint::dynamic::prepare_model(rt, aimdo.path(), params, inventory)
+        })?;
+        (None, None, params)
+    } else {
+        let model = observe_load("dit", &r.diffusion_model, observer, || {
+            let params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
+            let patches = if loras.is_empty() {
+                None
+            } else {
+                Some(m::component_patch_owner(&params, &loras)?)
+            };
+            let component =
+                m::static_moss_component(rt, "dit", params)?.with_shared_pins(pins.clone());
+            let component = if let Some(patches) = patches {
+                component.with_patches(patches)?
+            } else {
+                component
+            };
+            Ok(c::StaticModel::new(
+                component,
+                rt,
+                Some(tch::Kind::BFloat16),
+            ))
+        })?;
+        let patcher = model.patcher();
+        manager
+            .load(
+                std::slice::from_ref(&patcher),
+                0.,
+                None,
+                false,
+                false,
+                &mut memory,
+            )
+            .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
+        let mut doubled = shape;
+        doubled[0] *= 2;
+        manager
+            .load(
+                std::slice::from_ref(&patcher),
+                m::moss_memory_required(&doubled, Kind::BFloat16, true) + 2. * reference_memory,
+                Some(m::moss_memory_required(&shape, Kind::BFloat16, true) + reference_memory),
+                false,
+                false,
+                &mut memory,
+            )
+            .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
         let params = model.owner.borrow().execution_parameters();
+        (Some(model), Some(patcher), params)
+    };
+    let latent = {
         let fused = params.contains_key("layers.0.proj.qkv.weight");
         let dit = m::MossDiT::from_parameters(
             m::MossConfig {
@@ -274,9 +295,15 @@ pub(super) fn generate(
         q::flow_inverse_noise_scaling(&sigmas.f_get(sigmas.size()[0] - 1)?, &out)?
             .f_to_device(Device::Cpu)?
     };
-    manager.unload_all(dev, &mut memory)?;
+    if model.is_some() {
+        manager.unload_all(dev, &mut memory)?;
+    }
     drop(patcher);
     drop(model);
+    // Complete queued uses before destroying a dynamic VBAR and its views.
+    let synchronized = rt.native.synchronize_device(0);
+    drop(params);
+    synchronized?;
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("saving_output"))?;
     let vae = load_vae(rt, aimdo, r, &pins, observer)?;

@@ -130,6 +130,29 @@ pub fn attention_method(
         },
     )
 }
+/// Binds LoRA patches to apply where a dynamic layer uses its weight. Only
+/// cast modules (`Linear`) read them; a patch elsewhere fails by name instead
+/// of being lost.
+pub(super) fn bind_dynamic_patches(
+    owner: &crate::patching::PatchOwner,
+    parameters: &mut PreparedParameters,
+    modules: &[crate::components::OffloadModule],
+) -> Result<(), Error> {
+    let cast = modules
+        .iter()
+        .filter(|m| m.cast_weights)
+        .flat_map(|m| m.parameters.iter())
+        .collect::<std::collections::BTreeSet<_>>();
+    for key in owner.patches.keys() {
+        if !cast.contains(key) {
+            return Err(Error::Native(
+                "A LoRA patches a weight that dynamic VRAM cannot patch".into(),
+            ));
+        }
+        owner.bind_lowvram(parameters, key, 1);
+    }
+    Ok(())
+}
 pub(super) fn attention(rt: &Runtime, choice: execution::Settings) -> Result<Attention, Error> {
     Ok(Attention {
         method: attention_method(rt, choice)?

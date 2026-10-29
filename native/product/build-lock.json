@@ -1,10 +1,10 @@
 {
   "schema": 1,
   "source_base": "d08d3af96e90798ba618c5b5acb1dd538ccd5cc8",
-  "core_revision": "d08d3af96e90798ba618c5b5acb1dd538ccd5cc8",
+  "core_revision": "3097bcfc2d88e78c9555b9185b7d76be618e35d7",
   "core_files": {
     "inference/src/checkpoint/prepared.rs": "a8b35de43a173de491c01e04ca357aec75d8642bb50ff630e747363770f48569",
-    "inference/src/checkpoint/dynamic.rs": "b3fe91a22505bd60e6d5918edefcd31ed3ef2c1a71c2dffa9bd0852fb103c4a9",
+    "inference/src/checkpoint/dynamic.rs": "3142b2e8c497afd9f1579039b5472e56943df56f9133bb20c7827780663ff997",
     "inference/src/checkpoint/dynamic_vbar.rs": "c70d902ab0b02dd3b9691d832628acfdfeba08769ed99caf4c8d6acac71340f7",
     "inference/src/models/minimax_h3/checkpoint.rs": "be2bf9f25bb67a7ca24385088ccab93c92b501a9c448c3ed0145d0a0174205f0",
     "inference/src/models/minimax_h3/sampling.rs": "ef97d0fda2f360c75ac92a40b5669f34d6778b20069404f8ab2bca5149413c34",

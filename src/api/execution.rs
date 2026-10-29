@@ -131,7 +131,10 @@ mod tests {
         );
         assert_eq!(
             call(&router, "GET", Some(session), None).await,
-            (StatusCode::OK, json!({"attention":"auto"}))
+            (
+                StatusCode::OK,
+                json!({"attention":"auto","dynamic_vram":true})
+            )
         );
         for bad in [
             json!({"attention":"sage"}),
@@ -142,12 +145,13 @@ mod tests {
             assert_eq!(body["error"]["code"], "invalid_execution_settings");
         }
         assert_eq!(execution.get().attention, Attention::Auto);
-        let chosen = json!({"attention":"pytorch_sdpa"});
+        let chosen = json!({"attention":"pytorch_sdpa","dynamic_vram":false});
         assert_eq!(
             call(&router, "POST", Some(session), Some(chosen.clone())).await,
             (StatusCode::OK, chosen.clone())
         );
         assert_eq!(execution.get().attention, Attention::PytorchSdpa);
+        assert!(!execution.get().dynamic_vram);
         assert_eq!(call(&router, "GET", Some(session), None).await.1, chosen);
         drop(router);
         control.call(Action::Shutdown).await.unwrap();

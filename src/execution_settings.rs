@@ -90,13 +90,14 @@ mod tests {
         let root = Root::with_environment(config, volume).unwrap();
         let relative = PathBuf::from("library/runtime-execution.json");
         let store = Store::open_private(root.clone(), relative.clone()).unwrap();
-        assert_eq!(store.get().attention, Attention::Auto);
-        store
-            .set(Settings {
-                attention: Attention::PytorchSdpa,
-            })
-            .unwrap();
+        assert_eq!(store.get(), Settings::default());
+        assert!(store.get().dynamic_vram);
+        let chosen = Settings {
+            attention: Attention::PytorchSdpa,
+            dynamic_vram: false,
+        };
+        store.set(chosen).unwrap();
         let reopened = Store::open_private(root, relative).unwrap();
-        assert_eq!(reopened.get().attention, Attention::PytorchSdpa);
+        assert_eq!(reopened.get(), chosen);
     }
 }

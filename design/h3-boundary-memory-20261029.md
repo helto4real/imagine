@@ -106,6 +106,13 @@ The outputs differ in bytes, as INT8 attention is expected to; the Kitchen
 images were inspected and are intact. A side-by-side quality comparison needs
 both modes in one server session and belongs to the planned test matrix.
 
+## Resolution: dynamic VRAM
+
+With dynamic VRAM for the H3 diffusion model
+([runtime-execution-settings.md](runtime-execution-settings.md)) Combo and
+Influence at this size succeed (120 s each) with the reference window on, and
+the same scenes still run out of memory with dynamic VRAM off.
+
 ## Status and next steps
 
 The Combo/Influence path is coupled end to end in code and synthetic tests, and

@@ -113,19 +113,19 @@ struct Models {
     profile: Value,
     i2v: bool,
     options: p::options::Options,
-    attention: p::execution::Attention,
+    execution: p::execution::Settings,
 }
 impl Models {
     fn new(
         root: PathBuf,
         i2v: bool,
         options: p::options::Options,
-        attention: p::execution::Attention,
+        execution: p::execution::Settings,
     ) -> Result<Self, ErrorCode> {
         Ok(Self {
             root,
             i2v,
-            attention,
+            execution,
             options,
             profile: serde_json::from_str(PROFILE).map_err(|_| ErrorCode::DeploymentMismatch)?,
         })
@@ -313,6 +313,95 @@ fn prepare(
     }
     h3::checkpoint::prepare_normalized(rt, role, state)
 }
+/// The diffusion model with dynamic VRAM: its layers enter a VBAR range when
+/// they run and leave under memory pressure, as ComfyUI's ModelPatcherDynamic,
+/// instead of one static placement. LoRA patches apply where a layer uses its
+/// weight; a patch outside a cast module fails by name instead of being lost.
+fn dynamic_dit<T>(
+    rt: &Runtime,
+    aimdo: &Aimdo,
+    models: &Models,
+    path: &std::path::Path,
+    notify: &mut dyn FnMut(Notice) -> NResult<()>,
+    forward: impl FnOnce(&PreparedParameters, &mut ModelSampling, &mut Exec<'_>) -> NResult<T>,
+) -> Result<T, ErrorCode> {
+    let mut lora_failure = false;
+    let mut sampling =
+        h3::sampling::schedule(rt, models.options.shift_video, models.options.shift_audio)
+            .map_err(|error| classify(&error, ErrorCode::ComponentLoadFailed))?;
+    let parameters = (|| -> NResult<_> {
+        let state = unsafe {
+            component::load_aimdo(
+                rt,
+                aimdo,
+                path,
+                &Options::Atom(V::None),
+                &StorageAnnotations::default(),
+            )
+        }?;
+        let mut parameters = prepare(rt, Component::Dit, &state)?;
+        parameters.values.insert(
+            "model_sampling.sigmas".into(),
+            V::tensor(sampling.sigmas.shallow_clone()),
+        );
+        let inventory = h3::checkpoint::component_inventory(Component::Dit)?;
+        let cast = inventory
+            .modules
+            .iter()
+            .filter(|m| m.cast_weights)
+            .flat_map(|m| m.parameters.iter().cloned())
+            .collect::<std::collections::BTreeSet<_>>();
+        let owner = super::loras::owner(&parameters, &models.root, &models.options.loras)
+            .inspect_err(|_| lora_failure = true)?;
+        for key in owner.patches.keys() {
+            if !cast.contains(key) {
+                lora_failure = true;
+                return Err(Error::Native(
+                    "A LoRA patches a weight that dynamic VRAM cannot patch".into(),
+                ));
+            }
+            owner.bind_lowvram(&mut parameters, key, 1);
+        }
+        crate::checkpoint::dynamic::prepare_model(rt, aimdo.path(), parameters, inventory)
+    })()
+    .map_err(|error| {
+        classify(
+            &error,
+            if lora_failure {
+                ErrorCode::LoraLoadFailed
+            } else {
+                ErrorCode::ComponentLoadFailed
+            },
+        )
+    })?;
+    let mut exec = Exec {
+        native: rt.native.clone(),
+        attention: Attention {
+            method: attention_method(rt, models.execution.attention)?,
+            priority_wrapper: true,
+            attention_precision: None,
+            low_precision_attention: true,
+            model_device: Device::Cuda(0),
+        },
+        sampler_progress: p::progress::Tracker::new(p::STEPS),
+        capture_prediction: false,
+        last_prediction: None,
+        window: None,
+        preview: None,
+        boundary_window_seen: false,
+        notify,
+    };
+    let result = forward(&parameters, &mut sampling, &mut exec);
+    // Complete queued uses before destroying the VBAR and its ATen views.
+    let synchronized = rt.native.synchronize_device(0);
+    drop(parameters);
+    let release = rt.native.cuda_soft_empty_cache(0);
+    let out = result.map_err(|error| classify(&error, ErrorCode::GenerationFailed))?;
+    synchronized
+        .and(release)
+        .map_err(|error| classify(&error, ErrorCode::GenerationFailed))?;
+    Ok(out)
+}
 fn component<T>(
     rt: &Runtime,
     aimdo: &Aimdo,
@@ -350,7 +439,7 @@ fn component<T>(
         let mut exec = Exec {
             native: rt.native.clone(),
             attention: Attention {
-                method: attention_method(rt, models.attention)?,
+                method: attention_method(rt, models.execution.attention)?,
                 priority_wrapper: true,
                 attention_precision: None,
                 low_precision_attention: true,
@@ -375,6 +464,9 @@ fn component<T>(
             .and(release)
             .map_err(|error| classify(&error, ErrorCode::GenerationFailed))?;
         return Ok(out);
+    }
+    if role == Component::Dit && models.execution.dynamic_vram {
+        return dynamic_dit(rt, aimdo, models, &path, notify, forward);
     }
     let mut lora_failure = false;
     let setup = (|| -> NResult<_> {
@@ -450,7 +542,7 @@ fn component<T>(
         let mut exec = Exec {
             native: rt.native.clone(),
             attention: Attention {
-                method: attention_method(rt, models.attention)?,
+                method: attention_method(rt, models.execution.attention)?,
                 priority_wrapper: true,
                 attention_precision: None,
                 low_precision_attention: true,
@@ -545,7 +637,7 @@ impl Generator for Native {
             self.config.model_root.clone(),
             request.profile == p::Profile::ImageToAvV1,
             request.options.clone(),
-            request.execution.attention,
+            request.execution,
         )?;
         models.verify_all()?;
         // Everything above is admitted-request bounded CPU header validation. The first
@@ -594,7 +686,7 @@ impl Generator for Native {
                     self.config.model_root.clone(),
                     second.profile == p::Profile::ImageToAvV1,
                     options,
-                    request.execution.attention,
+                    request.execution,
                 )
             })
             .transpose()?;

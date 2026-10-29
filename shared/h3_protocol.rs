@@ -150,10 +150,27 @@ pub mod execution {
     }
     /// A checkpoint's own ComfyAttention preference applies in every mode, as
     /// in ComfyUI.
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
     #[serde(deny_unknown_fields)]
     pub struct Settings {
+        #[serde(default)]
         pub attention: Attention,
+        /// Diffusion models keep their weights on the host and bring each
+        /// layer into VRAM when it runs, evicting under memory pressure, as
+        /// ComfyUI's dynamic VRAM. Off places them once, statically.
+        #[serde(default = "on")]
+        pub dynamic_vram: bool,
+    }
+    impl Default for Settings {
+        fn default() -> Self {
+            Self {
+                attention: Attention::default(),
+                dynamic_vram: true,
+            }
+        }
+    }
+    fn on() -> bool {
+        true
     }
 }
 impl Request {
