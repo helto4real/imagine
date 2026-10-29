@@ -973,6 +973,17 @@ async fn agent_produces_a_video_in_its_workspace_and_resumes_with_the_key() {
     );
     assert_eq!(probe.completions.load(Ordering::SeqCst), 0);
 
+    // A key change: the new key works, the old does not, and the key file holds
+    // only the new one.
+    let workspaces = imagine.store.workspaces.as_ref().unwrap();
+    let rotated = workspaces.replace_key(&workspace.meta.id).unwrap();
+    assert_ne!(rotated, key);
+    assert_eq!(workspaces.key(&workspace.meta.id).unwrap(), rotated);
+    assert!(workspaces.resolve(&key).is_err());
+    let key_file = workspace.folder.join("AGENT-KEY.txt");
+    let text = std::fs::read_to_string(&key_file).unwrap();
+    assert!(text.starts_with(&format!("{rotated}\n\n")) && !text.contains(&key));
+
     running.close().await;
     imagine.stop().await;
     relay_task.abort();

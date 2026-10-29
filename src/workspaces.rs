@@ -131,6 +131,18 @@ fn key_text(key: &str) -> String {
         "{key}\n\nAgent key for this Imagine workspace. Give it to an agent that should\ncontinue this work; the agent opens the workspace with workspace_open.\n"
     )
 }
+/// The key file while a new key replaces the old one: both, newest first.
+fn rotating_key_text(new: &str, old: &str) -> String {
+    format!("{new}\n{}", key_text(old))
+}
+/// The first key of a key file (the lines before its blank line) whose hash the
+/// workspace accepts.
+fn accepted_key<'a>(text: &'a str, hash: &str) -> Option<&'a str> {
+    text.lines()
+        .map(str::trim)
+        .take_while(|line| !line.is_empty())
+        .find(|key| ids::key_hash(key) == hash)
+}
 /// What the first bytes of a file are, by content.
 pub fn media_type(head: &[u8]) -> Option<(&'static str, &'static str, &'static str)> {
     let at = |offset: usize, magic: &[u8]| head.get(offset..offset + magic.len()) == Some(magic);
@@ -335,31 +347,29 @@ impl Workspaces {
             .root
             .read(&workspace.relative.join(KEY_FILE))?
             .ok_or("workspace_key_missing")?;
-        let key = String::from_utf8_lossy(&bytes)
-            .lines()
-            .next()
-            .unwrap_or("")
-            .trim()
-            .to_owned();
-        if ids::key_hash(&key) != workspace.meta.key_sha256 {
-            return Err(Error("workspace_key_missing"));
-        }
-        Ok(key)
+        accepted_key(&String::from_utf8_lossy(&bytes), &workspace.meta.key_sha256)
+            .map(str::to_owned)
+            .ok_or(Error("workspace_key_missing"))
     }
-    /// A new key; the old one stops working at once.
+    /// A new key; the old one stops working at once. The key file holds both keys
+    /// until the new one is accepted, so an interrupted change always leaves the
+    /// accepted key retrievable.
     pub fn replace_key(&self, id: &str) -> Result<String> {
         let mut workspace = self.get(id)?;
+        let old = self.key(id).ok();
         let key = ids::new_key(&random::<17>()?);
+        let key_file = workspace.relative.join(KEY_FILE);
+        if let Some(old) = &old {
+            self.root
+                .write(&key_file, rotating_key_text(&key, old).as_bytes())?;
+        }
         workspace.meta.key_sha256 = ids::key_hash(&key);
         self.root.write(
             &workspace.relative.join(META_FILE),
             &serde_json::to_vec_pretty(&workspace.meta).map_err(|_| "workspace_invalid")?,
         )?;
-        self.root.write(
-            &workspace.relative.join(KEY_FILE),
-            key_text(&key).as_bytes(),
-        )?;
         self.scan();
+        self.root.write(&key_file, key_text(&key).as_bytes())?;
         Ok(key)
     }
     /// Whether `path` is a workspace's image output folder.
@@ -555,5 +565,22 @@ mod tests {
         assert_eq!(media_type(b"\0\0\0\x18ftypisom").unwrap().0, "video");
         assert_eq!(media_type(b"RIFF\0\0\0\0WAVEfmt ").unwrap().0, "audio");
         assert_eq!(media_type(b"#!/bin/sh"), None);
+    }
+    #[test]
+    fn interrupted_key_changes_leave_the_accepted_key_readable() {
+        let (old, new) = ("imk-own-old-key", "imk-own-new-key");
+        let rotating = rotating_key_text(new, old);
+        // Before the new hash is written the old key is accepted, after it the new.
+        assert_eq!(accepted_key(&rotating, &ids::key_hash(old)), Some(old));
+        assert_eq!(accepted_key(&rotating, &ids::key_hash(new)), Some(new));
+        assert_eq!(accepted_key(&key_text(new), &ids::key_hash(new)), Some(new));
+        assert_eq!(accepted_key(&key_text(new), &ids::key_hash(old)), None);
+        // The explanation below the keys is never taken for a key.
+        assert!(
+            rotating
+                .lines()
+                .skip(3)
+                .all(|l| l.is_empty() || l.contains(' '))
+        );
     }
 }
