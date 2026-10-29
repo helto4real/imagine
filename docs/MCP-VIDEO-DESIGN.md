@@ -197,10 +197,13 @@ one pass:
    response is the **context bundle**:
    - the inventory, outline and scene-expansion system prompts, verbatim from
      the profile (dialogue variants as selected; schema placeholder filled);
-   - the outline and expansion user messages rendered with every fixed context
-     block. Expansion messages mark three per-scene slots the agent fills from
-     its own work: `<previous_scene_context>`, `<next_scene_summary>` and
-     `<scene_json>`;
+   - the outline and expansion user messages, built as Director builds them
+     (see `design/video-contract/authoring.md`, "Director Story messages").
+     The outline marks one `inventory_note:<image id>` slot per story image;
+     the expansion template marks its per-scene blocks (`previous_scene_summary`,
+     `previous_scene_context`, `next_scene_summary`, `selected_cast`,
+     `continuity_cast`, `dialogue_timing` with dialogue, `scene_json` and
+     `image_context`), each described in `slot_values`;
    - every story image as the same normalized JPEG the provider receives, and
      the selected cast's identity images, labelled by role;
    - profile revision, prompt files and planning limits.
@@ -226,9 +229,11 @@ Rationale:
 
 - Profile text is delivered verbatim and its output instructions match what the
   server parses. Profiles are never edited for the MCP path.
-- The agent's context equals the provider's: the per-scene slots hold values
-  the agent wrote itself, and a test proves that filling them with the
-  provider's values reproduces the provider's messages byte for byte.
+- The agent's context equals the provider's: the slots hold values the agent
+  wrote itself, and a test proves that filling them with the provider's values
+  reproduces the provider's messages byte for byte. The provider path also
+  writes references as Director's `[[DIRECTOR_REF_nnnn]]` markers; an agent
+  may write them directly.
 - One parser, validator and projection for both paths; no second schema.
 - Two calls author the whole video, with no GPU and no local model involved.
 - Production choices stay out of creative text and out of compiled prompts.

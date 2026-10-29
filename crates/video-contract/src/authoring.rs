@@ -170,6 +170,9 @@ pub struct InventoryNote {
 #[serde(deny_unknown_fields)]
 pub struct StorySection {
     pub id: String,
+    /// A Section summary an expansion may write, as in Director; never applied.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub summary: String,
     pub prompt: String,
     pub weight: f64,
     #[serde(default)]

@@ -47,7 +47,8 @@ project asset, display label and `setting_reference`, `required_moment`,
 The model assigns semantic beats to Scene/Section ordinals; code owns image IDs,
 frame roles and the Director two-turn dialogue limit. Eighteen valid/invalid
 projection cases match the actual Director contract implementation, including
-its code-owned Scene/Section IDs. This does not test the entire prompt builder.
+its code-owned Scene/Section IDs. The Story messages themselves follow
+"Director Story messages" below.
 
 Inventory runs sequentially using the exact profile's `image_analysis` settings
 and `story_image_inventory` prompt. Outline/expansion choose the matching
@@ -82,7 +83,6 @@ CHECKPOINT-22 adds Enhance protection/restoration with the distinct Prompt
 Studio lexical contract. Missing provider markers retain the original source
 and report a failed proposal; new markers produce a review warning. Retry uses
 the same snapshot. The Enhance user-prompt builder matches the source function.
-Full Story dynamic prompt/protection construction remains a separate gap.
 
 Native H3 I2V (three fields) and Reference (six sections) compilers now produce
 dialogue/speaker/language/voice guidance, tags, sound/music channels, timed shots,
@@ -114,6 +114,56 @@ FirstFrame relation with audio continuity off. Model/conditioning eligibility
 must still be reviewed before Runs. Replace currently fails document integrity
 validation when existing Scenes have stored Takes; automatic deletion is absent.
 
+## Director Story messages
+
+The inventory, outline and Scene expansion user messages, and the outline
+schema in the system prompt, are Director's own construction for the same
+input. `src/video/authoring/director.rs` ports the server side
+(`shared/prompt_studio.py` `_inventory_user_prompt`, `_build_story_outline`,
+`_story_outline_user_prompt`, `_run_story_scene`/`_story_scene_user_prompt`,
+`normalize_story_cast`, the continuation normalizers, `protect_references`, and
+`shared/contracts/story_outline.py`'s schema) with Python's JSON spacing, key
+order, int/float distinction and float repr. `src/video/authoring/steps.rs`
+builds the requests Director's browser would send (`web/timeline/prompt_studio*.js`,
+`story_cast.js`): cast records, `storyContinuationAvailability`,
+`allocateStoryTimings`/`promptStudioDialogueTiming`, visual beat records and the
+per-Scene cast filter.
+
+- The outline carries Director's rows: task, array placement rule, character
+  reference rule, the minimal JSON shape with the cast's tags (two Scenes above
+  15 s, a `dialogue_intent` example with dialogue), the exact schema, total
+  duration, maximum Scene duration, minimum Scene count, the music flag, the
+  image inventory and visual beats, then `selected_cast`,
+  `continuation_context`, `additional_instruction` and `story`.
+- An expansion carries `previous_scene_summary`, `previous_scene_context`,
+  `next_scene_summary`, the cast its Scene names, `continuity_cast`,
+  `dialogue_timing` with dialogue, `additional_instruction` and the Scene in
+  Director's layout. Images are supplied as before.
+- References in the story, cast, continuation and Scene blocks are sent as
+  `[[DIRECTOR_REF_nnnn]]` markers and restored in the answer, as in Director.
+  Reference tags use Director's alias normalization.
+- Imagine's images map to Director visuals: a setting reference is a reusable
+  `story_reference`, a Required moment a `required_moment`, and start/end frames
+  are placed once; each start/end pair is a directed beat `beat_<n>`. Beat keys
+  are `required_moment:<id>` and `start_end_pair:beat_<n>`, moments first.
+  Imagine keeps no separate user cue, so `user_note` and `cue` are empty.
+- Continue sends Director's continuation context (the last Scene, the two
+  summaries before it and the characters they name). A last Scene without
+  authored text fails `story_continuation_text_missing`; malformed context
+  `story_continuation_context_invalid`; over-limit context
+  `story_continuation_context_limit`.
+- A Section may carry Director's optional `summary`; it is never applied.
+
+Evidence: `tools/director-story-messages-oracle.py` runs Director's Python
+builders, with only the provider call captured, on eleven synthetic browser
+requests (`tests/fixtures/director-story-messages.json`);
+`tools/director-story-browser-oracle.mjs` runs the browser helpers on
+continuation, timing, beat, cast and previous-Scene inputs
+(`tests/fixtures/director-story-browser.json`). Rust compares both byte for
+byte without Python or Node. The adaptive and one-Scene policies, visual-binding
+sidecars and Director's response text normalization (Markdown and backtick
+removal) are not ported; Imagine keeps its own answer validation.
+
 ## Timing and source
 
 Ordinary Director timing uses the 250 ms minimum when possible, weighted
@@ -121,9 +171,9 @@ remaining duration and 15 second Scene capacity redistribution. Materialization
 uses exact microsecond endpoints and local Section times. This Story policy is
 separate from H3 generation limits. Ambient/music source is retained and appended
 explicitly to authored description; authoring does not synthesize/mix audio.
-Continue captures the last Scene by occupied endpoint, bounded to Director's
-16,000-character fields, 128 Sections and 100,000-character context. Oversized
-input fails rather than being truncated. Provider responses are bounded.
+Continue captures the last Scene in Director's timeline order (start, end,
+id), bounded to Director's 16,000-character fields, 128 Sections and
+100,000-character context. Oversized input fails rather than being truncated. Provider responses are bounded.
 
 ## Verification and remaining scope
 
@@ -132,8 +182,7 @@ private projects, production services or GPU. Snapshot/retry, stale Apply, exact
 reviewed text, timing, expansion structure and Save/Open have regression tests.
 Native UI QA is recorded separately. These make no live LLM quality claim.
 
-P07 remains incomplete: full Story prompt/protection construction, broader
-dialogue lexical diagnostics, full Reference manifest/runtime projection,
+P07 remains incomplete: broader dialogue lexical diagnostics, full Reference manifest/runtime projection,
 full library reference metadata/editing semantics,
 binding editing/acceptance for every visual role, Animate authoring, richer
 field selection, catalog editor, IntelliSense/Phrase Composer, provider context

@@ -221,6 +221,7 @@ pub(in crate::app) fn edit_outline(draft: &mut Draft, edit: OutlineEdit, selecte
                 boundary_from_previous: "hard_cut".into(),
                 sections: vec![StorySection {
                     id: fresh_id("section"),
+                    summary: String::new(),
                     prompt: String::new(),
                     weight: 1.,
                     image_ids: vec![],
@@ -247,6 +248,7 @@ pub(in crate::app) fn edit_outline(draft: &mut Draft, edit: OutlineEdit, selecte
             if let Some(scene) = scenes.get_mut(i).filter(|s| s.sections.len() < 12) {
                 scene.sections.push(StorySection {
                     id: fresh_id("section"),
+                    summary: String::new(),
                     prompt: String::new(),
                     weight: 1.,
                     image_ids: vec![],
@@ -385,6 +387,7 @@ mod tests {
         for s in &mut d.outline.as_mut().unwrap().scenes {
             s.sections.push(StorySection {
                 id: format!("{}-1", s.id),
+                summary: String::new(),
                 prompt: "Own beat".into(),
                 weight: 1.,
                 image_ids: vec![],

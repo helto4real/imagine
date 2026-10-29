@@ -49,10 +49,16 @@ fn fill(template: &str, slots: &[(&str, &str)]) -> String {
             text.replace(&format!("{{{{SLOT:{name}}}}}"), value)
         })
 }
+/// One block of a Director message.
+fn block<'a>(text: &'a str, tag: &str) -> &'a str {
+    text.split(&format!("<{tag}>\n"))
+        .nth(1)
+        .and_then(|s| s.split(&format!("\n</{tag}>")).next())
+        .unwrap()
+}
 /// The bundle's messages, filled with the provider path's own values,
 /// reproduce every message the provider received.
 fn assert_equivalent(requests: &[Value], ready: &Value, bundle: &Value) {
-    let notes = ready["inventory"].to_string();
     let images = ready["request"]["images"].as_array().unwrap().len();
     let (inventory, rest) = requests.split_at(images);
     for (i, sent) in inventory.iter().enumerate() {
@@ -74,11 +80,26 @@ fn assert_equivalent(requests: &[Value], ready: &Value, bundle: &Value) {
         outline["messages"][0]["content"],
         bundle["outline"]["system"]
     );
+    let notes = ready["inventory"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| {
+            let escaped = serde_json::to_string(n["note"].as_str().unwrap()).unwrap();
+            (
+                format!("inventory_note:{}", n["id"].as_str().unwrap()),
+                escaped[1..escaped.len() - 1].to_owned(),
+            )
+        })
+        .collect::<Vec<_>>();
     assert_eq!(
         user_text(outline),
         fill(
             bundle["outline"]["user"].as_str().unwrap(),
-            &[("image_inventory", &notes)]
+            &notes
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect::<Vec<_>>()
         )
     );
     let scenes = ready["outline"]["scenes"].as_array().unwrap();
@@ -90,32 +111,57 @@ fn assert_equivalent(requests: &[Value], ready: &Value, bundle: &Value) {
             sent["messages"][0]["content"],
             bundle["expansion"]["system"]
         );
-        let previous = if i == 0 {
-            bundle["expansion"]["slot_values"]["previous_scene_context"]["first_scene"]
-                .as_str()
-                .unwrap()
-                .to_owned()
-        } else {
-            ready["scenes"][i - 1].to_string()
+        let user = user_text(sent);
+        let summary = |j: Option<usize>| {
+            j.and_then(|j| scenes.get(j))
+                .map(|s| s["summary"].as_str().unwrap())
+                .unwrap_or("")
         };
-        let next = scenes
-            .get(i + 1)
-            .map(|s| s["summary"].as_str().unwrap())
-            .unwrap_or("");
+        assert_eq!(
+            block(&user, "previous_scene_summary"),
+            summary(i.checked_sub(1))
+        );
+        assert_eq!(block(&user, "next_scene_summary"), summary(Some(i + 1)));
+        let scene: Value = serde_json::from_str(block(&user, "scene_json")).unwrap();
+        assert_eq!(scene["id"], scenes[i]["id"]);
+        if i == 0 {
+            let first =
+                &bundle["expansion"]["slot_values"]["previous_scene_context"]["first_scene"];
+            if !first.as_str().unwrap().contains('@') {
+                assert_eq!(
+                    block(&user, "previous_scene_context"),
+                    first.as_str().unwrap()
+                );
+            }
+        }
         let context = if sent_images(sent).is_empty() {
             &rule["without_images"]
         } else {
             &rule["with_images"]
         };
+        let timing = if user.contains("<dialogue_timing>") {
+            block(&user, "dialogue_timing")
+        } else {
+            ""
+        };
         assert_eq!(
-            user_text(sent),
+            user,
             fill(
                 template,
                 &[
-                    ("previous_scene_context", &previous),
-                    ("next_scene_summary", next),
-                    ("scene_json", &scenes[i].to_string()),
-                    ("image_inventory", &notes),
+                    (
+                        "previous_scene_summary",
+                        block(&user, "previous_scene_summary")
+                    ),
+                    (
+                        "previous_scene_context",
+                        block(&user, "previous_scene_context")
+                    ),
+                    ("next_scene_summary", block(&user, "next_scene_summary")),
+                    ("selected_cast", block(&user, "selected_cast")),
+                    ("continuity_cast", block(&user, "continuity_cast")),
+                    ("dialogue_timing", timing),
+                    ("scene_json", block(&user, "scene_json")),
                     ("image_context", context.as_str().unwrap()),
                 ]
             ),
@@ -175,17 +221,25 @@ async fn external_bundle_matches_the_provider_path_and_submission_parses_identic
     assert_equivalent(&requests, &ready, bundle);
     assert_eq!(
         bundle["outline"]["slots"],
-        json!(["image_inventory"]),
+        json!([
+            "inventory_note:own_setting",
+            "inventory_note:own_start",
+            "inventory_note:own_end",
+            "inventory_note:own_moment"
+        ]),
         "{}",
         bundle["outline"]
     );
     assert_eq!(
         bundle["expansion"]["slots"],
         json!([
+            "previous_scene_summary",
             "previous_scene_context",
             "next_scene_summary",
+            "selected_cast",
+            "continuity_cast",
+            "dialogue_timing",
             "scene_json",
-            "image_inventory",
             "image_context"
         ])
     );
@@ -539,7 +593,7 @@ fn story() -> (Value, Vec<String>) {
         scene("entry","continuous_shot",false,1),
         scene("parcel","continuous_shot",false,1),
         scene("close","hard_cut",false,1)
-    ],"visual_placements":[{"beat_key":"pair_own_open","scene_ordinal":2,"section_ordinal":1,"semantic_role":"state_transition"}]});
+    ],"visual_placements":[{"beat_key":"start_end_pair:beat_1","scene_ordinal":2,"section_ordinal":1,"semantic_role":"state_transition"}]});
     let expansions = outline["scenes"]
         .as_array()
         .unwrap()

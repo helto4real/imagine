@@ -1,4 +1,5 @@
 //! Authoring services do not own a model reservation or invoke H3 inference.
+pub mod director;
 pub mod drafts;
 pub mod engine;
 pub(crate) mod grounding;

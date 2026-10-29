@@ -76,6 +76,31 @@ fn tokens(text: &str) -> Vec<(usize, usize)> {
     }
     out
 }
+/// Director's markers for every reference in `text`, given the markers
+/// `protect_references` assigned to the whole payload `text` belongs to.
+pub fn apply(text: &str, references: &[(String, String)]) -> String {
+    let mut out = String::new();
+    let mut cursor = 0;
+    for (start, end) in tokens(text) {
+        out.push_str(&text[cursor..start]);
+        let reference = &text[start..end];
+        match references.iter().find(|(_, r)| r == reference) {
+            Some((marker, _)) => out.push_str(marker),
+            None => out.push_str(reference),
+        }
+        cursor = end;
+    }
+    out.push_str(&text[cursor..]);
+    out
+}
+/// `restore_references_in_value` on JSON text: markers never need escaping.
+pub fn restore_all(text: &str, references: &[(String, String)]) -> String {
+    references
+        .iter()
+        .fold(text.to_owned(), |text, (marker, reference)| {
+            text.replace(marker, reference)
+        })
+}
 impl Protected {
     pub fn new(source: &str) -> Self {
         let mut references: Vec<(String, String)> = vec![];

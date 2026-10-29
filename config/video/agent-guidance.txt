@@ -18,12 +18,17 @@ Starting a Draft with `provider: "external"` returns a bundle with everything th
 - `profile`, `limits` and `code_owned_fields`.
 Treat each system prompt as the instructions for that step and each user message as its task, exactly as the provider would. Dialogue variants are already selected by `add_dialogue`.
 
-User messages contain slots written as {{SLOT:name}}, listed in `slots`. They stand for values from your own work:
-- `image_inventory`: your inventory notes as a JSON array of {id, note}, in story image order.
-- `previous_scene_context`: your expansion of the previous Scene as compact JSON; for the first Scene, the value given in `slot_values` (an existing Scene when continuing a timeline, otherwise null).
+User messages contain slots written as {{SLOT:name}}, listed in `slots`. They stand for values from your own work; `slot_values` describes each:
+- `inventory_note:<image id>`: your inventory note for that story image, escaped as the body of a JSON string.
+- `previous_scene_summary`: the previous outline Scene's summary; empty for the first Scene.
+- `previous_scene_context`: your expansion of the previous Scene as JSON {title, summary, description, ambient_sound, non_diegetic_music, sections: [{prompt}]}; for the first Scene, the value given in `slot_values` (an existing Scene when continuing a timeline, otherwise null).
 - `next_scene_summary`: the next outline Scene's summary; empty for the last Scene.
+- `selected_cast`: the outline's selected_cast entries whose reference tag appears in this Scene.
+- `continuity_cast`: for the first Scene the value given in `slot_values`, otherwise [].
+- `dialogue_timing`: with dialogue, this Scene's planned Scene and Section seconds.
 - `scene_json`: this Scene from your outline, as projected by the server.
 - `image_context`: the `with_images` text when the Scene uses any story image, otherwise `without_images`.
+The provider path writes each @reference as a [[DIRECTOR_REF_nnnn]] marker and restores it in the answer; you may write references directly.
 
 Music: set `add_music: false` and leave every `non_diegetic_music` empty unless the user explicitly asks for music. Then no music is requested from the model (`non_diegetic_music: N/A`); scene sound comes only from `ambient_sound`. Do not describe a score, song or soundtrack in any other field either.
 

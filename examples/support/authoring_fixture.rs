@@ -53,7 +53,15 @@ async fn reply(State(state): State<Arc<Fixture>>, Json(body): Json<Value>) -> Js
             .and_then(|s| serde_json::from_str::<Value>(s).ok())
             .unwrap_or(Value::Null)
     };
-    let text = if user.contains("<image_id>") {
+    // One labelled row of a Director message: `Label:\n<json>`.
+    let row = |name: &str| {
+        user.split(&format!("\n\n{name}:\n"))
+            .nth(1)
+            .and_then(|s| s.split("\n\n").next())
+            .and_then(|s| serde_json::from_str::<Value>(s).ok())
+            .unwrap_or(Value::Null)
+    };
+    let text = if user.contains("\n\nStable image ID:\n") {
         if state.fail_inventory_once.swap(false, Ordering::SeqCst) {
             String::new()
         } else {
@@ -84,20 +92,20 @@ async fn reply(State(state): State<Arc<Fixture>>, Json(body): Json<Value>) -> Js
             }
             scene.to_string()
         }
-    } else if user.contains("<latest_moment>") {
+    } else if user.contains("\n\nMinimal JSON shape:\n") {
         let mut board = json!({"scenes":[{"title":"Arrival","summary":"Approach the lighthouse","description":"The keeper walks across the rocks.","ambient_sound":"Waves","non_diegetic_music":"Own score","weight":1,"boundary_from_previous":"hard_cut","setting_reference_matches":{},"sections":[{"prompt":"The keeper approaches the lighthouse.","weight":1}]},{"title":"Signal","summary":"Light the beacon","description":"The keeper lights the beacon.","ambient_sound":"Wind","non_diegetic_music":"","weight":2,"boundary_from_previous":"continuous_shot","setting_reference_matches":{},"sections":[{"prompt":"The keeper switches on the beacon.","weight":1}]}],"visual_placements":[]});
-        let images = tag("image_sources");
+        let images = row("Image inventory");
         for scene in board["scenes"].as_array_mut().unwrap() {
             for image in images
                 .as_array()
                 .into_iter()
                 .flatten()
-                .filter(|i| i["usage"] == "setting_reference")
+                .filter(|i| i["usage"] == "story_reference" && i["reuse"] == true)
             {
                 scene["setting_reference_matches"][image["id"].as_str().unwrap()] = json!(true);
             }
         }
-        board["visual_placements"]=json!(tag("visual_beats").as_array().into_iter().flatten().map(|b|json!({"beat_key":b["beat_key"],"scene_ordinal":1,"section_ordinal":1,"semantic_role":b["semantic_role"]})).collect::<Vec<_>>());
+        board["visual_placements"]=json!(row("Required image order and visual beats").as_array().into_iter().flatten().map(|b|json!({"beat_key":b["beat_key"],"scene_ordinal":1,"section_ordinal":1,"semantic_role":if b["type"]=="required_moment"{"depicted_moment"}else{"state_transition"}})).collect::<Vec<_>>());
         let cast = tag("selected_cast");
         let system = body["messages"][0]["content"]
             .as_str()

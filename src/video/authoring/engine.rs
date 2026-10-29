@@ -657,7 +657,7 @@ pub fn system_with_images(
         .ok_or("prompt_profile_unavailable")?;
     Ok(text.replace(
         "{{STORY_OUTLINE_JSON_SCHEMA}}",
-        &super::visuals::schema(images, dialogue)?.to_string(),
+        &super::director::schema_text(&super::visuals::contract(images, dialogue)?),
     ))
 }
 #[cfg(test)]

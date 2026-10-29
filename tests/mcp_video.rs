@@ -626,8 +626,11 @@ async fn agent_produces_a_video_in_its_workspace_and_resumes_with_the_key() {
         bundle["inventory"]["system"].as_str().unwrap(),
         prompt_file(&profile, "story_image_inventory")
     );
-    assert_eq!(bundle["outline"]["slots"], json!(["image_inventory"]));
-    for slot in ["image_inventory", "image_context", "scene_json"] {
+    assert_eq!(
+        bundle["outline"]["slots"],
+        json!(["inventory_note:own_harbour"])
+    );
+    for slot in ["previous_scene_context", "image_context", "scene_json"] {
         assert!(
             bundle["expansion"]["slots"]
                 .as_array()

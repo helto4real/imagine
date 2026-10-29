@@ -93,22 +93,10 @@ impl Service {
                 return Err(fault("section_not_found"));
             }
         }
-        if request.destination == Destination::Continue && base.scenes.is_empty() {
-            return Err(fault("story_continuation_source_missing"));
-        }
         if request.destination == Destination::Continue {
-            let scene =
-                steps::last_scene(&base).ok_or(fault("story_continuation_source_missing"))?;
-            if scene.description.chars().count() > 16000
-                || scene.sections.len() > 128
-                || scene
-                    .sections
-                    .iter()
-                    .any(|s| s.prompt.chars().count() > 16000)
-                || serde_json::to_string(scene).unwrap().chars().count() > 100000
-            {
-                return Err(fault("story_continuation_context_limit"));
-            }
+            steps::continuation(&base)
+                .and_then(|c| super::director::normalize_continuation(&c))
+                .map_err(fault)?;
         }
         let catalog = profiles::Catalog::load(&crate::config_files::path("video/prompt-profiles"))
             .map_err(fault)?;
@@ -609,29 +597,48 @@ impl Service {
             } else {
                 grounding.images.iter().map(|(_, p)| p.clone()).collect()
             };
-            let inventory = json!(draft.inventory).to_string();
+            // A Story message's reference markers, or why it cannot be built.
+            let mut markers = Ok(vec![]);
             let (key, operation, user, protected) = if expand {
-                let jobs = self.jobs.lock().unwrap();
-                let d = &jobs[&id].draft;
-                let outline = d.outline.as_ref().unwrap();
+                let message = {
+                    let jobs = self.jobs.lock().unwrap();
+                    steps::expansion_message(&jobs[&id].draft, &base, index, !images.is_empty())
+                };
+                let user = match message {
+                    Ok(message) => {
+                        markers = Ok(message.references);
+                        message.user
+                    }
+                    Err(code) => {
+                        markers = Err(code);
+                        String::new()
+                    }
+                };
                 (
                     steps::scene_key(draft.request.add_dialogue),
                     "story_scene_expansion",
-                    steps::expansion_message(
-                        &draft,
-                        &steps::previous_context(d, &base, index).to_string(),
-                        steps::next_summary(outline, index),
-                        &serde_json::to_string(&outline.scenes[index]).unwrap(),
-                        &inventory,
-                        !images.is_empty(),
-                    ),
+                    user,
                     None,
                 )
             } else if draft.request.operation == Operation::Outline {
+                let user = match steps::outline_message(
+                    &draft,
+                    &base,
+                    steps::Notes::Known(&draft.inventory),
+                ) {
+                    Ok(message) => {
+                        markers = Ok(message.references);
+                        message.user
+                    }
+                    Err(code) => {
+                        markers = Err(code);
+                        String::new()
+                    }
+                };
                 (
                     steps::outline_key(draft.request.add_dialogue),
                     "story_outline",
-                    steps::outline_message(&draft, &base, &inventory),
+                    user,
                     None,
                 )
             } else {
@@ -671,6 +678,7 @@ impl Service {
                 )
             };
             let result=async {
+                markers.clone()?;
                 if user.chars().count()>steps::CONTEXT_LIMIT{return Err("story_context_limit");}
                 let parameters=profiles::resolve(&profile.profile.generation,&draft.request.provider,operation)?;
                 let system=system_with_images(&profile,key,&draft.request.images,draft.request.add_dialogue)?;
@@ -688,9 +696,9 @@ impl Service {
             }
             let result = result.and_then(|text| {
                 if expand {
-                    steps::accept_expansion(&mut j.draft, index, &text)?;
+                    steps::accept_expansion(&mut j.draft, index, &text, &markers?)?;
                 } else if draft.request.operation == Operation::Outline {
-                    steps::accept_outline(&mut j.draft, &text)?;
+                    steps::accept_outline(&mut j.draft, &text, &markers?)?;
                 } else {
                     if text.len() > 65536 {
                         return Err("story_text_limit");

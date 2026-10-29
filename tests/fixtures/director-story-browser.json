@@ -1,0 +1,785 @@
+{
+ "source": "comfyui-helto-director ab8a643af92b3fe63adc3b78e626e4656b9d800e web/timeline/prompt_studio*.js, story_cast.js",
+ "continuation": [
+  {
+   "name": "three_scenes_unsorted_sections",
+   "references_enabled": true,
+   "references": [
+    {
+     "alias": "keeper",
+     "kind": "character",
+     "description": " Own fictional keeper ",
+     "enabled": true
+    },
+    {
+     "alias": "visitor",
+     "kind": "character",
+     "description": "Own visitor",
+     "enabled": true
+    },
+    {
+     "alias": "lamp",
+     "kind": "object",
+     "description": "Own lamp",
+     "enabled": true
+    },
+    {
+     "alias": "ghost",
+     "kind": "character",
+     "description": "Own ghost",
+     "enabled": false
+    },
+    {
+     "alias": "absent",
+     "kind": "character",
+     "description": "Own absent",
+     "enabled": true
+    }
+   ],
+   "scenes": [
+    {
+     "id": "own_c",
+     "start": 8,
+     "end": 12,
+     "title": "",
+     "summary": "",
+     "description": " Own harbour at dusk @lamp ",
+     "ambient_sound": "Gulls",
+     "non_diegetic_music": "",
+     "sections": [
+      {
+       "id": "own_b",
+       "start": 10,
+       "end": 12,
+       "prompt": "  "
+      },
+      {
+       "id": "own_a",
+       "start": 8,
+       "end": 10,
+       "prompt": "@keeper waits\n"
+      }
+     ]
+    },
+    {
+     "id": "own_a",
+     "start": 0,
+     "end": 4,
+     "title": "Own Arrival",
+     "summary": " @visitor lands. ",
+     "description": "",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": []
+    },
+    {
+     "id": "own_b",
+     "start": 4,
+     "end": 8,
+     "title": "",
+     "summary": "",
+     "description": "Own middle",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": []
+    }
+   ],
+   "context": {
+    "schema_version": 1,
+    "source_scene_id": "own_c",
+    "recent_scene_summaries": [
+     {
+      "title": "Own Arrival",
+      "summary": "@visitor lands."
+     }
+    ],
+    "previous_scene": {
+     "title": "Final Scene",
+     "summary": "",
+     "description": "Own harbour at dusk @lamp",
+     "ambient_sound": "Gulls",
+     "non_diegetic_music": "",
+     "sections": [
+      {
+       "prompt": "@keeper waits"
+      }
+     ]
+    },
+    "context_cast": [
+     {
+      "reference_tag": "@keeper",
+      "description": "Own fictional keeper",
+      "required": false
+     },
+     {
+      "reference_tag": "@visitor",
+      "description": "Own visitor",
+      "required": false
+     }
+    ],
+    "source_revision": "1ybznne"
+   }
+  },
+  {
+   "name": "recent_summaries_are_the_two_before_the_last",
+   "references_enabled": false,
+   "references": [
+    {
+     "alias": "keeper",
+     "kind": "character",
+     "description": "Own keeper",
+     "enabled": true
+    }
+   ],
+   "scenes": [
+    {
+     "id": "own_1",
+     "start": 0,
+     "end": 4,
+     "title": "Own 1",
+     "summary": "@keeper summary 1",
+     "description": "",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": [
+      {
+       "id": "own_1_s",
+       "start": 0,
+       "end": 4,
+       "prompt": "Own prompt 1"
+      }
+     ]
+    },
+    {
+     "id": "own_2",
+     "start": 4,
+     "end": 8,
+     "title": "Own 2",
+     "summary": "@keeper summary 2",
+     "description": "",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": [
+      {
+       "id": "own_2_s",
+       "start": 4,
+       "end": 8,
+       "prompt": "Own prompt 2"
+      }
+     ]
+    },
+    {
+     "id": "own_3",
+     "start": 8,
+     "end": 12,
+     "title": "",
+     "summary": "@keeper summary 3",
+     "description": "",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": [
+      {
+       "id": "own_3_s",
+       "start": 8,
+       "end": 12,
+       "prompt": "Own prompt 3"
+      }
+     ]
+    },
+    {
+     "id": "own_4",
+     "start": 12,
+     "end": 16,
+     "title": "Own 4",
+     "summary": "@keeper summary 4",
+     "description": "",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": [
+      {
+       "id": "own_4_s",
+       "start": 12,
+       "end": 16,
+       "prompt": "Own prompt 4"
+      }
+     ]
+    }
+   ],
+   "context": {
+    "schema_version": 1,
+    "source_scene_id": "own_4",
+    "recent_scene_summaries": [
+     {
+      "title": "Own 2",
+      "summary": "@keeper summary 2"
+     },
+     {
+      "title": "Scene",
+      "summary": "@keeper summary 3"
+     }
+    ],
+    "previous_scene": {
+     "title": "Own 4",
+     "summary": "@keeper summary 4",
+     "description": "",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": [
+      {
+       "prompt": "Own prompt 4"
+      }
+     ]
+    },
+    "context_cast": [],
+    "source_revision": "1hlptuu"
+   }
+  },
+  {
+   "name": "same_start_orders_by_end_then_id",
+   "references_enabled": true,
+   "references": [],
+   "scenes": [
+    {
+     "id": "own_z",
+     "start": 0,
+     "end": 4,
+     "title": "Z",
+     "summary": "",
+     "description": "Own z",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": []
+    },
+    {
+     "id": "own_y",
+     "start": 0,
+     "end": 4,
+     "title": "Y",
+     "summary": "",
+     "description": "Own y",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": []
+    },
+    {
+     "id": "own_x",
+     "start": 0,
+     "end": 2,
+     "title": "X",
+     "summary": "",
+     "description": "Own x",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": []
+    }
+   ],
+   "context": {
+    "schema_version": 1,
+    "source_scene_id": "own_z",
+    "recent_scene_summaries": [],
+    "previous_scene": {
+     "title": "Z",
+     "summary": "",
+     "description": "Own z",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": []
+    },
+    "context_cast": [],
+    "source_revision": "gxdhrl"
+   }
+  },
+  {
+   "name": "no_authored_text",
+   "references_enabled": true,
+   "references": [],
+   "scenes": [
+    {
+     "id": "own_empty",
+     "start": 0,
+     "end": 4,
+     "title": "Own",
+     "summary": " ",
+     "description": "",
+     "ambient_sound": "",
+     "non_diegetic_music": "",
+     "sections": [
+      {
+       "id": "own_s",
+       "start": 0,
+       "end": 4,
+       "prompt": " "
+      }
+     ]
+    }
+   ],
+   "context": null
+  }
+ ],
+ "timing": [
+  {
+   "duration": 20,
+   "scenes": [
+    [
+     1,
+     [
+      1,
+      2
+     ]
+    ],
+    [
+     2,
+     [
+      1
+     ]
+    ]
+   ],
+   "timing": [
+    {
+     "scene_duration_seconds": 6.75,
+     "sections": [
+      {
+       "id": "scene_001_section_001",
+       "duration_seconds": 2.3333333333333335
+      },
+      {
+       "id": "scene_001_section_002",
+       "duration_seconds": 4.416666666666666
+      }
+     ]
+    },
+    {
+     "scene_duration_seconds": 13.25,
+     "sections": [
+      {
+       "id": "scene_002_section_001",
+       "duration_seconds": 13.25
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "duration": 10,
+   "scenes": [
+    [
+     1,
+     [
+      1,
+      1,
+      1
+     ]
+    ]
+   ],
+   "timing": [
+    {
+     "scene_duration_seconds": 10,
+     "sections": [
+      {
+       "id": "scene_001_section_001",
+       "duration_seconds": 3.3333333333333335
+      },
+      {
+       "id": "scene_001_section_002",
+       "duration_seconds": 3.3333333333333335
+      },
+      {
+       "id": "scene_001_section_003",
+       "duration_seconds": 3.333333333333333
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "duration": 0.3,
+   "scenes": [
+    [
+     1,
+     [
+      1
+     ]
+    ],
+    [
+     1,
+     [
+      1
+     ]
+    ]
+   ],
+   "timing": [
+    {
+     "scene_duration_seconds": 0.15,
+     "sections": [
+      {
+       "id": "scene_001_section_001",
+       "duration_seconds": 0.15
+      }
+     ]
+    },
+    {
+     "scene_duration_seconds": 0.15,
+     "sections": [
+      {
+       "id": "scene_002_section_001",
+       "duration_seconds": 0.15
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "duration": 29.9,
+   "scenes": [
+    [
+     100,
+     [
+      1
+     ]
+    ],
+    [
+     1,
+     [
+      3,
+      1
+     ]
+    ]
+   ],
+   "timing": [
+    {
+     "scene_duration_seconds": 15,
+     "sections": [
+      {
+       "id": "scene_001_section_001",
+       "duration_seconds": 15
+      }
+     ]
+    },
+    {
+     "scene_duration_seconds": 14.899999999999999,
+     "sections": [
+      {
+       "id": "scene_002_section_001",
+       "duration_seconds": 11.049999999999997
+      },
+      {
+       "id": "scene_002_section_002",
+       "duration_seconds": 3.8500000000000014
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "duration": 7,
+   "scenes": [
+    [
+     1,
+     [
+      0.5,
+      0.25,
+      2
+     ]
+    ]
+   ],
+   "timing": [
+    {
+     "scene_duration_seconds": 7,
+     "sections": [
+      {
+       "id": "scene_001_section_001",
+       "duration_seconds": 1.3863636363636365
+      },
+      {
+       "id": "scene_001_section_002",
+       "duration_seconds": 0.8181818181818181
+      },
+      {
+       "id": "scene_001_section_003",
+       "duration_seconds": 4.795454545454545
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "duration": 44.5,
+   "scenes": [
+    [
+     1,
+     [
+      1
+     ]
+    ],
+    [
+     1,
+     [
+      2
+     ]
+    ],
+    [
+     1.5,
+     [
+      1,
+      1
+     ]
+    ]
+   ],
+   "timing": [
+    {
+     "scene_duration_seconds": 14.75,
+     "sections": [
+      {
+       "id": "scene_001_section_001",
+       "duration_seconds": 14.75
+      }
+     ]
+    },
+    {
+     "scene_duration_seconds": 14.75,
+     "sections": [
+      {
+       "id": "scene_002_section_001",
+       "duration_seconds": 14.75
+      }
+     ]
+    },
+    {
+     "scene_duration_seconds": 15,
+     "sections": [
+      {
+       "id": "scene_003_section_001",
+       "duration_seconds": 7.5
+      },
+      {
+       "id": "scene_003_section_002",
+       "duration_seconds": 7.5
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "beats": [
+  {
+   "images": [
+    {
+     "id": "own_setting",
+     "usage": "setting_reference"
+    },
+    {
+     "id": "own_start",
+     "usage": "start_frame"
+    },
+    {
+     "id": "own_m2",
+     "usage": "required_moment"
+    },
+    {
+     "id": "own_end",
+     "usage": "end_frame"
+    },
+    {
+     "id": "own_m1",
+     "usage": "required_moment"
+    }
+   ],
+   "visuals": [
+    {
+     "id": "own_setting",
+     "usage": "story_reference",
+     "note": ""
+    },
+    {
+     "id": "own_start",
+     "usage": "story_reference",
+     "note": ""
+    },
+    {
+     "id": "own_m2",
+     "usage": "required_moment",
+     "note": ""
+    },
+    {
+     "id": "own_end",
+     "usage": "story_reference",
+     "note": ""
+    },
+    {
+     "id": "own_m1",
+     "usage": "required_moment",
+     "note": ""
+    }
+   ],
+   "beats": [
+    {
+     "id": "beat_1",
+     "start_image_id": "own_start",
+     "end_image_id": "own_end",
+     "cue": ""
+    }
+   ],
+   "records": [
+    {
+     "beat_key": "required_moment:own_m2",
+     "type": "required_moment",
+     "order": 1,
+     "image_id": "own_m2",
+     "cue": ""
+    },
+    {
+     "beat_key": "required_moment:own_m1",
+     "type": "required_moment",
+     "order": 2,
+     "image_id": "own_m1",
+     "cue": ""
+    },
+    {
+     "id": "beat_1",
+     "start_image_id": "own_start",
+     "end_image_id": "own_end",
+     "cue": "",
+     "beat_key": "start_end_pair:beat_1",
+     "type": "start_end_pair",
+     "order": 1
+    }
+   ]
+  }
+ ],
+ "cast": {
+  "members": [
+   {
+    "title": "Own Keeper",
+    "alias": "keeper",
+    "description": " Own keeper ",
+    "language": "Swedish",
+    "voice": " calm "
+   },
+   {
+    "title": "keeper2",
+    "alias": "Keeper2",
+    "description": "",
+    "language": "",
+    "voice": ""
+   },
+   {
+    "title": "Dup",
+    "alias": "KEEPER",
+    "description": "Own duplicate",
+    "language": "",
+    "voice": ""
+   },
+   {
+    "title": "",
+    "alias": "visitor",
+    "description": "Own visitor",
+    "language": "English",
+    "voice": ""
+   }
+  ],
+  "records": [
+   {
+    "story_names": [
+     "Own Keeper",
+     "keeper"
+    ],
+    "reference_tag": "@keeper",
+    "description": "Own keeper",
+    "default_language": "Swedish",
+    "voice_guidance": "calm",
+    "required": true
+   },
+   {
+    "story_names": [
+     "keeper2",
+     "Keeper2"
+    ],
+    "reference_tag": "@keeper2",
+    "description": "",
+    "default_language": "",
+    "voice_guidance": "",
+    "required": true
+   },
+   {
+    "story_names": [
+     "visitor"
+    ],
+    "reference_tag": "@visitor",
+    "description": "Own visitor",
+    "default_language": "English",
+    "voice_guidance": "",
+    "required": true
+   }
+  ],
+  "scene": {
+   "id": "scene_001",
+   "title": "Own",
+   "summary": "@keeper2 waits",
+   "description": "",
+   "ambient_sound": "",
+   "non_diegetic_music": "",
+   "weight": 1,
+   "image_ids": [],
+   "boundary_from_previous": "hard_cut",
+   "sections": [
+    {
+     "id": "scene_001_section_001",
+     "summary": "",
+     "prompt": "Then\n@visitor and mail@keeper",
+     "weight": 1,
+     "image_ids": [],
+     "first_frame_id": "",
+     "last_frame_id": ""
+    }
+   ]
+  },
+  "scene_records": [
+   {
+    "story_names": [
+     "keeper2",
+     "Keeper2"
+    ],
+    "reference_tag": "@keeper2",
+    "description": "",
+    "default_language": "",
+    "voice_guidance": "",
+    "required": true
+   }
+  ]
+ },
+ "previous": {
+  "scene": {
+   "title": " Own ",
+   "summary": "",
+   "description": " d ",
+   "ambient_sound": "",
+   "non_diegetic_music": " m ",
+   "sections": [
+    {
+     "prompt": " a "
+    },
+    {
+     "prompt": "  "
+    },
+    {
+     "prompt": "b"
+    }
+   ]
+  },
+  "context": {
+   "title": "Own",
+   "summary": "",
+   "description": "d",
+   "ambient_sound": "",
+   "non_diegetic_music": "m",
+   "sections": [
+    {
+     "prompt": "a"
+    },
+    {
+     "prompt": "b"
+    }
+   ]
+  }
+ }
+}

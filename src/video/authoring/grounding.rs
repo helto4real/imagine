@@ -66,7 +66,7 @@ impl Grounding {
             if !r.enabled {
                 continue;
             }
-            cast.push(json!({"story_names":[r.name],"reference_tag":format!("@{}",r.alias.trim_start_matches('@')),"description":r.description,"required":true,"default_language":r.voice.as_ref().map(|v|v.language.as_str()).unwrap_or(""),"voice_guidance":r.voice.as_ref().map(|v|v.description.as_str()).unwrap_or("")}));
+            cast.push(json!({"story_names":[r.name],"reference_tag":format!("@{}",imagine_video_contract::creative::reference_alias(&r.alias)),"description":r.description,"required":true,"default_language":r.voice.as_ref().map(|v|v.language.as_str()).unwrap_or(""),"voice_guidance":r.voice.as_ref().map(|v|v.description.as_str()).unwrap_or("")}));
             if request.operation != Operation::Outline {
                 for image in r.images.iter().filter(|i| i.enabled) {
                     if !selections.iter().any(|i| i.asset == image.asset) {

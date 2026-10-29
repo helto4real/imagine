@@ -455,6 +455,7 @@ mod tests {
                 .sections
                 .push(imagine_video_contract::authoring::StorySection {
                     id: format!("{}-1", scene.id),
+                    summary: String::new(),
                     prompt: "Own beat".into(),
                     weight: 1.,
                     image_ids: vec![],
