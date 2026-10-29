@@ -3,7 +3,7 @@
 use crate::{storage_layout as layout, video_destination as d};
 use std::io::{Read, Write};
 use std::{
-    ffi::CString,
+    ffi::{CStr, CString},
     fs::File,
     os::fd::{AsRawFd, FromRawFd},
     os::unix::fs::MetadataExt,
@@ -479,30 +479,9 @@ impl NewFile {
                 libc::RENAME_NOREPLACE,
             )
         };
-        // Filesystems without RENAME_NOREPLACE: check, then rename.
+        // Filesystems without RENAME_NOREPLACE: an atomic hard link instead.
         if renamed != 0 && std::io::Error::last_os_error().raw_os_error() == Some(libc::EINVAL) {
-            let mut stat: libc::stat = unsafe { std::mem::zeroed() };
-            let taken = unsafe {
-                libc::fstatat(
-                    self.parent.as_raw_fd(),
-                    self.name.as_ptr(),
-                    &mut stat,
-                    libc::AT_SYMLINK_NOFOLLOW,
-                )
-            } == 0;
-            renamed = if taken {
-                unsafe { *libc::__errno_location() = libc::EEXIST };
-                -1
-            } else {
-                unsafe {
-                    libc::renameat(
-                        self.parent.as_raw_fd(),
-                        self.temporary.as_ptr(),
-                        self.parent.as_raw_fd(),
-                        self.name.as_ptr(),
-                    )
-                }
-            };
+            renamed = link_noreplace(self.parent.as_raw_fd(), &self.temporary, &self.name);
         }
         if renamed != 0 {
             let exists = std::io::Error::last_os_error().raw_os_error() == Some(libc::EEXIST);
@@ -521,6 +500,16 @@ impl NewFile {
             .sync_all()
             .map_err(|_| "private_storage_write_unconfirmed")
     }
+}
+/// Publishes `temporary` as `name` in `parent` without ever replacing an existing
+/// `name`: a hard link, which fails with EEXIST when the name is taken, then the
+/// temporary name is removed. A filesystem without hard links fails closed.
+fn link_noreplace(parent: std::os::fd::RawFd, temporary: &CStr, name: &CStr) -> libc::c_int {
+    let linked = unsafe { libc::linkat(parent, temporary.as_ptr(), parent, name.as_ptr(), 0) };
+    if linked == 0 {
+        unsafe { libc::unlinkat(parent, temporary.as_ptr(), 0) };
+    }
+    linked
 }
 impl Drop for NewFile {
     fn drop(&mut self) {
@@ -550,6 +539,43 @@ mod tests {
         }
         fn host(&self) -> d::Result<String> {
             Ok("own-fixture".into())
+        }
+    }
+    #[test]
+    fn link_publication_never_replaces_a_concurrent_winner() {
+        let dir = tempfile::tempdir().unwrap();
+        let parent = File::open(dir.path()).unwrap();
+        for round in 0..20 {
+            let name = CString::new(format!("own-{round}.bin")).unwrap();
+            let racers: Vec<_> = (0..2u8)
+                .map(|i| {
+                    let temporary = format!(".own-{round}-{i}.tmp");
+                    std::fs::write(dir.path().join(&temporary), [i; 64]).unwrap();
+                    let (fd, name) = (parent.as_raw_fd(), name.clone());
+                    std::thread::spawn(move || {
+                        let temporary = CString::new(temporary).unwrap();
+                        let published = link_noreplace(fd, &temporary, &name);
+                        let error = std::io::Error::last_os_error().raw_os_error();
+                        (i, published, error)
+                    })
+                })
+                .collect();
+            let results: Vec<_> = racers.into_iter().map(|r| r.join().unwrap()).collect();
+            let winners: Vec<_> = results.iter().filter(|r| r.1 == 0).collect();
+            assert_eq!(winners.len(), 1, "{results:?}");
+            assert!(
+                results
+                    .iter()
+                    .any(|r| r.1 != 0 && r.2 == Some(libc::EEXIST))
+            );
+            let published = std::fs::read(dir.path().join(name.to_str().unwrap())).unwrap();
+            assert_eq!(published, [winners[0].0; 64]);
+            // The winner's temporary name is gone; the loser keeps its own.
+            assert!(
+                !dir.path()
+                    .join(format!(".own-{round}-{}.tmp", winners[0].0))
+                    .exists()
+            );
         }
     }
     #[test]
