@@ -184,6 +184,9 @@ mod tests {
         assert!(prompt.contains("in all three body views: SYNTHETIC_CLOTHES. The face"));
         assert!(prompt.contains("exactly the left 45 percent"));
         assert!(prompt.contains("the remaining 55 percent"));
+        assert!(prompt.contains("to the soles of the feet"));
+        assert!(!prompt.contains("shoes"), "{prompt}");
+        assert!(!prompt.contains("glasses"), "{prompt}");
         assert!(!prompt.contains(['{', '}']), "{prompt}");
         sheet.clothing_description = " ".into();
         sheet.layout.portrait_fraction = 0.5;
