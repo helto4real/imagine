@@ -189,8 +189,12 @@ load, encoding, sampling and decoding. Every image was byte-identical to the
 earlier ones (Qwen `75ba1036`, MOSS `a4c2e962`), and dynamic VRAM is now faster
 than static placement, as in ComfyUI. A first job whose files are not in the
 page cache reads them from the model disk: 65.3 s for Qwen and 36.3 s for MOSS
-on this machine. The H3 source scene is unchanged (80.1 s, the same video) and
-Combo took 110 s; H3 has not been compared with the same trace yet.
+on this machine; with 64 GB of RAM the page cache does not hold Qwen, MOSS and
+H3 together, so switching families rereads them. The 80 s H3 scenes measured
+earlier were such jobs. With its files cached, the H3 source scene took 35.4 s
+(text 5.0 s, sampling 27.3 s; ComfyUI's code: conditioning 7.0 s, sampling
+25.6 s) and Combo 73.5 s (text 8.2 s, reference video 4.7 s, sampling 57.3 s;
+ComfyUI: 11.6 s and 61.5 s), with the earlier source video (`4e19f788`).
 
 The fixes left the results of the inference parity suite (`tests/primitives`,
 on the GPU under the coordinator) unchanged: 442 passed and the same 17 failed
@@ -202,6 +206,6 @@ Keeping models, VBARs and host pins between jobs, as ComfyUI does between
 prompts: its warm text encoding is 0.5–0.8 s against Imagine's 1.5 s, because
 its text encoder stays loaded. Pinned host staging for dynamic layers matters
 once models stay loaded and evict each other; on its own it would only speed
-up the first step. H3 against ComfyUI with the kernel trace, and a test matrix
+up the first step. A test matrix
 of both attention modes for Qwen, MOSS and H3 at Draft quality, comparing time,
 memory and output.
