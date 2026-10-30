@@ -63,43 +63,66 @@ pub(super) fn generate(
             .is_none_or(|r| r.reference_latents.is_empty()),
         ..Default::default()
     };
-    let text = observe_load("text", &r.text_encoder, observer, || {
-        let params = load(rt, aimdo, &r.text_encoder, "text", &r.model)?;
-        let patches = q::component_patch_owner("text", &params, &loras)?;
-        patch_report.merge(&patches.report);
-        Ok(c::StaticModel::new(
-            q::static_component(rt, "text", params)?
-                .with_shared_pins(pins.clone())
-                .with_patches(patches)?,
-            rt,
-            None,
-        ))
-    })?;
-    let patcher = text.patcher();
+    // Dynamic VRAM: the text encoder's layers enter a VBAR range when they
+    // run, as ComfyUI's text encoders do with it on.
+    let (text, dynamic_text) = if r.execution.dynamic_vram {
+        let params = observe_load("text", &r.text_encoder, observer, || {
+            let mut params = load(rt, aimdo, &r.text_encoder, "text", &r.model)?;
+            let patches = q::component_patch_owner("text", &params, &loras)?;
+            patch_report.merge(&patches.report);
+            let inventory = q::component_inventory("text")?;
+            bind_dynamic_patches(&patches, &mut params, &inventory.modules)?;
+            crate::checkpoint::dynamic::prepare_text(rt, aimdo.path(), params, inventory)
+        })?;
+        (None, Some(params))
+    } else {
+        let text = observe_load("text", &r.text_encoder, observer, || {
+            let params = load(rt, aimdo, &r.text_encoder, "text", &r.model)?;
+            let patches = q::component_patch_owner("text", &params, &loras)?;
+            patch_report.merge(&patches.report);
+            Ok(c::StaticModel::new(
+                q::static_component(rt, "text", params)?
+                    .with_shared_pins(pins.clone())
+                    .with_patches(patches)?,
+                rt,
+                None,
+            ))
+        })?;
+        (Some(text), None)
+    };
+    let patcher = text.as_ref().map(|t| t.patcher());
     let mut encode = |prompt: &str| -> Result<q::TextConditioning, Error> {
         let tokens = tokenizer.tokenize_prompt(prompt, &opts)?;
-        manager
-            .load(
-                std::slice::from_ref(&patcher),
-                0.,
-                None,
-                false,
-                false,
-                &mut memory,
-            )
-            .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?;
-        let params = text.owner.borrow().execution_parameters();
-        let encoder = q::QwenTextEncoder::from_parameters(Default::default(), &params)
+        let placed;
+        let params = match (&dynamic_text, &text, &patcher) {
+            (Some(params), _, _) => params,
+            (None, Some(text), Some(patcher)) => {
+                manager
+                    .load(
+                        std::slice::from_ref(patcher),
+                        0.,
+                        None,
+                        false,
+                        false,
+                        &mut memory,
+                    )
+                    .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?;
+                placed = text.owner.borrow().execution_parameters();
+                &placed
+            }
+            _ => unreachable!(),
+        };
+        let encoder = q::QwenTextEncoder::from_parameters(Default::default(), params)
             .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?;
         let vision = if images.is_empty() {
             None
         } else {
             Some(
-                q::QwenVisionEncoder::from_parameters(Default::default(), &params)
+                q::QwenVisionEncoder::from_parameters(Default::default(), params)
                     .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?,
             )
         };
-        let mut exec = q::ResidentExecution::bind(rt, &params, 0, attention(rt, r.execution)?)?;
+        let mut exec = q::ResidentExecution::bind(rt, params, 0, attention(rt, r.execution)?)?;
         unsafe {
             encoder.encode_prompt_with_images(
                 rt,
@@ -127,6 +150,9 @@ pub(super) fn generate(
     manager.unload_all(dev, &mut memory)?;
     drop(patcher);
     drop(text);
+    // Complete queued uses before destroying the VBAR and its ATen views.
+    rt.native.synchronize_device(0)?;
+    drop(dynamic_text);
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("loading_model"))?;
     let shape = [1, 64, r.height / 16, r.width / 16];

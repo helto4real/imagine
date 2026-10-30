@@ -42,14 +42,17 @@ ComfyUI's `ModelPatcherDynamic`. Modules register in its load order: a model's
 dynamic units, then `_load_list(for_dynamic=True)` sorted; these diffusion
 models define no units. LoRA patches are bound as low-VRAM patches that `Linear`
 applies where it uses the weight; a patch on any other weight fails the load by
-name rather than being dropped. Off places the diffusion model statically
-before sampling, as before. Text encoders already ran dynamically and VAEs
-stay static in both modes.
+name rather than being dropped. With it on, the Qwen and MOSS text encoders
+are dynamic too, as ComfyUI's text encoders are with dynamic VRAM; H3's text
+encoder always was. Off places the diffusion model and the image text encoders
+statically before use, as before. VAEs stay static in both modes.
 
 The general preparation lives in the inference core (`checkpoint/dynamic.rs`),
 so `native/product/build-lock.json` moved `core_revision` to the commit that
-contains it and updated that file's hash; every other core file is unchanged at
-the new revision.
+contains it and updated that file's hash. The parity fixes below changed more
+core files and added four to the lock's core list (`qwen_image21/denoiser.rs`,
+`qwen_image21/host_cache.rs`, `moss_image/text.rs`, `moss_image/execution.rs`),
+each unchanged from `source_base` before the fix.
 
 ## Each job
 
@@ -95,10 +98,8 @@ Each model gave the same image in all four runs. Dynamic VRAM cost 6.0–8.9 s
 per image (11–23 %), in sampling rather than loading, and the cost did not
 shrink when warm, while free GPU memory and worker RSS stayed within about
 200 MiB of the static runs. These jobs fit statically, so dynamic VRAM bought
-them nothing. The VBAR is released at the end of each job, so a warm job
-brings its weights in again. Imagine's port also lacks, as far as the source
-shows, ComfyUI's pinned host staging buffers; how much each contributes is
-unmeasured.
+them nothing. The cause was a defect, not residency or staging: see
+[Parity with ComfyUI](#parity-with-comfyui-2026-10-30).
 
 ComfyUI's own code for the same profiles, prompt and seed
 (`tools/image-python-reference.py`, checkout `426f5eea`, `--use-ck-attention`,
@@ -124,15 +125,83 @@ keeps the process at 2547–2935 MiB resident against 7788–14730 MiB static
 (the last at its peak). Each
 model's decoded pixels were identical with it on and off. Imagine's dynamic
 sampling took 42–55 % longer than ComfyUI's (Qwen 56.1/50.1 s against
-37.4/35.4 s, MOSS 39.1/34.1 s against 25.3/23.3 s) with about four times the
-resident memory, while Imagine's static placement and sampling were within
+37.4/35.4 s, MOSS 39.1/34.1 s against 25.3/23.3 s), while Imagine's static
+placement and sampling were within
 1–10 s of ComfyUI's static sampling. The gap is in Imagine's dynamic port, so
 an automatic choice would hide it; the port should be brought to ComfyUI's
 behavior instead. The reference sets comfy-aimdo's log level to warning, as
-`main.py` sets one; with it, decoding completed in every run.
+`main.py` sets one; with it, decoding completed in every run. The RSS columns
+are not comparable across the two: Imagine's counts the mapped checkpoint
+pages it touches, and how comfy-aimdo's host buffers appear in RSS is
+unverified.
+
+## Parity with ComfyUI, 2026-10-30
+
+A temporary build (not committed) wrote integer counters to a file of my own
+choosing: VBAR acquires, resident hits, copies and bytes per denoising step,
+and the time of each phase. It showed the Qwen diffusion model fully resident
+after step 1 (168 modules, 5.4 GB, no copies afterwards), so neither
+residency nor host staging explained the slower steps. Two runs per step of
+one row each matched ComfyUI, which does not batch these conditions either
+(their contexts have 26 and 56 tokens).
+
+A small CUPTI kernel tracer, preloaded into the image worker and into the
+ComfyUI reference, showed identical kernels with identical durations in both.
+ComfyUI's GPU was busy 34.6 s of its 36.1 s sampling window; Imagine's 33.0 s
+of 43.9 s. The gaps were host-to-device copies of exactly 48 MiB, one per
+block per forward (2600 copies, 8.3 s): `Linear::input_act`, the fused SwiGLU
+INT8 path, read the module's host weight instead of its VBAR lease, so each
+call copied the weight to the GPU. With dynamic VRAM off the weight is
+resident and the path had no gaps. It now takes the lease, as `forward` and
+ComfyUI's `cast_bias_weight` do.
+
+Other changes, each measured on the same synthetic prompt and seed:
+
+- **Text encoders on the dynamic path.** Qwen's static text encoder cost 1.3 s
+  to place and 3.2 s to unload per job; as a VBAR model it encodes both
+  prompts in about 1.4 s and drops in a fraction of a second. MOSS's text
+  embedding and gated-delta `conv1d` now take their leases, so its text
+  encoder runs dynamically as well (warm encoding 6.7 s before, 1.5 s after).
+- **Free memory counts what AIMDO could release** (`vbars_analyze`), as
+  `ModelPatcher.get_free_memory` does, for CFG batching (Qwen, MOSS) and the
+  Qwen prefix cache. It does not change these text-to-image jobs, whose
+  conditions cannot be concatenated; it follows ComfyUI where they can.
+- **comfy-aimdo 0.6.0** (ComfyUI's current version) was tried in place of the
+  locked build: no speed change for images, and the H3 worker failed every job
+  with `h3_protocol_error`. The lock keeps the earlier library.
+- **ComfyUI's compiler and prefetch queue** were ruled out on ComfyUI's side:
+  with `--disable-comfy-compiler` or `--disable-async-offload` its Qwen
+  sampling stayed at 35.7–36.0 s.
+
+Results through the proxy on the RTX 4070 Ti SUPER, Kitchen INT8 (`auto`),
+after the fix. Cold is the first job after a server restart with the model
+files in the OS page cache; warm repeats it.
+
+| Model | Dynamic VRAM | Cold | Warm | ComfyUI cold / warm |
+| --- | --- | --- | --- | --- |
+| Qwen | on | 41.8 s | 40.8 s | 41.6 / 36.8 s |
+| Qwen | off | 47.5 s | 45.0 s | 44.7 / 41.8 s |
+| MOSS | on | 25.8 s | 25.8 s | 29.5 / 24.0 s |
+| MOSS | off | 32.5 s | 31.5 s | 30.8 / 28.4 s |
+
+Imagine's totals include its job overhead and PNG output, ComfyUI's only
+load, encoding, sampling and decoding. Every image was byte-identical to the
+earlier ones (Qwen `75ba1036`, MOSS `a4c2e962`), and dynamic VRAM is now faster
+than static placement, as in ComfyUI. A first job whose files are not in the
+page cache reads them from the model disk: 65.3 s for Qwen and 36.3 s for MOSS
+on this machine. The H3 source scene is unchanged (80.1 s, the same video) and
+Combo took 110 s; H3 has not been compared with the same trace yet.
+
+The fixes left the results of the inference parity suite (`tests/primitives`,
+on the GPU under the coordinator) unchanged: 442 passed and the same 17 failed
+before and after, all for parity fixtures this environment does not provide.
 
 ## Not yet included
 
-Dynamic VRAM at ComfyUI's speed and resident memory, and a test matrix of both
-choices for H3 and of both attention modes for Qwen, MOSS and H3 at Draft
-quality, comparing time, memory and output.
+Keeping models, VBARs and host pins between jobs, as ComfyUI does between
+prompts: its warm text encoding is 0.5–0.8 s against Imagine's 1.5 s, because
+its text encoder stays loaded. Pinned host staging for dynamic layers matters
+once models stay loaded and evict each other; on its own it would only speed
+up the first step. H3 against ComfyUI with the kernel trace, and a test matrix
+of both attention modes for Qwen, MOSS and H3 at Draft quality, comparing time,
+memory and output.

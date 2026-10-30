@@ -24,37 +24,60 @@ pub(super) fn generate(
         })
         .collect::<Result<Vec<_>, Error>>()?;
     observer(Event::Phase("encoding"))?;
-    let text = observe_load("text", &r.text_encoder, observer, || {
-        Ok(c::StaticModel::new(
-            m::static_moss_component(
+    // Dynamic VRAM: the text encoder's layers enter a VBAR range when they
+    // run, as ComfyUI's text encoders do with it on.
+    let (text, dynamic_text) = if r.execution.dynamic_vram {
+        let params = observe_load("text", &r.text_encoder, observer, || {
+            crate::checkpoint::dynamic::prepare_text(
                 rt,
-                "text",
+                aimdo.path(),
                 load(rt, aimdo, &r.text_encoder, "text", &r.model)?,
-            )?
-            .with_shared_pins(pins.clone()),
-            rt,
-            None,
-        ))
-    })?;
-    let patcher = text.patcher();
+                m::moss_component_inventory_for_layout("text", true)?,
+            )
+        })?;
+        (None, Some(params))
+    } else {
+        let text = observe_load("text", &r.text_encoder, observer, || {
+            Ok(c::StaticModel::new(
+                m::static_moss_component(
+                    rt,
+                    "text",
+                    load(rt, aimdo, &r.text_encoder, "text", &r.model)?,
+                )?
+                .with_shared_pins(pins.clone()),
+                rt,
+                None,
+            ))
+        })?;
+        (Some(text), None)
+    };
+    let patcher = text.as_ref().map(|t| t.patcher());
     let mut tokenizer = m::MossTokenizer::frozen()?;
     let mut contexts = Vec::new();
     for prompt in [&r.prompt, &r.negative_prompt] {
         let tokens = tokenizer.tokenize(prompt, &Default::default())?;
-        manager
-            .load(
-                std::slice::from_ref(&patcher),
-                0.,
-                None,
-                false,
-                false,
-                &mut memory,
-            )
+        let placed;
+        let params = match (&dynamic_text, &text, &patcher) {
+            (Some(params), _, _) => params,
+            (None, Some(text), Some(patcher)) => {
+                manager
+                    .load(
+                        std::slice::from_ref(patcher),
+                        0.,
+                        None,
+                        false,
+                        false,
+                        &mut memory,
+                    )
+                    .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?;
+                placed = text.owner.borrow().execution_parameters();
+                &placed
+            }
+            _ => unreachable!(),
+        };
+        let encoder = m::Qwen35TextEncoder::from_parameters(Default::default(), params)
             .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?;
-        let params = text.owner.borrow().execution_parameters();
-        let encoder = m::Qwen35TextEncoder::from_parameters(Default::default(), &params)
-            .map_err(|error| load_failure("text", &r.text_encoder, observer, error))?;
-        let mut exec = m::MossStaticExecution::bind(rt, &params, attention(rt, r.execution)?)?;
+        let mut exec = m::MossStaticExecution::bind(rt, params, attention(rt, r.execution)?)?;
         contexts.push(
             unsafe {
                 encoder.encode_prompt(
@@ -73,6 +96,9 @@ pub(super) fn generate(
     manager.unload_all(dev, &mut memory)?;
     drop(patcher);
     drop(text);
+    // Complete queued uses before destroying the VBAR and its ATen views.
+    rt.native.synchronize_device(0)?;
+    drop(dynamic_text);
     rt.native.cuda_soft_empty_cache(0)?;
     // The edit encoder encodes the references after the prompt, and
     // MOSSImageControl its maps; Flux2's latent format leaves them as encoded.
