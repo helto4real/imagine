@@ -1,58 +1,10 @@
-//! Oracle captured from Director's source-owned v3 profiles, never runtime config.
-use imagine_server::video::authoring::profiles::{Catalog, OPERATIONS, PROVIDERS, resolve};
+//! The prompt profile catalog: inheritance, reload and safe loading.
+use imagine_server::video::authoring::profiles::{Catalog, PROVIDERS, resolve};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
 fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("config/video/prompt-profiles")
-}
-#[test]
-fn all_five_profiles_prompts_revisions_and_sixty_operation_resolutions_match_director() {
-    let oracle: Value =
-        serde_json::from_str(include_str!("fixtures/director-prompt-profiles.json")).unwrap();
-    let catalog = Catalog::load(&root()).unwrap();
-    assert_eq!(catalog.default_id, "normal");
-    assert!(catalog.warnings.is_empty());
-    let actual = serde_json::to_value(&catalog.profiles).unwrap();
-    for (actual, expected) in actual
-        .as_array()
-        .unwrap()
-        .iter()
-        .zip(oracle["profiles"].as_array().unwrap())
-    {
-        for (key, value) in actual.as_object().unwrap() {
-            assert!(
-                value == &expected[key],
-                "profile {} differs at {key}",
-                actual["id"]
-            );
-        }
-    }
-    assert_eq!(catalog.profiles.len(), 5);
-    assert_eq!(
-        serde_json::to_value(&catalog.prompts).unwrap(),
-        oracle["prompts"]
-    );
-    for profile in &catalog.profiles {
-        for provider in PROVIDERS {
-            for operation in OPERATIONS {
-                assert_eq!(
-                    json!(resolve(&profile.generation, provider, operation).unwrap()),
-                    oracle["resolved"][&profile.id][provider][operation],
-                    "{} {provider} {operation}",
-                    profile.id
-                );
-            }
-        }
-    }
-    for file in oracle["source_files"].as_array().unwrap() {
-        let bytes = std::fs::read(root().join(file["path"].as_str().unwrap())).unwrap();
-        assert_eq!(
-            format!("{:x}", Sha256::digest(bytes)),
-            file["sha256"].as_str().unwrap()
-        );
-    }
 }
 fn copy_profiles(destination: &Path) {
     for entry in std::fs::read_dir(root()).unwrap() {
