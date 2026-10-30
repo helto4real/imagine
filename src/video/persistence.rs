@@ -1635,6 +1635,7 @@ mod tests {
                 add_ambient_sound: false,
                 inventory: vec![],
                 budget_fingerprint: None,
+                include_private_error_details: false,
             },
             phase: Phase::Review,
             outline: None,

@@ -32,6 +32,76 @@ struct Job {
     restore: Option<(usize, Option<StoryScene>)>,
     /// A whole-Scene enhancement row is being retried alone.
     single_row: bool,
+    /// Why the latest Story answer failed (`GET …/diagnostic`); never stored.
+    diagnostic: Option<serde_json::Value>,
+}
+/// The private diagnostic fields' limit, as the client's error details accept.
+const DIAGNOSTIC_TEXT_LIMIT: usize = 262_144;
+/// Why a Story answer failed: the exact JSON syntax or validation error and,
+/// when the request opted in, the prompts and the model's answer.
+fn diagnostic(
+    code: &str,
+    operation: &str,
+    text: &str,
+    private: Option<(&str, &str)>,
+) -> serde_json::Value {
+    let (kind, message, line, column) = if code == "authoring_invalid_json" {
+        // Director's `parse_json_object` read the stripped answer, then its outermost braces.
+        let stripped = super::director::strip_outer_markdown(text);
+        match serde_json::from_str::<serde_json::Value>(&stripped) {
+            Err(whole) => {
+                let inner = stripped
+                    .find('{')
+                    .zip(stripped.rfind('}'))
+                    .filter(|(start, end)| end > start)
+                    .and_then(|(start, end)| {
+                        serde_json::from_str::<serde_json::Value>(&stripped[start..=end]).err()
+                    });
+                let message = match inner {
+                    Some(inner) => {
+                        format!("Whole answer: {whole}. Between its first {{ and last }}: {inner}.")
+                    }
+                    None => format!("Whole answer: {whole}."),
+                };
+                (
+                    "json_syntax",
+                    message,
+                    Some(whole.line()),
+                    Some(whole.column()),
+                )
+            }
+            Ok(_) => (
+                "json_shape",
+                "The answer is JSON, but not one JSON object.".to_owned(),
+                None,
+                None,
+            ),
+        }
+    } else {
+        (
+            "schema_validation",
+            format!("The answer failed Imagine's Story validation: {code}."),
+            None,
+            None,
+        )
+    };
+    let mut truncated = vec![];
+    let mut field = |name: &'static str, value: &str| {
+        if value.chars().count() > DIAGNOSTIC_TEXT_LIMIT {
+            truncated.push(name);
+            value.chars().take(DIAGNOSTIC_TEXT_LIMIT).collect()
+        } else {
+            value.to_owned()
+        }
+    };
+    let private = private.map(|(system, user)| {
+        json!({"system_prompt": field("system_prompt", system), "user_prompt": field("user_prompt", user), "model_response": field("model_response", text)})
+    });
+    let mut value = json!({"schema_version": 1, "code": code, "operation": operation, "kind": kind, "message": message, "line": line, "column": column, "private": private});
+    if let Some(private) = value["private"].as_object_mut() {
+        private.insert("truncated_fields".into(), json!(truncated));
+    }
+    value
 }
 /// Review when every Scene is expanded; otherwise the outline is still open.
 fn settled(draft: &Draft) -> Phase {
@@ -238,6 +308,7 @@ impl Service {
                 grounding,
                 restore: None,
                 single_row: false,
+                diagnostic: None,
             },
         );
         drop(jobs);
@@ -279,6 +350,17 @@ impl Service {
         if let Some(job) = self.jobs.lock().unwrap().get_mut(id) {
             job.draft = draft;
         }
+    }
+    /// Why the Draft's latest Story answer failed, while its job is held.
+    pub fn diagnostic(&self, id: &str) -> Result<serde_json::Value, Fault> {
+        self.jobs
+            .lock()
+            .unwrap()
+            .get(id)
+            .ok_or(Fault::new(404, "authoring_not_found"))?
+            .diagnostic
+            .clone()
+            .ok_or(Fault::new(404, "authoring_diagnostic_not_found"))
     }
     pub fn read(&self, id: &str) -> Result<Draft, Fault> {
         self.jobs
@@ -758,11 +840,13 @@ impl Service {
                     Some(protected),
                 )
             };
+            let mut sent_system = String::new();
             let result=async {
                 let contract = built.clone()?.contract;
                 if user.chars().count()>steps::CONTEXT_LIMIT{return Err("story_context_limit");}
                 let parameters=profiles::resolve(&profile.profile.generation,&draft.request.provider,operation)?;
                 let system=if !expand && draft.request.operation==Operation::Outline {system_for(&profile,key,&contract)?} else {system_with_images(&profile,key,&draft.request.images,draft.request.add_dialogue)?};
+                sent_system.clone_from(&system);
                 tokio::select!{biased;_=cancel.cancelled()=>Err("authoring_cancelled"),result=transport.authoring_complete(&provider,&draft.request.provider,&system,&user,&parameters,&images)=>result}
             }.await;
             let mut jobs = self.jobs.lock().unwrap();
@@ -775,6 +859,9 @@ impl Service {
                 j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
                 return;
             }
+            // A Story answer that fails is described for the client's error details.
+            let story = expand || draft.request.operation == Operation::Outline;
+            let answer_text = result.as_ref().ok().filter(|_| story).cloned();
             let result = result.and_then(|text| {
                 // Director's `parse_json_object` before any JSON answer is read.
                 let answer = |code| {
@@ -819,6 +906,13 @@ impl Service {
             if let Err(code) = result {
                 j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
                 j.draft.failure = Some(code.into());
+                j.diagnostic = answer_text.as_deref().map(|text| {
+                    let private = draft
+                        .request
+                        .include_private_error_details
+                        .then_some((sent_system.as_str(), user.as_str()));
+                    diagnostic(code, operation, text, private)
+                });
                 // A failed regeneration keeps the Scene it would have replaced.
                 if let Some((index, scene)) = j.restore.take() {
                     j.draft.scenes[index] = scene;
@@ -838,6 +932,7 @@ impl Service {
         j.clock_elapsed = Some(j.clock.elapsed().as_secs_f64());
         j.restore = None;
         j.single_row = false;
+        j.diagnostic = None;
         j.draft.phase = if !expand && draft.request.operation == Operation::Outline {
             Phase::Outline
         } else if expand {

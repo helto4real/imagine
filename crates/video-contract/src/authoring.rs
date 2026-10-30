@@ -165,6 +165,10 @@ pub struct Request {
     /// start fails `authoring_budget_changed` when the measured basis changed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub budget_fingerprint: Option<String>,
+    /// Keep the prompts and the model's answer with a failed Story answer, for
+    /// the client's error details (`GET …/diagnostic`); held in memory only.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub include_private_error_details: bool,
 }
 /// What an outline request would send to the provider, measured without
 /// starting it, as Director's outline budget.

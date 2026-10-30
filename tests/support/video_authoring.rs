@@ -1339,3 +1339,106 @@ async fn enhancement_tells_the_model_the_first_frame_opens_the_scene() {
     worker.abort();
     let _ = worker.await;
 }
+#[tokio::test]
+async fn a_failed_story_answer_names_the_exact_error_and_keeps_the_answer_only_on_opt_in() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "story").await;
+    let (url, worker, state) = fixture::spawn().await;
+    for private in [true, false] {
+        let project = configured(&h, &url).await;
+        let mut start = request(&h, &project, "outline", "koboldcpp").await;
+        start["include_private_error_details"] = json!(private);
+        let (code, d) = call(
+            &h,
+            "POST",
+            &format!("/v1/video/projects/{project}/authoring"),
+            Some(start),
+        )
+        .await;
+        assert_eq!(code, 202, "{d}");
+        let id = d["id"].as_str().unwrap();
+        wait(&h, id, "outline").await;
+        let (code, _) = call(
+            &h,
+            "GET",
+            &format!("/v1/video/authoring/{id}/diagnostic"),
+            None,
+        )
+        .await;
+        assert_eq!(code, 404);
+        state
+            .fail_second_once
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let expand = Some(json!({"schema_version":1,"start_index":0}));
+        assert_eq!(
+            call(
+                &h,
+                "POST",
+                &format!("/v1/video/authoring/{id}/expand"),
+                expand
+            )
+            .await
+            .0,
+            200
+        );
+        let failed = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                let (_, d) = call(&h, "GET", &format!("/v1/video/authoring/{id}"), None).await;
+                if d["phase"] == "failed" {
+                    break d;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(failed["failure"], "authoring_invalid_json");
+        let (code, diagnostic) = call(
+            &h,
+            "GET",
+            &format!("/v1/video/authoring/{id}/diagnostic"),
+            None,
+        )
+        .await;
+        assert_eq!(code, 200, "{diagnostic}");
+        assert_eq!(diagnostic["code"], "authoring_invalid_json");
+        assert_eq!(diagnostic["operation"], "story_scene_expansion");
+        assert_eq!(diagnostic["kind"], "json_syntax");
+        assert!(
+            diagnostic["message"]
+                .as_str()
+                .unwrap()
+                .starts_with("Whole answer: "),
+            "{diagnostic}"
+        );
+        assert_eq!(
+            (diagnostic["line"].as_u64(), diagnostic["column"].is_u64()),
+            (Some(1), true)
+        );
+        if private {
+            assert_eq!(
+                diagnostic["private"]["model_response"],
+                "{invalid fixture JSON"
+            );
+            assert!(
+                !diagnostic["private"]["system_prompt"]
+                    .as_str()
+                    .unwrap()
+                    .is_empty()
+            );
+            assert!(
+                diagnostic["private"]["user_prompt"]
+                    .as_str()
+                    .unwrap()
+                    .contains("<scene_json>")
+            );
+            assert_eq!(diagnostic["private"]["truncated_fields"], json!([]));
+        } else {
+            assert!(diagnostic["private"].is_null(), "{diagnostic}");
+            assert!(!diagnostic.to_string().contains("invalid fixture"));
+        }
+    }
+    stop(h).await;
+    worker.abort();
+    let _ = worker.await;
+}

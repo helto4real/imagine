@@ -5457,6 +5457,10 @@
           "string",
           "null"
         ]
+      },
+      "include_private_error_details": {
+        "description": "Keep the prompts and the model's answer with a failed Story answer, for\nthe client's error details (`GET …/diagnostic`); held in memory only.",
+        "type": "boolean"
       }
     },
     "additionalProperties": false,
@@ -6304,6 +6308,10 @@
               "string",
               "null"
             ]
+          },
+          "include_private_error_details": {
+            "description": "Keep the prompts and the model's answer with a failed Story answer, for\nthe client's error details (`GET …/diagnostic`); held in memory only.",
+            "type": "boolean"
           }
         },
         "additionalProperties": false,

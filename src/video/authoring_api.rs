@@ -73,6 +73,7 @@ pub(super) fn routes() -> Router<App> {
         .route("/v1/video/projects/{id}/authoring/measure", post(measure))
         .route("/v1/video/authoring/{id}", get(read))
         .route("/v1/video/authoring/{id}/bundle", get(bundle))
+        .route("/v1/video/authoring/{id}/diagnostic", get(diagnostic))
         .route("/v1/video/authoring/{id}/review", post(review))
         .route("/v1/video/authoring/{id}/expand", post(expand))
         .route("/v1/video/authoring/{id}/cancel", post(cancel))
@@ -241,6 +242,9 @@ async fn read(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Val
     let mut value = json!(service.read(&id)?);
     value["progress"] = service.progress(&id)?;
     Ok(Json(value))
+}
+async fn diagnostic(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Fault> {
+    Ok(Json(registry(&app).await.diagnostic(&id)?))
 }
 async fn cancel(State(app): State<App>, Path(id): Path<String>) -> Result<Json<Value>, Fault> {
     let service = app.video.lock().await;

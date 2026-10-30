@@ -548,6 +548,7 @@ fn generate_request(state: &State, d: &Snapshot) -> Request {
         add_ambient_sound: false,
         inventory: vec![],
         budget_fingerprint: None,
+        include_private_error_details: false,
     }
 }
 /// The editable source of one outline scene and its Sections.
