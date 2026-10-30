@@ -228,6 +228,92 @@ pub(super) fn load(
         q::prepare_initial_component(rt, role, state, Device::Cpu)
     }
 }
+/// A file as the worker read it: replacing or rewriting it changes this.
+#[derive(PartialEq)]
+struct FileIdentity {
+    path: PathBuf,
+    device: u64,
+    inode: u64,
+    len: u64,
+    modified: (i64, i64),
+}
+fn file_identity(path: &std::path::Path) -> Result<FileIdentity, Error> {
+    use std::os::unix::fs::MetadataExt;
+    let m = std::fs::metadata(path).map_err(|e| Error::Native(e.to_string()))?;
+    Ok(FileIdentity {
+        path: path.into(),
+        device: m.dev(),
+        inode: m.ino(),
+        len: m.len(),
+        modified: (m.mtime(), m.mtime_nsec()),
+    })
+}
+/// What a dynamic component was prepared from: the selected model, its file
+/// and the LoRAs bound into it.
+#[derive(PartialEq)]
+pub(super) struct ComponentKey {
+    model: String,
+    file: FileIdentity,
+    loras: Vec<(FileIdentity, f64)>,
+}
+impl ComponentKey {
+    fn new(r: &Request, path: &std::path::Path, loras: bool) -> Result<Self, Error> {
+        Ok(Self {
+            model: r.model.clone(),
+            file: file_identity(path)?,
+            loras: if loras {
+                active_loras(&r.loras)
+                    .map(|l| Ok((file_identity(&l.path)?, l.strength)))
+                    .collect::<Result<_, Error>>()?
+            } else {
+                Vec::new()
+            },
+        })
+    }
+}
+/// The previous job's dynamic text encoder and diffusion model with their
+/// VBARs, kept for the next job, as ComfyUI keeps a prompt's loaded models for
+/// the next prompt. A job that names other files or LoRAs, or runs with
+/// dynamic VRAM off, drops them before it loads anything.
+#[derive(Default)]
+pub struct Kept {
+    text: Option<(ComponentKey, PreparedParameters)>,
+    dit: Option<(ComponentKey, PreparedParameters)>,
+}
+impl Kept {
+    fn retain(
+        &mut self,
+        rt: &Runtime,
+        keys: Option<&(ComponentKey, ComponentKey)>,
+    ) -> Result<(), Error> {
+        let text = self
+            .text
+            .take_if(|(key, _)| keys.is_none_or(|(text, _)| key != text));
+        let dit = self
+            .dit
+            .take_if(|(key, _)| keys.is_none_or(|(_, dit)| key != dit));
+        if text.is_some() || dit.is_some() {
+            // Complete queued uses before destroying a VBAR and its ATen views.
+            rt.native.synchronize_device(0)?;
+            drop((text, dit));
+            rt.native.cuda_soft_empty_cache(0)?;
+        }
+        Ok(())
+    }
+}
+/// The kept parameters for `key`, or those `load` prepares, kept from now on.
+/// A kept model regains the highest VBAR priority, as when ComfyUI loads it.
+pub(super) fn reuse(
+    slot: &mut Option<(ComponentKey, PreparedParameters)>,
+    key: ComponentKey,
+    load: impl FnOnce() -> Result<PreparedParameters, Error>,
+) -> Result<&PreparedParameters, Error> {
+    match slot {
+        Some((kept, params)) if *kept == key => crate::checkpoint::dynamic::prioritize(params),
+        _ => *slot = Some((key, load()?)),
+    }
+    Ok(&slot.as_ref().unwrap().1)
+}
 /// All calls run on the private worker's single inference thread. Cancellation
 /// terminates/reaps that worker before the server releases its GPU lease.
 pub fn generate(
@@ -236,6 +322,7 @@ pub fn generate(
     r: &Request,
     images: &[Tensor],
     maps: &ControlMaps,
+    kept: &mut Kept,
     observer: &mut Observer<'_>,
 ) -> Result<Tensor, Error> {
     let moss = model_spec::is_moss(&r.model);
@@ -302,12 +389,22 @@ pub fn generate(
             "Insufficient host RAM for selected model".into(),
         ));
     }
+    // MOSS binds LoRAs into its diffusion model only.
+    let keys = if r.execution.dynamic_vram {
+        Some((
+            ComponentKey::new(r, &r.text_encoder, !moss)?,
+            ComponentKey::new(r, &r.diffusion_model, true)?,
+        ))
+    } else {
+        None
+    };
+    kept.retain(rt, keys.as_ref())?;
     let _grad = tch::no_grad_guard();
     let _inference = crate::native::inference_mode(true)?;
     let out = if moss {
-        moss::generate(rt, aimdo, r, images, maps, observer)
+        moss::generate(rt, aimdo, r, images, maps, kept, keys, observer)
     } else {
-        qwen::generate(rt, aimdo, r, images, observer)
+        qwen::generate(rt, aimdo, r, images, kept, keys, observer)
     }?;
     rt.native.cuda_soft_empty_cache(0)?;
     Ok(out)
@@ -431,5 +528,35 @@ mod lora_selection_tests {
                 ("same", f64::MIN_POSITIVE)
             ]
         );
+    }
+}
+#[cfg(test)]
+mod kept_key_tests {
+    use super::*;
+
+    #[test]
+    fn a_rewritten_file_or_changed_lora_is_not_reused() {
+        let dir = std::env::temp_dir().join(format!("kept-key-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (model, lora) = (dir.join("model"), dir.join("lora"));
+        std::fs::write(&model, b"one").unwrap();
+        std::fs::write(&lora, b"lora").unwrap();
+        let request = |strength: f64| -> Request {
+            serde_json::from_value(serde_json::json!({
+                "model": "qwen-image-2.1-int8", "diffusion_model": model, "text_encoder": model,
+                "vae": model, "prompt": "", "negative_prompt": "", "width": 32, "height": 32,
+                "seed": 0, "loras": [{"path": lora, "strength": strength}],
+                "sampling": {"steps": 1, "cfg_scale": 1.0, "sampler": "euler", "scheduler": "simple"}
+            }))
+            .unwrap()
+        };
+        let key = |r: &Request, loras| ComponentKey::new(r, &model, loras).unwrap();
+        let kept = key(&request(1.), true);
+        assert!(kept == key(&request(1.), true));
+        assert!(kept != key(&request(0.5), true));
+        assert!(key(&request(1.), false) == key(&request(0.5), false));
+        std::fs::write(&model, b"two, longer").unwrap();
+        assert!(kept != key(&request(1.), true));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

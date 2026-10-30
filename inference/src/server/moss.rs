@@ -2,38 +2,49 @@ use super::*;
 use crate::components as c;
 /// `images` are reference images to edit with (Moss-Image-Edit), RGBA in [0, 1];
 /// `maps` drive the color/depth control adapter.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn generate(
     rt: &Runtime,
     aimdo: &Aimdo,
     r: &Request,
     images: &[Tensor],
     maps: &ControlMaps,
+    kept: &mut Kept,
+    keys: Option<(ComponentKey, ComponentKey)>,
     observer: &mut Observer<'_>,
 ) -> Result<Tensor, Error> {
     let dev = Device::Cuda(0);
     let pins = c::HostPins::new(rt.native.clone())?;
     let mut manager = Manager::new();
     let mut memory = c::StaticMemoryServices::new(rt.native.clone(), pins.clone());
-    let loras = active_loras(&r.loras)
-        .map(|l| {
-            Ok((
-                crate::patching::read_lora(rt, aimdo, &l.path)?,
-                l.strength,
-                l.strength,
-            ))
-        })
-        .collect::<Result<Vec<_>, Error>>()?;
+    let (text_key, dit_key) = keys.unzip();
+    // A kept diffusion model already carries its LoRA patches.
+    let loras = if dit_key.is_some() && kept.dit.is_some() {
+        Vec::new()
+    } else {
+        active_loras(&r.loras)
+            .map(|l| {
+                Ok((
+                    crate::patching::read_lora(rt, aimdo, &l.path)?,
+                    l.strength,
+                    l.strength,
+                ))
+            })
+            .collect::<Result<Vec<_>, Error>>()?
+    };
     observer(Event::Phase("encoding"))?;
     // Dynamic VRAM: the text encoder's layers enter a VBAR range when they
     // run, as ComfyUI's text encoders do with it on.
-    let (text, dynamic_text) = if r.execution.dynamic_vram {
-        let params = observe_load("text", &r.text_encoder, observer, || {
-            crate::checkpoint::dynamic::prepare_text(
-                rt,
-                aimdo.path(),
-                load(rt, aimdo, &r.text_encoder, "text", &r.model)?,
-                m::moss_component_inventory_for_layout("text", true)?,
-            )
+    let (text, dynamic_text) = if let Some(key) = text_key {
+        let params = reuse(&mut kept.text, key, || {
+            observe_load("text", &r.text_encoder, observer, || {
+                crate::checkpoint::dynamic::prepare_text(
+                    rt,
+                    aimdo.path(),
+                    load(rt, aimdo, &r.text_encoder, "text", &r.model)?,
+                    m::moss_component_inventory_for_layout("text", true)?,
+                )
+            })
         })?;
         (None, Some(params))
     } else {
@@ -57,7 +68,7 @@ pub(super) fn generate(
     for prompt in [&r.prompt, &r.negative_prompt] {
         let tokens = tokenizer.tokenize(prompt, &Default::default())?;
         let placed;
-        let params = match (&dynamic_text, &text, &patcher) {
+        let params = match (dynamic_text, &text, &patcher) {
             (Some(params), _, _) => params,
             (None, Some(text), Some(patcher)) => {
                 manager
@@ -96,9 +107,6 @@ pub(super) fn generate(
     manager.unload_all(dev, &mut memory)?;
     drop(patcher);
     drop(text);
-    // Complete queued uses before destroying the VBAR and its ATen views.
-    rt.native.synchronize_device(0)?;
-    drop(dynamic_text);
     rt.native.cuda_soft_empty_cache(0)?;
     // The edit encoder encodes the references after the prompt, and
     // MOSSImageControl its maps; Flux2's latent format leaves them as encoded.
@@ -154,21 +162,24 @@ pub(super) fn generate(
     };
     observer(Event::Phase("loading_model"))?;
     let shape = [1, 128, r.height / 16, r.width / 16];
-    let (model, patcher, params) = if r.execution.dynamic_vram {
+    let mut placed = None;
+    let (model, patcher, params) = if let Some(key) = dit_key {
         // Dynamic VRAM: layers enter a VBAR range when they run, as ComfyUI.
-        let params = observe_load("dit", &r.diffusion_model, observer, || {
-            let mut params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
-            params.values.insert(
-                "model_sampling.sigmas".into(),
-                crate::execution_value::Value::tensor(m::MossSampling::moss()?.sigmas),
-            );
-            let fused = params.contains_key("layers.0.proj.qkv.weight");
-            let inventory = m::moss_component_inventory_for_layout("dit", fused)?;
-            if !loras.is_empty() {
-                let patches = m::component_patch_owner(&params, &loras)?;
-                bind_dynamic_patches(&patches, &mut params, &inventory.modules)?;
-            }
-            crate::checkpoint::dynamic::prepare_model(rt, aimdo.path(), params, inventory)
+        let params = reuse(&mut kept.dit, key, || {
+            observe_load("dit", &r.diffusion_model, observer, || {
+                let mut params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
+                params.values.insert(
+                    "model_sampling.sigmas".into(),
+                    crate::execution_value::Value::tensor(m::MossSampling::moss()?.sigmas),
+                );
+                let fused = params.contains_key("layers.0.proj.qkv.weight");
+                let inventory = m::moss_component_inventory_for_layout("dit", fused)?;
+                if !loras.is_empty() {
+                    let patches = m::component_patch_owner(&params, &loras)?;
+                    bind_dynamic_patches(&patches, &mut params, &inventory.modules)?;
+                }
+                crate::checkpoint::dynamic::prepare_model(rt, aimdo.path(), params, inventory)
+            })
         })?;
         (None, None, params)
     } else {
@@ -215,7 +226,7 @@ pub(super) fn generate(
                 &mut memory,
             )
             .map_err(|error| load_failure("dit", &r.diffusion_model, observer, error))?;
-        let params = model.owner.borrow().execution_parameters();
+        let params = &*placed.insert(model.owner.borrow().execution_parameters());
         (Some(model), Some(patcher), params)
     };
     let latent = {
@@ -225,7 +236,7 @@ pub(super) fn generate(
                 fused_qkv: fused,
                 ..Default::default()
             },
-            &params,
+            params,
         )?;
         let sampling = m::MossSampling {
             shift: 5.,
@@ -279,7 +290,7 @@ pub(super) fn generate(
                 .iter()
                 .map(|l| l.f_to_device_(dev, Kind::BFloat16, false, false))
                 .collect::<Result<Vec<_>, _>>()?;
-            let mut exec = m::MossStaticExecution::bind(rt, &params, attention(rt, r.execution)?)?;
+            let mut exec = m::MossStaticExecution::bind(rt, params, attention(rt, r.execution)?)?;
             Some(unsafe { dit.preprocess_refs(rt, &refs, &mut exec)? })
         };
         let condition = |context| q::FullAreaCondition {
@@ -303,7 +314,7 @@ pub(super) fn generate(
                 compute_dtype: Kind::BFloat16,
                 flash_attention_memory: true,
                 multiplier: 1.,
-                execution: m::MossStaticExecution::bind(rt, &params, attention(rt, r.execution)?)?,
+                execution: m::MossStaticExecution::bind(rt, params, attention(rt, r.execution)?)?,
                 generator: rt.native.generator(dev, r.seed)?,
                 observer: Some(Box::new(|step| {
                     observer(Event::Step(step.i + 1))?;
@@ -326,10 +337,7 @@ pub(super) fn generate(
     }
     drop(patcher);
     drop(model);
-    // Complete queued uses before destroying a dynamic VBAR and its views.
-    let synchronized = rt.native.synchronize_device(0);
-    drop(params);
-    synchronized?;
+    drop(placed);
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("saving_output"))?;
     let vae = load_vae(rt, aimdo, r, &pins, observer)?;

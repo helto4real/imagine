@@ -5,18 +5,26 @@ pub(super) fn generate(
     aimdo: &Aimdo,
     r: &Request,
     images: &[Tensor],
+    kept: &mut Kept,
+    keys: Option<(ComponentKey, ComponentKey)>,
     observer: &mut Observer<'_>,
 ) -> Result<Tensor, Error> {
     let dev = Device::Cuda(0);
     let pins = c::HostPins::new(rt.native.clone())?;
     let mut manager = Manager::new();
     let mut memory = c::StaticMemoryServices::new(rt.native.clone(), pins.clone());
-    let loras = active_loras(&r.loras)
-        .map(|l| {
-            let state = crate::patching::read_lora(rt, aimdo, &l.path)?;
-            Ok((state, l.strength, l.strength))
-        })
-        .collect::<Result<Vec<_>, Error>>()?;
+    let (text_key, dit_key) = keys.unzip();
+    // Kept components already carry their LoRA patches.
+    let loras = if dit_key.is_some() && kept.text.is_some() && kept.dit.is_some() {
+        Vec::new()
+    } else {
+        active_loras(&r.loras)
+            .map(|l| {
+                let state = crate::patching::read_lora(rt, aimdo, &l.path)?;
+                Ok((state, l.strength, l.strength))
+            })
+            .collect::<Result<Vec<_>, Error>>()?
+    };
     let mut patch_report = crate::patching::PatchReport::default();
     observer(Event::Phase("preparing_inputs"))?;
     let references = if images.is_empty() {
@@ -65,14 +73,16 @@ pub(super) fn generate(
     };
     // Dynamic VRAM: the text encoder's layers enter a VBAR range when they
     // run, as ComfyUI's text encoders do with it on.
-    let (text, dynamic_text) = if r.execution.dynamic_vram {
-        let params = observe_load("text", &r.text_encoder, observer, || {
-            let mut params = load(rt, aimdo, &r.text_encoder, "text", &r.model)?;
-            let patches = q::component_patch_owner("text", &params, &loras)?;
-            patch_report.merge(&patches.report);
-            let inventory = q::component_inventory("text")?;
-            bind_dynamic_patches(&patches, &mut params, &inventory.modules)?;
-            crate::checkpoint::dynamic::prepare_text(rt, aimdo.path(), params, inventory)
+    let (text, dynamic_text) = if let Some(key) = text_key {
+        let params = reuse(&mut kept.text, key, || {
+            observe_load("text", &r.text_encoder, observer, || {
+                let mut params = load(rt, aimdo, &r.text_encoder, "text", &r.model)?;
+                let patches = q::component_patch_owner("text", &params, &loras)?;
+                patch_report.merge(&patches.report);
+                let inventory = q::component_inventory("text")?;
+                bind_dynamic_patches(&patches, &mut params, &inventory.modules)?;
+                crate::checkpoint::dynamic::prepare_text(rt, aimdo.path(), params, inventory)
+            })
         })?;
         (None, Some(params))
     } else {
@@ -94,7 +104,7 @@ pub(super) fn generate(
     let mut encode = |prompt: &str| -> Result<q::TextConditioning, Error> {
         let tokens = tokenizer.tokenize_prompt(prompt, &opts)?;
         let placed;
-        let params = match (&dynamic_text, &text, &patcher) {
+        let params = match (dynamic_text, &text, &patcher) {
             (Some(params), _, _) => params,
             (None, Some(text), Some(patcher)) => {
                 manager
@@ -150,9 +160,6 @@ pub(super) fn generate(
     manager.unload_all(dev, &mut memory)?;
     drop(patcher);
     drop(text);
-    // Complete queued uses before destroying the VBAR and its ATen views.
-    rt.native.synchronize_device(0)?;
-    drop(dynamic_text);
     rt.native.cuda_soft_empty_cache(0)?;
     observer(Event::Phase("loading_model"))?;
     let shape = [1, 64, r.height / 16, r.width / 16];
@@ -231,32 +238,28 @@ pub(super) fn generate(
             )?
             .f_to_device(Device::Cpu)?)
     };
-    let latent = if r.execution.dynamic_vram {
+    let latent = if let Some(key) = dit_key {
         // Dynamic VRAM: layers enter a VBAR range when they run, as ComfyUI.
-        let (params, mut sampling) = observe_load("dit", &r.diffusion_model, observer, || {
-            let mut params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
-            let patches = q::component_patch_owner("dit", &params, &loras)?;
-            patch_report.merge(&patches.report);
-            let modules = q::bf16_dit_modules()?;
-            bind_dynamic_patches(&patches, &mut params, &modules)?;
-            let inventory = c::ComponentInventory {
-                model_size: modules.iter().map(|m| m.module_bytes).sum(),
-                modules,
-                force_cast_weights: false,
-                manual_cast_dtype: "bfloat16".into(),
-                buffers: vec![],
-            };
-            let params =
-                crate::checkpoint::dynamic::prepare_model(rt, aimdo.path(), params, inventory)?;
-            Ok((params, q::FluxSampling::qwen21()?))
+        let params = reuse(&mut kept.dit, key, || {
+            observe_load("dit", &r.diffusion_model, observer, || {
+                let mut params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;
+                let patches = q::component_patch_owner("dit", &params, &loras)?;
+                patch_report.merge(&patches.report);
+                let modules = q::bf16_dit_modules()?;
+                bind_dynamic_patches(&patches, &mut params, &modules)?;
+                let inventory = c::ComponentInventory {
+                    model_size: modules.iter().map(|m| m.module_bytes).sum(),
+                    modules,
+                    force_cast_weights: false,
+                    manual_cast_dtype: "bfloat16".into(),
+                    buffers: vec![],
+                };
+                crate::checkpoint::dynamic::prepare_model(rt, aimdo.path(), params, inventory)
+            })
         })?;
+        let mut sampling = q::FluxSampling::qwen21()?;
         sampling.to_device(dev)?;
-        let latent = sample(&params, &sampling, observer);
-        // Complete queued uses before destroying the VBAR and its ATen views.
-        let synchronized = rt.native.synchronize_device(0);
-        drop(params);
-        synchronized?;
-        latent?
+        sample(params, &sampling, observer)?
     } else {
         let model = observe_load("dit", &r.diffusion_model, observer, || {
             let params = load(rt, aimdo, &r.diffusion_model, "dit", &r.model)?;

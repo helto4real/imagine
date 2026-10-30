@@ -116,6 +116,9 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     bind_comfy_layouts(&rt);
     let aimdo = unsafe { Aimdo::load(&path("IMAGINE_AIMDO_LIBRARY")?) }?;
     rt.native.cuda_memory(0)?;
+    // The previous job's dynamic models, until a job needs others or the
+    // server stops this worker to release the GPU.
+    let mut kept = server::Kept::default();
     let mut input = io::stdin().lock();
     let mut output = io::stdout().lock();
     write(
@@ -228,12 +231,20 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 };
                 write(&mut output, event, &[]).map_err(|e| Error::Native(e.to_string()))
             };
-            let pixels = server::generate(&rt, &aimdo, &request, &images, &maps, &mut observer)?
-                .f_get(0)?
-                .f_to_device(Device::Cpu)?
-                .f_mul_scalar(255.)?
-                .f_to_kind(Kind::Uint8)?
-                .f_contiguous()?;
+            let pixels = server::generate(
+                &rt,
+                &aimdo,
+                &request,
+                &images,
+                &maps,
+                &mut kept,
+                &mut observer,
+            )?
+            .f_get(0)?
+            .f_to_device(Device::Cpu)?
+            .f_mul_scalar(255.)?
+            .f_to_kind(Kind::Uint8)?
+            .f_contiguous()?;
             let shape = pixels.size();
             let mut bytes = vec![0u8; pixels.numel()];
             let n = bytes.len();

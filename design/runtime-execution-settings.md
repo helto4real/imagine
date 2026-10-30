@@ -200,12 +200,46 @@ The fixes left the results of the inference parity suite (`tests/primitives`,
 on the GPU under the coordinator) unchanged: 442 passed and the same 17 failed
 before and after, all for parity fixtures this environment does not provide.
 
+## Kept between jobs, 2026-10-30
+
+With dynamic VRAM on, the image worker keeps the previous job's text encoder
+and diffusion model, with their VBARs, for the next job
+(`server::Kept`), as ComfyUI keeps a prompt's loaded models for the next
+prompt. A kept model is used again when the next job names the same model,
+the same files (path, device, inode, size and modification time) and the same
+active LoRAs and strengths; it then regains the highest VBAR priority, as
+`ModelPatcherDynamic.load` calls `prioritize()` each time. Anything else, and
+any job with dynamic VRAM off, drops the kept models before it loads, after
+the device's queued work. As in ComfyUI with only dynamic models, nothing is
+unloaded to make room for another dynamic model: AIMDO pages the
+lower-priority VBAR out on demand. The worker process already outlives a job;
+the proxy's `/v1/runtime/yield` and every H3 job stop it, which releases
+everything. The core change is `checkpoint::dynamic::prioritize`; the lock's
+`core_revision` moves to the commit that contains it.
+
+Through the proxy on the same GPU, `auto` attention, the same synthetic prompt
+and seed, cold after a server restart with the files in the page cache:
+
+| Model | Before cold / warm | Kept cold / warm | ComfyUI cold / warm |
+| --- | --- | --- | --- |
+| Qwen | 41.8 / 40.8 s | 39.8 / 38.4 s | 41.6 / 36.8 s |
+| MOSS | 25.8 / 25.8 s | 27.5 / 24.4 s | 29.5 / 24.0 s |
+
+Warm text encoding fell to 0.8 s (Qwen) and 0.5 s (MOSS), ComfyUI's 0.8 and
+0.5 s, and a warm job no longer prepares or places its diffusion model. The
+lowest free device memory is now 240–280 MiB, as ComfyUI's, and the worker's
+peak RSS 14.6–17.3 GiB (8.3–9.7 GiB before), since both models' mapped checkpoint pages stay mapped
+(file pages the kernel can reclaim). Every image matched its earlier hash
+(Qwen `75ba1036`, MOSS `a4c2e962`), including Qwen after MOSS, a static job
+in between (which dropped the kept models) and dynamic again. The first job
+after switching family rereads the other family's files when they have left
+the page cache (MOSS after Qwen 37.5 s).
+
 ## Not yet included
 
-Keeping models, VBARs and host pins between jobs, as ComfyUI does between
-prompts: its warm text encoding is 0.5–0.8 s against Imagine's 1.5 s, because
-its text encoder stays loaded. Pinned host staging for dynamic layers matters
-once models stay loaded and evict each other; on its own it would only speed
-up the first step. A test matrix
-of both attention modes for Qwen, MOSS and H3 at Draft quality, comparing time,
-memory and output.
+Pinned host staging for dynamic layers: with the models kept, warm text
+encoding already matches ComfyUI's, so these jobs leave it nothing to gain;
+it matters when kept models evict each other more than here. The VAE is still
+prepared per job, and H3 keeps nothing between jobs, because its worker is
+started for each job. A test matrix of both attention modes for Qwen, MOSS
+and H3 at Draft quality, comparing time, memory and output.
