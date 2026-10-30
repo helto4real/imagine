@@ -193,6 +193,14 @@ impl Module {
     }
 }
 
+/// Moves the parameters' VBAR to the highest priority, as
+/// `ModelPatcherDynamic.load` does whenever ComfyUI loads a kept model again.
+pub fn prioritize(parameters: &PreparedParameters) {
+    if let Some(module) = parameters.dynamic_modules.values().next() {
+        module.owner.vbar.prioritize();
+    }
+}
+
 /// The returned parameters own the model VBAR through every dynamic module.
 /// Synchronize its device before dropping the final encoder/parameter owner.
 pub fn prepare_text(
