@@ -109,7 +109,14 @@ impl Service {
         } else {
             return Err("unsupported_authoring_provider");
         };
-        let value = self.receive(self.http.post(url).json(&body)).await?;
+        let value = self
+            .receive(
+                self.http
+                    .post(url)
+                    .timeout(Duration::from_secs(p.timeout_seconds.into()))
+                    .json(&body),
+            )
+            .await?;
         if provider == "ollama" {
             if value["done"] != true {
                 return Err("enhancement_invalid_response");
@@ -203,7 +210,7 @@ impl Service {
                 .no_proxy()
                 .redirect(reqwest::redirect::Policy::none())
                 .connect_timeout(Duration::from_secs(10))
-                .timeout(Duration::from_secs(180))
+                .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECONDS.into()))
                 .build()?,
             slots: Arc::new(Semaphore::new(4)),
         }))
@@ -420,6 +427,7 @@ impl Service {
                 "{}/chat/completions",
                 profile.base_url.trim_end_matches('/')
             ))
+            .timeout(Duration::from_secs(profile.timeout_seconds.into()))
             .json(&body);
         let value = self.receive(request).await?;
         completion_text(&value)
@@ -496,6 +504,7 @@ pub fn validate(p: &Profile) -> Result<()> {
         || p.model.len() > 1024
         || p.system_prompt.trim().is_empty()
         || !(1..=131072).contains(&p.max_tokens)
+        || !(1..=3600).contains(&p.timeout_seconds)
         || p.temperature
             .is_some_and(|t| !t.is_finite() || !(0.0..=2.0).contains(&t))
     {

@@ -91,6 +91,9 @@ frequency and presence penalties, and seed; unchecked controls use server defaul
 **Advanced → Extra parameters (JSON)** accepts additional provider fields, such as
 `{"stop": ["<end>"], "repeat_last_n": 64}`. Dedicated fields cannot be overridden
 in JSON. Advanced settings also select `max_tokens` or `max_completion_tokens`.
+**Timeout (seconds)** limits each model request of the profile, including Story
+authoring (1–3600, default 300); a request that takes longer fails with
+`enhancement_timeout`. Profiles saved without it use the default.
 Unsupported parameters produce a provider error and preserve the prompt.
 API keys are optional,
 stored privately on the Imagine server, and never returned in profile responses.

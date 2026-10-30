@@ -784,6 +784,11 @@ impl ImagineApp {
             ui.add(egui::DragValue::new(&mut draft.max_tokens).range(1..=131072))
                 .labelled_by(label.id);
         });
+        ui.horizontal(|ui| {
+            let label = ui.label("Timeout (seconds)");
+            ui.add(egui::DragValue::new(&mut draft.timeout_seconds).range(1..=3600))
+                .labelled_by(label.id);
+        });
         for (key, label, default, range, integer) in [
             ("top_p", "Top P", 1., 0.0..=1.0, false),
             ("top_k", "Top K", 40., 0.0..=i32::MAX as f64, true),

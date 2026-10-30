@@ -510,3 +510,39 @@ mod private_store {
         assert_ne!(std::fs::read(path).unwrap(), disk);
     }
 }
+
+#[test]
+fn profiles_saved_without_a_timeout_use_the_default_and_out_of_range_values_are_rejected() {
+    let mut saved = serde_json::to_value(Profile::default()).unwrap();
+    saved.as_object_mut().unwrap().remove("timeout_seconds");
+    let profile: Profile = serde_json::from_value(saved).unwrap();
+    assert_eq!(profile.timeout_seconds, DEFAULT_TIMEOUT_SECONDS);
+    assert_eq!(DEFAULT_TIMEOUT_SECONDS, 300);
+    for timeout_seconds in [0, 3601] {
+        assert!(
+            validate(&Profile {
+                timeout_seconds,
+                ..Default::default()
+            })
+            .is_err()
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_request_fails_with_enhancement_timeout_after_the_profile_timeout() {
+    let provider = provider().await;
+    let root = tempfile::tempdir().unwrap();
+    let service = Service::open(root.path().join("profiles.json")).unwrap();
+    let profile = Profile {
+        base_url: provider.base.clone(),
+        model: "slow".into(),
+        timeout_seconds: 1,
+        ..Default::default()
+    };
+    service.save(ProfileUpdate { profile }).unwrap();
+    let id = submit(&service, "SYNTHETIC prompt");
+    assert!(
+        matches!(result(&service, &id).await, Status::Failed { code } if code == "enhancement_timeout")
+    );
+}

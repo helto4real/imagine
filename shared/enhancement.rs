@@ -2,6 +2,11 @@
 use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_BASE_URL: &str = "http://127.0.0.1:5002/v1";
+/// Seconds one model request may take; a long Story outline needs minutes.
+pub const DEFAULT_TIMEOUT_SECONDS: u32 = 300;
+fn default_timeout_seconds() -> u32 {
+    DEFAULT_TIMEOUT_SECONDS
+}
 pub const DEFAULT_SYSTEM_PROMPT: &str = "Improve the user's image-generation prompt for clarity and useful visual detail. Preserve their intent, subjects, reference-image bindings, language, and explicit constraints. Do not invent additional characters or change requested actions. Return only the improved prompt, without commentary, headings, or quotation marks.";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -50,6 +55,9 @@ pub struct Profile {
     pub model: String,
     pub system_prompt: String,
     pub max_tokens: u32,
+    /// Profiles saved without it use the default.
+    #[serde(default = "default_timeout_seconds")]
+    pub timeout_seconds: u32,
     #[serde(default)]
     pub token_parameter: TokenParameter,
     pub temperature: Option<f32>,
@@ -67,6 +75,7 @@ impl Default for Profile {
             model: "koboldcpp/initial_model".into(),
             system_prompt: DEFAULT_SYSTEM_PROMPT.into(),
             max_tokens: 1024,
+            timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
             token_parameter: TokenParameter::default(),
             temperature: None,
             parameters: Default::default(),
