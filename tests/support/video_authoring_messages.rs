@@ -1,12 +1,6 @@
-//! Golden provider messages for synthetic Drafts: the system prompt digests,
-//! user messages and image counts the local provider receives.
-use super::authoring_tests::fixture;
+//! Synthetic projects, Draft requests and readers of the messages the local
+//! provider receives, shared by the authoring tests.
 use super::*;
-use sha2::Digest;
-const GOLDEN: &str = concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/tests/fixtures/authoring-messages.json"
-);
 fn colored(rgb: [u8; 3]) -> Vec<u8> {
     let mut out = Cursor::new(vec![]);
     image::RgbImage::from_pixel(16, 16, image::Rgb(rgb))
@@ -155,101 +149,4 @@ pub(crate) fn sent_images(body: &Value) -> Vec<String> {
         .filter_map(|p| p["image_url"]["url"].as_str())
         .map(|u| u.split_once(',').unwrap().1.to_owned())
         .collect()
-}
-fn recorded(requests: &[Value], assets: &[String], label: &str) -> Vec<Value> {
-    requests
-        .iter()
-        .enumerate()
-        .map(|(i, body)| {
-            let mut user = user_text(body);
-            for (n, asset) in assets.iter().enumerate() {
-                user = user.replace(asset.as_str(), &format!("<asset_{n}>"));
-            }
-            let system = body["messages"][0]["content"].as_str().unwrap();
-            json!({"case":format!("{label}_{i}"),"system_sha256":format!("{:x}", sha2::Sha256::digest(system.as_bytes())),"images":sent_images(body).len(),"user":user})
-        })
-        .collect()
-}
-#[tokio::test]
-async fn provider_messages_match_the_golden_record() {
-    let root = tempfile::tempdir().unwrap();
-    let h = setup(root.path(), "golden-messages").await;
-    let (url, worker, state) = fixture::spawn().await;
-    provider(&h, &url).await;
-    let mut record = vec![];
-    // Images, cast and dialogue.
-    let (project, images, assets) = grounded(&h).await;
-    let mut start = story_request(&h, &project, "koboldcpp", "nsfw").await;
-    start["cast"] = json!(["keeper_id", "visitor_id"]);
-    start["images"] = images;
-    start["add_dialogue"] = json!(true);
-    provider_story(&h, &project, start).await;
-    record.extend(recorded(
-        &std::mem::take(&mut *state.requests.lock().unwrap()),
-        &assets,
-        "grounded",
-    ));
-    // No story images, continuing an existing Scene that opens on a frame.
-    let (_, d) = call(&h, "POST", "/v1/video/projects", Some(create())).await;
-    let project = d["project"]["id"].as_str().unwrap().to_owned();
-    let frame = attach(&h, &project, [10, 10, 10]).await;
-    let scene = json!({"id":"own_scene","start":{"num":0,"den":1},"duration":{"num":4,"den":1},"description":"Own harbour at dusk","model":"project_default","settings":[],"sections":[{"id":"own_section","start":{"num":0,"den":1},"duration":{"num":2,"den":1},"prompt":"Own keeper waits"},{"id":"own_later","start":{"num":2,"den":1},"duration":{"num":2,"den":1},"prompt":"Own keeper turns"}],"bindings":[{"id":"own_binding","asset":frame,"role":"first_frame","enabled":true,"video":null}],"continuity":null,"accepted_take":null});
-    let (code, added) = call(
-        &h,
-        "POST",
-        &format!("/v1/video/projects/{project}/edits"),
-        Some(json!({"schema_version":1,"expected_project_revision":1,"commands":[{"operation":"add_scene","scene":scene}]})),
-    )
-    .await;
-    assert_eq!(code, 200, "{added}");
-    let mut start = story_request(&h, &project, "koboldcpp", "normal").await;
-    start["destination"] = json!("continue");
-    start["instruction"] = json!("");
-    provider_story(&h, &project, start).await;
-    record.extend(recorded(
-        &std::mem::take(&mut *state.requests.lock().unwrap()),
-        std::slice::from_ref(&frame),
-        "continued",
-    ));
-    // Enhancements of that Scene's fields and Sections.
-    for (operation, field, section) in [
-        ("enhance_scene", Some("description"), None),
-        ("enhance_scene", Some("summary"), None),
-        ("enhance_section", None, Some("own_section")),
-        ("enhance_section", None, Some("own_later")),
-        ("enhance_scene_all", None, None),
-    ] {
-        let mut payload = story_request(&h, &project, "koboldcpp", "normal").await;
-        payload["operation"] = json!(operation);
-        payload["scene_id"] = json!("own_scene");
-        payload["scene_field"] = json!(field);
-        payload["section_id"] = json!(section);
-        let (code, d) = call(
-            &h,
-            "POST",
-            &format!("/v1/video/projects/{project}/authoring"),
-            Some(payload),
-        )
-        .await;
-        assert_eq!(code, 202, "{d}");
-        settle(&h, d["id"].as_str().unwrap(), "review").await;
-    }
-    record.extend(recorded(
-        &std::mem::take(&mut *state.requests.lock().unwrap()),
-        std::slice::from_ref(&frame),
-        "enhanced",
-    ));
-    let actual = serde_json::to_string_pretty(&record).unwrap() + "\n";
-    if std::env::var_os("IMAGINE_UPDATE_AUTHORING_GOLDEN").is_some() {
-        std::fs::write(GOLDEN, &actual).unwrap();
-    }
-    let expected = std::fs::read_to_string(GOLDEN).unwrap();
-    let expected: Vec<Value> = serde_json::from_str(&expected).unwrap();
-    assert_eq!(expected.len(), record.len());
-    for (expected, actual) in expected.iter().zip(&record) {
-        assert_eq!(expected, actual, "{}", expected["case"]);
-    }
-    stop(h).await;
-    worker.abort();
-    let _ = worker.await;
 }

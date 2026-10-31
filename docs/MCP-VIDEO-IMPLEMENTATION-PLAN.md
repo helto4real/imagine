@@ -424,8 +424,6 @@ implementation, beyond the text above:
 - **A successful dry run updates the Draft** (Review phase, parsed result,
   production), never the project. Submission `production` is optional;
   `dry_run` is required.
-- **Golden provider messages** live in `tests/fixtures/authoring-messages.json`,
-  generated from the pre-refactor code.
 - **Project roots:** `imagine-server --private-project-root PATH` (repeatable;
   replaces the default `/run/media/veracrypt1/mcp-inputs`). Roots outside the
   verified mount are ignored with a startup warning. `Root::allows` also checks

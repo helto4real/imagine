@@ -5461,6 +5461,20 @@
       "include_private_error_details": {
         "description": "Keep the prompts and the model's answer with a failed Story answer, for\nthe client's error details (`GET …/diagnostic`); held in memory only.",
         "type": "boolean"
+      },
+      "outline": {
+        "description": "Outline: a reviewed outline to start from instead of the provider's.\nThe Draft settles in `outline` without a provider request; its Scenes\nthen expand through the provider as usual.",
+        "anyOf": [
+          {
+            "$ref": "#/$defs/Storyboard"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "opening_appearance": {
+        "description": "With `outline` and a context's cast state, optionally: that outline's\nopening appearance, as a Draft's `opening_appearance`. Without it the\nScenes start from the context's current appearance."
       }
     },
     "additionalProperties": false,
@@ -5714,6 +5728,151 @@
         "required": [
           "id",
           "note"
+        ]
+      },
+      "Storyboard": {
+        "type": "object",
+        "properties": {
+          "scenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/StoryScene"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "scenes"
+        ]
+      },
+      "StoryScene": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "ambient_sound": {
+            "type": "string"
+          },
+          "non_diegetic_music": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number",
+            "format": "double"
+          },
+          "boundary_from_previous": {
+            "type": "string"
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/StorySection"
+            }
+          },
+          "image_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "summary",
+          "description",
+          "ambient_sound",
+          "non_diegetic_music",
+          "weight",
+          "boundary_from_previous",
+          "sections"
+        ]
+      },
+      "StorySection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "summary": {
+            "description": "A Section summary an expansion may write, as in Director; never applied.",
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "number",
+            "format": "double"
+          },
+          "image_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "first_frame_id": {
+            "type": "string",
+            "default": ""
+          },
+          "last_frame_id": {
+            "type": "string",
+            "default": ""
+          },
+          "dialogue_intent": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DialogueIntent"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "prompt",
+          "weight"
+        ]
+      },
+      "DialogueIntent": {
+        "type": "object",
+        "properties": {
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "max_turns": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0,
+            "default": 2
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "participants",
+          "purpose"
         ]
       }
     }
@@ -6312,6 +6471,20 @@
           "include_private_error_details": {
             "description": "Keep the prompts and the model's answer with a failed Story answer, for\nthe client's error details (`GET …/diagnostic`); held in memory only.",
             "type": "boolean"
+          },
+          "outline": {
+            "description": "Outline: a reviewed outline to start from instead of the provider's.\nThe Draft settles in `outline` without a provider request; its Scenes\nthen expand through the provider as usual.",
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Storyboard"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "opening_appearance": {
+            "description": "With `outline` and a context's cast state, optionally: that outline's\nopening appearance, as a Draft's `opening_appearance`. Without it the\nScenes start from the context's current appearance."
           }
         },
         "additionalProperties": false,
@@ -6567,19 +6740,6 @@
           "note"
         ]
       },
-      "Phase": {
-        "type": "string",
-        "enum": [
-          "inventory",
-          "running",
-          "outline",
-          "expanding",
-          "review",
-          "failed",
-          "cancelled",
-          "applied"
-        ]
-      },
       "Storyboard": {
         "type": "object",
         "properties": {
@@ -6723,6 +6883,19 @@
         "required": [
           "participants",
           "purpose"
+        ]
+      },
+      "Phase": {
+        "type": "string",
+        "enum": [
+          "inventory",
+          "running",
+          "outline",
+          "expanding",
+          "review",
+          "failed",
+          "cancelled",
+          "applied"
         ]
       },
       "FieldProposal": {

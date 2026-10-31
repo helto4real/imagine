@@ -1,6 +1,8 @@
 //! A client's Story context (conversation, cast state, protected facts) as
 //! Director's Story bridge receives it.
-use super::authoring_messages::{grounded, provider, provider_story, story_request, user_text};
+use super::authoring_messages::{
+    grounded, provider, provider_story, settle, story_request, user_text,
+};
 use super::authoring_tests::fixture;
 use super::*;
 
@@ -74,6 +76,107 @@ async fn context_reaches_the_outline_and_every_expansion_as_bridge_context() {
             "{scene}"
         );
     }
+    stop(h).await;
+    worker.abort();
+    let _ = worker.await;
+}
+#[tokio::test]
+async fn a_reviewed_outline_starts_a_draft_whose_scenes_expand_through_the_provider() {
+    let root = tempfile::tempdir().unwrap();
+    let h = setup(root.path(), "story-seeded").await;
+    let (url, worker, state) = fixture::spawn().await;
+    provider(&h, &url).await;
+    let (project, _, _) = grounded(&h).await;
+    let mut request = story_request(&h, &project, "koboldcpp", "normal").await;
+    request["brief"] = json!("");
+    request["cast"] = json!(["keeper_id", "visitor_id"]);
+    request["context"] = context();
+    let ready = provider_story(&h, &project, request.clone()).await;
+    state.requests.lock().unwrap().clear();
+    // A client may keep the cast state but not the conversation it wrote the outline from.
+    let mut seeded = request.clone();
+    seeded["context"]["earlier_continuity"] = json!([]);
+    seeded["context"]["latest_moment"] = json!([]);
+    seeded["outline"] = ready["outline"].clone();
+    seeded["opening_appearance"] = ready["opening_appearance"].clone();
+    seeded["opening_appearance"]["characters"][0]["garments"] = json!(["Own reviewed coat"]);
+    let (code, d) = start(&h, &project, seeded.clone()).await;
+    assert_eq!(code, 202, "{d}");
+    assert_eq!(d["phase"], "outline");
+    assert_eq!(d["outline"], ready["outline"]);
+    assert_eq!(
+        d["scenes"].as_array().unwrap().len(),
+        ready["outline"]["scenes"].as_array().unwrap().len()
+    );
+    assert!(state.requests.lock().unwrap().is_empty());
+    let id = d["id"].as_str().unwrap();
+    let (code, expanded) = call(
+        &h,
+        "POST",
+        &format!("/v1/video/authoring/{id}/expand"),
+        Some(json!({"schema_version":1,"start_index":0})),
+    )
+    .await;
+    assert_eq!(code, 200, "{expanded}");
+    let done = settle(&h, id, "review").await;
+    assert!(
+        done["scenes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|s| !s.is_null())
+    );
+    let requests = std::mem::take(&mut *state.requests.lock().unwrap());
+    assert_eq!(requests.len(), d["scenes"].as_array().unwrap().len());
+    assert!(user_text(&requests[0]).contains("Own reviewed coat"));
+    assert!(!user_text(&requests[0]).contains("The storm is coming."));
+    // Without an opening appearance the Scenes start from the context's current appearance.
+    let mut unopened = seeded.clone();
+    unopened["opening_appearance"] = Value::Null;
+    let (code, d) = start(&h, &project, unopened).await;
+    assert_eq!(code, 202, "{d}");
+    assert_eq!(
+        (&d["phase"], &d["opening_appearance"]),
+        (&json!("outline"), &Value::Null)
+    );
+    // A given opening appearance must resolve the cast exactly; it belongs to a reviewed outline.
+    let cases: Vec<(Mutation, u16, &str)> = vec![
+        (
+            &|r| r["opening_appearance"]["characters"][0]["character_id"] = json!("visitor_id"),
+            422,
+            "story_opening_appearance_invalid",
+        ),
+        // Without a reviewed outline the conversation is needed again.
+        (
+            &|r| r["outline"] = Value::Null,
+            422,
+            "story_context_invalid",
+        ),
+        (
+            &|r| {
+                r["outline"] = Value::Null;
+                r["context"] = context();
+            },
+            422,
+            "invalid_authoring_request",
+        ),
+        (
+            &|r| r["provider"] = json!("external"),
+            422,
+            "invalid_authoring_request",
+        ),
+    ];
+    for (mutate, status, code) in cases {
+        let mut request = seeded.clone();
+        mutate(&mut request);
+        let (got, d) = start(&h, &project, request).await;
+        assert_eq!(
+            (got, d["error"]["code"].as_str()),
+            (status, Some(code)),
+            "{d}"
+        );
+    }
+    assert!(state.requests.lock().unwrap().is_empty());
     stop(h).await;
     worker.abort();
     let _ = worker.await;

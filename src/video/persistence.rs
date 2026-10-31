@@ -1636,6 +1636,8 @@ mod tests {
                 inventory: vec![],
                 budget_fingerprint: None,
                 include_private_error_details: false,
+                outline: None,
+                opening_appearance: None,
             },
             phase: Phase::Review,
             outline: None,

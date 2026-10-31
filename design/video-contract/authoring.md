@@ -336,6 +336,17 @@ and every request, message and response is unchanged.
 - An outline start with `budget_fingerprint` measures again first and fails
   `authoring_budget_changed` (409) when the result differs; nothing starts.
 - The authoring limits add `char_limit`.
+- `Request.outline` (outline, provider only) starts from a reviewed outline
+  instead of the provider's, for example a client's saved Storyboard edited
+  again. It needs a known note per story image (`authoring_inventory_mismatch`).
+  `Request.opening_appearance` may give its opening appearance for exactly the
+  context's cast state (else `story_opening_appearance_invalid`); without it the
+  Scenes start from the context's current appearance. The context may leave its
+  conversation empty, since no outline is written from it. The outline is
+  validated as a review of it is, plus its cast as an outline answer.
+  The Draft settles in `outline` at once, with no provider request and no busy
+  check; Expand then writes its Scenes through the provider. Measure rejects it
+  (`invalid_authoring_request`).
 
 The client decides whether a measurement fits. The native Story view's
 Generate outline runs the inventory Draft (when story images are selected),

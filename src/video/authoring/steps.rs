@@ -309,7 +309,8 @@ pub fn bridge(
     if !request.brief.is_empty() {
         return Err(context_error("brief", "must be empty with a context"));
     }
-    if context.latest_moment.is_empty() {
+    // A reviewed outline is not written from the conversation, so it may come without one.
+    if context.latest_moment.is_empty() && request.outline.is_none() {
         return Err(context_error("context.latest_moment", "must not be empty"));
     }
     check_messages(&context.earlier_continuity, "context.earlier_continuity")?;
@@ -1140,6 +1141,59 @@ pub fn accept_outline(draft: &mut Draft, text: &str, message: &director::Built) 
     draft.scenes = vec![None; board.scenes.len()];
     draft.outline = Some(board);
     draft.opening_appearance = opening;
+    Ok(())
+}
+/// Starts a provider Draft from the request's reviewed outline instead of the
+/// provider's, validated as a review and an outline answer are: its images,
+/// cast and any opening appearance, which needs a context's cast state. Without
+/// one, the Scenes start from the context's current appearance.
+pub fn seed_outline(draft: &mut Draft, base: &VideoProject) -> Result<()> {
+    let request = &draft.request;
+    let mut board = request.outline.clone().ok_or("story_outline_required")?;
+    validate(&board)?;
+    let known = |id: &String| id.is_empty() || request.images.iter().any(|i| &i.id == id);
+    if !board.scenes.iter().all(|scene| {
+        scene.image_ids.iter().all(known)
+            && scene.sections.iter().all(|s| {
+                s.image_ids.iter().all(known) && known(&s.first_frame_id) && known(&s.last_frame_id)
+            })
+    }) {
+        return Err("story_image_missing");
+    }
+    if !request.add_music {
+        for scene in &mut board.scenes {
+            scene.non_diegetic_music.clear();
+        }
+    }
+    visuals::validate_cast(&board, &draft.selected_cast, request.add_dialogue)?;
+    let message = outline_message(draft, base, Notes::Known(&draft.inventory.clone()))?;
+    let opening = draft.request.opening_appearance.clone();
+    match (&message.contract.opening, &opening) {
+        (Some(roster), Some(value)) => {
+            // The roster names each character by its marker; the outline by its tag.
+            let roster = roster
+                .iter()
+                .map(|c| director::OpeningCharacter {
+                    reference_tag: references::restore_all(&c.reference_tag, &message.references),
+                    ..c.clone()
+                })
+                .collect::<Vec<_>>();
+            let value = Py::parse(&value.to_string()).ok_or("story_opening_appearance_invalid")?;
+            director::validate_opening(&value, &roster)
+                .map_err(|_| "story_opening_appearance_invalid")?;
+        }
+        (_, None) => {}
+        (None, Some(_)) => return Err("story_opening_appearance_invalid"),
+    }
+    draft.planned_durations = durations(
+        &board.scenes.iter().map(|s| s.weight).collect::<Vec<_>>(),
+        draft.request.duration_seconds,
+        MAX_SCENE_SECONDS,
+    )?;
+    draft.scenes = vec![None; board.scenes.len()];
+    draft.outline = Some(board);
+    draft.opening_appearance = opening;
+    draft.phase = Phase::Outline;
     Ok(())
 }
 pub fn accept_expansion(

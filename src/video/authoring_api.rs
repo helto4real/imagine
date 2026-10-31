@@ -163,7 +163,7 @@ async fn measure(
     body: Result<Json<AuthorRequest>, JsonRejection>,
 ) -> Result<Json<Value>, Located> {
     let Json(request) = body.map_err(|_| Fault::new(422, "invalid_request"))?;
-    if request.budget_fingerprint.is_some() {
+    if request.budget_fingerprint.is_some() || request.outline.is_some() {
         return Err(Fault::new(422, "invalid_authoring_request").into());
     }
     Ok(Json(json!(measured(&app, &id, request).await?)))

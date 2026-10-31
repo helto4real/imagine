@@ -138,11 +138,20 @@ pub(crate) fn prepare(
     if !animate && (!request.mentions.is_empty() || request.add_ambient_sound) {
         return Err(fault("invalid_authoring_request"));
     }
-    // Known notes and a measured budget belong to a provider outline.
-    if (!request.inventory.is_empty() || request.budget_fingerprint.is_some())
+    // Known notes, a measured budget and a reviewed outline belong to a provider outline.
+    if (!request.inventory.is_empty()
+        || request.budget_fingerprint.is_some()
+        || request.outline.is_some())
         && (external || request.operation != Operation::Outline)
     {
         return Err(fault("invalid_authoring_request"));
+    }
+    if request.opening_appearance.is_some() && request.outline.is_none() {
+        return Err(fault("invalid_authoring_request"));
+    }
+    // A reviewed outline's Scenes expand with the images' known notes.
+    if request.outline.is_some() && request.inventory.len() != request.images.len() {
+        return Err(fault("authoring_inventory_mismatch"));
     }
     if request.operation == Operation::Inventory && request.images.is_empty() {
         return Err(fault("invalid_authoring_request"));
@@ -216,7 +225,7 @@ pub(crate) fn prepare(
             )
         })
         .collect::<BTreeMap<_, _>>();
-    let draft = Draft {
+    let mut draft = Draft {
         schema_version: 1,
         id: id.clone(),
         project_id: base.id.clone(),
@@ -253,6 +262,9 @@ pub(crate) fn prepare(
         opening_appearance: None,
         animate: None,
     };
+    if draft.request.outline.is_some() {
+        steps::seed_outline(&mut draft, base).map_err(fault)?;
+    }
     Ok((draft, profile))
 }
 /// A request's known inventory notes in story image order: exactly one per
@@ -285,11 +297,12 @@ impl Service {
         transport: Arc<ProviderService>,
         grounding: super::grounding::Grounding,
     ) -> Result<Draft, Fault> {
-        let external = request.provider == steps::EXTERNAL;
+        // An external Draft and a reviewed outline make no provider request now.
+        let generated = request.provider != steps::EXTERNAL && request.outline.is_none();
         let (draft, profile) = prepare(&base, request, &provider, &grounding)?;
         let id = draft.id.clone();
         let mut jobs = self.jobs.lock().unwrap();
-        if !external && jobs.values().any(|j| j.draft.phase.busy()) {
+        if generated && jobs.values().any(|j| j.draft.phase.busy()) {
             return Err(Fault::new(409, "authoring_busy"));
         }
         jobs.insert(
@@ -312,7 +325,7 @@ impl Service {
             },
         );
         drop(jobs);
-        if !external {
+        if generated {
             let service = self.clone();
             tokio::spawn(async move {
                 service.generate(id, 0, transport, false, 0).await;

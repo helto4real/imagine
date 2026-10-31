@@ -169,6 +169,16 @@ pub struct Request {
     /// the client's error details (`GET …/diagnostic`); held in memory only.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub include_private_error_details: bool,
+    /// Outline: a reviewed outline to start from instead of the provider's.
+    /// The Draft settles in `outline` without a provider request; its Scenes
+    /// then expand through the provider as usual.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outline: Option<Storyboard>,
+    /// With `outline` and a context's cast state, optionally: that outline's
+    /// opening appearance, as a Draft's `opening_appearance`. Without it the
+    /// Scenes start from the context's current appearance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub opening_appearance: Option<serde_json::Value>,
 }
 /// What an outline request would send to the provider, measured without
 /// starting it, as Director's outline budget.
