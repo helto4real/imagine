@@ -22,7 +22,7 @@
         "max_tokens": 10000
       },
       "story_outline": {
-        "temperature": 0.5,
+        "temperature": 0.2,
         "max_tokens": 10000
       },
       "story_scene_expansion": {
